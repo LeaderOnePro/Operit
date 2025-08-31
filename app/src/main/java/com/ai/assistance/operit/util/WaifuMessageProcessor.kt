@@ -74,22 +74,22 @@ object WaifuMessageProcessor {
     private fun cleanContentForWaifu(content: String): String {
         return content
             // 移除状态标签
-            .replace(Regex("<status[^>]*>.*?</status>"), "")
+            .replace(Regex("<status[^>]*>.*?</status>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<status[^>]*/>"), "")
             // 移除思考标签
-            .replace(Regex("<think[^>]*>.*?</think>"), "")
+            .replace(Regex("<think[^>]*>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<think[^>]*/>"), "")
             // 移除工具标签
-            .replace(Regex("<tool[^>]*>.*?</tool>"), "")
+            .replace(Regex("<tool[^>]*>.*?</tool>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<tool[^>]*/>"), "")
             // 移除工具结果标签
-            .replace(Regex("<tool_result[^>]*>.*?</tool_result>"), "")
+            .replace(Regex("<tool_result[^>]*>.*?</tool_result>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<tool_result[^>]*/>"), "")
             // 移除计划项标签
-            .replace(Regex("<plan_item[^>]*>.*?</plan_item>"), "")
+            .replace(Regex("<plan_item[^>]*>.*?</plan_item>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<plan_item[^>]*/>"), "")
             // 移除emotion标签（因为已经在processEmotionTags中处理过了）
-            .replace(Regex("<emotion[^>]*>.*?</emotion>"), "")
+            .replace(Regex("<emotion[^>]*>.*?</emotion>", RegexOption.DOT_MATCHES_ALL), "")
             // 移除其他常见的XML标签
             .replace(Regex("<[^>]*>"), "")
             // 清理多余的空白

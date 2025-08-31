@@ -165,21 +165,23 @@ fun OperitTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            if (statusBarTransparent) {
-                window.statusBarColor = Color.Transparent.toArgb()
-                WindowCompat.setDecorFitsSystemWindows(window, false)
-            } else {
-                WindowCompat.setDecorFitsSystemWindows(window, true)
-                val statusBarColor =
-                        if (useCustomStatusBarColor && customStatusBarColorValue != null) {
-                            customStatusBarColorValue!!.toInt()
-                        } else {
-                            colorScheme.primary.toArgb()
-                        }
-                window.statusBarColor = statusBarColor
-                ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars =
-                        !isColorLight(Color(statusBarColor))
+            
+            // 始终保持沉浸式模式，让Compose处理状态栏背景
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            // 状态栏颜色和图标颜色控制
+            val statusBarColor = when {
+                statusBarTransparent -> Color.Transparent.toArgb()
+                useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
+                else -> colorScheme.primary.toArgb()
             }
+            window.statusBarColor = statusBarColor
+
+            // 根据状态栏背景色动态设置状态栏图标颜色
+            // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
+            // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
+            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars =
+                !isColorLight(Color(statusBarColor))
         }
     }
 

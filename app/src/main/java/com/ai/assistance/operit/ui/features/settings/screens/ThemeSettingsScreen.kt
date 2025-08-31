@@ -317,7 +317,7 @@ fun ThemeSettingsScreen() {
                     playWhenReady = true
 
                     // If there's a background video URI, load it
-                    if (backgroundImageUriInput != null &&
+                    if (!backgroundImageUriInput.isNullOrEmpty() &&
                                     backgroundMediaTypeInput ==
                                             UserPreferencesManager.MEDIA_TYPE_VIDEO
                     ) {
@@ -347,7 +347,7 @@ fun ThemeSettingsScreen() {
 
     // Handle video URI changes
     LaunchedEffect(backgroundImageUriInput, backgroundMediaTypeInput) {
-        if (backgroundImageUriInput != null &&
+        if (!backgroundImageUriInput.isNullOrEmpty() &&
                         backgroundMediaTypeInput == UserPreferencesManager.MEDIA_TYPE_VIDEO
         ) {
             try {
@@ -386,11 +386,13 @@ fun ThemeSettingsScreen() {
                                 Log.d("ThemeSettings", "Background image saved to: $internalUri")
                                 backgroundImageUriInput = internalUri.toString()
                                 backgroundMediaTypeInput = UserPreferencesManager.MEDIA_TYPE_IMAGE
-                                preferencesManager.saveThemeSettings(
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(
                                         backgroundImageUri = internalUri.toString(),
                                         backgroundMediaType =
                                                 UserPreferencesManager.MEDIA_TYPE_IMAGE
-                                )
+                                    )
+                                }
                                 showSaveSuccessMessage = true
                                 Toast.makeText(
                                                 context,
@@ -532,11 +534,13 @@ fun ThemeSettingsScreen() {
                                 Log.d("ThemeSettings", "Background video saved to: $internalUri")
                                 backgroundImageUriInput = internalUri.toString()
                                 backgroundMediaTypeInput = UserPreferencesManager.MEDIA_TYPE_VIDEO
-                                preferencesManager.saveThemeSettings(
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(
                                         backgroundImageUri = internalUri.toString(),
                                         backgroundMediaType =
                                                 UserPreferencesManager.MEDIA_TYPE_VIDEO
-                                )
+                                    )
+                                }
                                 showSaveSuccessMessage = true
                                 Toast.makeText(
                                                 context,
@@ -1852,7 +1856,7 @@ fun ThemeSettingsScreen() {
                                 onClick = {
                                     backgroundMediaTypeInput =
                                             UserPreferencesManager.MEDIA_TYPE_IMAGE
-                                    if (backgroundImageUriInput != null) {
+                                    if (!backgroundImageUriInput.isNullOrEmpty()) {
                                         // If there's already a background, save the media type
                                         saveThemeSettingsWithCharacterCard {
                                             preferencesManager.saveThemeSettings(
@@ -1874,7 +1878,7 @@ fun ThemeSettingsScreen() {
                                 onClick = {
                                     backgroundMediaTypeInput =
                                             UserPreferencesManager.MEDIA_TYPE_VIDEO
-                                    if (backgroundImageUriInput != null) {
+                                    if (!backgroundImageUriInput.isNullOrEmpty()) {
                                         // If there's already a background, save the media type
                                         saveThemeSettingsWithCharacterCard {
                                             preferencesManager.saveThemeSettings(
@@ -1888,7 +1892,7 @@ fun ThemeSettingsScreen() {
                     }
 
                     // Current selected media preview
-                    if (backgroundImageUriInput != null) {
+                    if (!backgroundImageUriInput.isNullOrEmpty()) {
                         Box(
                                 modifier =
                                         Modifier.fillMaxWidth()

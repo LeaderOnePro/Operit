@@ -33,6 +33,13 @@
                 { "name": "page", "description": "页码，默认为1", "type": "number", "required": false },
                 { "name": "count", "description": "返回结果的数量，默认10，最多20", "type": "number", "required": false }
             ]
+        },
+        {
+            "name": "get_user_info",
+            "description": "获取B站用户的基本信息。",
+            "parameters": [
+                { "name": "mid", "description": "用户的数字ID (UID)", "type": "number", "required": true }
+            ]
         }
     ],
     "category": "NETWORK"
@@ -47,9 +54,19 @@ const BilibiliVideoAnalysis = (function () {
     const API_GET_COMMENTS = "https://api.bilibili.com/x/v2/reply/wbi/main";
     const API_SEARCH = "https://api.bilibili.com/x/web-interface/search/all/v2";
     const API_NAV = "https://api.bilibili.com/x/web-interface/nav";
+    const API_GET_USER_INFO = "https://api.bilibili.com/x/space/wbi/acc/info";
+    const API_GET_RELATION_STAT = "https://api.bilibili.com/x/relation/stat";
     const client = OkHttp.newClient();
     let SESSDATA;
     let wbiKeys = null;
+    let buvid3 = null;
+    function generateBuvid3() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
     async function init() {
         if (SESSDATA === undefined) {
             // SESSDATA 是B站的Cookie，用于访问一些需要登录的API。
@@ -61,15 +78,24 @@ const BilibiliVideoAnalysis = (function () {
                 console.log("SESSDATA 未设置，部分需要登录的请求可能会失败。");
             }
         }
+        // Pre-fetch WBI keys if not already available.
+        if (!wbiKeys) {
+            wbiKeys = await get_wbi_keys();
+        }
     }
     function getHeaders() {
         const headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
             'Referer': 'https://www.bilibili.com/'
         };
-        if (SESSDATA) {
-            headers['Cookie'] = `SESSDATA=${SESSDATA}`;
+        if (!buvid3) {
+            buvid3 = generateBuvid3();
         }
+        const cookies = [`buvid3=${buvid3}`];
+        if (SESSDATA) {
+            cookies.push(`SESSDATA=${SESSDATA}`);
+        }
+        headers['Cookie'] = cookies.join('; ');
         return headers;
     }
     function unescapeXml(text) {
@@ -102,9 +128,6 @@ const BilibiliVideoAnalysis = (function () {
     }
     async function get_wbi_keys() {
         var _a, _b, _c, _d;
-        if (wbiKeys) {
-            return wbiKeys;
-        }
         try {
             const response = await client.get(API_NAV, getHeaders());
             if (!response.isSuccessful()) {
@@ -121,8 +144,7 @@ const BilibiliVideoAnalysis = (function () {
             const subUrl = navData.data.wbi_img.sub_url;
             const img_key = imgUrl.substring(imgUrl.lastIndexOf('/') + 1, imgUrl.lastIndexOf('.'));
             const sub_key = subUrl.substring(subUrl.lastIndexOf('/') + 1, subUrl.lastIndexOf('.'));
-            wbiKeys = { img_key, sub_key };
-            return wbiKeys;
+            return { img_key, sub_key };
         }
         catch (e) {
             console.error(`Error fetching WBI keys: ${e.message}`);
@@ -236,8 +258,7 @@ const BilibiliVideoAnalysis = (function () {
     async function get_comments_from_api(aid) {
         var _a, _b;
         const all_comments = [];
-        const keys = await get_wbi_keys();
-        if (!keys) {
+        if (!wbiKeys) {
             return { comments: "", count: 0, error: "获取 WBI keys 失败，无法请求评论 API" };
         }
         let page_num = 1;
@@ -250,7 +271,7 @@ const BilibiliVideoAnalysis = (function () {
                     sort: 2, // sort=2 for hot
                     pn: page_num
                 };
-                const signed_query = encWbi(params, keys.img_key, keys.sub_key);
+                const signed_query = encWbi(params, wbiKeys.img_key, wbiKeys.sub_key);
                 const url = `${API_GET_COMMENTS}?${signed_query}`;
                 const response = await client.get(url, getHeaders());
                 if (!response.isSuccessful()) {
@@ -380,8 +401,7 @@ const BilibiliVideoAnalysis = (function () {
         return { success: true, message: message, data: comments };
     }
     async function search_videos_from_api(keyword, page) {
-        const keys = await get_wbi_keys();
-        if (!keys) {
+        if (!wbiKeys) {
             return { results: null, error: "获取 WBI keys 失败，无法请求搜索 API" };
         }
         try {
@@ -390,7 +410,7 @@ const BilibiliVideoAnalysis = (function () {
                 page: page,
                 search_type: "video"
             };
-            const signed_query = encWbi(params, keys.img_key, keys.sub_key);
+            const signed_query = encWbi(params, wbiKeys.img_key, wbiKeys.sub_key);
             const url = `${API_SEARCH}?${signed_query}`;
             const response = await client.get(url, getHeaders());
             if (!response.isSuccessful()) {
@@ -453,6 +473,80 @@ const BilibiliVideoAnalysis = (function () {
         const message = `成功为 "${keyword}" 找到 ${total_count} 个相关视频，当前显示第 ${page} 页的 ${result_count} 个结果。`;
         return { success: true, message, data: formatted };
     }
+    function format_user_info_to_string(user) {
+        return [
+            `昵称: ${user.name} (UID: ${user.mid})`,
+            `性别: ${user.sex}`,
+            `等级: LV${user.level}`,
+            `生日: ${user.birthday || '未设置'}`,
+            `粉丝数: ${user.follower.toLocaleString()}`,
+            `关注数: ${user.following.toLocaleString()}`,
+            `个人简介: ${user.sign || '这个UP主很懒，什么都没有写...'}`,
+            `头像链接: ${user.face}`
+        ].join('\n');
+    }
+    async function get_user_info_from_api(mid) {
+        if (!wbiKeys) {
+            return { user_info: null, error: "获取 WBI keys 失败，无法请求用户信息 API" };
+        }
+        try {
+            // Get user account info (WBI signed)
+            const params = { mid };
+            const signed_query = encWbi(params, wbiKeys.img_key, wbiKeys.sub_key);
+            const url = `${API_GET_USER_INFO}?${signed_query}`;
+            const response = await client.get(url, getHeaders());
+            if (!response.isSuccessful()) {
+                return { user_info: null, error: `获取用户信息失败, status: ${response.statusCode}` };
+            }
+            const userData = response.json();
+            if (userData.code !== 0) {
+                return { user_info: null, error: `用户信息 API 错误: ${userData.message}` };
+            }
+            // Get user relation stat (not WBI signed)
+            const statUrl = `${API_GET_RELATION_STAT}?vmid=${mid}`;
+            const statResponse = await client.get(statUrl, getHeaders());
+            let follower = -1, following = -1;
+            if (statResponse.isSuccessful()) {
+                const statData = statResponse.json();
+                if (statData.code === 0) {
+                    follower = statData.data.follower;
+                    following = statData.data.following;
+                }
+            }
+            const userInfo = {
+                mid: userData.data.mid,
+                name: userData.data.name,
+                sex: userData.data.sex,
+                face: userData.data.face,
+                sign: userData.data.sign,
+                level: userData.data.level,
+                birthday: userData.data.birthday,
+                follower: follower,
+                following: following
+            };
+            return { user_info: userInfo, error: null };
+        }
+        catch (e) {
+            return { user_info: null, error: `获取用户信息时发生异常: ${e.message}` };
+        }
+    }
+    async function get_user_info(params) {
+        await init();
+        const { mid } = params;
+        if (!mid || typeof mid !== 'number' || mid <= 0) {
+            return { success: false, message: "参数 'mid' 必须是一个正整数" };
+        }
+        const { user_info, error } = await get_user_info_from_api(mid);
+        if (error) {
+            return { success: false, message: `获取用户信息失败: ${error}` };
+        }
+        if (!user_info) {
+            return { success: false, message: "未能获取到用户信息" };
+        }
+        const formatted_info = format_user_info_to_string(user_info);
+        const message = `成功获取 UID:${mid} 的用户信息。`;
+        return { success: true, message, data: formatted_info };
+    }
     async function wrapToolExecution(func, params) {
         try {
             const result = await func(params);
@@ -469,18 +563,29 @@ const BilibiliVideoAnalysis = (function () {
     async function main() {
         console.log("--- Bilibili Video Analysis Tool Test ---");
         const testUrl = "https://www.bilibili.com/video/BV1NRE5zmE3W";
-        const testKeyword = "原神";
-        console.log("\n[1/4] Testing get_subtitles...");
+        const testKeyword = "OpenAI";
+        console.log("\n[1/4] Testing search_videos...");
+        const searchResult = await search_videos({ keyword: testKeyword, count: 10 });
+        if (searchResult.success) {
+            console.log(`Success: ${searchResult.message}`);
+            console.log(`---------- Search Results for "${testKeyword}" ----------`);
+            console.log(searchResult.data);
+            console.log("------------------------------------------");
+        }
+        else {
+            console.error(`Failure: ${searchResult.message}`);
+        }
+        console.log("\n[2/4] Testing get_subtitles...");
         const subtitlesResult = await get_subtitles({ url: testUrl });
         console.log(JSON.stringify(subtitlesResult, null, 2));
-        console.log("\n[2/4] Testing get_danmaku...");
+        console.log("\n[3/4] Testing get_danmaku...");
         const danmakuResult = await get_danmaku({ url: testUrl });
         // Print first 5 danmaku
         if (danmakuResult.success && Array.isArray(danmakuResult.data)) {
             danmakuResult.data = danmakuResult.data.slice(0, 5);
         }
         console.log(JSON.stringify(danmakuResult, null, 2));
-        console.log("\n[3/4] Testing get_comments...");
+        console.log("\n[4/4] Testing get_comments...");
         const commentsResult = await get_comments({ url: testUrl });
         // For compact string format, we don't need JSON.stringify and can print directly
         if (commentsResult.success) {
@@ -492,16 +597,16 @@ const BilibiliVideoAnalysis = (function () {
         else {
             console.error(`Failure: ${commentsResult.message}`);
         }
-        console.log("\n[4/4] Testing search_videos...");
-        const searchResult = await search_videos({ keyword: testKeyword, count: 10 });
-        if (searchResult.success) {
-            console.log(`Success: ${searchResult.message}`);
-            console.log(`---------- Search Results for "${testKeyword}" ----------`);
-            console.log(searchResult.data);
-            console.log("------------------------------------------");
+        console.log("\n[5/5] Testing get_user_info...");
+        const userInfoResult = await get_user_info({ mid: 2 }); // 2 is B站创始人之一的UID
+        if (userInfoResult.success) {
+            console.log(`Success: ${userInfoResult.message}`);
+            console.log("---------- User Info ----------");
+            console.log(userInfoResult.data);
+            console.log("-----------------------------");
         }
         else {
-            console.error(`Failure: ${searchResult.message}`);
+            console.error(`Failure: ${userInfoResult.message}`);
         }
         complete({ success: true, message: "Test finished." });
     }
@@ -510,6 +615,7 @@ const BilibiliVideoAnalysis = (function () {
         get_danmaku: (params) => wrapToolExecution(get_danmaku, params),
         get_comments: (params) => wrapToolExecution(get_comments, params),
         search_videos: (params) => wrapToolExecution(search_videos, params),
+        get_user_info: (params) => wrapToolExecution(get_user_info, params),
         main,
     };
 })();
@@ -517,4 +623,5 @@ exports.get_subtitles = BilibiliVideoAnalysis.get_subtitles;
 exports.get_danmaku = BilibiliVideoAnalysis.get_danmaku;
 exports.get_comments = BilibiliVideoAnalysis.get_comments;
 exports.search_videos = BilibiliVideoAnalysis.search_videos;
+exports.get_user_info = BilibiliVideoAnalysis.get_user_info;
 exports.main = BilibiliVideoAnalysis.main;

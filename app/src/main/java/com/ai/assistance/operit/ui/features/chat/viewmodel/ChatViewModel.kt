@@ -39,6 +39,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import com.ai.assistance.operit.api.voice.VoiceService
+import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -62,6 +64,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     private val _generatedInvitationMessage = MutableStateFlow("")
     val generatedInvitationMessage = _generatedInvitationMessage.asStateFlow()
+
+    // 添加语音服务
+    private var voiceService: VoiceService? = null
+
+    // 添加语音播放状态
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     fun showInvitationPanel() {
         _generatedInvitationMessage.value = invitationManager.generateInvitationMessage()
@@ -257,6 +266,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         // Setup additional components
         setupPermissionSystemCollection()
         setupAttachmentManagerToastCollection()
+
+        // 初始化语音服务
+        initializeVoiceService()
 
         // 观察ApiConfigDelegate的初始化状态
         viewModelScope.launch {
@@ -1297,6 +1309,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         super.onCleared()
         // 清理悬浮窗资源
         floatingWindowDelegate.cleanup()
+        
+        // 清理语音服务资源
+        voiceService?.shutdown()
 
         // 不再在这里停止Web服务器，因为使用的是单例模式
         // 服务器应在应用退出时由Application类或专门的服务管理类关闭
@@ -1372,6 +1387,64 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 toggleAiComputer()
             } else {
                 _showInvitationExplanation.value = true
+            }
+        }
+    }
+
+    /** 初始化语音服务 */
+    private fun initializeVoiceService() {
+        viewModelScope.launch {
+            try {
+                voiceService = VoiceServiceFactory.getInstance(context)
+                val initialized = voiceService?.initialize() ?: false
+                if (!initialized) {
+                    Log.w(TAG, "语音服务初始化失败")
+                }
+                
+                // 监听语音播放状态
+                voiceService?.speakingStateFlow?.collect { isSpeaking ->
+                    _isPlaying.value = isSpeaking
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "初始化语音服务时出错", e)
+            }
+        }
+    }
+
+    /** 朗读消息内容 */
+    fun speakMessage(message: String) {
+        viewModelScope.launch {
+            try {
+                if (voiceService == null) {
+                    initializeVoiceService()
+                    // 等待初始化完成
+                    delay(500)
+                }
+                
+                val success = voiceService?.speak(
+                    text = message,
+                    interrupt = true, // 中断当前播放
+                    rate = 1.0f,
+                    pitch = 1.0f
+                ) ?: false
+                
+                if (!success) {
+                    uiStateDelegate.showToast("朗读失败")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "朗读消息失败", e)
+                uiStateDelegate.showToast("朗读消息失败: ${e.message}")
+            }
+        }
+    }
+
+    /** 停止朗读 */
+    fun stopSpeaking() {
+        viewModelScope.launch {
+            try {
+                voiceService?.stop()
+            } catch (e: Exception) {
+                Log.e(TAG, "停止朗读失败", e)
             }
         }
     }

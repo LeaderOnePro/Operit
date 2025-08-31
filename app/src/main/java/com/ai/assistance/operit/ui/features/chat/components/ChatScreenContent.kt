@@ -47,6 +47,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.InputChip
@@ -54,6 +55,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.res.stringResource
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.components.MessageEditor
 
 
@@ -122,6 +125,9 @@ fun ChatScreenContent(
     var exportErrorMessage by remember { mutableStateOf<String?>(null) }
     var webContentDir by remember { mutableStateOf<File?>(null) }
     var editingMessageType by remember { mutableStateOf<String?>(null) }
+    
+    // 监听朗读状态
+    val isPlaying by actualViewModel.isPlaying.collectAsState()
 
     val onSelectMessageToEditCallback = remember(editingMessageIndex, editingMessageContent, editingMessageType) {
         { index: Int, message: ChatMessage, senderType: String ->
@@ -154,6 +160,7 @@ fun ChatScreenContent(
                         onSelectMessageToEdit = onSelectMessageToEditCallback,
                         onDeleteMessage = { index -> actualViewModel.deleteMessage(index) },
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
+                        onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
                         topPadding = headerHeight,
                         chatStyle = chatStyle // Pass chat style
                 )
@@ -204,7 +211,31 @@ fun ChatScreenContent(
                         onSelectMessageToEdit = onSelectMessageToEditCallback,
                         onDeleteMessage = { index -> actualViewModel.deleteMessage(index) },
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
+                        onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
                         chatStyle = chatStyle // Pass chat style
+                )
+            }
+        }
+
+        // 停止朗读按钮
+        AnimatedVisibility(
+            visible = isPlaying,
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 80.dp)
+        ) {
+            FloatingActionButton(
+                onClick = { actualViewModel.stopSpeaking() },
+                modifier = Modifier.size(56.dp),
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = stringResource(R.string.stop_reading),
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }

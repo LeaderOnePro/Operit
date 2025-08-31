@@ -52,8 +52,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.with
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.TopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
@@ -130,46 +134,43 @@ fun AppContent(
                 ""
             }
 
-    // 内容区域仅包含顶部应用栏和主内容，不再使用Scaffold
-    Column(
-            modifier =
-                    Modifier.fillMaxSize()
-                            .background(Color.Transparent) // Explicitly set transparent background
-    ) {
-        CompositionLocalProvider(LocalAppBarContentColor provides appBarContentColor) {
-            // 单一工具栏 - 使用小型化的设计
-            SmallTopAppBar(
+    CompositionLocalProvider(LocalAppBarContentColor provides appBarContentColor) {
+        // 使用Scaffold来正确处理顶部栏和内容的布局
+        Scaffold(
+            topBar = {
+                // 单一工具栏 - 使用小型化的设计
+                SmallTopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // 使用Screen的标题或导航项的标题
                             Text(
-                                    text =
-                                            when {
-                                                // 如果是AI对话界面且有自定义标题，则优先显示
-                                                currentScreen is Screen.AiChat && !customChatTitle.isNullOrEmpty() ->
-                                                    customChatTitle!!
-                                                // 优先使用Screen的标题
-                                                currentScreen.getTitle().isNotBlank() ->
-                                                        currentScreen.getTitle()
-                                                // 回退到导航项的标题资源
-                                                selectedItem.titleResId != 0 ->
-                                                        stringResource(id = selectedItem.titleResId)
-                                                // 最后的默认值
-                                                else -> ""
-                                            },
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = appBarContentColor
+                                text =
+                                when {
+                                    // 如果是AI对话界面且有自定义标题，则优先显示
+                                    currentScreen is Screen.AiChat && !customChatTitle.isNullOrEmpty() ->
+                                        customChatTitle!!
+                                    // 优先使用Screen的标题
+                                    currentScreen.getTitle().isNotBlank() ->
+                                        currentScreen.getTitle()
+                                    // 回退到导航项的标题资源
+                                    selectedItem.titleResId != 0 ->
+                                        stringResource(id = selectedItem.titleResId)
+                                    // 最后的默认值
+                                    else -> ""
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = appBarContentColor
                             )
 
                             // 显示当前聊天标题（仅在AI对话页面)
                             if (currentScreen is Screen.AiChat && currentChatTitle.isNotBlank()) {
                                 Text(
-                                        text = "- $currentChatTitle",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = appBarContentColor.copy(alpha = 0.8f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                    text = "- $currentChatTitle",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = appBarContentColor.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -177,85 +178,90 @@ fun AppContent(
                     navigationIcon = {
                         // 导航按钮逻辑
                         IconButton(
-                                onClick = {
-                                    if (canGoBack) {
-                                        onGoBack()
+                            onClick = {
+                                if (canGoBack) {
+                                    onGoBack()
+                                } else {
+                                    // 平板模式下切换侧边栏展开/收起状态
+                                    if (useTabletLayout) {
+                                        onToggleSidebar()
                                     } else {
-                                        // 平板模式下切换侧边栏展开/收起状态
-                                        if (useTabletLayout) {
-                                            onToggleSidebar()
-                                        } else {
-                                            // 手机模式下打开抽屉
-                                            scope.launch { drawerState.open() }
-                                        }
+                                        // 手机模式下打开抽屉
+                                        scope.launch { drawerState.open() }
                                     }
                                 }
+                            }
                         ) {
                             Icon(
-                                    if (canGoBack) Icons.Default.ArrowBack
-                                    else if (useTabletLayout)
-                                    // 平板模式下使用开关图标表示收起/展开
+                                if (canGoBack) Icons.Default.ArrowBack
+                                else if (useTabletLayout)
+                                // 平板模式下使用开关图标表示收起/展开
                                     if (isTabletSidebarExpanded) Icons.Filled.ChevronLeft
-                                            else Icons.Default.Menu
-                                    else Icons.Default.Menu,
-                                    contentDescription =
-                                            when {
-                                                canGoBack -> "返回"
-                                                useTabletLayout ->
-                                                        if (isTabletSidebarExpanded) "收起侧边栏"
-                                                        else "展开侧边栏"
-                                                else -> stringResource(id = R.string.menu)
-                                            },
-                                    tint = appBarContentColor
+                                    else Icons.Default.Menu
+                                else Icons.Default.Menu,
+                                contentDescription =
+                                when {
+                                    canGoBack -> "返回"
+                                    useTabletLayout ->
+                                        if (isTabletSidebarExpanded) "收起侧边栏"
+                                        else "展开侧边栏"
+                                    else -> stringResource(id = R.string.menu)
+                                },
+                                tint = appBarContentColor
                             )
                         }
                     },
                     actions = actions,
                     colors =
-                            TopAppBarDefaults.smallTopAppBarColors(
-                                    containerColor =
-                                            if (toolbarTransparent) Color.Transparent
-                                            else MaterialTheme.colorScheme.primary,
-                                    titleContentColor = appBarContentColor,
-                                    navigationIconContentColor = appBarContentColor,
-                                    actionIconContentColor = appBarContentColor
-                            )
-            )
-
+                    TopAppBarDefaults.smallTopAppBarColors(
+                        containerColor =
+                        if (toolbarTransparent) Color.Transparent
+                        else MaterialTheme.colorScheme.primary,
+                        titleContentColor = appBarContentColor,
+                        navigationIconContentColor = appBarContentColor,
+                        actionIconContentColor = appBarContentColor
+                    ),
+                    // Scaffold会处理 insets, 这里不再需要手动添加 modifier
+                )
+            },
+            containerColor = Color.Transparent
+        ) { innerPadding ->
             // 主内容区域
             Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color =
-                            if (hasBackgroundImage) Color.Transparent
-                            else MaterialTheme.colorScheme.background
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize(),
+                color =
+                if (hasBackgroundImage) Color.Transparent
+                else MaterialTheme.colorScheme.background
             ) {
                 if (isLoading) {
                     // 加载中状态
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Surface(
-                                    modifier = Modifier.size(48.dp),
-                                    shape = MaterialTheme.shapes.small,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                modifier = Modifier.size(48.dp),
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ) {
                                 Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                            text = "...",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                        text = "...",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                    text = "正在加载...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                text = "正在加载...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -280,24 +286,25 @@ fun AppContent(
                         Box(modifier = Modifier.fillMaxSize()) {
                             // 统一调用当前屏幕的内容渲染方法
                             screen.Content(
-                                    navController = navController,
-                                    navigateTo = onScreenChange,
-                                    updateNavItem = onNavItemChange,
-                                    onGoBack = onGoBack,
-                                    hasBackgroundImage = hasBackgroundImage,
-                                    onLoading = onLoading,
-                                    onError = onError,
-                                    onGestureConsumed =
-                                    if (screen is Screen.AiChat) onGestureConsumed
-                                    else { _ -> },
+                                navController = navController,
+                                navigateTo = onScreenChange,
+                                updateNavItem = onNavItemChange,
+                                onGoBack = onGoBack,
+                                hasBackgroundImage = hasBackgroundImage,
+                                onLoading = onLoading,
+                                onError = onError,
+                                onGestureConsumed =
+                                if (screen is Screen.AiChat) onGestureConsumed
+                                else { _ -> },
                             )
 
                             // 帧率计数器 - 放在右上角
                             if (showFpsCounter) {
                                 FpsCounter(
-                                        modifier =
-                                        Modifier.align(Alignment.TopEnd)
-                                                .padding(top = 80.dp, end = 16.dp)
+                                    modifier =
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 80.dp, end = 16.dp)
                                 )
                             }
                         }

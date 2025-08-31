@@ -290,6 +290,10 @@ class CharacterCardManager private constructor(private val context: Context) {
         }
 
         if (isInitialized) {
+            // This is a new installation or an old user updating.
+            // We should migrate their existing theme settings to the default character card.
+            Log.d("CharacterCardManager", "First initialization detected. Migrating current theme to default character card.")
+            userPreferencesManager.copyCurrentThemeToCharacterCard(DEFAULT_CHARACTER_CARD_ID)
             userPreferencesManager.saveAiAvatarForCharacterCard(DEFAULT_CHARACTER_CARD_ID, "file:///android_asset/operit.png")
         }
         

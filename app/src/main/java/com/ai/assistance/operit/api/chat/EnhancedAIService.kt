@@ -46,6 +46,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 /**
  * Enhanced AI service that provides advanced conversational capabilities by integrating various
@@ -864,192 +866,102 @@ class EnhancedAIService private constructor(private val context: Context) {
             tokenUsageThreshold: Double
     ) {
         val startTime = System.currentTimeMillis()
-        // Only process the first tool invocation, show warning if there are multiple
-        val invocation = toolInvocations.first()
-
-        if (toolInvocations.size > 1) {
-            Log.w(TAG, "发现多个工具调用(${toolInvocations.size})，但只处理第一个: ${invocation.tool.name}")
-            val warningContent =
-                    ConversationMarkupManager.createMultipleToolsWarning(invocation.tool.name)
-
-            // 显示警告内容给用户
-            roundManager.appendContent(warningContent)
-            collector.emit(warningContent)
-
-            // 创建一个特殊的工具警告信息
-            val warningMessage =
-                    "警告：检测到${toolInvocations.size}个工具调用，但只处理第一个: ${invocation.tool.name}。其他工具调用将被忽略。"
-            conversationMutex.withLock { conversationHistory.add(Pair("tool", warningMessage)) }
-        }
-
-        // Get tool executor and execute
-        val executor = toolHandler.getToolExecutor(invocation.tool.name)
-
-        // Start executing the tool
+        
         withContext(Dispatchers.Main) {
-            val category = executor?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
-            _inputProcessingState.value =
-                    InputProcessingState.ExecutingTool(invocation.tool.name, category)
+            val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
+            val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
+            _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
         }
 
-        val processToolJob =
-                toolProcessingScope.launch {
+        val processToolJob = toolProcessingScope.launch {
+            // 权限检查前置，串行进行
+            val permittedInvocations = mutableListOf<ToolInvocation>()
+            val permissionDeniedResults = mutableListOf<ToolResult>()
+
+            for (invocation in toolInvocations) {
+                val (hasPermission, errorResult) = ToolExecutionManager.checkToolPermission(toolHandler, invocation)
+                if (hasPermission) {
+                    permittedInvocations.add(invocation)
+                } else {
+                    permissionDeniedResults.add(errorResult!!)
+                    val errorStatusContent = ConversationMarkupManager.createErrorStatus("权限拒绝", "操作 '${invocation.tool.name}' 未授权")
+                    roundManager.appendContent(errorStatusContent)
+                    collector.emit(errorStatusContent)
+                    val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(errorResult)
+                    roundManager.appendContent(toolResultStatusContent)
+                    collector.emit(toolResultStatusContent)
+                }
+            }
+            
+            val executionResults = permittedInvocations.map { invocation ->
+                async {
+                    val executor = toolHandler.getToolExecutor(invocation.tool.name)
                     if (executor == null) {
                         val toolName = invocation.tool.name
-                        val errorMessage =
-                                when {
-                                    // 检查 packName.toolname 的错误格式
-                                    toolName.contains('.') && !toolName.contains(':') -> {
-                                        val parts = toolName.split('.', limit = 2)
-                                        "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
-                                    }
-                                    // 检查 packName:toolname 格式
-                                    toolName.contains(':') -> {
-                                        val parts = toolName.split(':', limit = 2)
-                                        val packName = parts[0]
-                                        val packageManager = toolHandler.getOrCreatePackageManager()
+                        val errorMessage = when {
+                            toolName.contains('.') && !toolName.contains(':') -> {
+                                val parts = toolName.split('.', limit = 2)
+                                "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
+                            }
+                            toolName.contains(':') -> {
+                                val parts = toolName.split(':', limit = 2)
+                                val packName = parts[0]
+                                val packageManager = toolHandler.getOrCreatePackageManager()
+                                val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
+                                if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
+                                else "工具包 '$packName' 不存在。"
+                            }
+                            else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+                        }
 
-                                        // val isImported = packageManager.isPackageImported(packName)
-                                        val isAvailable =
-                                                packageManager.getAvailablePackages().containsKey(packName)
-
-                                        when {
-                                            // Imported and available, but not active (since executor is null)
-                                            isAvailable ->
-                                                    "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
-
-                                            // Not imported and not available
-                                            else -> "工具包 '$packName' 不存在。"
-                                        }
-                                    }
-                                    else ->
-                                            "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
-                                }
-
-                        val notAvailableContent =
-                                ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
+                        val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
                         roundManager.appendContent(notAvailableContent)
                         collector.emit(notAvailableContent)
 
-                        // Create and process the error result immediately
-                        val errorResult =
-                                ToolResult(
-                                        toolName = toolName,
-                                        success = false,
-                                        result = StringResultData(""),
-                                        error = errorMessage
-                                )
-                        processToolResult(
-                                errorResult,
-                                functionType,
-                                collector,
-                                enableThinking,
-                                enableMemoryAttachment,
-                                onNonFatalError,
-                                maxTokens,
-                                tokenUsageThreshold
-                        )
-                        return@launch
+                        return@async listOf(ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage))
+                    }
+
+                    val collectedResults = mutableListOf<ToolResult>()
+                    ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
+                        collectedResults.add(result)
+                        val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
+                        roundManager.appendContent(toolResultStatusContent)
+                        collector.emit(toolResultStatusContent)
+                    }
+
+                    if (collectedResults.isNotEmpty()) {
+                        val lastResult = collectedResults.last()
+                        val combinedResultString = collectedResults.joinToString("\n") { res ->
+                            if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
+                        }
+                        listOf(ToolResult(
+                                toolName = invocation.tool.name,
+                                success = lastResult.success,
+                                result = StringResultData(combinedResultString),
+                                error = lastResult.error
+                        ))
                     } else {
-                        // Check permissions before execution
-                        val (hasPermission, errorResult) =
-                                ToolExecutionManager.checkToolPermission(toolHandler, invocation)
-
-                        // If permission denied, add result and exit function
-                        if (!hasPermission) {
-                            // Add both error status and a tool result status to ensure the UI shows the error
-                            // properly
-                            val errorStatusContent =
-                                    ConversationMarkupManager.createErrorStatus(
-                                            "权限拒绝",
-                                            "操作 '${invocation.tool.name}' 未授权"
-                                    )
-                            roundManager.appendContent(errorStatusContent)
-                            collector.emit(errorStatusContent)
-
-                            // Also add a proper tool result status with error=true to ensure it shows up
-                            // correctly in the UI
-                            val toolResultStatusContent =
-                                    ConversationMarkupManager.formatToolResultForMessage(
-                                            ToolResult(
-                                                    toolName = invocation.tool.name,
-                                                    success = false,
-                                                    result = StringResultData(""),
-                                                    error = "权限拒绝: 操作 '${invocation.tool.name}' 未授权"
-                                            )
-                                    )
-                            roundManager.appendContent(toolResultStatusContent)
-                            collector.emit(toolResultStatusContent)
-
-                            // Process error result and exit
-                            if (errorResult != null) {
-                                processToolResult(
-                                        errorResult,
-                                        functionType,
-                                        collector,
-                                        enableThinking,
-                                        enableMemoryAttachment,
-                                        onNonFatalError,
-                                        maxTokens,
-                                        tokenUsageThreshold
-                                )
-                            }
-                            return@launch
-                        }
-
-                        // Execute the tool
-                        val toolStartTime = System.currentTimeMillis()
-                        val allToolResults = mutableListOf<ToolResult>()
-
-                        ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
-                            allToolResults.add(result)
-
-                            val executionTime = System.currentTimeMillis() - toolStartTime
-                            Log.d(
-                                    TAG,
-                                    "工具中间结果收到，耗时: ${executionTime}ms，结果: ${if (result.success) "成功" else "失败"}"
-                            )
-
-                            // Display intermediate tool execution result
-                            val toolResultStatusContent =
-                                    ConversationMarkupManager.formatToolResultForMessage(result)
-                            roundManager.appendContent(toolResultStatusContent)
-                            collector.emit(toolResultStatusContent)
-                        }
-
-                        if (allToolResults.isNotEmpty()) {
-                            val lastResult = allToolResults.last()
-                            val combinedResultString =
-                                    allToolResults.joinToString("\n") { res ->
-                                        if (res.success) {
-                                            res.result.toString()
-                                        } else {
-                                            "Error in step: ${res.error ?: "Unknown error"}"
-                                        }
-                                    }
-
-                            val finalResult =
-                                    ToolResult(
-                                            toolName = invocation.tool.name,
-                                            success = lastResult.success,
-                                            result = StringResultData(combinedResultString),
-                                            error = lastResult.error
-                                    )
-
-                            Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
-                            processToolResult(
-                                    finalResult,
-                                    functionType,
-                                    collector,
-                                    enableThinking,
-                                    enableMemoryAttachment,
-                                    onNonFatalError,
-                                    maxTokens,
-                                    tokenUsageThreshold
-                            )
-                        }
+                        emptyList()
                     }
                 }
+            }.awaitAll().flatten()
+
+            val allToolResults = permissionDeniedResults + executionResults
+
+            if (allToolResults.isNotEmpty()) {
+                Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
+                processToolResults(
+                        allToolResults,
+                        functionType,
+                        collector,
+                        enableThinking,
+                        enableMemoryAttachment,
+                        onNonFatalError,
+                        maxTokens,
+                        tokenUsageThreshold
+                )
+            }
+        }
 
         val invocationId = java.util.UUID.randomUUID().toString()
         toolExecutionJobs[invocationId] = processToolJob
@@ -1060,13 +972,12 @@ class EnhancedAIService private constructor(private val context: Context) {
             toolExecutionJobs.remove(invocationId)
         }
 
-        // Process the tool result
         Log.d(TAG, "工具调用处理耗时: ${System.currentTimeMillis() - startTime}ms")
     }
 
     /** Process tool execution result - simplified version without callbacks */
-    private suspend fun processToolResult(
-            result: ToolResult,
+    private suspend fun processToolResults(
+            results: List<ToolResult>,
             functionType: FunctionType = FunctionType.CHAT,
             collector: StreamCollector<String>,
             enableThinking: Boolean = false,
@@ -1076,11 +987,12 @@ class EnhancedAIService private constructor(private val context: Context) {
             tokenUsageThreshold: Double
     ) {
         val startTime = System.currentTimeMillis()
-        Log.d(TAG, "开始处理工具结果: ${result.toolName}, 成功: ${result.success}")
+        val toolNames = results.joinToString(", ") { it.toolName }
+        Log.d(TAG, "开始处理工具结果: $toolNames, 成功: ${results.all { it.success }}")
 
         // Add transition state
         withContext(Dispatchers.Main) {
-            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(result.toolName)
+            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
         }
 
         // Check if conversation is still active
@@ -1089,7 +1001,9 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         // Tool result processing and subsequent AI request
-        val toolResultMessage = ConversationMarkupManager.formatToolResultForMessage(result)
+        val toolResultMessage = results.joinToString("\n") {
+            ConversationMarkupManager.formatToolResultForMessage(it)
+        }
 
         // Add tool result to conversation history
         conversationMutex.withLock { conversationHistory.add(Pair("tool", toolResultMessage)) }
@@ -1106,7 +1020,7 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // Clearly show we're preparing to send tool result to AI
         withContext(Dispatchers.Main) {
-            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(result.toolName)
+            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
         }
 
         // Add short delay to make state change more visible

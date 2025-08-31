@@ -43,12 +43,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -308,5 +308,21 @@ dependencies {
     implementation(libs.objectbox.kotlin)
     kapt(libs.objectbox.processor)
     
-//    implementation(libs.modelcontextprotocol.kotlin.sdk)
+    // MCP Kotlin SDK with version compatibility fix
+    implementation("io.modelcontextprotocol.sdk:mcp:0.7.0") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-serialization-json")
+        exclude(group = "io.ktor", module = "ktor-client-core")
+        exclude(group = "io.ktor", module = "ktor-client-cio")
+        exclude(group = "io.ktor", module = "ktor-serialization-kotlinx-json")
+    }
+    
+    // 强制使用兼容的版本
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
+            force("io.ktor:ktor-client-core:2.3.5") 
+            force("io.ktor:ktor-client-cio:2.3.5")
+            force("io.ktor:ktor-serialization-kotlinx-json:2.3.5")
+        }
+    }
 }

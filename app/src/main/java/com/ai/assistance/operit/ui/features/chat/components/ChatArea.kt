@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -97,6 +98,7 @@ fun ChatArea(
     onCopyMessage: ((ChatMessage) -> Unit)? = null,
     onDeleteMessage: ((Int) -> Unit)? = null,
     onDeleteMessagesFrom: ((Int) -> Unit)? = null,
+    onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调参数
     messagesPerPage: Int = 10, // 每页显示的消息数量
     topPadding: Dp = 0.dp,
     chatStyle: ChatStyle = ChatStyle.CURSOR // 新增参数，默认为CURSOR风格
@@ -177,6 +179,7 @@ fun ChatArea(
                         onCopyMessage = onCopyMessage,
                         onDeleteMessage = onDeleteMessage,
                         onDeleteMessagesFrom = onDeleteMessagesFrom,
+                        onSpeakMessage = onSpeakMessage, // 传递朗读回调
                         chatStyle = chatStyle, // 传递风格
                         isHidden = shouldHide // 新增参数控制隐藏
                     )
@@ -237,6 +240,7 @@ private fun MessageItem(
     onCopyMessage: ((ChatMessage) -> Unit)?,
     onDeleteMessage: ((Int) -> Unit)?,
     onDeleteMessagesFrom: ((Int) -> Unit)?,
+    onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
     chatStyle: ChatStyle, // 新增参数
     isHidden: Boolean = false // 新增参数控制隐藏
 ) {
@@ -345,6 +349,30 @@ private fun MessageItem(
                     Icon(
                         imageVector = Icons.Default.ContentCut,
                         contentDescription = stringResource(id = R.string.select_copy),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                modifier = Modifier.height(36.dp)
+            )
+
+            // 朗读消息选项
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.read_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.sp
+                    )
+                },
+                onClick = {
+                    onSpeakMessage?.invoke(message.content)
+                    showContextMenu = false
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = stringResource(R.string.read_message),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )

@@ -295,7 +295,6 @@
 
     <!-- Model selector related -->
     <string name="model_selector_title">Seleccionar configuración de modelo</string>
-    <string name="model_selector_close">Cerrar</string>
     <string name="model_selector_toggle">Mostrar selector de modelo</string>
     <string name="model_selector_toggle_desc">Mostrar el selector de configuración de modelo en la parte superior de la interfaz de chat para cambiar rápidamente entre diferentes configuraciones</string>
     <string name="model">Modelo</string>
