@@ -68,6 +68,51 @@ data class UpdateInfo(
 
 val updates = listOf(
     UpdateInfo(
+        version = "v1.4.0",
+        date = "2025-09-01",
+        title = "角色卡系统与自动化能力扩展",
+        description = "引入强大的角色卡系统，支持自定义和导入，并新增了多个自动化工具包。同时，核心功能如MCP、TTS和多语言支持也得到了显著增强，修复了多项关键Bug。",
+        highlights = listOf(
+            "🎭 角色卡系统：新增角色卡、生成器并支持酒馆角色卡导入，可绑定独立主题。",
+            "🛠️ 自动化工具扩展：新增Bilibili、百度地图、抖音等工具包，拓展自动化能力。",
+            "🚀 MCP增强：支持URL/压缩包导入、HTTP Streaming和SSE模式，稳定性提升。",
+            "🔊 TTS功能升级：支持POST请求和消息朗读，适配硅基流动。",
+            "🌍 国际化：增加大量英文翻译和系统语言跟随模式。"
+        ),
+        allChanges = listOf(
+            "增加角色卡、角色卡生成器，支持酒馆角色卡导入。角色卡与主题绑定，可对每个角色的主题分别设定",
+            "修复一个版本迭代导致的崩溃bug",
+            "修复gemini思考显示异常bug",
+            "修复日常包中的功能无法使用bug",
+            "修复预制的glm模型的endpoint",
+            "增加tts post请求并对硅基流动进行tts适配",
+            "修复代码运行包的js运行bug",
+            "优化包管理界面",
+            "修复偏好设置向导无法对其他配置使用的bug",
+            "增加模型endpoint路径的自动补全",
+            "增加bilibili自动化工具以及bilibili综合工具包",
+            "增加百度地图自动化工具",
+            "更新插件开发文档",
+            "增加抖音下载包",
+            "修复百度地图包，现在可以正常使用了",
+            "将ffmepg和ui自动化从内置工具移动到工具包",
+            "增强mcp的稳定性，支持url或者压缩包导入并本地运行/http streaming/sse模式",
+            "修复一个开屏未响应问题",
+            "增加默认开启的工具包",
+            "增加大量的英文以及默认的系统语言跟随模式",
+            "增加模型自定义参数功能",
+            "修复记忆库的夜间模式的字体颜色不明显",
+            "修复键盘向上移动的问题",
+            "增加消息的tts朗读",
+            "支持工具并发搜索",
+            "现在在token超限后依旧可以强制发送内容了",
+            "修复了一次请求报错后第二次请求需要重进软件的问题"
+        ),
+        isLatest = true,
+        downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.4.0",
+        releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.4.0"
+    ),
+    UpdateInfo(
         version = "v1.3.0",
         date = "2025-08-04",
         title = "界面焕新与Agent能力跃升",
@@ -95,7 +140,7 @@ val updates = listOf(
             "增加ai的网络断开重试机制",
             "增加ai内置浏览器操作能力(部分)"
         ),
-        isLatest = true,
+        isLatest = false,
         downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.3.0",
         releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.3.0"
     ),
@@ -278,19 +323,13 @@ fun UpdateCard(
     
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = if (updateInfo.isLatest) 8.dp else 4.dp,
-                shape = RoundedCornerShape(16.dp)
-            ),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (updateInfo.isLatest) 
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
-            else MaterialTheme.colorScheme.surface
+            containerColor = if (updateInfo.isLatest) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (updateInfo.isLatest) 6.dp else 2.dp
+            defaultElevation = if (updateInfo.isLatest) 4.dp else 2.dp
         )
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
