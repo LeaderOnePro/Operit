@@ -138,6 +138,10 @@ class UserPreferencesManager(private val context: Context) {
         private val KEY_GLOBAL_USER_NAME = stringPreferencesKey("global_user_name")
 
 
+        // 最近使用颜色
+        private val RECENT_COLORS = stringPreferencesKey("recent_colors")
+
+
         const val AVATAR_SHAPE_CIRCLE = "circle"
         const val AVATAR_SHAPE_SQUARE = "square"
 
@@ -381,6 +385,40 @@ class UserPreferencesManager(private val context: Context) {
         context.userPreferencesDataStore.data.map { preferences ->
             preferences[KEY_SHOW_INPUT_PROCESSING_STATUS] ?: true
         }
+
+    // 获取最近使用颜色
+    val recentColorsFlow: Flow<List<Int>> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            val colorsString = preferences[RECENT_COLORS] ?: ""
+            if (colorsString.isBlank()) {
+                emptyList()
+            } else {
+                colorsString.split(",").mapNotNull { it.toIntOrNull() }
+            }
+        }
+
+    // 添加最近使用颜色
+    suspend fun addRecentColor(color: Int) {
+        context.userPreferencesDataStore.edit { preferences ->
+            val currentColorsString = preferences[RECENT_COLORS] ?: ""
+            val currentColors =
+                if (currentColorsString.isBlank()) {
+                    mutableListOf()
+                } else {
+                    currentColorsString.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
+                }
+
+            // 移除已存在的相同颜色，以确保新添加的在最前面
+            currentColors.remove(color)
+            // 添加新颜色到列表开头
+            currentColors.add(0, color)
+
+            // 限制历史记录数量，例如最多14个
+            val trimmedColors = currentColors.take(14)
+
+            preferences[RECENT_COLORS] = trimmedColors.joinToString(",")
+        }
+    }
 
     fun getAiAvatarForCharacterCardFlow(characterCardId: String): Flow<String?> {
         return context.userPreferencesDataStore.data.map { preferences ->

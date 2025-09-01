@@ -3,6 +3,8 @@ package com.ai.assistance.operit.ui.features.settings.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,6 +54,7 @@ fun ColorPickerDialog(
     statusBarColorInput: Int,
     historyIconColorInput: Int,
     pipIconColorInput: Int,
+    recentColors: List<Int>,
     onColorSelected:
             (
                     primaryColor: Int?,
@@ -74,19 +77,20 @@ fun ColorPickerDialog(
                 else -> primaryColorInput
             }
     val currentColor = Color(currentColorForPicker)
-    val pickerController = rememberColorPickerController()
-    val scope = rememberCoroutineScope()
 
-    // Set initial color
-    LaunchedEffect(pickerController) {
-        pickerController.setWheelColor(currentColor)
+    // This is the definitive fix for the initial color bug.
+    // We create a controller that is remembered based on the current color.
+    // When the dialog is opened for a different color, a new controller is created
+    // and initialized correctly.
+    val pickerController = remember(currentColor) {
+        ColorPickerController().apply {
+            // Programmatically set the color of the controller upon creation.
+            selectByColor(currentColor, fromUser = false)
+        }
     }
 
-    // 创建一个可变状态，用于实时预览颜色
-    var previewColor by remember { mutableStateOf(currentColor) }
-
-    // 监听颜色变化
-    LaunchedEffect(currentColor) { previewColor = currentColor }
+    // The controller's selected color is the source of truth for our UI.
+    val pickedColor by pickerController.selectedColor
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -105,7 +109,7 @@ fun ColorPickerDialog(
             )
         },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 // Live color preview - use solid backgrounds
                 Box(
                     modifier = Modifier.fillMaxWidth()
@@ -125,7 +129,7 @@ fun ColorPickerDialog(
                         Box(
                             modifier = Modifier.size(80.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(previewColor)
+                                .background(pickedColor)
                                 .border(
                                     1.dp,
                                     MaterialTheme.colorScheme.outline,
@@ -138,10 +142,10 @@ fun ColorPickerDialog(
                         // Text preview
                         Column {
                             // Show contrast example
-                            val textColor = getTextColorForBackground(previewColor)
+                            val textColor = getTextColorForBackground(pickedColor)
                             Surface(
                                 modifier = Modifier.width(120.dp).height(40.dp),
-                                color = previewColor,
+                                color = pickedColor,
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Box(
@@ -158,9 +162,9 @@ fun ColorPickerDialog(
 
                             // Add contrast rating
                             val contrastRating =
-                                if (isHighContrast(previewColor)) "高对比度 ✓" else "低对比度 ⚠"
+                                if (isHighContrast(pickedColor)) "高对比度 ✓" else "低对比度 ⚠"
                             val contrastColor =
-                                if (isHighContrast(previewColor)) Color(0xFF388E3C)
+                                if (isHighContrast(pickedColor)) Color(0xFF388E3C)
                                 else Color(0xFFD32F2F)
 
                             Text(
@@ -185,21 +189,12 @@ fun ColorPickerDialog(
                 // HSV Color Picker
                 HsvColorPicker(
                     modifier = Modifier.fillMaxWidth()
-                        .height(300.dp)
+                        .height(220.dp)
                         .padding(vertical = 8.dp),
                     controller = pickerController,
-                    onColorChanged = { colorEnvelope: ColorEnvelope ->
-                        if (colorEnvelope.fromUser) {
-                            val newColor = colorEnvelope.color.toArgb()
-                            when (currentColorPickerMode) {
-                                "primary" -> onColorSelected(newColor, null, null, null, null)
-                                "secondary" -> onColorSelected(null, newColor, null, null, null)
-                                "statusBar" -> onColorSelected(null, null, newColor, null, null)
-                                "historyIcon" -> onColorSelected(null, null, null, newColor, null)
-                                "pipIcon" -> onColorSelected(null, null, null, null, newColor)
-                            }
-                            previewColor = colorEnvelope.color
-                        }
+                    onColorChanged = {
+                        // Intentionally left blank. The controller updates its own state.
+                        // We observe the state via `pickerController.selectedColor`.
                     }
                 )
 
@@ -225,6 +220,46 @@ fun ColorPickerDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Recent colors section
+                if (recentColors.isNotEmpty()) {
+                    Text(
+                        text = "最近使用",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            space = 8.dp,
+                            alignment = Alignment.Start
+                        )
+                    ) {
+                        recentColors.take(7).forEach { colorInt ->
+                            val color = Color(colorInt)
+                            PresetColorItem(color) {
+                                pickerController.selectByColor(it, fromUser = true)
+                            }
+                        }
+                    }
+                    if (recentColors.size > 7) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(
+                                space = 8.dp,
+                                alignment = Alignment.Start
+                            )
+                        ) {
+                            recentColors.drop(7).take(7).forEach { colorInt ->
+                                val color = Color(colorInt)
+                                PresetColorItem(color) {
+                                    pickerController.selectByColor(it, fromUser = true)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 // Preset colors title
                 Text(
                     text = "推荐颜色",
@@ -239,15 +274,7 @@ fun ColorPickerDialog(
                 ) {
                     materialColors.take(7).forEach { color ->
                         PresetColorItem(color) {
-                            when (currentColorPickerMode) {
-                                "primary" -> onColorSelected(it.toArgb(), null, null, null, null)
-                                "secondary" -> onColorSelected(null, it.toArgb(), null, null, null)
-                                "statusBar" -> onColorSelected(null, null, it.toArgb(), null, null)
-                                "historyIcon" -> onColorSelected(null, null, null, it.toArgb(), null)
-                                "pipIcon" -> onColorSelected(null, null, null, null, it.toArgb())
-                            }
-                            pickerController.setWheelColor(it)
-                            previewColor = it
+                            pickerController.selectByColor(it, fromUser = true)
                         }
                     }
                 }
@@ -258,15 +285,7 @@ fun ColorPickerDialog(
                 ) {
                     materialColors.takeLast(7).forEach { color ->
                         PresetColorItem(color) {
-                            when (currentColorPickerMode) {
-                                "primary" -> onColorSelected(it.toArgb(), null, null, null, null)
-                                "secondary" -> onColorSelected(null, it.toArgb(), null, null, null)
-                                "statusBar" -> onColorSelected(null, null, it.toArgb(), null, null)
-                                "historyIcon" -> onColorSelected(null, null, null, it.toArgb(), null)
-                                "pipIcon" -> onColorSelected(null, null, null, null, it.toArgb())
-                            }
-                            pickerController.setWheelColor(it)
-                            previewColor = it
+                            pickerController.selectByColor(it, fromUser = true)
                         }
                     }
                 }
@@ -275,9 +294,15 @@ fun ColorPickerDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    scope.launch {
-                        onDismiss()
+                    val newColor = pickedColor.toArgb()
+                    when (currentColorPickerMode) {
+                        "primary" -> onColorSelected(newColor, null, null, null, null)
+                        "secondary" -> onColorSelected(null, newColor, null, null, null)
+                        "statusBar" -> onColorSelected(null, null, newColor, null, null)
+                        "historyIcon" -> onColorSelected(null, null, null, newColor, null)
+                        "pipIcon" -> onColorSelected(null, null, null, null, newColor)
                     }
+                    onDismiss()
                 }
             ) { Text("确定") }
         },

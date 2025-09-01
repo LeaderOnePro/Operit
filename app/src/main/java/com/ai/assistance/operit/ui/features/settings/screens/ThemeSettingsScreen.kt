@@ -193,6 +193,9 @@ fun ThemeSettingsScreen() {
     // Collect on color mode
     val onColorMode = preferencesManager.onColorMode.collectAsState(initial = UserPreferencesManager.ON_COLOR_MODE_AUTO).value
 
+    // Collect recent colors
+    val recentColors = preferencesManager.recentColorsFlow.collectAsState(initial = emptyList()).value
+
 
 
     var showSaveSuccessMessage by remember { mutableStateOf(false) }
@@ -2398,6 +2401,7 @@ fun ThemeSettingsScreen() {
                     statusBarColorInput = customStatusBarColorInput,
                     historyIconColorInput = chatHeaderHistoryIconColorInput,
                     pipIconColorInput = chatHeaderPipIconColorInput,
+                    recentColors = recentColors,
                     onColorSelected = {
                         primaryColor,
                         secondaryColor,
@@ -2409,6 +2413,15 @@ fun ThemeSettingsScreen() {
                         statusBarColor?.let { customStatusBarColorInput = it }
                         historyIconColor?.let { chatHeaderHistoryIconColorInput = it }
                         pipIconColor?.let { chatHeaderPipIconColorInput = it }
+
+                        // Save the new color to recent colors
+                        val newColor =
+                                primaryColor
+                                        ?: secondaryColor
+                                        ?: statusBarColor
+                                        ?: historyIconColor
+                                        ?: pipIconColor
+                        newColor?.let { scope.launch { preferencesManager.addRecentColor(it) } }
 
                         // Save the colors
                         saveThemeSettingsWithCharacterCard {
