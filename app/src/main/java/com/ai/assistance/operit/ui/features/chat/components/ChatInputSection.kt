@@ -70,6 +70,28 @@ fun ChatInputSection(
     onAttachmentPanelStateChange: ((Boolean) -> Unit)? = null,
     showInputProcessingStatus: Boolean = true
 ) {
+    val showTokenLimitDialog = remember { mutableStateOf(false) }
+
+    if (showTokenLimitDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showTokenLimitDialog.value = false },
+            title = { Text("Token 超限警告") },
+            text = { Text("消息已超出Token上限，继续发送可能会导致上下文丢失或AI无法理解。是否继续？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showTokenLimitDialog.value = false
+                        onSendMessage()
+                    }
+                ) { Text("继续发送") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTokenLimitDialog.value = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
     val modernTextStyle = TextStyle(fontSize = 13.sp, lineHeight = 16.sp)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -95,7 +117,7 @@ fun ChatInputSection(
     val sendButtonEnabled =
         when {
             isProcessing -> true // Cancel button
-            canSendMessage -> !isOverTokenLimit // Send button
+            canSendMessage -> true // Send button is always enabled if there's content
             else -> true // Mic button
         }
 
@@ -312,18 +334,10 @@ fun ChatInputSection(
                                         .error
 
                                 canSendMessage ->
-                                    if (sendButtonEnabled)
-                                        MaterialTheme
-                                            .colorScheme
-                                            .primary
+                                    if (isOverTokenLimit)
+                                        MaterialTheme.colorScheme.secondary // Warning color
                                     else
-                                        MaterialTheme
-                                            .colorScheme
-                                            .onSurface
-                                            .copy(
-                                                alpha =
-                                                0.12f
-                                            )
+                                        MaterialTheme.colorScheme.primary
 
                                 else ->
                                     MaterialTheme
@@ -339,11 +353,15 @@ fun ChatInputSection(
                                         onCancelMessage()
 
                                     canSendMessage -> {
-                                        onSendMessage()
-                                        // 发送消息后关闭附件面板
-                                        setShowAttachmentPanel(
-                                            false
-                                        )
+                                        if (isOverTokenLimit) {
+                                            showTokenLimitDialog.value = true
+                                        } else {
+                                            onSendMessage()
+                                            // 发送消息后关闭附件面板
+                                            setShowAttachmentPanel(
+                                                false
+                                            )
+                                        }
                                     }
 
                                     else -> {
@@ -363,13 +381,10 @@ fun ChatInputSection(
                         when {
                             isProcessing -> MaterialTheme.colorScheme.onError
                             canSendMessage ->
-                                if (sendButtonEnabled)
-                                    MaterialTheme.colorScheme
-                                        .onPrimary
+                                if (isOverTokenLimit)
+                                    MaterialTheme.colorScheme.onSecondary
                                 else
-                                    MaterialTheme.colorScheme
-                                        .onSurface
-                                        .copy(alpha = 0.38f)
+                                    MaterialTheme.colorScheme.onPrimary
 
                             else -> MaterialTheme.colorScheme.onPrimary
                         }

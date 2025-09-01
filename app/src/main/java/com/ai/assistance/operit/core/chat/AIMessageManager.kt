@@ -33,7 +33,7 @@ import kotlinx.coroutines.withContext
 object AIMessageManager {
     private const val TAG = "AIMessageManager"
     // 聊天总结的消息数量阈值
-    private const val SUMMARY_CHUNK_SIZE = 8
+    private const val SUMMARY_CHUNK_SIZE = 4
 
     // 使用独立的协程作用域，确保AI操作的生命周期独立于任何特定的ViewModel
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -221,7 +221,7 @@ object AIMessageManager {
         } else {
             messages
         }
-        val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user" || it.sender == "ai" }
+        val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user"}
 
         if (userAiMessagesSinceLastSummary >= SUMMARY_CHUNK_SIZE) {
             Log.d(TAG, "自上次总结后新消息数量达到阈值 ($userAiMessagesSinceLastSummary)，生成总结.")

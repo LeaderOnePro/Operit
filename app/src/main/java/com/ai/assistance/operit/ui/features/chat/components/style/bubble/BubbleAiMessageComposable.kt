@@ -31,10 +31,12 @@ import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRender
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun BubbleAiMessageComposable(
@@ -85,9 +87,17 @@ fun BubbleAiMessageComposable(
         animationSpec = tween(durationMillis = 300)
     )
 
+    val imageUrl = remember(message.content, message.contentStream) {
+        if (message.contentStream == null) {
+            val regex = """^\s*!\[[^\]]*\]\(([^)]+)\)\s*$""".toRegex()
+            regex.find(message.content)?.groups?.get(1)?.value
+        } else {
+            null
+        }
+    }
+
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .alpha(alpha)
             .offset(y = offsetY.dp),
@@ -115,40 +125,52 @@ fun BubbleAiMessageComposable(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        // Message bubble
-        Surface(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .padding(end = 64.dp)
-                .defaultMinSize(minHeight = 44.dp),
-            shape = RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp),
-            color = backgroundColor,
-            tonalElevation = 2.dp
-        ) {
-            // 使用 message.timestamp 作为 key，确保在重组期间，
-            // 只要是同一条消息，StreamMarkdownRenderer就不会被销毁和重建。
-            key(message.timestamp) {
-                val stream = message.contentStream
-                if (stream != null) {
-                    val charStream = remember(stream) { stream.toCharStream() }
-                    StreamMarkdownRenderer(
-                        markdownStream = charStream,
-                        textColor = textColor,
-                        backgroundColor = backgroundColor,
-                        onLinkClick = rememberedOnLinkClick,
-                        xmlRenderer = xmlRenderer,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                } else {
-                    // 对于已完成的静态消息，使用 content 参数的渲染器以支持Markdown
-                    StreamMarkdownRenderer(
-                        content = message.content,
-                        textColor = textColor,
-                        backgroundColor = backgroundColor,
-                        onLinkClick = rememberedOnLinkClick,
-                        xmlRenderer = xmlRenderer,
-                        modifier = Modifier.padding(12.dp)
-                    )
+
+        if (imageUrl != null) {
+            AsyncImage(
+                model = Uri.parse(imageUrl),
+                contentDescription = "Image from AI",
+                modifier = Modifier
+                    .padding(end = 64.dp)
+                    .heightIn(max = 80.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            // Message bubble
+            Surface(
+                modifier = Modifier
+                    .padding(end = 64.dp)
+                    .defaultMinSize(minHeight = 44.dp),
+                shape = RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp),
+                color = backgroundColor,
+                tonalElevation = 2.dp
+            ) {
+                // 使用 message.timestamp 作为 key，确保在重组期间，
+                // 只要是同一条消息，StreamMarkdownRenderer就不会被销毁和重建。
+                key(message.timestamp) {
+                    val stream = message.contentStream
+                    if (stream != null) {
+                        val charStream = remember(stream) { stream.toCharStream() }
+                        StreamMarkdownRenderer(
+                            markdownStream = charStream,
+                            textColor = textColor,
+                            backgroundColor = backgroundColor,
+                            onLinkClick = rememberedOnLinkClick,
+                            xmlRenderer = xmlRenderer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    } else {
+                        // 对于已完成的静态消息，使用 content 参数的渲染器以支持Markdown
+                        StreamMarkdownRenderer(
+                            content = message.content,
+                            textColor = textColor,
+                            backgroundColor = backgroundColor,
+                            onLinkClick = rememberedOnLinkClick,
+                            xmlRenderer = xmlRenderer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
                 }
             }
         }

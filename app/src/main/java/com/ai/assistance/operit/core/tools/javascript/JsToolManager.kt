@@ -99,10 +99,31 @@ private constructor(private val context: Context, private val packageManager: Pa
                 return@channelFlow
             }
 
+            val packageName = parts[0]
             val functionName = parts[1]
 
-            // Convert tool parameters to map for the script
-            val params = tool.parameters.associate { it.name to it.value }
+            // Get tool definition from PackageManager to access parameter types
+            val toolDefinition = packageManager.getPackageTools(packageName)?.tools?.find { it.name == functionName }
+
+            // Convert tool parameters to map for the script, with type conversion
+            val params: Map<String, Any?> = tool.parameters.associate { param ->
+                val paramDefinition = toolDefinition?.parameters?.find { it.name == param.name }
+                // default to string if not found in metadata
+                val paramType = paramDefinition?.type ?: "string"
+
+                val convertedValue: Any? = try {
+                    when (paramType.lowercase()) {
+                        "number" -> param.value.toDoubleOrNull() ?: param.value.toLongOrNull() ?: param.value
+                        "boolean" -> param.value.toBoolean()
+                        "integer" -> param.value.toLongOrNull() ?: param.value
+                        else -> param.value // string and other types
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to convert parameter '${param.name}' with value '${param.value}' to type '$paramType'. Using string value. Error: ${e.message}")
+                    param.value // Fallback to string
+                }
+                param.name to convertedValue
+            }
 
             // Execute the script with timeout
             try {

@@ -695,6 +695,16 @@ class EnhancedAIService private constructor(private val context: Context) {
             // Get response content
             val content = streamBuffer.toString().trim()
 
+            // If content is empty, it means an error likely occurred or the model returned nothing.
+            // We must still finalize the conversation to reset the state correctly.
+            if (content.isEmpty()) {
+                Log.d(TAG, "Stream content is empty. Finalizing conversation state.")
+                // We call handleTaskCompletion to properly set the conversation as inactive and update the UI state.
+                // We pass enableMemoryAttachment = false because there's no content to analyze or save.
+                handleWaitForUserNeed(content)
+                return
+            }
+
             // If content is empty, finish immediately
             if (content.isEmpty()) {
                 return

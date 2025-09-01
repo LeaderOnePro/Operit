@@ -639,7 +639,7 @@ class JsEngine(private val context: Context) {
     fun executeScriptFunction(
             script: String,
             functionName: String,
-            params: Map<String, String>,
+            params: Map<String, Any?>,
             onIntermediateResult: ((Any?) -> Unit)? = null
     ): Any? {
         // Reset any previous state

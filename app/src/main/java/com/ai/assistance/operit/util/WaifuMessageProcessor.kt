@@ -16,17 +16,31 @@ object WaifuMessageProcessor {
      */
     fun splitMessageBySentences(content: String, removePunctuation: Boolean = false): List<String> {
         if (content.isBlank()) return emptyList()
+
+        // 正则表达式，用于匹配Markdown的图片 ![]() 和链接 []()
+        val markdownEntityRegex = Regex("""!?\[[^\]]*?\]\([^)]*?\)""")
+        val entities = mutableListOf<String>()
+        val placeholderPrefix = "__MD_ENTITY__"
+        val placeholderSuffix = "__"
+
+        // 1. 将Markdown实体替换为占位符，以保护它们不被错误分割
+        var entityIndex = 0
+        val contentWithPlaceholders = markdownEntityRegex.replace(content) {
+            val placeholder = "$placeholderPrefix${entityIndex++}$placeholderSuffix"
+            entities.add(it.value)
+            placeholder
+        }
         
-        // 首先分离表情包和文本内容
-        val separatedContent = separateEmotionAndText(content)
+        // 2. 首先分离表情包和文本内容（在处理占位符版本的内容上）
+        val separatedContent = separateEmotionAndText(contentWithPlaceholders)
         
-        // 处理每个分离后的内容
-        val result = mutableListOf<String>()
+        // 3. 处理每个分离后的内容
+        val resultWithPlaceholders = mutableListOf<String>()
         
         for (item in separatedContent) {
             // 如果这个item是表情包（包含![开头的），直接添加
             if (item.startsWith("![")) {
-                result.add(item)
+                resultWithPlaceholders.add(item)
                 continue
             }
             
@@ -60,12 +74,31 @@ object WaifuMessageProcessor {
                 }.filter { it.isNotBlank() }
             }
             
-            result.addAll(sentences)
+            resultWithPlaceholders.addAll(sentences)
         }
         
-        android.util.Log.d("WaifuMessageProcessor", "分割出${result.size}个结果")
+        // 4. 将占位符恢复为原始的Markdown实体
+        val finalResult = resultWithPlaceholders.map { sentence ->
+            var currentSentence = sentence
+            val placeholderRegex = Regex("$placeholderPrefix(\\d+)$placeholderSuffix")
+            
+            // 循环替换，以处理一个句子中可能存在的多个占位符
+            while (placeholderRegex.containsMatchIn(currentSentence)) {
+                currentSentence = placeholderRegex.replace(currentSentence) { matchResult ->
+                    val index = matchResult.groupValues[1].toInt()
+                    if (index < entities.size) {
+                        entities[index]
+                    } else {
+                        matchResult.value // 理论上不会发生，作为安全回退
+                    }
+                }
+            }
+            currentSentence
+        }
+
+        android.util.Log.d("WaifuMessageProcessor", "分割出${finalResult.size}个结果")
         
-        return result
+        return finalResult
     }
     
     /**

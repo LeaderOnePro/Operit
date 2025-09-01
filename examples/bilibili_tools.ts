@@ -15,7 +15,8 @@
             "name": "get_danmaku",
             "description": "从Bilibili视频中获取弹幕。",
             "parameters": [
-                { "name": "url", "description": "Bilibili视频URL，例如：https://www.bilibili.com/video/BV1x341177NN", "type": "string", "required": true }
+                { "name": "url", "description": "Bilibili视频URL，例如：https://www.bilibili.com/video/BV1x341177NN", "type": "string", "required": true },
+                { "name": "count", "description": "要获取的弹幕数量，默认500，最多1000", "type": "number", "required": false }
             ]
         },
         {
@@ -293,7 +294,7 @@ const BilibiliVideoAnalysis = (function () {
         }
     }
 
-    async function get_danmaku_from_api(cid: number): Promise<{ danmaku: string[], error: string | null }> {
+    async function get_danmaku_from_api(cid: number, count: number): Promise<{ danmaku: string[], error: string | null }> {
         const danmaku_list: string[] = [];
         try {
             const url = `${API_GET_DANMAKU}?oid=${cid}`;
@@ -314,6 +315,9 @@ const BilibiliVideoAnalysis = (function () {
             const regex = /<d p=".*?">(.*?)<\/d>/g;
             let match;
             while ((match = regex.exec(danmaku_content)) !== null) {
+                if (danmaku_list.length >= count) {
+                    break;
+                }
                 danmaku_list.push(unescapeXml(match[1]));
             }
 
@@ -438,11 +442,16 @@ const BilibiliVideoAnalysis = (function () {
         return { success: true, message: `成功获取 ${subtitles.length} 门语言的字幕`, data: subtitles };
     }
 
-    async function get_danmaku(params: { url: string }): Promise<ToolResponse> {
+    async function get_danmaku(params: { url: string, count?: number }): Promise<ToolResponse> {
         await init();
-        const bvid = await extract_bvid(params.url);
+        const { url, count = 500 } = params;
+        const bvid = await extract_bvid(url);
         if (!bvid) {
-            return { success: false, message: `错误: 无法从 URL 提取 BV 号: ${params.url}` };
+            return { success: false, message: `错误: 无法从 URL 提取 BV 号: ${url}` };
+        }
+
+        if (count > 1000) {
+            return { success: false, message: "参数 'count' 不能超过 1000" };
         }
 
         const { aid, cid, error: infoError } = await get_video_basic_info(bvid);
@@ -453,7 +462,7 @@ const BilibiliVideoAnalysis = (function () {
             return { success: false, message: '获取视频 cid 失败' };
         }
 
-        const { danmaku, error: danmakuError } = await get_danmaku_from_api(cid);
+        const { danmaku, error: danmakuError } = await get_danmaku_from_api(cid, count);
         if (danmakuError) {
             return { success: false, message: `获取弹幕失败: ${danmakuError}` };
         }
@@ -708,12 +717,8 @@ const BilibiliVideoAnalysis = (function () {
         const subtitlesResult = await get_subtitles({ url: testUrl });
         console.log(JSON.stringify(subtitlesResult, null, 2));
 
-        console.log("\n[3/4] Testing get_danmaku...");
-        const danmakuResult = await get_danmaku({ url: testUrl });
-        // Print first 5 danmaku
-        if (danmakuResult.success && Array.isArray(danmakuResult.data)) {
-            danmakuResult.data = danmakuResult.data.slice(0, 5);
-        }
+        console.log("\n[3/4] Testing get_danmaku with count limit...");
+        const danmakuResult = await get_danmaku({ url: testUrl, count: 20 });
         console.log(JSON.stringify(danmakuResult, null, 2));
 
         console.log("\n[4/4] Testing get_comments...");
@@ -744,7 +749,7 @@ const BilibiliVideoAnalysis = (function () {
 
     return {
         get_subtitles: (params: { url: string }) => wrapToolExecution(get_subtitles, params),
-        get_danmaku: (params: { url: string }) => wrapToolExecution(get_danmaku, params),
+        get_danmaku: (params: { url: string, count?: number }) => wrapToolExecution(get_danmaku, params),
         get_comments: (params: { url: string }) => wrapToolExecution(get_comments, params),
         search_videos: (params: { keyword: string, page?: number, count?: number }) => wrapToolExecution(search_videos, params),
         get_user_info: (params: { mid: number }) => wrapToolExecution(get_user_info, params),

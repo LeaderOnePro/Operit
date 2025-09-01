@@ -326,7 +326,7 @@ fun StreamMarkdownRenderer(
 
     // 渲染Markdown内容
     Surface(modifier = modifier, color = Color.Transparent, shape = RoundedCornerShape(4.dp)) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column {
             key(rendererId) {
                 // 只渲染节点列表，内容更新不会触发重建
                 renderNodes.forEachIndexed { index, node ->
@@ -573,7 +573,7 @@ fun StreamMarkdownRenderer(
 
     // 渲染Markdown内容 - 这里保持原样，与流式渲染使用相同的组件结构
     Surface(modifier = modifier, color = Color.Transparent, shape = RoundedCornerShape(4.dp)) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column {
             key(rendererId) {
                 nodes.forEachIndexed { index, node ->
                     val nodeKey = "static-node-$rendererId-$index-${node.type}"
@@ -1082,7 +1082,7 @@ fun StableMarkdownNodeRenderer(
             var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
             Text(
                     text = inlineContent,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp).handleLinkClicks(onLinkClick, textLayoutResult, inlineContent),
+                    modifier = Modifier.padding(vertical = 1.dp).handleLinkClicks(onLinkClick, textLayoutResult, inlineContent),
                     inlineContent = inlineContentMap,
                     color = textColor,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1111,7 +1111,7 @@ fun StableMarkdownNodeRenderer(
             var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
             Text(
                     text = inlineContent,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp).handleLinkClicks(onLinkClick, textLayoutResult, inlineContent),
+                    modifier = Modifier.padding(vertical = 1.dp).handleLinkClicks(onLinkClick, textLayoutResult, inlineContent),
                     inlineContent = inlineContentMap,
                     color = textColor,
                     style = MaterialTheme.typography.bodyMedium,
