@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.CharacterCard
@@ -60,6 +61,7 @@ fun CharacterCardDialog(
     var fullScreenEditValue by remember { mutableStateOf("") }
     var fullScreenEditField by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
     val avatarUri by userPreferencesManager.getAiAvatarForCharacterCardFlow(characterCard.id)
         .collectAsState(initial = null)
 
@@ -108,10 +110,10 @@ fun CharacterCardDialog(
                         CompactTextFieldWithExpand(
                             value = name,
                             onValueChange = { name = it },
-                            label = "名称",
+                            label = stringResource(R.string.character_card_name),
                             singleLine = true,
                             onExpandClick = {
-                                fullScreenEditTitle = "编辑名称"
+                                fullScreenEditTitle = context.getString(R.string.character_card_edit_name)
                                 fullScreenEditValue = name
                                 fullScreenEditField = "name"
                                 showFullScreenEdit = true
@@ -123,10 +125,10 @@ fun CharacterCardDialog(
                         CompactTextFieldWithExpand(
                             value = description,
                             onValueChange = { description = it },
-                            label = "描述",
+                            label = stringResource(R.string.character_card_description),
                             maxLines = 2,
                             onExpandClick = {
-                                fullScreenEditTitle = "编辑描述"
+                                fullScreenEditTitle = context.getString(R.string.character_card_edit_description)
                                 fullScreenEditValue = description
                                 fullScreenEditField = "description"
                                 showFullScreenEdit = true
@@ -147,7 +149,7 @@ fun CharacterCardDialog(
                 ) {
                     // 角色设定
                     Text(
-                        text = "角色设定",
+                        text = stringResource(R.string.character_card_character_setting),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary
@@ -155,11 +157,11 @@ fun CharacterCardDialog(
                     CompactTextFieldWithExpand(
                         value = characterSetting,
                         onValueChange = { characterSetting = it },
-                        placeholder = "描述角色的性格特点...",
+                        placeholder = stringResource(R.string.character_card_character_setting_placeholder),
                         minLines = 2,
                         maxLines = 4,
                         onExpandClick = {
-                            fullScreenEditTitle = "编辑角色设定"
+                            fullScreenEditTitle = context.getString(R.string.character_card_edit_character_setting)
                             fullScreenEditValue = characterSetting
                             fullScreenEditField = "characterSetting"
                             showFullScreenEdit = true
@@ -168,7 +170,7 @@ fun CharacterCardDialog(
 
                     // 其他内容
                     Text(
-                        text = "其他内容",
+                        text = stringResource(R.string.character_card_other_content),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary
@@ -176,11 +178,11 @@ fun CharacterCardDialog(
                     CompactTextFieldWithExpand(
                         value = otherContent,
                         onValueChange = { otherContent = it },
-                        placeholder = "角色背景、经历等...",
+                        placeholder = stringResource(R.string.character_card_other_content_placeholder),
                         minLines = 2,
                         maxLines = 4,
                         onExpandClick = {
-                            fullScreenEditTitle = "编辑其他内容"
+                            fullScreenEditTitle = context.getString(R.string.character_card_edit_other_content)
                             fullScreenEditValue = otherContent
                             fullScreenEditField = "otherContent"
                             showFullScreenEdit = true
@@ -188,14 +190,14 @@ fun CharacterCardDialog(
                     )
 
                     // 标签选择
+                    Text(
+                        text = stringResource(R.string.character_card_tags),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     val customTags = allTags.filter { !it.isSystemTag }
                     if (customTags.isNotEmpty()) {
-                        Text(
-                            text = "标签",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -216,6 +218,16 @@ fun CharacterCardDialog(
                                 )
                             }
                         }
+                    } else {
+                        Text(
+                            text = stringResource(R.string.character_card_no_custom_tags),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            textAlign = TextAlign.Center
+                        )
                     }
 
                     // 高级选项折叠区域
@@ -234,7 +246,7 @@ fun CharacterCardDialog(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "高级选项",
+                            text = stringResource(R.string.character_card_advanced_options),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
@@ -246,12 +258,12 @@ fun CharacterCardDialog(
                         CompactTextFieldWithExpand(
                             value = advancedCustomPrompt,
                             onValueChange = { advancedCustomPrompt = it },
-                            label = "自定义提示词",
-                            placeholder = "高级自定义提示词...",
+                            label = stringResource(R.string.character_card_custom_prompt),
+                            placeholder = stringResource(R.string.character_card_custom_prompt_placeholder),
                             minLines = 2,
                             maxLines = 3,
                             onExpandClick = {
-                                fullScreenEditTitle = "编辑自定义提示词"
+                                fullScreenEditTitle = context.getString(R.string.character_card_edit_custom_prompt)
                                 fullScreenEditValue = advancedCustomPrompt
                                 fullScreenEditField = "advancedCustomPrompt"
                                 showFullScreenEdit = true
@@ -264,12 +276,12 @@ fun CharacterCardDialog(
                         CompactTextFieldWithExpand(
                             value = marks,
                             onValueChange = { marks = it },
-                            label = "备注",
-                            placeholder = "私人备注，不会影响AI...",
+                            label = stringResource(R.string.character_card_marks),
+                            placeholder = stringResource(R.string.character_card_marks_placeholder),
                             minLines = 1,
                             maxLines = 2,
                             onExpandClick = {
-                                fullScreenEditTitle = "编辑备注"
+                                fullScreenEditTitle = context.getString(R.string.character_card_edit_marks)
                                 fullScreenEditValue = marks
                                 fullScreenEditField = "marks"
                                 showFullScreenEdit = true
@@ -290,7 +302,7 @@ fun CharacterCardDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
-                        Text("取消", fontSize = 13.sp)
+                        Text(stringResource(R.string.cancel), fontSize = 13.sp)
                     }
                     
                     Button(
@@ -310,7 +322,7 @@ fun CharacterCardDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(6.dp)
                     ) {
-                        Text("保存", fontSize = 13.sp)
+                        Text(stringResource(R.string.save), fontSize = 13.sp)
                     }
                 }
             }
@@ -378,7 +390,7 @@ fun CompactTextFieldWithExpand(
         ) {
             Icon(
                 imageVector = Icons.Default.OpenInFull,
-                contentDescription = "大屏编辑",
+                contentDescription = stringResource(R.string.character_card_fullscreen_edit),
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
@@ -431,7 +443,7 @@ fun FullScreenEditDialog(
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "关闭"
+                            contentDescription = stringResource(R.string.close)
                         )
                     }
                 }
@@ -446,7 +458,7 @@ fun FullScreenEditDialog(
                         .fillMaxWidth()
                         .weight(1f),
                     shape = RoundedCornerShape(8.dp),
-                    placeholder = { Text("在此输入内容...") }
+                    placeholder = { Text(stringResource(R.string.character_card_fullscreen_edit_placeholder)) }
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -460,14 +472,14 @@ fun FullScreenEditDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("取消")
+                        Text(stringResource(R.string.cancel))
                     }
                     
                     Button(
                         onClick = { onSave(editValue) },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.save))
                     }
                 }
             }
@@ -499,14 +511,14 @@ fun CompactAvatarPicker(
             if (avatarUri != null) {
                 Image(
                     painter = rememberAsyncImagePainter(model = Uri.parse(avatarUri)),
-                    contentDescription = "头像",
+                    contentDescription = stringResource(R.string.character_card_avatar),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Person,
-                    contentDescription = "默认头像",
+                    contentDescription = stringResource(R.string.character_card_default_avatar),
                     modifier = Modifier.size(30.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -526,7 +538,7 @@ fun CompactAvatarPicker(
                     modifier = Modifier.size(12.dp)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
-                Text("重置", fontSize = 10.sp)
+                Text(stringResource(R.string.character_card_reset), fontSize = 10.sp)
             }
         } else {
             TextButton(
@@ -540,7 +552,7 @@ fun CompactAvatarPicker(
                     modifier = Modifier.size(12.dp)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
-                Text("添加", fontSize = 10.sp)
+                Text(stringResource(R.string.character_card_add), fontSize = 10.sp)
             }
         }
     }

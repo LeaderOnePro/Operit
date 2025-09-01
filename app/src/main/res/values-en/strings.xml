@@ -2390,7 +2390,6 @@
     <string name="view_details">View Details</string>
     <string name="create_character_card">Create Character Card</string>
     <string name="edit_character_card">Edit Character Card</string>
-    <string name="character_card_name">Character Card Name</string>
     <string name="description_optional">Description (Optional)</string>
     <string name="character_setting_prompt">Character Setting (Prompt)</string>
     <string name="other_content_prompt">Other Content (Prompt)</string>
@@ -2446,4 +2445,32 @@
     <string name="waifu_mode_explanation">• Normal Mode: AI responses sent all at once\n• Waifu Mode: AI responses split by sentences, each in separate bubbles\n• Smart Delay: Calculate delay time based on sentence length\n• Auto Cleanup: Remove status tags, show only plain text\n• Optional Features: Remove end punctuation, disable action emoticons, enable emoticons\n• Use Case: Simulate more natural conversation rhythm\n• Note: This mode may not adapt well to tool calls</string>
     <string name="settings_saved_message">Settings saved</string>
     
+    <!-- Character Card Dialog -->
+    <string name="character_card_name">Name</string>
+    <string name="character_card_description">Description</string>
+    <string name="character_card_character_setting">Character Setting</string>
+    <string name="character_card_character_setting_placeholder">Describe the character\'s personality traits...</string>
+    <string name="character_card_other_content">Other Content</string>
+    <string name="character_card_other_content_placeholder">Character background, experiences, etc...</string>
+    <string name="character_card_tags">Tags</string>
+    <string name="character_card_no_custom_tags">No custom tags available. Please create them in settings.</string>
+    <string name="character_card_advanced_options">Advanced Options</string>
+    <string name="character_card_custom_prompt">Custom Prompt</string>
+    <string name="character_card_custom_prompt_placeholder">Advanced custom prompt...</string>
+    <string name="character_card_marks">Notes</string>
+    <string name="character_card_marks_placeholder">Private notes, won\'t affect AI...</string>
+    <string name="character_card_edit_name">Edit Name</string>
+    <string name="character_card_edit_description">Edit Description</string>
+    <string name="character_card_edit_character_setting">Edit Character Setting</string>
+    <string name="character_card_edit_other_content">Edit Other Content</string>
+    <string name="character_card_edit_custom_prompt">Edit Custom Prompt</string>
+    <string name="character_card_edit_marks">Edit Notes</string>
+    <string name="character_card_fullscreen_edit_placeholder">Enter content here...</string>
+    <string name="character_card_fullscreen_edit">Fullscreen Edit</string>
+    <string name="character_card_avatar">Avatar</string>
+    <string name="character_card_default_avatar">Default Avatar</string>
+    <string name="character_card_reset">Reset</string>
+    <string name="character_card_add">Add</string>
+
+    <!-- Crash Report Screen -->
 </resources> 

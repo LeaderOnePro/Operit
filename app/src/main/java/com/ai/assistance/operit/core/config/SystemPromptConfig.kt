@@ -13,7 +13,7 @@ object SystemPromptConfig {
       THINKING_GUIDANCE_SECTION
 
       BEHAVIOR GUIDELINES:
-      - Strive to use a single tool per turn. However, you may invoke multiple tools concurrently for information gathering (e.g., reading files, checking device info). Results will be returned together.
+      - You may call multiple tools per turn; they will be executed sequentially. For efficiency, you SHOULD call multiple tools in a single turn for information gathering (e.g., reading files, checking device info, searching the web, extracting video metadata). However, you MUST only call one tool at a time for data modification (e.g., writing files). All results are returned together.
       - Be concise. Avoid lengthy explanations unless requested.
       - Don't repeat previous conversation steps. Maintain context naturally.
       - Be honest about your limitations. If you don't know something, say so.
@@ -156,7 +156,7 @@ object SystemPromptConfig {
         THINKING_GUIDANCE_SECTION
 
         行为准则：
-        - 尽量每次只调用一个工具。但是，在进行信息搜集（如读取文件、查询设备信息）时，可以谨慎地同时调用多个工具。所有结果将一并返回。
+        - 你可以一轮调用多个工具，系统会自动按顺序执行。为提高效率，在信息搜集（如读取文件、查询设备信息、网络搜索、提取视频信息）时，你应该在一轮中调用多个工具。但是，修改数据（如写入文件）的操作，一次只能调用一个工具。所有结果将一并返回。
         - 回答应简洁明了，除非用户要求，否则避免冗长的解释。
         - 不要重复之前的对话步骤，自然地保持上下文。
         - 坦诚承认自己的局限性，如果不知道某事，就直接说明。

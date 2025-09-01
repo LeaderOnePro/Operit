@@ -368,12 +368,6 @@ fun AIChatScreen(
     val showAiComputer by actualViewModel.showAiComputer.collectAsState()
     val view = LocalView.current
 
-    LaunchedEffect(showWebView) {
-        val window = (view.context as? android.app.Activity)?.window
-        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN)
-    }
-
-
     // 当手势状态改变时，通知父组件
     LaunchedEffect(chatScreenGestureConsumed, showWebView) {
         val finalGestureState = chatScreenGestureConsumed

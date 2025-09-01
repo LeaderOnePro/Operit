@@ -893,58 +893,56 @@ class EnhancedAIService private constructor(private val context: Context) {
                 }
             }
             
-            val executionResults = permittedInvocations.map { invocation ->
-                async {
-                    val executor = toolHandler.getToolExecutor(invocation.tool.name)
-                    if (executor == null) {
-                        val toolName = invocation.tool.name
-                        val errorMessage = when {
-                            toolName.contains('.') && !toolName.contains(':') -> {
-                                val parts = toolName.split('.', limit = 2)
-                                "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
-                            }
-                            toolName.contains(':') -> {
-                                val parts = toolName.split(':', limit = 2)
-                                val packName = parts[0]
-                                val packageManager = toolHandler.getOrCreatePackageManager()
-                                val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
-                                if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
-                                else "工具包 '$packName' 不存在。"
-                            }
-                            else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+            val executionResults = mutableListOf<ToolResult>()
+            for (invocation in permittedInvocations) {
+                val executor = toolHandler.getToolExecutor(invocation.tool.name)
+                if (executor == null) {
+                    val toolName = invocation.tool.name
+                    val errorMessage = when {
+                        toolName.contains('.') && !toolName.contains(':') -> {
+                            val parts = toolName.split('.', limit = 2)
+                            "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
                         }
-
-                        val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
-                        roundManager.appendContent(notAvailableContent)
-                        collector.emit(notAvailableContent)
-
-                        return@async listOf(ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage))
-                    }
-
-                    val collectedResults = mutableListOf<ToolResult>()
-                    ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
-                        collectedResults.add(result)
-                        val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
-                        roundManager.appendContent(toolResultStatusContent)
-                        collector.emit(toolResultStatusContent)
-                    }
-
-                    if (collectedResults.isNotEmpty()) {
-                        val lastResult = collectedResults.last()
-                        val combinedResultString = collectedResults.joinToString("\n") { res ->
-                            if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
+                        toolName.contains(':') -> {
+                            val parts = toolName.split(':', limit = 2)
+                            val packName = parts[0]
+                            val packageManager = toolHandler.getOrCreatePackageManager()
+                            val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
+                            if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
+                            else "工具包 '$packName' 不存在。"
                         }
-                        listOf(ToolResult(
-                                toolName = invocation.tool.name,
-                                success = lastResult.success,
-                                result = StringResultData(combinedResultString),
-                                error = lastResult.error
-                        ))
-                    } else {
-                        emptyList()
+                        else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
                     }
+
+                    val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
+                    roundManager.appendContent(notAvailableContent)
+                    collector.emit(notAvailableContent)
+
+                    executionResults.add(ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage))
+                    continue
                 }
-            }.awaitAll().flatten()
+
+                val collectedResults = mutableListOf<ToolResult>()
+                ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
+                    collectedResults.add(result)
+                    val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
+                    roundManager.appendContent(toolResultStatusContent)
+                    collector.emit(toolResultStatusContent)
+                }
+
+                if (collectedResults.isNotEmpty()) {
+                    val lastResult = collectedResults.last()
+                    val combinedResultString = collectedResults.joinToString("\n") { res ->
+                        if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
+                    }
+                    executionResults.add(ToolResult(
+                            toolName = invocation.tool.name,
+                            success = lastResult.success,
+                            result = StringResultData(combinedResultString),
+                            error = lastResult.error
+                    ))
+                }
+            }
 
             val allToolResults = permissionDeniedResults + executionResults
 

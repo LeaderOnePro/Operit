@@ -277,7 +277,7 @@ class CharacterCardManager private constructor(private val context: Context) {
             val cardListKey = CHARACTER_CARD_LIST
             val currentList = preferences[cardListKey]?.toMutableSet()
             
-            if (currentList == null) {
+            if (currentList == null || currentList.isEmpty()) {
                 isInitialized = true
                 // 首次安装，创建默认角色卡
                 val defaultCardId = DEFAULT_CHARACTER_CARD_ID
