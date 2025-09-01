@@ -2326,7 +2326,7 @@
     
     <!-- Tavern Character Card Import -->
     <string name="import_tavern_card">Import Tavern Card</string>
-    <string name="import_tavern_card_desc">Import character cards from tavern format files</string>
+    <string name="import_tavern_card_desc">Import character cards from JSON or PNG tavern format files</string>
     <string name="select_tavern_card_file">Select Tavern Card File</string>
     <string name="tavern_card_import_success">Tavern card imported successfully</string>
     <string name="tavern_card_import_failed">Failed to import tavern card</string>

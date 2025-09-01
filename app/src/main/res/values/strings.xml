@@ -2327,7 +2327,7 @@
     
     <!-- 酒馆角色卡导入 -->
     <string name="import_tavern_card">导入酒馆角色卡</string>
-    <string name="import_tavern_card_desc">从文件导入酒馆格式的角色卡</string>
+    <string name="import_tavern_card_desc">从JSON或PNG文件导入酒馆格式的角色卡</string>
     <string name="select_tavern_card_file">选择酒馆角色卡文件</string>
     <string name="tavern_card_import_success">酒馆角色卡导入成功</string>
     <string name="tavern_card_import_failed">酒馆角色卡导入失败</string>

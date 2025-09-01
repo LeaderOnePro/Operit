@@ -137,16 +137,46 @@ fun ModelPromptsSettingsScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let {
+        uri?.let { fileUri ->
             scope.launch {
                 try {
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val reader = BufferedReader(InputStreamReader(inputStream))
-                    val jsonContent = reader.readText()
-                    reader.close()
-                    
-                    val result = characterCardManager.createCharacterCardFromTavernJson(jsonContent)
-                    result.onSuccess { newCardId ->
+                    val mimeType = context.contentResolver.getType(fileUri)
+                    val fileName = fileUri.lastPathSegment ?: ""
+
+                    val result = when {
+                        mimeType == "image/png" || fileName.lowercase().endsWith(".png") -> {
+                            context.contentResolver.openInputStream(fileUri).use { inputStream ->
+                                requireNotNull(inputStream) { "无法读取文件" }
+                                characterCardManager.createCharacterCardFromTavernPng(inputStream)
+                            }
+                        }
+                        mimeType == "application/json" || fileName.lowercase().endsWith(".json") -> {
+                            context.contentResolver.openInputStream(fileUri).use { inputStream ->
+                                requireNotNull(inputStream) { "无法读取文件" }
+                                val jsonContent = inputStream.bufferedReader().readText()
+                                characterCardManager.createCharacterCardFromTavernJson(jsonContent)
+                            }
+                        }
+                        else -> {
+                            // Fallback for unknown file types
+                            try {
+                                // Try JSON first
+                                context.contentResolver.openInputStream(fileUri).use { inputStream ->
+                                    requireNotNull(inputStream) { "无法读取文件" }
+                                    val jsonContent = inputStream.bufferedReader().readText()
+                                    characterCardManager.createCharacterCardFromTavernJson(jsonContent)
+                                }
+                            } catch (e: Exception) {
+                                // If JSON fails, try PNG
+                                context.contentResolver.openInputStream(fileUri).use { inputStream ->
+                                    requireNotNull(inputStream) { "无法读取文件" }
+                                    characterCardManager.createCharacterCardFromTavernPng(inputStream)
+                                }
+                            }
+                        }
+                    }
+
+                    result.onSuccess {
                         showImportSuccessMessage = true
                         refreshTrigger++
                     }.onFailure { exception ->
@@ -354,7 +384,7 @@ fun ModelPromptsSettingsScreen(
                         },
                         onNavigateToPersonaGeneration = onNavigateToPersonaGeneration,
                         onImportTavernCard = {
-                            filePickerLauncher.launch("application/json")
+                            filePickerLauncher.launch("*/*")
                         }
                     )
                     1 -> TagTab(

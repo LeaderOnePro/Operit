@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 import android.util.Log
+import android.util.Base64
+import java.io.InputStream
+import java.io.ByteArrayOutputStream
 
 private val Context.characterCardDataStore by preferencesDataStore(
     name = "character_cards"
@@ -357,6 +360,95 @@ class CharacterCardManager private constructor(private val context: Context) {
             Result.failure(Exception("JSON格式错误: ${e.message}"))
         } catch (e: Exception) {
             Result.failure(Exception("解析失败: ${e.message}"))
+        }
+    }
+    
+    /**
+     * 从PNG图片文件中提取酒馆角色卡数据
+     */
+    suspend fun createCharacterCardFromTavernPng(inputStream: InputStream): Result<String> {
+        return try {
+            val jsonString = extractJsonFromPng(inputStream)
+            createCharacterCardFromTavernJson(jsonString)
+        } catch (e: Exception) {
+            Result.failure(Exception("PNG解析失败: ${e.message}"))
+        }
+    }
+    
+    /**
+     * 从PNG图片的tEXt块中提取JSON数据
+     */
+    private fun extractJsonFromPng(inputStream: InputStream): String {
+        val bytes = inputStream.readBytes()
+        
+        // PNG文件头检查
+        if (bytes.size < 8 || !isPngHeader(bytes)) {
+            throw Exception("不是有效的PNG文件")
+        }
+        
+        var offset = 8 // 跳过PNG头
+        
+        while (offset < bytes.size - 12) { // 确保有足够的字节读取块头
+            // 读取块长度
+            val chunkLength = readUInt32BigEndian(bytes, offset)
+            offset += 4
+            
+            // 读取块类型
+            val chunkType = String(bytes.sliceArray(offset until offset + 4), Charsets.ISO_8859_1)
+            offset += 4
+            
+            // 如果是tEXt块
+            if (chunkType == "tEXt") {
+                val chunkData = bytes.sliceArray(offset until offset + chunkLength.toInt())
+                val textData = String(chunkData, Charsets.ISO_8859_1)
+                
+                // 查找关键字"chara"
+                val nullIndex = textData.indexOf('\u0000')
+                if (nullIndex > 0) {
+                    val keyword = textData.substring(0, nullIndex)
+                    if (keyword == "chara") {
+                        val base64Data = textData.substring(nullIndex + 1)
+                        return decodeBase64ToJson(base64Data)
+                    }
+                }
+            }
+            
+            // 跳到下一个块 (数据长度 + 4字节CRC)
+            offset += chunkLength.toInt() + 4
+        }
+        
+        throw Exception("在PNG文件中未找到角色卡数据")
+    }
+    
+    /**
+     * 检查PNG文件头
+     */
+    private fun isPngHeader(bytes: ByteArray): Boolean {
+        val pngSignature = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+        )
+        return bytes.size >= 8 && bytes.sliceArray(0..7).contentEquals(pngSignature)
+    }
+    
+    /**
+     * 从字节数组中读取大端序的32位无符号整数
+     */
+    private fun readUInt32BigEndian(bytes: ByteArray, offset: Int): Long {
+        return (((bytes[offset].toInt() and 0xFF) shl 24) or
+               ((bytes[offset + 1].toInt() and 0xFF) shl 16) or
+               ((bytes[offset + 2].toInt() and 0xFF) shl 8) or
+               (bytes[offset + 3].toInt() and 0xFF)).toLong()
+    }
+    
+    /**
+     * 解码Base64数据为JSON字符串
+     */
+    private fun decodeBase64ToJson(base64Data: String): String {
+        try {
+            val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+            return String(decodedBytes, Charsets.UTF_8)
+        } catch (e: Exception) {
+            throw Exception("Base64解码失败: ${e.message}")
         }
     }
     
