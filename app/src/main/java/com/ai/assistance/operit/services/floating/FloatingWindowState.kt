@@ -8,7 +8,10 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.ui.floating.FloatingMode
 
 class FloatingWindowState(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("floating_chat_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("floating_chat_prefs", Context.MODE_PRIVATE)
+    private val screenWidthDp: Dp
+    private val screenHeightDp: Dp
 
     // Window position
     var x: Int = 0
@@ -37,6 +40,9 @@ class FloatingWindowState(context: Context) {
     val transitionDebounceTime = 500L // 防抖时间
 
     init {
+        val displayMetrics = context.resources.displayMetrics
+        screenWidthDp = (displayMetrics.widthPixels / displayMetrics.density).dp
+        screenHeightDp = (displayMetrics.heightPixels / displayMetrics.density).dp
         restoreState()
     }
 
@@ -57,24 +63,37 @@ class FloatingWindowState(context: Context) {
     fun restoreState() {
         x = prefs.getInt("window_x", 0)
         y = prefs.getInt("window_y", 100)
-        windowWidth.value = Dp(prefs.getFloat("window_width", 300f).coerceAtLeast(200f))
-        windowHeight.value = Dp(prefs.getFloat("window_height", 400f).coerceAtLeast(250f))
 
-        val currentModeName = prefs.getString("current_mode", FloatingMode.WINDOW.name) ?: FloatingMode.WINDOW.name
-        val previousModeName = prefs.getString("previous_mode", FloatingMode.WINDOW.name) ?: FloatingMode.WINDOW.name
+        // 读取已保存的宽高，并限制在屏幕范围内
+        val savedWidth = Dp(prefs.getFloat("window_width", 300f))
+        val savedHeight = Dp(prefs.getFloat("window_height", 400f))
 
-        currentMode.value = try {
-            FloatingMode.valueOf(if (currentModeName == "LIVE2D") "DragonBones" else currentModeName)
-        } catch (e: IllegalArgumentException) {
-            FloatingMode.WINDOW // Fallback to default
-        }
+        windowWidth.value = savedWidth.coerceIn(200.dp, screenWidthDp * 0.95f)
+        windowHeight.value = savedHeight.coerceIn(250.dp, screenHeightDp * 0.95f)
 
-        previousMode = try {
-            FloatingMode.valueOf(if (previousModeName == "LIVE2D") "DragonBones" else previousModeName)
-        } catch (e: IllegalArgumentException) {
-            FloatingMode.WINDOW // Fallback to default
-        }
-        
+        val currentModeName =
+            prefs.getString("current_mode", FloatingMode.WINDOW.name) ?: FloatingMode.WINDOW.name
+        val previousModeName =
+            prefs.getString("previous_mode", FloatingMode.WINDOW.name) ?: FloatingMode.WINDOW.name
+
+        currentMode.value =
+            try {
+                FloatingMode.valueOf(
+                    if (currentModeName == "LIVE2D") "DragonBones" else currentModeName
+                )
+            } catch (e: IllegalArgumentException) {
+                FloatingMode.WINDOW // Fallback to default
+            }
+
+        previousMode =
+            try {
+                FloatingMode.valueOf(
+                    if (previousModeName == "LIVE2D") "DragonBones" else previousModeName
+                )
+            } catch (e: IllegalArgumentException) {
+                FloatingMode.WINDOW // Fallback to default
+            }
+
         windowScale.value = prefs.getFloat("window_scale", 1.0f).coerceIn(0.5f, 1.0f)
         lastWindowScale = prefs.getFloat("last_window_scale", 1.0f).coerceIn(0.5f, 1.0f)
     }

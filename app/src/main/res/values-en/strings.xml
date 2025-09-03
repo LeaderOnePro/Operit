@@ -2473,4 +2473,9 @@
     <string name="character_card_add">Add</string>
 
     <!-- Crash Report Screen -->
+    <string name="delete_character_card">Delete Character Card</string>
+    <string name="delete_character_card_confirm">Are you sure you want to delete character card "%1$s"? This action cannot be undone.</string>
+    <string name="delete_tag">Delete Tag</string>
+    <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
+
 </resources> 

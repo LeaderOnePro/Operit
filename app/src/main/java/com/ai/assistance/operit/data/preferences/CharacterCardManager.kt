@@ -196,6 +196,7 @@ class CharacterCardManager private constructor(private val context: Context) {
                 "character_card_${id}_other_content",
                 "character_card_${id}_attached_tag_ids",
                 "character_card_${id}_advanced_custom_prompt",
+                "character_card_${id}_marks",
                 "character_card_${id}_is_default",
                 "character_card_${id}_created_at",
                 "character_card_${id}_updated_at"

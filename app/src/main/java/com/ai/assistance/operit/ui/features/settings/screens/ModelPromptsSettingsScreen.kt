@@ -78,6 +78,11 @@ fun ModelPromptsSettingsScreen(
     var showEditCharacterCardDialog by remember { mutableStateOf(false) }
     var editingCharacterCard by remember { mutableStateOf<CharacterCard?>(null) }
     
+    // 删除确认对话框状态
+    var showDeleteCharacterCardConfirm by remember { mutableStateOf(false) }
+    var deletingCharacterCardId by remember { mutableStateOf("") }
+    var deletingCharacterCardName by remember { mutableStateOf("") }
+    
     // 酒馆角色卡导入相关状态
     var showImportSuccessMessage by remember { mutableStateOf(false) }
     var showImportErrorMessage by remember { mutableStateOf(false) }
@@ -197,6 +202,11 @@ fun ModelPromptsSettingsScreen(
     var showEditTagDialog by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<PromptTag?>(null) }
 
+    // 标签删除确认对话框状态
+    var showDeleteTagConfirm by remember { mutableStateOf(false) }
+    var deletingTagId by remember { mutableStateOf("") }
+    var deletingTagName by remember { mutableStateOf("") }
+
     // 旧配置相关状态
     val oldProfileList by oldPromptPreferencesManager.profileListFlow.collectAsState(initial = emptyList())
     var showOldConfigDialog by remember { mutableStateOf(false) }
@@ -279,6 +289,25 @@ fun ModelPromptsSettingsScreen(
     fun deleteCharacterCard(id: String) {
         scope.launch {
             characterCardManager.deleteCharacterCard(id)
+            refreshTrigger++
+        }
+    }
+    
+    // 显示删除角色卡确认对话框
+    fun showDeleteCharacterCardConfirm(id: String, name: String) {
+        deletingCharacterCardId = id
+        deletingCharacterCardName = name
+        showDeleteCharacterCardConfirm = true
+    }
+    
+    // 确认删除角色卡
+    fun confirmDeleteCharacterCard() {
+        scope.launch {
+            characterCardManager.deleteCharacterCard(deletingCharacterCardId)
+            showDeleteCharacterCardConfirm = false
+            deletingCharacterCardId = ""
+            deletingCharacterCardName = ""
+            refreshTrigger++
         }
     }
     
@@ -288,6 +317,23 @@ fun ModelPromptsSettingsScreen(
             promptTagManager.deletePromptTag(id)
             }
         }
+    
+    // 显示删除标签确认对话框
+    fun showDeleteTagConfirm(id: String, name: String) {
+        deletingTagId = id
+        deletingTagName = name
+        showDeleteTagConfirm = true
+    }
+    
+    // 确认删除标签
+    fun confirmDeleteTag() {
+        scope.launch {
+            promptTagManager.deletePromptTag(deletingTagId)
+            showDeleteTagConfirm = false
+            deletingTagId = ""
+            deletingTagName = ""
+        }
+    }
     
     CustomScaffold() { paddingValues ->
         Box(
@@ -376,7 +422,7 @@ fun ModelPromptsSettingsScreen(
                             editingCharacterCard = card.copy()
                             showEditCharacterCardDialog = true
                         },
-                        onDeleteCharacterCard = { deleteCharacterCard(it) },
+                        onDeleteCharacterCard = { card -> showDeleteCharacterCardConfirm(card.id, card.name) },
                         onSetActiveCharacterCard = { cardId ->
                             scope.launch {
                                 characterCardManager.setActiveCharacterCard(cardId)
@@ -403,7 +449,7 @@ fun ModelPromptsSettingsScreen(
                             editingTag = tag.copy()
                             showEditTagDialog = true
                         },
-                        onDeleteTag = { deleteTag(it) },
+                        onDeleteTag = { tag -> showDeleteTagConfirm(tag.id, tag.name) },
                         onNavigateToMarket = onNavigateToMarket
                     )
                     2 -> OldConfigTab(
@@ -668,6 +714,68 @@ fun ModelPromptsSettingsScreen(
         )
     }
     
+    // 删除角色卡确认对话框
+    if (showDeleteCharacterCardConfirm) {
+        AlertDialog(
+            onDismissRequest = { 
+                showDeleteCharacterCardConfirm = false
+                deletingCharacterCardId = ""
+                deletingCharacterCardName = ""
+            },
+            title = { Text(stringResource(R.string.delete_character_card)) },
+            text = { Text(stringResource(R.string.delete_character_card_confirm, deletingCharacterCardName)) },
+            confirmButton = {
+                Button(
+                    onClick = { confirmDeleteCharacterCard() }
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showDeleteCharacterCardConfirm = false
+                        deletingCharacterCardId = ""
+                        deletingCharacterCardName = ""
+                    }
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
+    // 删除标签确认对话框
+    if (showDeleteTagConfirm) {
+        AlertDialog(
+            onDismissRequest = { 
+                showDeleteTagConfirm = false
+                deletingTagId = ""
+                deletingTagName = ""
+            },
+            title = { Text(stringResource(R.string.delete_tag)) },
+            text = { Text(stringResource(R.string.delete_tag_confirm, deletingTagName)) },
+            confirmButton = {
+                Button(
+                    onClick = { confirmDeleteTag() }
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showDeleteTagConfirm = false
+                        deletingTagId = ""
+                        deletingTagName = ""
+                    }
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    
     // 成功保存消息
 }
 
@@ -679,7 +787,7 @@ fun CharacterCardTab(
     allTags: List<PromptTag>,
     onAddCharacterCard: () -> Unit,
     onEditCharacterCard: (CharacterCard) -> Unit,
-    onDeleteCharacterCard: (String) -> Unit,
+    onDeleteCharacterCard: (CharacterCard) -> Unit,
     onSetActiveCharacterCard: (String) -> Unit,
     onNavigateToPersonaGeneration: () -> Unit,
     onImportTavernCard: () -> Unit
@@ -749,7 +857,7 @@ fun CharacterCardTab(
                 isActive = characterCard.id == activeCharacterCardId,
                 allTags = allTags,
                 onEdit = { onEditCharacterCard(characterCard) },
-                onDelete = { onDeleteCharacterCard(characterCard.id) },
+                onDelete = { onDeleteCharacterCard(characterCard) },
                 onSetActive = { onSetActiveCharacterCard(characterCard.id) }
             )
         }
@@ -922,7 +1030,7 @@ fun TagTab(
     tags: List<PromptTag>,
     onAddTag: () -> Unit,
     onEditTag: (PromptTag) -> Unit,
-    onDeleteTag: (String) -> Unit,
+    onDeleteTag: (PromptTag) -> Unit,
     onNavigateToMarket: () -> Unit
 ) {
     LazyColumn(
@@ -986,7 +1094,7 @@ fun TagTab(
                 TagItem(
                     tag = tag,
                     onEdit = { onEditTag(tag) },
-                    onDelete = { onDeleteTag(tag.id) }
+                    onDelete = { onDeleteTag(tag) }
                 )
             }
         }
@@ -1007,7 +1115,7 @@ fun TagTab(
                 TagItem(
                     tag = tag,
                     onEdit = { onEditTag(tag) },
-                    onDelete = { onDeleteTag(tag.id) }
+                    onDelete = { onDeleteTag(tag) }
                 )
             }
         }

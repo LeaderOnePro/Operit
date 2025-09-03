@@ -2474,4 +2474,9 @@
     <string name="character_card_add">添加</string>
     
     <!-- 权限请求 -->
+    <string name="delete_character_card">删除角色卡</string>
+    <string name="delete_character_card_confirm">确定要删除角色卡「%1$s」吗？此操作不可撤销。</string>
+    <string name="delete_tag">删除标签</string>
+    <string name="delete_tag_confirm">确定要删除标签「%1$s」吗？此操作不可撤销。</string>
+
 </resources>
