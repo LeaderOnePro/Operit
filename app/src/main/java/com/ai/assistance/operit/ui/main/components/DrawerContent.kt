@@ -53,7 +53,7 @@ fun DrawerContent(
                                 .padding(end = 8.dp) // Add some end padding
         ) {
                 // 抽屉标题
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(54.dp))
                 Text(
                         text = stringResource(id = R.string.app_name),
                         style = MaterialTheme.typography.headlineMedium,

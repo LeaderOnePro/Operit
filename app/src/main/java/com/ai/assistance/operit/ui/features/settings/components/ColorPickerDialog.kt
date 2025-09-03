@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,11 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.ui.theme.getTextColorForBackground
 import com.ai.assistance.operit.ui.theme.isHighContrast
 import com.github.skydoves.colorpicker.compose.*
 import kotlinx.coroutines.launch
+import kotlin.math.*
 
 /**
  * Material colors for the color picker
@@ -41,6 +48,46 @@ val materialColors = listOf(
     Color(0xFF5D4037), // Brown 700
     Color(0xFF455A64)  // Blue Grey 700
 )
+
+/**
+ * Convert Color to HSV values
+ */
+fun Color.toHsv(): FloatArray {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(this.toArgb(), hsv)
+    return hsv
+}
+
+/**
+ * Create Color from HSV values
+ */
+fun hsvToColor(h: Float, s: Float, v: Float): Color {
+    val hsv = floatArrayOf(h, s, v)
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+/**
+ * Parse hex color string to Color
+ */
+fun parseHexColor(hex: String): Color? {
+    return try {
+        val cleanHex = hex.trim().removePrefix("#")
+        when (cleanHex.length) {
+            6 -> Color(android.graphics.Color.parseColor("#$cleanHex"))
+            8 -> Color(android.graphics.Color.parseColor("#$cleanHex"))
+            3 -> {
+                // Convert 3-digit hex to 6-digit
+                val r = cleanHex[0].toString().repeat(2)
+                val g = cleanHex[1].toString().repeat(2)
+                val b = cleanHex[2].toString().repeat(2)
+                Color(android.graphics.Color.parseColor("#$r$g$b"))
+            }
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
 
 /**
  * A dialog with HSV color picker
@@ -91,6 +138,64 @@ fun ColorPickerDialog(
 
     // The controller's selected color is the source of truth for our UI.
     val pickedColor by pickerController.selectedColor
+
+    // Manual input states
+    var inputMode by remember { mutableStateOf("HEX") } // HEX, RGB, HSV
+    var hexInput by remember { mutableStateOf("") }
+    var rgbR by remember { mutableStateOf("") }
+    var rgbG by remember { mutableStateOf("") }
+    var rgbB by remember { mutableStateOf("") }
+    var hsvH by remember { mutableStateOf("") }
+    var hsvS by remember { mutableStateOf("") }
+    var hsvV by remember { mutableStateOf("") }
+    
+    val clipboardManager = LocalClipboardManager.current
+
+    // Update input fields when picked color changes
+    LaunchedEffect(pickedColor) {
+        val color = pickedColor
+        // Update HEX
+        hexInput = String.format("#%06X", (0xFFFFFF and color.toArgb()))
+        
+        // Update RGB
+        rgbR = (color.red * 255).toInt().toString()
+        rgbG = (color.green * 255).toInt().toString()
+        rgbB = (color.blue * 255).toInt().toString()
+        
+        // Update HSV
+        val hsv = color.toHsv()
+        hsvH = hsv[0].toInt().toString()
+        hsvS = (hsv[1] * 100).toInt().toString()
+        hsvV = (hsv[2] * 100).toInt().toString()
+    }
+
+    // Function to apply color from manual input
+    fun applyManualColor() {
+        val newColor = when (inputMode) {
+            "HEX" -> parseHexColor(hexInput)
+            "RGB" -> {
+                try {
+                    val r = rgbR.toIntOrNull()?.coerceIn(0, 255) ?: return
+                    val g = rgbG.toIntOrNull()?.coerceIn(0, 255) ?: return
+                    val b = rgbB.toIntOrNull()?.coerceIn(0, 255) ?: return
+                    Color(r / 255f, g / 255f, b / 255f)
+                } catch (e: Exception) { null }
+            }
+            "HSV" -> {
+                try {
+                    val h = hsvH.toFloatOrNull()?.coerceIn(0f, 360f) ?: return
+                    val s = (hsvS.toFloatOrNull()?.coerceIn(0f, 100f) ?: return) / 100f
+                    val v = (hsvV.toFloatOrNull()?.coerceIn(0f, 100f) ?: return) / 100f
+                    hsvToColor(h, s, v)
+                } catch (e: Exception) { null }
+            }
+            else -> null
+        }
+        
+        newColor?.let { color ->
+            pickerController.selectByColor(color, fromUser = true)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -173,6 +278,162 @@ fun ColorPickerDialog(
                                 color = contrastColor,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
+                        }
+                    }
+                }
+
+                // Manual input section
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "手动输入颜色",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        // Input mode selection
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("HEX", "RGB", "HSV").forEach { mode ->
+                                FilterChip(
+                                    onClick = { inputMode = mode },
+                                    label = { Text(mode) },
+                                    selected = inputMode == mode,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        // Input fields based on selected mode
+                        when (inputMode) {
+                            "HEX" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = hexInput,
+                                        onValueChange = { hexInput = it.uppercase() },
+                                        label = { Text("HEX") },
+                                        placeholder = { Text("#FF0000") },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        trailingIcon = {
+                                            IconButton(
+                                                onClick = {
+                                                    clipboardManager.getText()?.text?.let { text ->
+                                                        hexInput = text.trim()
+                                                        applyManualColor()
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(Icons.Default.ContentPaste, "粘贴")
+                                            }
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    TextButton(onClick = { applyManualColor() }) {
+                                        Text("应用")
+                                    }
+                                }
+                            }
+                            "RGB" -> {
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = rgbR,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) rgbR = it },
+                                            label = { Text("R") },
+                                            placeholder = { Text("255") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = rgbG,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) rgbG = it },
+                                            label = { Text("G") },
+                                            placeholder = { Text("0") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = rgbB,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) rgbB = it },
+                                            label = { Text("B") },
+                                            placeholder = { Text("0") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = { applyManualColor() },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("应用 RGB")
+                                    }
+                                }
+                            }
+                            "HSV" -> {
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = hsvH,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) hsvH = it },
+                                            label = { Text("H") },
+                                            placeholder = { Text("360") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = hsvS,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) hsvS = it },
+                                            label = { Text("S%") },
+                                            placeholder = { Text("100") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                        OutlinedTextField(
+                                            value = hsvV,
+                                            onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 3) hsvV = it },
+                                            label = { Text("V%") },
+                                            placeholder = { Text("100") },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                        )
+                                    }
+                                    Text(
+                                        text = "H: 0-360°, S: 0-100%, V: 0-100%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                    TextButton(
+                                        onClick = { applyManualColor() },
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("应用 HSV")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -303,7 +564,8 @@ fun ColorPickerDialog(
                         "pipIcon" -> onColorSelected(null, null, null, null, newColor)
                     }
                     onDismiss()
-                }
+                },
+                shape = RoundedCornerShape(8.dp)
             ) { Text("确定") }
         },
         dismissButton = {
