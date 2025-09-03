@@ -104,7 +104,7 @@ object WaifuMessageProcessor {
     /**
      * 清理内容中的状态标签和XML标签，只保留纯文本
      */
-    private fun cleanContentForWaifu(content: String): String {
+    fun cleanContentForWaifu(content: String): String {
         return content
             // 移除状态标签
             .replace(Regex("<status[^>]*>.*?</status>", RegexOption.DOT_MATCHES_ALL), "")

@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
+import com.ai.assistance.operit.util.WaifuMessageProcessor
 
 enum class ChatStyle {
     CURSOR,
@@ -366,7 +367,7 @@ private fun MessageItem(
                     )
                 },
                 onClick = {
-                    onSpeakMessage?.invoke(message.content)
+                    onSpeakMessage?.invoke(WaifuMessageProcessor.cleanContentForWaifu(message.content))
                     showContextMenu = false
                 },
                 leadingIcon = {
