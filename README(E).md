@@ -20,10 +20,10 @@
 
 <div align="center">
   <div style="padding: 10px 0; text-align: center;">
-    <img src="docx/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
   <p><b>🚀 We need your help to promote this application and gain more visibility! 🚀</b></p>
 </div>
@@ -66,17 +66,17 @@ Design web pages on your phone and export them as standalone apps, useful for pe
   <div style="margin: 20px 0;">
     <!-- Desktop Screenshot -->
     <figure style="margin-bottom: 15px;">
-      <img src="docx/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" style="max-width: 90%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Desktop">
+      <img src="docs/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" style="max-width: 90%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Desktop">
       <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">I used AI to create a music game with a built-in fast-paced background music</figcaption>
     </figure>
     <!-- Mobile Screenshots -->
     <div>
       <figure style="display: inline-block; margin: 0 5px; vertical-align: top;">
-        <img src="docx/assets/webdev/6b0f3650dd4c5709069d2e4201d3cb9.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 1">
+        <img src="docs/assets/webdev/6b0f3650dd4c5709069d2e4201d3cb9.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 1">
         <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Building the site via chat.</figcaption>
       </figure>
       <figure style="display: inline-block; margin: 0 5px; vertical-align: top;">
-        <img src="docx/assets/webdev/9e43331c5f055b1bd82cd0f7d74704d.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 2">
+        <img src="docs/assets/webdev/9e43331c5f055b1bd82cd0f7d74704d.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 2">
         <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Previewing the site on mobile.</figcaption>
       </figure>
     </div>
@@ -91,7 +91,7 @@ Operit AI supports a floating window mode and convenient attachment uploads, all
 <div align="center">
   <div style="margin: 20px 0;">
     <figure style="display: inline-block; margin: 0 10px;">
-      <img src="docx/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Floating Window and Attachments">
+      <img src="docs/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Floating Window and Attachments">
       <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">The floating window, chat overlay, and attachment menu.</figcaption>
     </figure>
   </div>
@@ -105,11 +105,11 @@ Operit AI offers a rich plugin ecosystem. Combined with built-in tools, it can h
 <div align="center">
   <div style="margin: 20px 0;">
     <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
-      <img src="docx/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Package List">
+      <img src="docs/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Package List">
       <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">The Package Manager to enable plugins.</figcaption>
     </figure>
     <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
-      <img src="docx/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Set Alarm and Date">
+      <img src="docs/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Set Alarm and Date">
       <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Using tools to set an alarm and get the date.</figcaption>
     </figure>
   </div>

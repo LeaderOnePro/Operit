@@ -125,12 +125,12 @@ class MessageProcessingDelegate(
 
             lateinit var aiMessage: ChatMessage
             try {
-                if (!NetworkUtils.isNetworkAvailable(context)) {
-                    withContext(Dispatchers.Main) { showErrorMessage("网络连接不可用") }
-                    _isLoading.value = false
-                    _inputProcessingState.value = EnhancedInputProcessingState.Idle
-                    return@launch
-                }
+                // if (!NetworkUtils.isNetworkAvailable(context)) {
+                //     withContext(Dispatchers.Main) { showErrorMessage("网络连接不可用") }
+                //     _isLoading.value = false
+                //     _inputProcessingState.value = EnhancedInputProcessingState.Idle
+                //     return@launch
+                // }
 
                 val service =
                     getEnhancedAiService()

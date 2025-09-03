@@ -1182,7 +1182,6 @@ fun TagDialog(
     var name by remember { mutableStateOf(tag.name) }
     var description by remember { mutableStateOf(tag.description) }
     var promptContent by remember { mutableStateOf(tag.promptContent) }
-    var tagType by remember { mutableStateOf(tag.tagType) }
     
         AlertDialog(
         onDismissRequest = onDismiss,
@@ -1214,28 +1213,7 @@ fun TagDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                if (!tag.isSystemTag) {
-                    // 只有自定义标签可以选择类型
-                    Text(
-                        text = stringResource(R.string.tag_type),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        TagType.values().filter { it != TagType.CUSTOM }.forEach { type ->
-                            FilterChip(
-                                selected = tagType == type,
-                                onClick = { tagType = type },
-                                label = { Text(type.name) }
-                            )
-                        }
-                    }
-                }
-                
-                    OutlinedTextField(
+                OutlinedTextField(
                     value = promptContent,
                     onValueChange = { promptContent = it },
                     label = { Text(stringResource(R.string.prompt_content)) },
@@ -1252,7 +1230,7 @@ fun TagDialog(
                             name = name,
                             description = description,
                             promptContent = promptContent,
-                            tagType = tagType
+                            tagType = tag.tagType
                         )
                     )
                 }

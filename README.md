@@ -20,10 +20,10 @@
 
 <div align="center">
   <div style="padding: 10px 0; text-align: center;">
-    <img src="docx/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit预览图1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit预览图2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit预览图3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docx/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit预览图4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit预览图1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit预览图2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit预览图3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit预览图4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
   <p><b>🚀 我们非常需要各位去推广这个软件来获取更高的关注度 🚀</b></p>
 </div>
@@ -65,11 +65,11 @@ Operit AI 现已支持**本地语音对话**与**UI自动化**的无缝结合。
 <div align="center">
   <div style="margin: 20px 0;">
     <!-- 桌面端截图 -->
-    <img src="docx/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" style="max-width: 90%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin-bottom: 15px;">
+    <img src="docs/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" style="max-width: 90%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin-bottom: 15px;">
     <!-- 移动端截图 -->
     <div>
-      <img src="docx/assets/webdev/6b0f3650dd4c5709069d2e4201d3cb9.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 5px; display: inline-block;">
-      <img src="docx/assets/webdev/9e43331c5f055b1bd82cd0f7d74704d.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 5px; display: inline-block;">
+      <img src="docs/assets/webdev/6b0f3650dd4c5709069d2e4201d3cb9.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 5px; display: inline-block;">
+      <img src="docs/assets/webdev/9e43331c5f055b1bd82cd0f7d74704d.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 5px; display: inline-block;">
     </div>
   </div>
   <p>👆 网页应用开发，支持导出为独立应用和多种交互体验</p>
@@ -81,7 +81,7 @@ Operit AI 支持悬浮窗模式和便捷的附件上传，随时调用AI功能�
 
 <div align="center">
   <div style="margin: 20px 0;">
-    <img src="docx/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px;">
+    <img src="docs/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px;">
   </div>
   <p>👆 悬浮窗随时调用，附件功能便捷共享</p>
 </div>
@@ -92,8 +92,8 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 
 <div align="center">
   <div style="margin: 20px 0;">
-    <img src="docx/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
-    <img src="docx/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
+    <img src="docs/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
+    <img src="docs/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
   </div>
   <p>👆 丰富的插件生态系统和内置工具，各种功能一触即发</p>
 </div>
