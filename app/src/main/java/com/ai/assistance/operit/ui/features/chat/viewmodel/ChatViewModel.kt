@@ -837,21 +837,17 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 return@launch
             }
 
-            if (isFloatingWindowUnlocked.first()) {
-                when(mode) {
-                    FloatingMode.WINDOW -> launchFloatingWindowWithPermissionCheck(permissionLauncher) {
-                        launchFloatingModeIn(FloatingMode.WINDOW, colorScheme, typography)
-                    }
-                    FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
-                    FloatingMode.BALL, 
-                    FloatingMode.VOICE_BALL,
-                    FloatingMode.DragonBones -> {
-                        // 这些模式暂时不处理，或者可以添加默认行为
-                        Log.d(TAG, "未实现的悬浮窗模式: $mode")
-                    }
+            when(mode) {
+                FloatingMode.WINDOW -> launchFloatingWindowWithPermissionCheck(permissionLauncher) {
+                    launchFloatingModeIn(FloatingMode.WINDOW, colorScheme, typography)
                 }
-            } else {
-                _showInvitationExplanation.value = true
+                FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
+                FloatingMode.BALL,
+                FloatingMode.VOICE_BALL,
+                FloatingMode.DragonBones -> {
+                    // 这些模式暂时不处理，或者可以添加默认行为
+                    Log.d(TAG, "未实现的悬浮窗模式: $mode")
+                }
             }
         }
     }
@@ -1372,23 +1368,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     fun onWorkspaceButtonClick() {
-        viewModelScope.launch {
-            if (isWorkspaceUnlocked.first()) {
-                toggleWebView()
-            } else {
-                _showInvitationExplanation.value = true
-            }
-        }
+        toggleWebView()
     }
 
     fun onAiComputerButtonClick() {
-        viewModelScope.launch {
-            if (isWorkspaceUnlocked.first()) {
-                toggleAiComputer()
-            } else {
-                _showInvitationExplanation.value = true
-            }
-        }
+        toggleAiComputer()
     }
 
     /** 初始化语音服务 */

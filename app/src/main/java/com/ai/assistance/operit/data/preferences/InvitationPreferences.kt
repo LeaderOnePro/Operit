@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 // Create the DataStore instance using the extension delegate
@@ -38,12 +39,12 @@ class InvitationRepository(private val context: Context) {
     /**
      * A flow that emits `true` if the workspace feature is unlocked (invitation count >= 1).
      */
-    val isWorkspaceUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 1 }
+    val isWorkspaceUnlockedFlow: Flow<Boolean> = flowOf(true)
 
     /**
      * A flow that emits `true` if the floating window feature is unlocked (invitation count >= 2).
      */
-    val isFloatingWindowUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 2 }
+    val isFloatingWindowUnlockedFlow: Flow<Boolean> = flowOf(true)
 
     /**
      * A flow that emits `true` if the device has already been successfully invited.

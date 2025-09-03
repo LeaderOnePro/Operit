@@ -51,7 +51,6 @@ fun ConfigurationScreen(
         // 状态管理
         var apiKeyInput by remember { mutableStateOf(if (isUsingDefault) "" else apiKey) }
         var showTokenInfoDialog by remember { mutableStateOf(false) }
-        var showOneClickConfig by remember { mutableStateOf(false) }
 
         // 使用默认密钥的状态检测
         val isUsingDefaultApiKey by
@@ -82,28 +81,6 @@ fun ConfigurationScreen(
                                 onNavigateToTokenConfig()
                         }
                 )
-        }
-
-        // 免费使用确认对话框
-        if (showOneClickConfig) {
-                Dialog(
-                        onDismissRequest = { showOneClickConfig = false },
-                        properties = DialogProperties(usePlatformDefaultWidth = false)
-                ) {
-                        OneClickConfigWebViewScreen(
-                                onBackPressed = { showOneClickConfig = false },
-                                onConfigCreated = { fetchedApiKey ->
-                                        onApiKeyChange(fetchedApiKey)
-                                        onApiEndpointChange(
-                                                "https://api.cccielo.cn/v1/chat/completions"
-                                        )
-                                        onModelNameChange("deepseek/deepseek-r1-0528-qwen3-8b:free")
-                                        onApiProviderTypeChange(ApiProviderType.OTHER)
-                                        onSaveConfig()
-                                        showOneClickConfig = false
-                                }
-                        )
-                }
         }
 
         // 主界面 - 简洁设计
@@ -247,44 +224,14 @@ fun ConfigurationScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // 底部选项 - 左右并排
+                        // 底部选项
                         Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.Center
                         ) {
-                                // 左侧 - 薅贡献者的
-                                TextButton(
-                                        onClick = {
-                                                // 显示确认对话框
-                                                showOneClickConfig = true
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        enabled = true
-                                ) {
-                                        Text(
-                                                stringResource(id = R.string.config_use_free),
-                                                color = MaterialTheme.colorScheme.secondary,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 12.sp
-                                        )
-                                }
-
-                                // 分隔线
-                                Divider(
-                                        modifier =
-                                                Modifier.height(20.dp)
-                                                        .width(1.dp)
-                                                        .align(Alignment.CenterVertically),
-                                        color =
-                                                MaterialTheme.colorScheme.outlineVariant.copy(
-                                                        alpha = 0.5f
-                                                )
-                                )
-
                                 // 右侧 - 自定义
                                 TextButton(
-                                        onClick = { onNavigateToSettings() },
-                                        modifier = Modifier.weight(1f)
+                                        onClick = { onNavigateToSettings() }
                                 ) {
                                         Text(
                                                 stringResource(id = R.string.config_custom),
