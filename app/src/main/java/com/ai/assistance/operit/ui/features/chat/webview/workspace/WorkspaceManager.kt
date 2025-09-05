@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.features.chat.webview.workspace
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.view.MotionEvent
 import android.webkit.WebView
 import androidx.compose.animation.*
@@ -52,7 +53,7 @@ fun WorkspaceManager(
         onExportClick: (workDir: File) -> Unit
 ) {
     val context = LocalContext.current
-    val webViewNeedsRefresh by actualViewModel.webViewNeedsRefresh.collectAsState()
+    val webViewRefreshCounter by actualViewModel.webViewRefreshCounter.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val toolHandler = remember { AIToolHandler.getInstance(context) }
 
@@ -100,6 +101,16 @@ fun WorkspaceManager(
     
     // 当前活动的编辑器引用
     var activeEditor by remember { mutableStateOf<com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.NativeCodeEditor?>(null) }
+
+    // 监听WebView刷新计数器变化并触发刷新
+    LaunchedEffect(webViewRefreshCounter) {
+        if (webViewRefreshCounter > 0) {
+            Log.d("WorkspaceManager", "WebView refresh triggered, counter: $webViewRefreshCounter")
+            // 确保webView已经加载完成后再刷新
+            kotlinx.coroutines.delay(100) // 短暂延迟确保webView准备就绪
+            webView.reload()
+        }
+    }
 
     // 当工作区可见时，检查文件更新
     LaunchedEffect(isVisible) {
@@ -285,12 +296,8 @@ fun WorkspaceManager(
                     currentFileIndex == -1 -> {
                         AndroidView(
                                 factory = { webView }, // 使用 remember 的实例
-                                update = {
-                                    if (webViewNeedsRefresh) {
-                                        it.reload()
-                                        actualViewModel.resetWebViewRefreshState()
-                                    }
-                                    webViewHandler.currentWebView = it
+                                update = { webView ->
+                                    webViewHandler.currentWebView = webView
                                 },
                                 modifier = Modifier.fillMaxSize()
                         )

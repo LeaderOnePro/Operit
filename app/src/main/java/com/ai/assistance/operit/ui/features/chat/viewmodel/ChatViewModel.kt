@@ -252,9 +252,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
 
-    // 添加WebView刷新控制流
-    private val _webViewNeedsRefresh = MutableStateFlow(false)
-    val webViewNeedsRefresh: StateFlow<Boolean> = _webViewNeedsRefresh
+    // 添加WebView刷新控制流 - 使用Int计数器避免重复刷新问题
+    private val _webViewRefreshCounter = MutableStateFlow(0)
+    val webViewRefreshCounter: StateFlow<Int> = _webViewRefreshCounter
 
     // 文件选择相关回调
     private var fileChooserCallback: ((Int, Intent?) -> Unit)? = null
@@ -550,7 +550,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             updateWebServerForCurrentChat(chatId)
             // 延迟一点时间再触发刷新，等待服务器工作区更新完成
             viewModelScope.launch {
-                delay(200) // 延迟200毫秒
                 refreshWebView()
             }
         }
@@ -1129,9 +1128,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             _showAiComputer.value = false
         }
         
-        // 每次切换时，标记需要刷新
+        // 每次切换时，增加刷新计数器
         if (_showWebView.value) {
-            _webViewNeedsRefresh.value = true
+            _webViewRefreshCounter.value += 1
         }
     }
 
@@ -1190,14 +1189,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // 重置WebView刷新状态
-    fun resetWebViewRefreshState() {
-        _webViewNeedsRefresh.value = false
-    }
-
     // 强制WebView刷新
     fun refreshWebView() {
-        _webViewNeedsRefresh.value = true
+        _webViewRefreshCounter.value += 1
     }
 
     // 判断是否正在使用默认API配置
