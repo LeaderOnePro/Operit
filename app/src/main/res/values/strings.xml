@@ -1774,6 +1774,7 @@
     <string name="function_type_problem_library">问题库管理</string>
     <string name="function_type_file_binding">文件绑定处理</string>
     <string name="function_type_ui_controller">UI 控制器</string>
+    <string name="function_type_translation">翻译功能</string>
     
     <!-- Function Descriptions -->
     <string name="function_desc_chat">主要的对话功能，用于与用户进行日常对话交互</string>
@@ -1781,6 +1782,7 @@
     <string name="function_desc_problem_library">用于问题库的分析和管理</string>
     <string name="function_desc_file_binding">处理文件内容的智能绑定与混合，提供更精确的代码处理能力。建议使用快速的廉价模型如Gemini Flash，不建议使用DeepSeek R1</string>
     <string name="function_desc_ui_controller">用于UI界面的自动遍历与操作，会被主模型调用。建议使用廉价快速模型。</string>
+    <string name="function_desc_translation">提供多语言翻译功能，支持文本内容的语言转换。建议使用支持多语言的模型。</string>
     
     <!-- Functional Prompt Config Screen -->
     <string name="advanced_config_notice">如需修改系统提示模板等高级配置，请前往「管理所有提示词」页面。</string>
@@ -2451,6 +2453,9 @@
     <string name="character_card_description">描述</string>
     <string name="character_card_character_setting">角色设定</string>
     <string name="character_card_character_setting_placeholder">描述角色的性格特点...</string>
+    <string name="character_card_opening_statement">开场白</string>
+    <string name="character_card_opening_statement_placeholder">角色的开场白或问候语...</string>
+    <string name="character_card_translate_opening_statement">翻译开场白</string>
     <string name="character_card_other_content">其他内容</string>
     <string name="character_card_other_content_placeholder">角色背景、经历等...</string>
     <string name="character_card_tags">标签</string>
@@ -2463,6 +2468,7 @@
     <string name="character_card_edit_name">编辑名称</string>
     <string name="character_card_edit_description">编辑描述</string>
     <string name="character_card_edit_character_setting">编辑角色设定</string>
+    <string name="character_card_edit_opening_statement">编辑开场白</string>
     <string name="character_card_edit_other_content">编辑其他内容</string>
     <string name="character_card_edit_custom_prompt">编辑自定义提示词</string>
     <string name="character_card_edit_marks">编辑备注</string>

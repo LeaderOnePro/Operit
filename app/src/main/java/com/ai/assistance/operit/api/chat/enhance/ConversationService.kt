@@ -34,8 +34,8 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import com.ai.assistance.operit.core.tools.ComputerDesktopActionResultData
-
-
+import com.ai.assistance.operit.util.LocaleUtils
+import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
 
 
 /** 处理会话相关功能的服务类，包括会话总结、偏好处理和对话切割准备 */
@@ -503,243 +503,6 @@ class ConversationService(private val context: Context) {
     private data class SearchReplaceOperation(val search: String, val replace: String)
 
     /**
-     * Processes file binding using a two-step approach to balance token cost and reliability.
-     * 1. Attempts a custom, low-token "loose text patch" that is whitespace-insensitive.
-     * 2. If that fails, falls back to a robust but more token-intensive full-content merge.
-     *
-     * @param originalContent The original content of the file.
-     * @param aiGeneratedCode The AI-generated code with placeholders, representing the desired
-     * changes.
-     * @param multiServiceManager The service manager for AI communication.
-     * @return A Pair containing the final merged content and a diff string representing the
-     * changes.
-     */
-    suspend fun processFileBinding(
-            originalContent: String,
-            aiGeneratedCode: String,
-            multiServiceManager: MultiServiceManager
-    ): Pair<String, String> {
-        // --- Attempt 1: Custom Loose Text Patch (Low Token Cost) ---
-        Log.d(TAG, "Attempt 1: Trying Custom Loose Text Patch...")
-        try {
-            val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
-            val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
-
-            val systemPrompt = FunctionalPrompts.FILE_BINDING_PATCH_PROMPT.trimIndent()
-
-            val userPrompt =
-"""
-**Original File Content:**
-```
-$normalizedOriginalContent
-```
-**AI's Edit Request:**
-```
-$normalizedAiGeneratedCode
-```
-Now, generate ONLY the patch in the custom format based on all the rules.
-""".trimIndent()
-            val modelParameters =
-                    multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
-            val fileBindingService =
-                    multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
-
-            val contentBuilder = StringBuilder()
-            fileBindingService.sendMessage(
-                            userPrompt,
-                            listOf(Pair("system", systemPrompt)),
-                            modelParameters
-                    )
-                    .collect { content -> contentBuilder.append(content) }
-
-            val patchResponse = ChatUtils.removeThinkingContent(contentBuilder.toString())
-
-            val (success, patchedContent) =
-                    applyLooseTextPatch(normalizedOriginalContent, patchResponse)
-
-            if (success) {
-                Log.d(TAG, "Attempt 1: Custom Loose Text Patch succeeded.")
-                apiPreferences.updateTokensForFunction(
-                        FunctionType.FILE_BINDING,
-                        fileBindingService.inputTokenCount,
-                        fileBindingService.outputTokenCount
-                )
-
-                val finalDiff =
-                        UnifiedDiffUtils.generateUnifiedDiff(
-                                        "a/file",
-                                        "b/file",
-                                        normalizedOriginalContent.lines(),
-                                        DiffUtils.diff(
-                                                normalizedOriginalContent.lines(),
-                                                patchedContent.lines()
-                                        ),
-                                        3
-                                )
-                                .joinToString("\n")
-
-                return Pair(patchedContent, finalDiff)
-            } else {
-                Log.w(
-                        TAG,
-                        "Attempt 1: Custom Loose Text Patch failed. Falling back to robust full merge."
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 1: Error during Custom Loose Text Patch. Falling back...", e)
-        }
-
-        // --- Attempt 2: Robust Full-Content Merge (Fallback) ---
-        Log.d(TAG, "Attempt 2 (Fallback): Trying robust full-content merge...")
-        try {
-            val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
-            val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
-            val mergeSystemPrompt = FunctionalPrompts.FILE_BINDING_MERGE_PROMPT.trimIndent()
-
-            val mergeUserPrompt =
-"""
-**Original File Content:**
-```
-$normalizedOriginalContent
-```
-**AI-Generated Code (with placeholders):**
-```
-$normalizedAiGeneratedCode
-```
-Now, generate ONLY the complete and final merged file content.
-""".trimIndent()
-
-            val modelParameters =
-                    multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
-            val fileBindingService =
-                    multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
-
-            val contentBuilder = StringBuilder()
-            fileBindingService.sendMessage(
-                            mergeUserPrompt,
-                            listOf(Pair("system", mergeSystemPrompt)),
-                            modelParameters
-                    )
-                    .collect { content -> contentBuilder.append(content) }
-
-            val mergedContentFromAI =
-                    ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
-
-            if (mergedContentFromAI.isBlank()) {
-                Log.w(TAG, "Attempt 2: Full merge returned empty content. Returning original.")
-                return Pair(originalContent, "")
-            }
-
-            val diffString =
-                    UnifiedDiffUtils.generateUnifiedDiff(
-                                    "a/file",
-                                    "b/file",
-                                    normalizedOriginalContent.lines(),
-                                    DiffUtils.diff(
-                                            normalizedOriginalContent.lines(),
-                                            mergedContentFromAI.lines()
-                                    ),
-                                    3
-                            )
-                            .joinToString("\n")
-
-            Log.d(TAG, "Attempt 2: Robust full-content merge successful.")
-            apiPreferences.updateTokensForFunction(
-                    FunctionType.FILE_BINDING,
-                    fileBindingService.inputTokenCount,
-                    fileBindingService.outputTokenCount
-            )
-            return Pair(mergedContentFromAI, diffString)
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 2: Error during robust full-merge fallback.", e)
-            return Pair(originalContent, "Error during fallback file binding: ${e.message}")
-        }
-    }
-
-    /**
-     * Normalizes a block of text for a "loose" comparison. This makes the comparison insensitive to
-     * leading/trailing whitespace on each line, and also to the amount of internal whitespace
-     * between non-whitespace characters. It preserves the number of lines (including blank ones) to
-     * ensure an unambiguous replacement.
-     */
-    private fun normalizeBlock(block: String): String {
-        return block.lines().joinToString("\n") { it.trim().replace("\\s+".toRegex(), " ") }
-    }
-
-    /**
-     * Applies a series of search-and-replace operations from a custom patch format using a "loose"
-     * matching algorithm that ignores leading/trailing whitespace on each line.
-     *
-     * @return A Pair of (Boolean, String) indicating success and the modified content.
-     */
-    private fun applyLooseTextPatch(
-            originalContent: String,
-            patchText: String
-    ): Pair<Boolean, String> {
-        var modifiedContent = originalContent
-        try {
-            val patchRegex =
-                    """(?s)<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE""".toRegex()
-            val operations =
-                    patchRegex
-                            .findAll(patchText)
-                            .map {
-                                // groupValues[1] is the SEARCH block, groupValues[2] is the REPLACE
-                                // block
-                                it.groupValues[1].trim() to it.groupValues[2].trim()
-                            }
-                            .toList()
-
-            if (operations.isEmpty()) {
-                Log.w(TAG, "Custom patch was empty or did not match expected format.")
-                return Pair(false, originalContent)
-            }
-
-            for ((searchBlock, replaceBlock) in operations) {
-                val normalizedSearch = normalizeBlock(searchBlock)
-                if (normalizedSearch.isEmpty()) continue
-
-                val originalLines = modifiedContent.lines()
-                val searchLinesCount = searchBlock.lines().size
-                var matchIndex = -1
-
-                // Find a unique loose match
-                for (i in 0..(originalLines.size - searchLinesCount)) {
-                    val windowBlock =
-                            originalLines.subList(i, i + searchLinesCount).joinToString("\n")
-                    if (normalizeBlock(windowBlock) == normalizedSearch) {
-                        if (matchIndex != -1) { // Ambiguous match
-                            Log.w(
-                                    TAG,
-                                    "Loose Patch failed: ambiguous match for search block:\n$searchBlock"
-                            )
-                            return Pair(false, originalContent)
-                        }
-                        matchIndex = i
-                    }
-                }
-
-                if (matchIndex != -1) { // Unique match found
-                    val modifiedLinesList = originalLines.toMutableList()
-                    repeat(searchLinesCount) { modifiedLinesList.removeAt(matchIndex) }
-                    modifiedLinesList.addAll(matchIndex, replaceBlock.lines())
-                    modifiedContent = modifiedLinesList.joinToString("\n")
-                } else { // No match found
-                    Log.w(
-                            TAG,
-                            "Loose Patch failed: could not find a unique match for block:\n$searchBlock"
-                    )
-                    return Pair(false, originalContent)
-                }
-            }
-            return Pair(true, modifiedContent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to apply custom loose text patch.", e)
-            return Pair(false, originalContent)
-        }
-    }
-
-    /**
      * Flattens the hierarchical UI node structure into a simple, flat list of key elements.
      * This provides a much cleaner context for the AI to make decisions.
      */
@@ -928,6 +691,59 @@ Now, generate ONLY the complete and final merged file content.
         finalPrompt = finalPrompt.replace("{{char}}", aiName)
         
         return finalPrompt
+    }
+
+    /**
+     * 翻译文本功能
+     * @param text 要翻译的文本
+     * @param multiServiceManager 多服务管理器
+     * @return 翻译后的文本
+     */
+    suspend fun translateText(text: String, multiServiceManager: MultiServiceManager): String {
+        val currentLanguage = LocaleUtils.getCurrentLanguage(context)
+        
+        // 根据当前语言确定目标语言
+        val targetLanguage = when (currentLanguage) {
+            "zh" -> "中文"
+            "en" -> "English"
+            else -> "中文" // 默认翻译为中文
+        }
+        
+        val translationPrompt = """
+请将以下文本翻译为$targetLanguage，保持原文的语气和风格：
+
+$text
+
+只返回翻译结果，不要添加任何解释或额外内容。
+        """.trim()
+        
+        val chatHistory = listOf(
+            Pair("system", "你是一个专业的翻译助手，能够准确翻译各种语言，并保持原文的语气和风格。")
+        )
+        
+        val contentBuilder = StringBuilder()
+        
+        try {
+            // 获取翻译功能的AIService实例
+            val translationService = multiServiceManager.getServiceForFunction(FunctionType.TRANSLATION)
+            
+            // 获取模型参数
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.TRANSLATION)
+            
+            val stream = translationService.sendMessage(
+                message = translationPrompt,
+                chatHistory = chatHistory,
+                modelParameters = modelParameters
+            )
+            
+            stream.collect { content ->
+                contentBuilder.append(content)
+            }
+            
+            return contentBuilder.toString().trim()
+        } catch (e: Exception) {
+            throw e
+        }
     }
 }
 

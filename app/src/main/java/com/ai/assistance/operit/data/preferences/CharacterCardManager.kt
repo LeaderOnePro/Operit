@@ -84,6 +84,7 @@ class CharacterCardManager private constructor(private val context: Context) {
         val nameKey = stringPreferencesKey("character_card_${id}_name")
         val descriptionKey = stringPreferencesKey("character_card_${id}_description")
         val characterSettingKey = stringPreferencesKey("character_card_${id}_character_setting")
+        val openingStatementKey = stringPreferencesKey("character_card_${id}_opening_statement") // 新增
         val otherContentKey = stringPreferencesKey("character_card_${id}_other_content")
         val attachedTagIdsKey = stringSetPreferencesKey("character_card_${id}_attached_tag_ids")
         val advancedCustomPromptKey = stringPreferencesKey("character_card_${id}_advanced_custom_prompt")
@@ -97,6 +98,7 @@ class CharacterCardManager private constructor(private val context: Context) {
             name = preferences[nameKey] ?: "默认角色卡",
             description = preferences[descriptionKey] ?: "",
             characterSetting = preferences[characterSettingKey] ?: "",
+            openingStatement = preferences[openingStatementKey] ?: "", // 新增
             otherContent = preferences[otherContentKey] ?: "",
             attachedTagIds = preferences[attachedTagIdsKey]?.toList() ?: emptyList(),
             advancedCustomPrompt = preferences[advancedCustomPromptKey] ?: "",
@@ -140,6 +142,7 @@ class CharacterCardManager private constructor(private val context: Context) {
             preferences[stringPreferencesKey("character_card_${id}_name")] = newCard.name
             preferences[stringPreferencesKey("character_card_${id}_description")] = newCard.description
             preferences[stringPreferencesKey("character_card_${id}_character_setting")] = newCard.characterSetting
+            preferences[stringPreferencesKey("character_card_${id}_opening_statement")] = newCard.openingStatement // 新增
             preferences[stringPreferencesKey("character_card_${id}_other_content")] = newCard.otherContent
             preferences[stringSetPreferencesKey("character_card_${id}_attached_tag_ids")] = newCard.attachedTagIds.toSet()
             preferences[stringPreferencesKey("character_card_${id}_advanced_custom_prompt")] = newCard.advancedCustomPrompt
@@ -168,6 +171,7 @@ class CharacterCardManager private constructor(private val context: Context) {
             preferences[stringPreferencesKey("character_card_${card.id}_name")] = card.name
             preferences[stringPreferencesKey("character_card_${card.id}_description")] = card.description
             preferences[stringPreferencesKey("character_card_${card.id}_character_setting")] = card.characterSetting
+            preferences[stringPreferencesKey("character_card_${card.id}_opening_statement")] = card.openingStatement // 新增
             preferences[stringPreferencesKey("character_card_${card.id}_other_content")] = card.otherContent
             preferences[stringSetPreferencesKey("character_card_${card.id}_attached_tag_ids")] = card.attachedTagIds.toSet()
             preferences[stringPreferencesKey("character_card_${card.id}_advanced_custom_prompt")] = card.advancedCustomPrompt
@@ -193,6 +197,7 @@ class CharacterCardManager private constructor(private val context: Context) {
                 "character_card_${id}_name",
                 "character_card_${id}_description",
                 "character_card_${id}_character_setting",
+                "character_card_${id}_opening_statement", // 新增
                 "character_card_${id}_other_content",
                 "character_card_${id}_attached_tag_ids",
                 "character_card_${id}_advanced_custom_prompt",
@@ -309,6 +314,7 @@ class CharacterCardManager private constructor(private val context: Context) {
         val nameKey = stringPreferencesKey("character_card_${id}_name")
         val descriptionKey = stringPreferencesKey("character_card_${id}_description")
         val characterSettingKey = stringPreferencesKey("character_card_${id}_character_setting")
+        val openingStatementKey = stringPreferencesKey("character_card_${id}_opening_statement") // 新增
         val otherContentKey = stringPreferencesKey("character_card_${id}_other_content")
         val attachedTagIdsKey = stringSetPreferencesKey("character_card_${id}_attached_tag_ids")
         val advancedCustomPromptKey = stringPreferencesKey("character_card_${id}_advanced_custom_prompt")
@@ -320,6 +326,7 @@ class CharacterCardManager private constructor(private val context: Context) {
         preferences[nameKey] = "Operit"
         preferences[descriptionKey] = "系统默认的角色卡配置"
         preferences[characterSettingKey] = "你是Operit，一个全能AI助手，旨在解决用户提出的任何任务。"
+        preferences[openingStatementKey] = "你好！我是Operit，你的全能AI助手。有什么可以帮助你的吗？" // 新增
         preferences[otherContentKey] = "保持有帮助的语气，并清楚地传达限制。"
         preferences[attachedTagIdsKey] = setOf<String>()
         preferences[advancedCustomPromptKey] = ""
@@ -352,10 +359,38 @@ class CharacterCardManager private constructor(private val context: Context) {
             if (tavernCard.data.name.isBlank()) {
                 return Result.failure(Exception("角色卡名称不能为空"))
             }
-            
+
+            // --- New logic for Character Book ---
+            var worldBookTagId: String? = null
+            tavernCard.data.character_book?.let { book ->
+                if (book.entries.isNotEmpty()) {
+                    val worldBookContent = buildString {
+                        book.entries.forEach { entry ->
+                            if (entry.content.isNotBlank()) {
+                                // 使用更结构化的格式作为提示词
+                                append("[${entry.name}]\n${entry.content}\n\n")
+                            }
+                        }
+                    }.trim()
+
+                    if (worldBookContent.isNotBlank()) {
+                        worldBookTagId = tagManager.createOrReusePromptTag(
+                            name = "世界书: ${tavernCard.data.name}",
+                            description = "为角色'${tavernCard.data.name}'自动生成的世界书。",
+                            promptContent = worldBookContent,
+                            tagType = TagType.FUNCTION
+                        )
+                    }
+                }
+            }
+
             val characterCard = convertTavernCardToCharacterCard(tavernCard)
-            val id = createCharacterCard(characterCard)
-            
+
+            val finalCard = worldBookTagId?.let {
+                characterCard.copy(attachedTagIds = characterCard.attachedTagIds + it)
+            } ?: characterCard
+
+            val id = createCharacterCard(finalCard)
             Result.success(id)
         } catch (e: JsonSyntaxException) {
             Result.failure(Exception("JSON格式错误: ${e.message}"))
@@ -456,7 +491,7 @@ class CharacterCardManager private constructor(private val context: Context) {
     /**
      * 将酒馆角色卡转换为本地角色卡格式
      */
-    private fun convertTavernCardToCharacterCard(tavernCard: TavernCharacterCard): CharacterCard {
+    private suspend fun convertTavernCardToCharacterCard(tavernCard: TavernCharacterCard): CharacterCard {
         val data = tavernCard.data
         
         // 组合角色设定
@@ -474,9 +509,6 @@ class CharacterCardManager private constructor(private val context: Context) {
         
         // 组合其他内容
         val otherContent = buildString {
-            if (data.first_mes.isNotBlank()) {
-                append("首次问候：\n${data.first_mes}\n\n")
-            }
             if (data.mes_example.isNotBlank()) {
                 append("对话示例：\n${data.mes_example}\n\n")
             }
@@ -485,19 +517,6 @@ class CharacterCardManager private constructor(private val context: Context) {
             }
             if (data.post_history_instructions.isNotBlank()) {
                 append("历史指令：\n${data.post_history_instructions}\n\n")
-            }
-            
-            // 添加角色书内容
-            data.character_book?.let { book ->
-                if (book.entries.isNotEmpty()) {
-                    append("角色书内容：\n")
-                    book.entries.forEach { entry ->
-                        if (entry.content.isNotBlank()) {
-                            append("${entry.name}：${entry.content}\n")
-                        }
-                    }
-                    append("\n")
-                }
             }
             
             // 添加备用问候语
@@ -556,6 +575,7 @@ class CharacterCardManager private constructor(private val context: Context) {
             name = data.name,
             description = description,
             characterSetting = characterSetting,
+            openingStatement = data.first_mes, // 从first_mes获取开场白
             otherContent = otherContent,
             attachedTagIds = emptyList(), // 可以后续根据tags创建标签
             advancedCustomPrompt = advancedCustomPrompt,

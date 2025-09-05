@@ -269,6 +269,12 @@ private constructor(
             val bytes = fstream.readBytes()
             fstream.close()
 
+            if (mimeType == "text/html") {
+                val htmlContent = String(bytes, Charsets.UTF_8)
+                val injectedHtml = injectErudaIntoHtml(htmlContent)
+                return newFixedLengthResponse(Response.Status.OK, mimeType, injectedHtml).addCorsHeaders()
+            }
+
             // Serve the file from a byte array input stream. This is the robust way to avoid GZIP issues.
             val inputStream = ByteArrayInputStream(bytes)
             val response = newFixedLengthResponse(Response.Status.OK, mimeType, inputStream, bytes.size.toLong())

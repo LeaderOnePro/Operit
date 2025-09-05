@@ -417,7 +417,6 @@ fun AIChatScreen(
             IconButton(
                     onClick = {
                         actualViewModel.onWorkspaceButtonClick()
-                        actualViewModel.refreshWebView()
                     }
             ) {
                 Icon(

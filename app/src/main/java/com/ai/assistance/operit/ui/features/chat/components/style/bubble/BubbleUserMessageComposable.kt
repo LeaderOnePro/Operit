@@ -37,6 +37,10 @@ import android.net.Uri
 import android.util.Log
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -52,6 +56,7 @@ fun BubbleUserMessageComposable(
     val avatarShapePref by preferencesManager.avatarShape.collectAsState(initial = UserPreferencesManager.AVATAR_SHAPE_CIRCLE)
     val avatarCornerRadius by preferencesManager.avatarCornerRadius.collectAsState(initial = 8f)
     val clipboardManager = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
 
     // 头像回退逻辑：优先使用角色卡专属头像，为空时使用全局头像
     val avatarUri = remember(customUserAvatarUri, globalUserAvatarUri) {
@@ -88,25 +93,38 @@ fun BubbleUserMessageComposable(
         if (trailingAttachments.isNotEmpty()) {
             // Display attachment row above the bubble
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 trailingAttachments.forEach { attachment ->
                     AttachmentTag(
-                        filename = attachment.filename,
-                        type = attachment.type,
+                        attachment = attachment,
                         textColor = textColor,
                         backgroundColor = backgroundColor,
-                        content = attachment.content,
-                        onClick = { content, name ->
+                        onClick = { attachmentData ->
                             // 当点击附件标签时，显示内容预览
-                            if (content.isNotEmpty()) {
-                                selectedAttachmentContent.value = content
-                                selectedAttachmentName.value = name
+                            if (attachmentData.content.isNotEmpty()) {
+                                selectedAttachmentContent.value = attachmentData.content
+                                selectedAttachmentName.value = attachmentData.filename
                                 showContentPreview.value = true
+                            } else if (attachmentData.id.startsWith("/storage/")) {
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        val fileContent = File(attachmentData.id).readText()
+                                        withContext(Dispatchers.Main) {
+                                            selectedAttachmentContent.value = fileContent
+                                            selectedAttachmentName.value = attachmentData.filename
+                                            showContentPreview.value = true
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e(
+                                            "BubbleUserMessage",
+                                            "Error reading attachment file",
+                                            e
+                                        )
+                                    }
+                                }
                             }
                         }
                     )
@@ -264,7 +282,27 @@ data class MessageParseResult(
  */
 private fun parseMessageContent(content: String): MessageParseResult {
     // First, strip out any <memory> tags so they are not displayed in the UI.
-    val cleanedContent = content.replace(Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL), "").trim()
+    var cleanedContent =
+        content.replace(Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL), "").trim()
+
+    val workspaceAttachments = mutableListOf<AttachmentData>()
+    // Extract workspace context as a special attachment
+    val workspaceRegex =
+        Regex("<workspace_attachment>.*?</workspace_attachment>", RegexOption.DOT_MATCHES_ALL)
+    val workspaceMatch = workspaceRegex.find(cleanedContent)
+    if (workspaceMatch != null) {
+        val workspaceContent = workspaceMatch.value
+        workspaceAttachments.add(
+            AttachmentData(
+                id = "workspace_context",
+                filename = "工作区状态",
+                type = "application/vnd.workspace-context+xml",
+                size = workspaceContent.length.toLong(),
+                content = workspaceContent
+            )
+        )
+        cleanedContent = cleanedContent.replace(workspaceContent, "").trim()
+    }
 
     val attachments = mutableListOf<AttachmentData>()
     val trailingAttachments = mutableListOf<AttachmentData>()
@@ -272,35 +310,45 @@ private fun parseMessageContent(content: String): MessageParseResult {
 
     // 先用简单的分割方式检测有没有附件标签
     if (!cleanedContent.contains("<attachment")) {
-        return MessageParseResult(cleanedContent, emptyList())
+        return MessageParseResult(cleanedContent, workspaceAttachments)
     }
 
     try {
         // Enhanced regex pattern to find attachments with optional content attribute
         // 注意：由于content属性可能包含json数据，我们用非贪婪匹配确保正确解析
         val attachmentPattern =
-            "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
-                RegexOption.DOT_MATCHES_ALL
-            )
+            "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>"
+                .toRegex(RegexOption.DOT_MATCHES_ALL)
 
         // Get all matches
         val matches = attachmentPattern.findAll(cleanedContent).toList()
         if (matches.isEmpty()) {
-            return MessageParseResult(cleanedContent, emptyList())
+            return MessageParseResult(cleanedContent, workspaceAttachments)
         }
 
-        // Find the last non-whitespace character after the last attachment
-        val lastMatch = matches.last()
-        val contentAfterLastMatch = cleanedContent.substring(lastMatch.range.last + 1).trim()
+        // Determine which attachments form a contiguous block at the end
+        val trailingAttachmentIndices = mutableSetOf<Int>()
+        if (matches.isNotEmpty()) {
+            val contentAfterLast = cleanedContent.substring(matches.last().range.last + 1)
+            if (contentAfterLast.isBlank()) {
+                trailingAttachmentIndices.add(matches.size - 1)
+                for (i in matches.size - 2 downTo 0) {
+                    val textBetween =
+                        cleanedContent.substring(matches[i].range.last + 1, matches[i + 1].range.first)
+                    if (textBetween.isBlank()) {
+                        trailingAttachmentIndices.add(i)
+                    } else {
+                        break
+                    }
+                }
+            }
+        }
 
         // Process all attachments
         var lastIndex = 0
         matches.forEachIndexed { index, matchResult ->
             // Add text before this attachment
             val startIndex = matchResult.range.first
-            if (startIndex > lastIndex) {
-                messageText.append(cleanedContent.substring(lastIndex, startIndex))
-            }
 
             // Extract attachment data
             val id = matchResult.groupValues[1]
@@ -319,16 +367,26 @@ private fun parseMessageContent(content: String): MessageParseResult {
                     content = attachmentContent
                 )
 
-            // Determine if this is a trailing attachment
-            val isLastAttachment = index == matches.size - 1
-            val isTrailingAttachment =
-                isLastAttachment && contentAfterLastMatch.isEmpty()
+            val isTrailingAttachment = trailingAttachmentIndices.contains(index)
 
             // 特殊处理屏幕内容附件，始终将其作为trailing attachment
-            val isScreenContent =
-                (type == "text/json" && filename == "screen_content.json")
+            val isScreenContent = (type == "text/json" && filename == "screen_content.json")
 
-            if (isTrailingAttachment || isScreenContent) {
+            val shouldBeTrailing = isTrailingAttachment || isScreenContent
+
+            if (startIndex > lastIndex) {
+                val textBefore = cleanedContent.substring(lastIndex, startIndex)
+                // Only append text if it's before an inline attachment,
+                // or if it's before the very first trailing attachment.
+                if (!shouldBeTrailing ||
+                    (trailingAttachmentIndices.isNotEmpty() &&
+                        index == trailingAttachmentIndices.minOrNull())
+                ) {
+                    messageText.append(textBefore)
+                }
+            }
+
+            if (shouldBeTrailing) {
                 // This is a trailing attachment, extract it
                 trailingAttachments.add(attachment)
             } else {
@@ -341,16 +399,17 @@ private fun parseMessageContent(content: String): MessageParseResult {
             lastIndex = matchResult.range.last + 1
         }
 
-        // Add any remaining text
+        // Add any remaining text if the last part of the message was not a trailing attachment
         if (lastIndex < cleanedContent.length) {
             messageText.append(cleanedContent.substring(lastIndex))
         }
 
+        trailingAttachments.addAll(0, workspaceAttachments)
         return MessageParseResult(messageText.toString(), trailingAttachments)
     } catch (e: Exception) {
         // 如果解析失败，返回原始内容
         android.util.Log.e("BubbleUserMessageComposable", "解析消息内容失败", e)
-        return MessageParseResult(cleanedContent, emptyList())
+        return MessageParseResult(cleanedContent, workspaceAttachments)
     }
 }
 
@@ -366,37 +425,37 @@ data class AttachmentData(
 /** Compact attachment tag component for displaying in user messages */
 @Composable
 private fun AttachmentTag(
-    filename: String,
-    type: String,
+    attachment: AttachmentData,
     textColor: Color,
     backgroundColor: Color,
-    content: String = "",
-    onClick: (String, String) -> Unit = { _, _ -> }
+    onClick: (AttachmentData) -> Unit = {}
 ) {
     // 根据附件类型选择图标
     val icon: ImageVector =
         when {
-            type.startsWith("image/") -> Icons.Default.Image
-            type == "text/json" && filename == "screen_content.json" ->
+            attachment.type.startsWith("image/") -> Icons.Default.Image
+            attachment.type == "text/json" && attachment.filename == "screen_content.json" ->
                 Icons.Default.ScreenshotMonitor
+            attachment.type == "application/vnd.workspace-context+xml" -> Icons.Default.Code
             else -> Icons.Default.Description
         }
 
     // 根据附件类型调整显示标签
     val displayLabel =
         when {
-            type == "text/json" && filename == "screen_content.json" -> "屏幕内容"
-            else -> filename
+            attachment.type == "text/json" && attachment.filename == "screen_content.json" -> "屏幕内容"
+            attachment.type == "application/vnd.workspace-context+xml" -> "工作区"
+            else -> attachment.filename
         }
 
     Surface(
-        modifier = Modifier
-            .height(24.dp)
-            .padding(vertical = 2.dp)
-            .clickable(
-                enabled = content.isNotEmpty(),
-                onClick = { onClick(content, filename) }
-            ),
+        modifier =
+            Modifier.height(24.dp)
+                .padding(vertical = 2.dp)
+                .clickable(
+                    enabled = attachment.content.isNotEmpty() || attachment.id.startsWith("/storage/"),
+                    onClick = { onClick(attachment) }
+                ),
         shape = RoundedCornerShape(12.dp),
         color = backgroundColor.copy(alpha = 0.5f)
     ) {

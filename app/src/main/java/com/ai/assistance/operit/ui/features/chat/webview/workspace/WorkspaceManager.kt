@@ -95,6 +95,9 @@ fun WorkspaceManager(
     // 控制可展开FAB的菜单状态
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     
+    // 解绑确认对话框状态
+    var showUnbindConfirmDialog by remember { mutableStateOf(false) }
+    
     // 当前活动的编辑器引用
     var activeEditor by remember { mutableStateOf<com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.NativeCodeEditor?>(null) }
 
@@ -401,8 +404,36 @@ fun WorkspaceManager(
             onExportClick = { onExportClick(File(workspacePath)) },
             onFileManagerClick = { showFileManager = true },
             onUndoClick = { activeEditor?.undo() },
-            onRedoClick = { activeEditor?.redo() }
+            onRedoClick = { activeEditor?.redo() },
+            onUnbindClick = { 
+                showUnbindConfirmDialog = true
+                isFabMenuExpanded = false
+            }
         )
+        
+        // 解绑确认对话框
+        if (showUnbindConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showUnbindConfirmDialog = false },
+                title = { Text("解绑工作区") },
+                text = { Text("确定要解绑当前聊天的工作区吗？解绑后将无法访问工作区文件和上下文信息。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            actualViewModel.unbindChatFromWorkspace(currentChat.id)
+                            showUnbindConfirmDialog = false
+                        }
+                    ) {
+                        Text("确定")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showUnbindConfirmDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -413,7 +444,8 @@ fun ExpandableFabMenu(
     onExportClick: () -> Unit,
     onFileManagerClick: () -> Unit,
     onUndoClick: () -> Unit,
-    onRedoClick: () -> Unit
+    onRedoClick: () -> Unit,
+    onUnbindClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -431,6 +463,8 @@ fun ExpandableFabMenu(
             FabMenuItem(icon = Icons.Default.Folder, text = "文件", onClick = onFileManagerClick)
             Spacer(modifier = Modifier.height(12.dp))
             FabMenuItem(icon = Icons.Default.Upload, text = "导出", onClick = onExportClick)
+            Spacer(modifier = Modifier.height(12.dp))
+            FabMenuItem(icon = Icons.Default.LinkOff, text = "解绑", onClick = onUnbindClick)
             Spacer(modifier = Modifier.height(16.dp))
         }
 

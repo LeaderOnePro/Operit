@@ -523,6 +523,7 @@ fun getFunctionDisplayName(functionType: FunctionType): String {
         FunctionType.PROBLEM_LIBRARY -> stringResource(id = R.string.function_type_problem_library)
         FunctionType.FILE_BINDING -> stringResource(id = R.string.function_type_file_binding)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_type_ui_controller)
+        FunctionType.TRANSLATION -> stringResource(id = R.string.function_type_translation)
     }
 }
 
@@ -535,5 +536,6 @@ fun getFunctionDescription(functionType: FunctionType): String {
         FunctionType.PROBLEM_LIBRARY -> stringResource(id = R.string.function_desc_problem_library)
         FunctionType.FILE_BINDING -> stringResource(id = R.string.function_desc_file_binding)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_desc_ui_controller)
+        FunctionType.TRANSLATION -> stringResource(id = R.string.function_desc_translation)
     }
 }

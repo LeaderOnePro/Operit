@@ -74,31 +74,31 @@ fun AttachmentSelectorPanel(
     }
 
     // 文件/图片选择器启动器
-    val imagePickerLauncher =
-            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) {
-                    uri: Uri? ->
-                uri?.let {
-                    // 将Uri转换为绝对路径
-                    val filePath = getFilePathFromUri(context, it)
-                    filePath?.let { path ->
-                        onAttachImage(path)
-                        onDismiss()
-                    }
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                getFilePathFromUri(context, uri)?.let { path ->
+                    onAttachImage(path)
                 }
             }
+            onDismiss()
+        }
+    }
 
-    val filePickerLauncher =
-            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) {
-                    uri: Uri? ->
-                uri?.let {
-                    // 将Uri转换为绝对路径
-                    val filePath = getFilePathFromUri(context, it)
-                    filePath?.let { path ->
-                        onAttachFile(path)
-                        onDismiss()
-                    }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                getFilePathFromUri(context, uri)?.let { path ->
+                    onAttachFile(path)
                 }
             }
+            onDismiss()
+        }
+    }
 
     // 附件选择面板 - 使用展开动画，从下方向上展开
     AnimatedVisibility(

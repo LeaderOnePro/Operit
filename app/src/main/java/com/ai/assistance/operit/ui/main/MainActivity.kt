@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
         // 语言设置已在Application中初始化，这里无需重复
 
         initializeComponents()
+        cleanTemporaryFiles()
         anrMonitor.start()
         setupPreferencesListener()
         configureDisplaySettings()
@@ -248,8 +249,6 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         Log.d(TAG, "onResume called")
 
-        // 清理临时文件目录
-        cleanTemporaryFiles()
         // Check clipboard for invitation code when the app resumes
         checkClipboardForInvitation()
     }
@@ -294,9 +293,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy called")
-
-        // 清理临时文件目录
-        cleanTemporaryFiles()
 
         // 确保隐藏加载界面
         pluginLoadingState.hide()

@@ -8,6 +8,7 @@ import android.view.WindowManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationMarkupManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationRoundManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationService
+import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.api.chat.enhance.InputProcessor
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
 import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
@@ -189,8 +190,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             // 获取EnhancedAIService实例
             val instance = getInstance(context)
 
-            // 委托给ConversationService处理
-            return instance.conversationService.processFileBinding(
+            // 委托给FileBindingService处理
+            return instance.fileBindingService.processFileBinding(
                     originalContent,
                     aiGeneratedCode,
                     instance.multiServiceManager
@@ -203,6 +204,9 @@ class EnhancedAIService private constructor(private val context: Context) {
 
     // 添加ConversationService实例
     private val conversationService = ConversationService(context)
+
+    // 添加FileBindingService实例
+    private val fileBindingService = FileBindingService(context)
 
     // AIService 实例 - 保留为兼容现有代码，但实际使用 MultiServiceManager
     private val aiService: AIService by lazy {
@@ -1366,11 +1370,20 @@ class EnhancedAIService private constructor(private val context: Context) {
             originalContent: String,
             aiGeneratedCode: String
     ): Pair<String, String> {
-        return conversationService.processFileBinding(
+        return fileBindingService.processFileBinding(
                 originalContent,
                 aiGeneratedCode,
                 multiServiceManager
         )
+    }
+
+    /**
+     * 翻译文本功能
+     * @param text 要翻译的文本
+     * @return 翻译后的文本
+     */
+    suspend fun translateText(text: String): String {
+        return conversationService.translateText(text, multiServiceManager)
     }
 
 

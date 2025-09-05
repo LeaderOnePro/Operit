@@ -508,7 +508,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
     }
 
     /** 更新聊天工作区 */
-    suspend fun updateChatWorkspace(chatId: String, workspace: String) {
+    suspend fun updateChatWorkspace(chatId: String, workspace: String?) {
         mutex.withLock {
             try {
                 chatDao.updateChatWorkspace(chatId, workspace)

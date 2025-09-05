@@ -206,6 +206,33 @@ class PromptTagManager private constructor(private val context: Context) {
         return getAllTags().filter { it.tagType == tagType }
     }
     
+    // 查找具有相同内容的标签（不包括标签标题）
+    suspend fun findTagWithSameContent(promptContent: String): PromptTag? {
+        return getAllTags().find { tag ->
+            tag.promptContent.trim() == promptContent.trim()
+        }
+    }
+    
+    // 创建或复用标签（如果内容相同则复用现有标签）
+    suspend fun createOrReusePromptTag(
+        name: String,
+        description: String = "",
+        promptContent: String = "",
+        tagType: TagType = TagType.CUSTOM,
+        isSystemTag: Boolean = false
+    ): String {
+        // 首先查找是否存在相同内容的标签
+        val existingTag = findTagWithSameContent(promptContent)
+        
+        return if (existingTag != null) {
+            // 如果找到相同内容的标签，返回现有标签的ID
+            existingTag.id
+        } else {
+            // 如果没有找到，创建新标签
+            createPromptTag(name, description, promptContent, tagType, isSystemTag)
+        }
+    }
+    
     // 初始化系统标签
     suspend fun initializeSystemTags() {
         dataStore.edit { preferences ->

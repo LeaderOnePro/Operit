@@ -789,6 +789,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 enableThinking = enableThinkingMode.value, // 传递思考模式的状态
                 thinkingGuidance = enableThinkingGuidance.value, // 传递思考引导的状态
                 enableMemoryAttachment = enableMemoryAttachment.value, // 传递记忆附着的状态
+                enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
                 maxTokens = maxTokens,
                 //如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
                 tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble()
@@ -1343,6 +1344,29 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /** 解绑聊天的工作区 */
+    fun unbindChatFromWorkspace(chatId: String) {
+        // 1. Persist the change
+        chatHistoryDelegate.unbindChatFromWorkspace(chatId)
+
+        // 2. Stop the web server or clear workspace
+        viewModelScope.launch {
+            try {
+                val webServer = LocalWebServer.getInstance(context, LocalWebServer.ServerType.WORKSPACE)
+                if (webServer.isRunning()) {
+                    webServer.stop()
+                }
+                Log.d(TAG, "Web server stopped after unbinding workspace for chat $chatId")
+
+                // 3. Trigger a refresh of the WebView
+                refreshWebView()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop web server after unbinding", e)
+                uiStateDelegate.showErrorMessage("停止Web工作空间失败: ${e.message}")
+            }
+        }
+    }
+
     /** 更新聊天顺序和分组 */
     fun updateChatOrderAndGroup(
         reorderedHistories: List<ChatHistory>,
@@ -1369,6 +1393,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun onWorkspaceButtonClick() {
         toggleWebView()
+        refreshWebView()
     }
 
     fun onAiComputerButtonClick() {
