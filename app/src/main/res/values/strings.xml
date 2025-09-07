@@ -2279,6 +2279,7 @@
     <string name="temperature_recommendation">温度推荐设置</string>
     <string name="parameter_value">参数值</string>
     <string name="parameter_range_format">范围: %1$s - %2$s</string>
+    <string name="overseas_provider_warning">检测到您在中国大陆，但选择了海外服务商。请确认是否已开启代理工具</string>
     
     <!-- 自定义参数对话框 -->
     <string name="custom_parameter_added">自定义参数已新增</string>
