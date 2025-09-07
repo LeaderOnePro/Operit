@@ -1,7 +1,9 @@
 package com.ai.assistance.operit.ui.features.settings.sections
 
+import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,11 +38,13 @@ import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
+import com.ai.assistance.operit.util.LocationUtils
 import kotlinx.coroutines.launch
 
 val TAG = "ModelApiSettings"
 
 @Composable
+@SuppressLint("MissingPermission")
 fun ModelApiSettingsSection(
         config: ModelConfigData,
         configManager: ModelConfigManager,
@@ -47,6 +52,9 @@ fun ModelApiSettingsSection(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    // 区域告警可见性
+    var showRegionWarning by remember { mutableStateOf(false) }
 
     // 获取每个提供商的默认模型名称
     fun getDefaultModelName(providerType: ApiProviderType): String {
@@ -111,6 +119,20 @@ fun ModelApiSettingsSection(
 
     // 当API提供商改变时更新端点
     LaunchedEffect(selectedApiProvider) {
+        Log.d("ModelApiSettingsSection", "API提供商改变")
+        if (selectedApiProvider == ApiProviderType.OPENAI || selectedApiProvider == ApiProviderType.GOOGLE
+            || selectedApiProvider == ApiProviderType.ANTHROPIC) {
+            val inChina = LocationUtils.isDeviceInMainlandChina(context)
+            showRegionWarning = inChina
+            if (inChina) {
+                Log.d("ModelApiSettingsSection", "检测到位于中国大陆")
+                showNotification(context.getString(R.string.overseas_provider_warning))
+            } else {
+                Log.d("ModelApiSettingsSection", "检测到位于海外")
+            }
+        } else {
+            showRegionWarning = false
+        }
         if (apiEndpointInput.isEmpty() || isDefaultApiEndpoint(apiEndpointInput)) {
             apiEndpointInput = getDefaultApiEndpoint(selectedApiProvider)
         }
@@ -143,6 +165,34 @@ fun ModelApiSettingsSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
+        // 区域警告（与外部容器边缘贴合）
+        AnimatedVisibility(visible = showRegionWarning) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.overseas_provider_warning),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+        }
+
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                     verticalAlignment = Alignment.CenterVertically,
