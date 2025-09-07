@@ -197,7 +197,7 @@ fun ModelPromptsSettingsScreen(
     }
     
     // 标签相关状态
-    val tagList by promptTagManager.tagListFlow.collectAsState(initial = emptyList())
+    val allTags by promptTagManager.allTagsFlow.collectAsState(initial = emptyList())
     var showAddTagDialog by remember { mutableStateOf(false) }
     var showEditTagDialog by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<PromptTag?>(null) }
@@ -217,15 +217,6 @@ fun ModelPromptsSettingsScreen(
         characterCardManager.initializeIfNeeded()
     }
     
-    // 获取所有标签
-    var allTags by remember { mutableStateOf(emptyList<PromptTag>()) }
-    LaunchedEffect(tagList) {
-        scope.launch {
-            val tags = promptTagManager.getAllTags()
-            allTags = tags
-        }
-    }
-
     // 获取所有角色卡
     var allCharacterCards by remember { mutableStateOf(emptyList<CharacterCard>()) }
     LaunchedEffect(characterCardList, refreshTrigger) {
@@ -275,7 +266,8 @@ fun ModelPromptsSettingsScreen(
                         id = tag.id,
                         name = tag.name,
                         description = tag.description,
-                        promptContent = tag.promptContent
+                        promptContent = tag.promptContent,
+                        tagType = tag.tagType
                     )
                 }
                 showEditTagDialog = false
