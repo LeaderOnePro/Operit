@@ -33,6 +33,9 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.model.PromptTag
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.api.chat.EnhancedAIService
+import kotlinx.coroutines.launch
+import android.content.Context
 
 // 角色卡名片对话框
 @OptIn(ExperimentalLayoutApi::class)
@@ -49,11 +52,15 @@ fun CharacterCardDialog(
     var name by remember(characterCard.id) { mutableStateOf(characterCard.name) }
     var description by remember(characterCard.id) { mutableStateOf(characterCard.description) }
     var characterSetting by remember(characterCard.id) { mutableStateOf(characterCard.characterSetting) }
+    var openingStatement by remember(characterCard.id) { mutableStateOf(characterCard.openingStatement) } // 新增：开场白
     var otherContent by remember(characterCard.id) { mutableStateOf(characterCard.otherContent) }
     var attachedTagIds by remember(characterCard.id) { mutableStateOf(characterCard.attachedTagIds) }
     var advancedCustomPrompt by remember(characterCard.id) { mutableStateOf(characterCard.advancedCustomPrompt) }
     var marks by remember(characterCard.id) { mutableStateOf(characterCard.marks) }
     var showAdvanced by remember { mutableStateOf(false) }
+    
+    // 翻译相关状态
+    var isTranslating by remember { mutableStateOf(false) }
     
     // 大屏编辑状态
     var showFullScreenEdit by remember { mutableStateOf(false) }
@@ -62,6 +69,7 @@ fun CharacterCardDialog(
     var fullScreenEditField by remember { mutableStateOf("") }
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val avatarUri by userPreferencesManager.getAiAvatarForCharacterCardFlow(characterCard.id)
         .collectAsState(initial = null)
 
@@ -164,6 +172,71 @@ fun CharacterCardDialog(
                             fullScreenEditTitle = context.getString(R.string.character_card_edit_character_setting)
                             fullScreenEditValue = characterSetting
                             fullScreenEditField = "characterSetting"
+                            showFullScreenEdit = true
+                        }
+                    )
+
+                    // 开场白
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.character_card_opening_statement),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        // 翻译按钮
+                        IconButton(
+                            onClick = {
+                                if (openingStatement.isNotBlank() && !isTranslating) {
+                                    scope.launch {
+                                        isTranslating = true
+                                        try {
+                                            val enhancedAIService = EnhancedAIService.getInstance(context)
+                                            val translatedText = enhancedAIService.translateText(openingStatement)
+                                            openingStatement = translatedText
+                                        } catch (e: Exception) {
+                                            // 翻译失败，可以显示错误提示
+                                        } finally {
+                                            isTranslating = false
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = openingStatement.isNotBlank() && !isTranslating,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            if (isTranslating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Translate,
+                                    contentDescription = stringResource(R.string.character_card_translate_opening_statement),
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    
+                    CompactTextFieldWithExpand(
+                        value = openingStatement,
+                        onValueChange = { openingStatement = it },
+                        placeholder = stringResource(R.string.character_card_opening_statement_placeholder),
+                        minLines = 2,
+                        maxLines = 4,
+                        onExpandClick = {
+                            fullScreenEditTitle = context.getString(R.string.character_card_edit_opening_statement)
+                            fullScreenEditValue = openingStatement
+                            fullScreenEditField = "openingStatement"
                             showFullScreenEdit = true
                         }
                     )
@@ -312,6 +385,7 @@ fun CharacterCardDialog(
                                     name = name,
                                     description = description,
                                     characterSetting = characterSetting,
+                                    openingStatement = openingStatement, // 新增
                                     otherContent = otherContent,
                                     attachedTagIds = attachedTagIds,
                                     advancedCustomPrompt = advancedCustomPrompt,
@@ -340,6 +414,7 @@ fun CharacterCardDialog(
                     "name" -> name = newValue
                     "description" -> description = newValue
                     "characterSetting" -> characterSetting = newValue
+                    "openingStatement" -> openingStatement = newValue // 新增
                     "otherContent" -> otherContent = newValue
                     "advancedCustomPrompt" -> advancedCustomPrompt = newValue
                     "marks" -> marks = newValue

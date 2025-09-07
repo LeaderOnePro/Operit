@@ -13,6 +13,7 @@ data class CharacterCard(
     val name: String,
     val description: String = "",
     val characterSetting: String = "", // 角色设定（引导词）
+    val openingStatement: String = "", // 新增：开场白
     val otherContent: String = "", // 其他乱七八糟的东西（引导词）
     val attachedTagIds: List<String> = emptyList(), // 附着的标签ID列表
     val advancedCustomPrompt: String = "", // 高级设置的自定义（引导词）

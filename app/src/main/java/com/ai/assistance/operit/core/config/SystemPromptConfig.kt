@@ -59,7 +59,7 @@ object SystemPromptConfig {
       - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
       - read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)
       - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
-      - apply_file: Applies intelligent edits to a file. For the 'content' parameter, you can use several formats: partial code with "// ... existing code ..." placeholders, a diff-like format with '+' for additions and '-' for deletions, or natural language instructions within comments (e.g., "// delete the login function"). A specialized service will interpret these instructions to create a proper patch. Parameters: path (file path), content (the code or instructions to apply)
+      - apply_file: Applies intelligent edits to a file. For the 'content' parameter, prioritize a diff-like format with '+' for additions and '-' for deletions to maximize efficiency. For larger changes, use partial code with "// ... existing code ..." placeholders. Natural language instructions in comments (e.g., "// delete this function") are also supported. A specialized service intelligently applies these changes. Parameters: path (file path), content (the code or instructions to apply)
       - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
       - file_exists: Check if a file or directory exists. Parameters: path (target path)
       - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
@@ -202,7 +202,7 @@ object SystemPromptConfig {
         - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
         - read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，会自动使用OCR提取文本。参数：path（文件路径）
         - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
-        - apply_file: 智能地修改文件。在'content'参数中，你可以使用多种格式：带 "// ... existing code ..." 占位符的部分代码、带 '+' 和 '-' 的差异（diff）格式，或注释中的自然语言指令（例如 "// 删除登录函数"）。一个专门的服务会解析这些指令来应用修改。参数：path（文件路径），content（要应用的代码或指令）
+        - apply_file: 智能地修改文件。为最大化效率，'content'参数应优先使用带'+'（增）和'-'（删）的差异（diff）格式。对于较大改动，可使用带 "// ... existing code ..." 占位符的部分代码。也支持注释中的自然语言指令（如 "// 删除此函数"）。一个专门的服务会智能地应用这些修改。参数：path（文件路径），content（要应用的代码或指令）
         - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
         - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
         - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）

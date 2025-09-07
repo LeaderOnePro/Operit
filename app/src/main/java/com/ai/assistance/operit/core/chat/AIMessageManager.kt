@@ -10,6 +10,7 @@ import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.WorkspaceAttachmentProcessor
 import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import kotlinx.coroutines.CoroutineScope
@@ -39,8 +40,10 @@ object AIMessageManager {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private lateinit var toolHandler: AIToolHandler
+    private lateinit var context: Context
 
     fun initialize(context: Context) {
+        this.context = context
         toolHandler = AIToolHandler.getInstance(context)
     }
 
@@ -50,12 +53,16 @@ object AIMessageManager {
      * @param messageText 用户输入的原始文本。
      * @param attachments 附件列表。
      * @param enableMemoryAttachment 是否启用记忆附着功能。
+     * @param enableWorkspaceAttachment 是否启用工作区附着功能。
+     * @param workspacePath 工作区路径。
      * @return 格式化后的完整消息字符串。
      */
     suspend fun buildUserMessageContent(
         messageText: String,
         attachments: List<AttachmentInfo>,
-        enableMemoryAttachment: Boolean
+        enableMemoryAttachment: Boolean,
+        enableWorkspaceAttachment: Boolean = false,
+        workspacePath: String? = null
     ): String {
         // 1. 根据开关决定是否查询知识库
         val memoryTag = if (enableMemoryAttachment && messageText.isNotBlank() && !messageText.contains("<memory>", ignoreCase = true)) {
@@ -74,7 +81,21 @@ object AIMessageManager {
             } else ""
         } else ""
 
-        // 2. 构建附件标签
+        // 2. 根据开关决定是否生成工作区附着
+        val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank()) {
+            try {
+                val workspaceContent = WorkspaceAttachmentProcessor.generateWorkspaceAttachment(
+                    context = context,
+                    workspacePath = workspacePath
+                )
+                "<workspace_attachment>$workspaceContent</workspace_attachment>"
+            } catch (e: Exception) {
+                Log.e(TAG, "生成工作区附着失败", e)
+                ""
+            }
+        } else ""
+
+        // 3. 构建附件标签
         val attachmentTags = if (attachments.isNotEmpty()) {
             attachments.joinToString(" ") { attachment ->
                 "<attachment " +
@@ -87,8 +108,8 @@ object AIMessageManager {
             }
         } else ""
 
-        // 3. 组合最终消息
-        return listOf(messageText, attachmentTags, memoryTag)
+        // 4. 组合最终消息
+        return listOf(messageText, attachmentTags, memoryTag, workspaceTag)
             .filter { it.isNotBlank() }
             .joinToString(" ")
     }

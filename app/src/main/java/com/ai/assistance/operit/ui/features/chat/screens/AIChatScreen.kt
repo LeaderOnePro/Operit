@@ -207,7 +207,7 @@ fun AIChatScreen(
 
 
     // 添加WebView刷新相关状态
-    val webViewNeedsRefresh by actualViewModel.webViewNeedsRefresh.collectAsState()
+    val webViewRefreshCounter by actualViewModel.webViewRefreshCounter.collectAsState()
 
     // Floating window mode state
     val isFloatingMode by actualViewModel.isFloatingMode.collectAsState()
@@ -417,7 +417,6 @@ fun AIChatScreen(
             IconButton(
                     onClick = {
                         actualViewModel.onWorkspaceButtonClick()
-                        actualViewModel.refreshWebView()
                     }
             ) {
                 Icon(

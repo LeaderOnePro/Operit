@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 
 /** 委托类，负责管理聊天历史相关功能 */
 class ChatHistoryDelegate(
@@ -39,6 +40,7 @@ class ChatHistoryDelegate(
     }
 
     private val chatHistoryManager = ChatHistoryManager.getInstance(context)
+    private val characterCardManager = CharacterCardManager.getInstance(context) // 新增
     private val isInitialized = AtomicBoolean(false)
     private val historyUpdateMutex = Mutex()
 
@@ -125,9 +127,27 @@ class ChatHistoryDelegate(
 
             val newChat = chatHistoryManager.createNewChat()
             _currentChatId.value = newChat.id
-            _chatHistory.value = newChat.messages
+            
+            // --- 新增：检查并添加开场白 ---
+            val activeCard = characterCardManager.activeCharacterCardFlow.first()
+            if (activeCard.openingStatement.isNotBlank()) {
+                val openingMessage = ChatMessage(
+                    sender = "ai",
+                    content = activeCard.openingStatement,
+                    timestamp = System.currentTimeMillis()
+                )
+                // 将开场白添加到新聊天的消息列表中
+                val messagesWithOpening = listOf(openingMessage)
+                _chatHistory.value = messagesWithOpening
+                // 保存带开场白的消息到数据库
+                chatHistoryManager.addMessage(newChat.id, openingMessage)
+                onChatHistoryLoaded(messagesWithOpening)
+            } else {
+                _chatHistory.value = newChat.messages
+                onChatHistoryLoaded(newChat.messages)
+            }
+            // --- 结束 ---
 
-            onChatHistoryLoaded(newChat.messages)
             onTokenStatisticsLoaded(0, 0, 0)
             resetPlanItems()
         }
@@ -237,6 +257,24 @@ class ChatHistoryDelegate(
             val updatedHistories = _chatHistories.value.map {
                 if (it.id == chatId) {
                     it.copy(workspace = workspace, updatedAt = LocalDateTime.now())
+                } else {
+                    it
+                }
+            }
+            _chatHistories.value = updatedHistories
+        }
+    }
+
+    /** 解绑聊天的工作区 */
+    fun unbindChatFromWorkspace(chatId: String) {
+        viewModelScope.launch {
+            // 1. Update the database (set workspace to null)
+            chatHistoryManager.updateChatWorkspace(chatId, null)
+
+            // 2. Manually update the UI state to reflect the change immediately
+            val updatedHistories = _chatHistories.value.map {
+                if (it.id == chatId) {
+                    it.copy(workspace = null, updatedAt = LocalDateTime.now())
                 } else {
                     it
                 }

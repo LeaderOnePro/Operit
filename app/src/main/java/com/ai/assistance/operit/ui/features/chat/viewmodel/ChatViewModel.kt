@@ -252,9 +252,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
 
-    // 添加WebView刷新控制流
-    private val _webViewNeedsRefresh = MutableStateFlow(false)
-    val webViewNeedsRefresh: StateFlow<Boolean> = _webViewNeedsRefresh
+    // 添加WebView刷新控制流 - 使用Int计数器避免重复刷新问题
+    private val _webViewRefreshCounter = MutableStateFlow(0)
+    val webViewRefreshCounter: StateFlow<Int> = _webViewRefreshCounter
 
     // 文件选择相关回调
     private var fileChooserCallback: ((Int, Intent?) -> Unit)? = null
@@ -550,7 +550,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             updateWebServerForCurrentChat(chatId)
             // 延迟一点时间再触发刷新，等待服务器工作区更新完成
             viewModelScope.launch {
-                delay(200) // 延迟200毫秒
                 refreshWebView()
             }
         }
@@ -789,6 +788,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 enableThinking = enableThinkingMode.value, // 传递思考模式的状态
                 thinkingGuidance = enableThinkingGuidance.value, // 传递思考引导的状态
                 enableMemoryAttachment = enableMemoryAttachment.value, // 传递记忆附着的状态
+                enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
                 maxTokens = maxTokens,
                 //如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
                 tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble()
@@ -1128,9 +1128,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             _showAiComputer.value = false
         }
         
-        // 每次切换时，标记需要刷新
+        // 每次切换时，增加刷新计数器
         if (_showWebView.value) {
-            _webViewNeedsRefresh.value = true
+            _webViewRefreshCounter.value += 1
         }
     }
 
@@ -1189,14 +1189,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    // 重置WebView刷新状态
-    fun resetWebViewRefreshState() {
-        _webViewNeedsRefresh.value = false
-    }
-
     // 强制WebView刷新
     fun refreshWebView() {
-        _webViewNeedsRefresh.value = true
+        _webViewRefreshCounter.value += 1
     }
 
     // 判断是否正在使用默认API配置
@@ -1343,6 +1338,29 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /** 解绑聊天的工作区 */
+    fun unbindChatFromWorkspace(chatId: String) {
+        // 1. Persist the change
+        chatHistoryDelegate.unbindChatFromWorkspace(chatId)
+
+        // 2. Stop the web server or clear workspace
+        viewModelScope.launch {
+            try {
+                val webServer = LocalWebServer.getInstance(context, LocalWebServer.ServerType.WORKSPACE)
+                if (webServer.isRunning()) {
+                    webServer.stop()
+                }
+                Log.d(TAG, "Web server stopped after unbinding workspace for chat $chatId")
+
+                // 3. Trigger a refresh of the WebView
+                refreshWebView()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop web server after unbinding", e)
+                uiStateDelegate.showErrorMessage("停止Web工作空间失败: ${e.message}")
+            }
+        }
+    }
+
     /** 更新聊天顺序和分组 */
     fun updateChatOrderAndGroup(
         reorderedHistories: List<ChatHistory>,
@@ -1369,6 +1387,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun onWorkspaceButtonClick() {
         toggleWebView()
+        refreshWebView()
     }
 
     fun onAiComputerButtonClick() {

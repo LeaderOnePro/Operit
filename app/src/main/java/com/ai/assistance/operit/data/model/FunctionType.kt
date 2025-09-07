@@ -6,5 +6,6 @@ enum class FunctionType {
     SUMMARY, // 对话总结
     PROBLEM_LIBRARY, // 问题库处理
     FILE_BINDING, // 文件绑定处理
-    UI_CONTROLLER // UI自动化控制
+    UI_CONTROLLER, // UI自动化控制
+    TRANSLATION // 翻译功能
 }
