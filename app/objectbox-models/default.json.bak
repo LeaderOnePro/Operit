@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "4:436170976169106389",
-      "lastPropertyId": "14:2410703398686992179",
+      "lastPropertyId": "15:6543036940703230340",
       "name": "Memory",
       "properties": [
         {
@@ -78,6 +78,11 @@
           "id": "14:2410703398686992179",
           "name": "isDocumentNode",
           "type": 1
+        },
+        {
+          "id": "15:6543036940703230340",
+          "name": "chunkIndexFilePath",
+          "type": 9
         }
       ],
       "relations": [
