@@ -230,14 +230,14 @@ fun ModelApiSettingsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
+                Text(
+                    text = stringResource(R.string.endpoint_completion_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                    lineHeight = 16.sp
+                )
             }
-            Text(
-                text = stringResource(R.string.endpoint_completion_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-                lineHeight = 16.sp
-            )
  
              // API密钥输入
              OutlinedTextField(
