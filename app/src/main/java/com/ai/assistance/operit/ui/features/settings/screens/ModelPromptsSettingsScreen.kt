@@ -57,6 +57,8 @@ fun ModelPromptsSettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showTagSavedHighlight by remember { mutableStateOf(false) }
+    var showSaveSuccessMessage by remember { mutableStateOf(false) }
     
     // 管理器
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
@@ -69,7 +71,6 @@ fun ModelPromptsSettingsScreen(
     
     // 状态
     var currentTab by remember { mutableStateOf(0) } // 0: 角色卡, 1: 标签, 2: 旧配置
-    var showSaveSuccessMessage by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableStateOf(0) }
 
     // 角色卡相关状态
@@ -260,6 +261,9 @@ fun ModelPromptsSettingsScreen(
                         promptContent = tag.promptContent,
                         tagType = tag.tagType
                     )
+                    showAddTagDialog = false
+                    editingTag = null
+                    showTagSavedHighlight = true
                 } else {
                     // 更新
                     promptTagManager.updatePromptTag(
@@ -269,10 +273,9 @@ fun ModelPromptsSettingsScreen(
                         promptContent = tag.promptContent,
                         tagType = tag.tagType
                     )
+                    showSaveSuccessMessage = true
                 }
                 showEditTagDialog = false
-                editingTag = null
-                showSaveSuccessMessage = true
             }
         }
     }
@@ -579,7 +582,7 @@ fun ModelPromptsSettingsScreen(
             }
         }
     }
-    
+
     // 新建角色卡对话框
     if (showAddCharacterCardDialog) {
         CharacterCardDialog(
@@ -768,7 +771,34 @@ fun ModelPromptsSettingsScreen(
         )
     }
     
-    // 成功保存消息
+    // 手动添加标签成功的高亮提示（底部显著提示，1.5s 自动消失）
+    if (showTagSavedHighlight) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(1500)
+            showTagSavedHighlight = false
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .align(Alignment.BottomCenter),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                tonalElevation = 6.dp,
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = stringResource(R.string.save_successful), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
 }
 
 // 角色卡标签页
