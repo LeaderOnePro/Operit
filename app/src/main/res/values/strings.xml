@@ -21,7 +21,7 @@
     <string name="nav_terminal">终端</string>
     <string name="nav_toolbox">工具箱</string>
     <string name="nav_item_agreement">用户协议</string>
-    <string name="nav_help">帮助中心</string>
+    <string name="nav_help">使用手册</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
     
