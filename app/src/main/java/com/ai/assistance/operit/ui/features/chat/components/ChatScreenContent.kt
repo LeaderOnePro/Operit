@@ -434,7 +434,8 @@ fun ChatScreenContent(
                     if (index != null) {
                         val editedMessage =
                             chatHistory[index].copy(
-                                content = editingMessageContent.value
+                                content = editingMessageContent.value,
+                                contentStream = null // 修复：清除stream，强制UI使用content
                             )
                         actualViewModel.updateMessage(index, editedMessage)
                     }

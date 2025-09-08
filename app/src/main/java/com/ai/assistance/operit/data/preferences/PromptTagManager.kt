@@ -47,6 +47,13 @@ class PromptTagManager private constructor(private val context: Context) {
     val tagListFlow: Flow<List<String>> = dataStore.data.map { preferences ->
         preferences[PROMPT_TAG_LIST]?.toList() ?: emptyList()
     }
+
+    val allTagsFlow: Flow<List<PromptTag>> = dataStore.data.map { preferences ->
+        val tagIds = preferences[PROMPT_TAG_LIST]?.toList() ?: emptyList()
+        tagIds.map { id ->
+            getPromptTagFromPreferences(preferences, id)
+        }.sortedByDescending { it.updatedAt }
+    }
     
     // 获取标签流
     fun getPromptTagFlow(id: String): Flow<PromptTag> = dataStore.data.map { preferences ->
@@ -125,7 +132,7 @@ class PromptTagManager private constructor(private val context: Context) {
         tagType: TagType? = null
     ) {
         // 不允许修改系统标签的类型
-        if (isSystemTag(id) && tagType != null) return
+        if (isSystemTag(id)) return
         
         dataStore.edit { preferences ->
             name?.let { preferences[stringPreferencesKey("prompt_tag_${id}_name")] = it }

@@ -95,24 +95,6 @@ open class StandardShellToolExecutor(private val context: Context) {
                 )
             }
             else -> {
-                // Check if Shizuku service is available
-                if (!ShizukuAuthorizer.isShizukuServiceRunning()) {
-                    return ToolValidationResult(
-                            valid = false,
-                            errorMessage =
-                                    "Shizuku service is not running. ${ShizukuAuthorizer.getShizukuStartupInstructions()}"
-                    )
-                }
-
-                // Check if we have Shizuku permission
-                if (!ShizukuAuthorizer.hasShizukuPermission()) {
-                    return ToolValidationResult(
-                            valid = false,
-                            errorMessage =
-                                    "Shizuku permission not granted. Please grant permission to use ADB commands."
-                    )
-                }
-
                 ToolValidationResult(valid = true)
             }
         }
