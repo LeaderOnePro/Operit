@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Shield
@@ -26,6 +27,7 @@ import com.ai.assistance.operit.data.model.PromptTag
 import com.ai.assistance.operit.data.model.TagType
 import com.ai.assistance.operit.data.preferences.PromptTagManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 // 预设标签的数据模型
 data class PresetTag(
@@ -166,6 +168,7 @@ fun TagMarketScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val promptTagManager = remember { PromptTagManager.getInstance(context) }
+    var showSaveSuccessHighlight by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var selectedPreset by remember { mutableStateOf<PresetTag?>(null) }
     var newTagName by remember { mutableStateOf("") }
@@ -233,7 +236,10 @@ fun TagMarketScreen(onBackPressed: () -> Unit) {
                                     tagType = selectedPreset!!.tagType
                                 )
                                 showCreateDialog = false
-                                onBackPressed() // 创建后返回
+                                showSaveSuccessHighlight = true
+                                // 延时 1.5s 后返回
+                                delay(1500)
+                                onBackPressed()
                             }
                         }
                     }
@@ -243,6 +249,35 @@ fun TagMarketScreen(onBackPressed: () -> Unit) {
                 TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
             }
         )
+    }
+
+    // 保存成功的底部高亮提示（1.5s 自动消失）
+    if (showSaveSuccessHighlight) {
+        LaunchedEffect(Unit) {
+            delay(1500)
+            showSaveSuccessHighlight = false
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .align(Alignment.BottomCenter),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                tonalElevation = 6.dp,
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = context.getString(com.ai.assistance.operit.R.string.save_successful), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
     }
 }
 
