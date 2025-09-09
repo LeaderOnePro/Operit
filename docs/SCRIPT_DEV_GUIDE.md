@@ -23,8 +23,8 @@
 
 ```bash
 # 克隆项目仓库
-git clone https://github.com/NakiriRuri/assistance.git
-cd assistance
+git clone https://github.com/AAswordman/Operit.git
+cd Operit
 
 # 安装项目依赖 (主要是TypeScript编译器)
 npm install

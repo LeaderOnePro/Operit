@@ -8,7 +8,7 @@
   <a href="https://github.com/AAswordman/Operit/releases/latest"><img src="https://img.shields.io/github/v/release/AAswordman/Operit" alt="Latest Release"></a>
   <br>
   <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
-  <a href="docs/USER_GUIDE.md"><img src="https://img.shields.io/badge/📖-用户指南-blue.svg" alt="User Guide"></a>
+  <a href="https://operit.dev.tc"><img src="https://img.shields.io/badge/📖-用户指南-blue.svg" alt="User Guide"></a>
   <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
 </div>
 
@@ -100,7 +100,7 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 
 ## 🚀 快速开始
 
-> **详细的安装指南和丰富的使用示例，请查阅我们的 👉 [用户指南](docs/USER_GUIDE.md)**
+> **详细的安装指南和丰富的使用示例，请查阅我们的 👉 [用户指南](https://operit.dev.tc)**
 
 - **系统要求**: Android 8.0+ (API 26+)，建议4GB以上内存，存储空间200MB+
 - **安装步骤**: 

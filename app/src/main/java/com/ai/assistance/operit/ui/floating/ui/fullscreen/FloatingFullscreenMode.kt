@@ -5,6 +5,10 @@ import android.media.AudioManager
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateDpAsState
@@ -16,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +29,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Close
@@ -31,11 +39,17 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -89,6 +103,13 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     var isWaveActive by remember { mutableStateOf(false) }
     var showBottomControls by remember { mutableStateOf(true) }
     var silenceTimeoutJob by remember { mutableStateOf<Job?>(null) }
+    
+    // 编辑模式相关状态
+    var isEditMode by remember { mutableStateOf(false) }
+    var editableText by remember { mutableStateOf("") }
+    
+    // 长按拖动提示相关状态
+    var showDragHints by remember { mutableStateOf(false) }
     
     // 添加输入法服务引用
     val inputMethodManager = remember { 
@@ -207,7 +228,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
         }
     }
 
-    // 监听语音识别结果
+    // 监听语音识别结果 
     LaunchedEffect(speechService) {
         speechService.recognitionResultFlow.collectLatest { result ->
             if (isRecording) {
@@ -283,6 +304,8 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
         silenceTimeoutJob?.cancel()
         isWaveActive = false
         showBottomControls = true
+        isEditMode = false
+        editableText = ""
 
         // 初始化语音服务
         speechService.initialize()
@@ -587,9 +610,120 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
             }
         }
 
-        // 底部控制栏 - 只在showBottomControls为true时显示
+        // 编辑界面 - 只在编辑模式下显示
         AnimatedVisibility(
-            visible = showBottomControls,
+            visible = isEditMode,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(300)
+            ) + fadeIn(tween(300)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(300)
+            ) + fadeOut(tween(300)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.8f),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "编辑您的消息",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                OutlinedTextField(
+                    value = editableText,
+                    onValueChange = { editableText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    placeholder = {
+                        Text(
+                            text = "在此输入或编辑您的消息...",
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    ),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        imeAction = ImeAction.Send
+                    ),
+                    maxLines = 4
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End)
+                ) {
+                    // 取消按钮
+                    OutlinedButton(
+                        onClick = {
+                            isEditMode = false
+                            editableText = ""
+                            aiMessage = "长按下方麦克风开始说话"
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color.White
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color.White.copy(alpha = 0.5f), Color.White.copy(alpha = 0.5f))
+                            )
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("取消")
+                    }
+                    
+                    // 发送按钮
+                    Button(
+                        onClick = {
+                            if (editableText.isNotBlank()) {
+                                floatContext.onSendMessage?.invoke(editableText, PromptFunctionType.VOICE)
+                                isEditMode = false
+                                editableText = ""
+                                aiMessage = "思考中..."
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("发送")
+                    }
+                }
+            }
+        }
+
+        // 底部控制栏 - 只在showBottomControls为true且不在编辑模式时显示
+        AnimatedVisibility(
+            visible = showBottomControls && !isEditMode,
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             Box(
@@ -622,6 +756,87 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                 // 麦克风按钮 - 中间
                 var dragOffset by remember { mutableStateOf(0f) }
                 val isDraggingToCancel = remember { mutableStateOf(false) }
+                val isDraggingToEdit = remember { mutableStateOf(false) }
+
+                // 拖动提示容器
+                Box(
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    // 左侧编辑提示
+                    AnimatedVisibility(
+                        visible = showDragHints,
+                        enter = fadeIn() + slideInHorizontally(initialOffsetX = { -it }),
+                        exit = fadeOut() + slideOutHorizontally(targetOffsetX = { -it }),
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = (-80).dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 编辑图标
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "编辑",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            
+                            // 虚线
+                            Canvas(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(2.dp)
+                            ) {
+                                val pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 4f), 0f)
+                                drawLine(
+                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                    start = Offset(0f, size.height / 2),
+                                    end = Offset(size.width, size.height / 2),
+                                    strokeWidth = 2.dp.toPx(),
+                                    pathEffect = pathEffect
+                                )
+                            }
+                        }
+                    }
+
+                    // 右侧取消提示
+                    AnimatedVisibility(
+                        visible = showDragHints,
+                        enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+                        exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = 80.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 虚线
+                            Canvas(
+                                modifier = Modifier
+                                    .width(40.dp)
+                                    .height(2.dp)
+                            ) {
+                                val pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 4f), 0f)
+                                drawLine(
+                                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                    start = Offset(0f, size.height / 2),
+                                    end = Offset(size.width, size.height / 2),
+                                    strokeWidth = 2.dp.toPx(),
+                                    pathEffect = pathEffect
+                                )
+                            }
+                            
+                            // 取消图标
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "取消",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
 
                 Box(
                     modifier =
@@ -672,6 +887,8 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                     // Reset drag state for the new gesture before starting.
                                     dragOffset = 0f
                                     isDraggingToCancel.value = false
+                                    isDraggingToEdit.value = false
+                                    showDragHints = true // 显示拖动提示
                                     
                                     coroutineScope.launch {
                                         startVoiceCapture()
@@ -698,15 +915,24 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                                                         .x
                                                         dragOffset += horizontalDrag
 
-                                                        // 如果水平拖动距离的绝对值超过阈值（60dp），标记为取消
-                                                        isDraggingToCancel.value =
-                                                            dragOffset.absoluteValue > 60f
-
-                                                        if (isRecording &&
-                                                            isDraggingToCancel
-                                                                .value
-                                                        ) {
-                                                            // 不再显示文本提示，而是在UI中显示垃圾桶图标
+                                                        // 区分左滑和右滑
+                                                        val dragThreshold = 60f
+                                                        when {
+                                                            dragOffset > dragThreshold -> {
+                                                                // 右滑 - 取消录音
+                                                                isDraggingToCancel.value = true
+                                                                isDraggingToEdit.value = false
+                                                            }
+                                                            dragOffset < -dragThreshold -> {
+                                                                // 左滑 - 编辑录音
+                                                                isDraggingToEdit.value = true
+                                                                isDraggingToCancel.value = false
+                                                            }
+                                                            else -> {
+                                                                // 在阈值范围内，重置状态
+                                                                isDraggingToCancel.value = false
+                                                                isDraggingToEdit.value = false
+                                                            }
                                                         }
                                                     }
                                                     previousPosition = position
@@ -721,8 +947,29 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                             }
                                         }
                                     } finally {
+                                        showDragHints = false // 隐藏拖动提示
                                         if (isRecording && !isWaveActive) { // 波浪模式下不响应抬起事件
-                                            stopVoiceCapture(isDraggingToCancel.value)
+                                            when {
+                                                isDraggingToCancel.value -> {
+                                                    // 右滑取消录音
+                                                    stopVoiceCapture(true)
+                                                }
+                                                isDraggingToEdit.value -> {
+                                                    // 左滑进入编辑模式
+                                                    coroutineScope.launch {
+                                                        isRecording = false
+                                                        speechService.stopRecognition()
+                                                        // 将当前录音文本设置为可编辑文本
+                                                        editableText = userMessage
+                                                        isEditMode = true
+                                                        aiMessage = "编辑您的消息"
+                                                    }
+                                                }
+                                                else -> {
+                                                    // 正常抬起，发送录音
+                                                    stopVoiceCapture(false)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -731,24 +978,37 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                     contentAlignment = Alignment.Center
                 ) {
                     // 根据状态显示不同的图标
-                    if (isRecording && isDraggingToCancel.value) {
-                        // 如果在拖动取消中，显示垃圾桶图标
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "取消录音",
-                            tint = Color.White,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    } else {
-                        // 正常情况显示麦克风图标
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "按住说话",
-                            tint = Color.White,
-                            modifier = Modifier.size(40.dp)
-                        )
+                    when {
+                        isRecording && isDraggingToCancel.value -> {
+                            // 如果在拖动取消中，显示垃圾桶图标
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "取消录音",
+                                tint = Color.White,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        isRecording && isDraggingToEdit.value -> {
+                            // 如果在拖动编辑中，显示编辑图标
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "编辑录音",
+                                tint = Color.White,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                        else -> {
+                            // 正常情况显示麦克风图标
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "按住说话",
+                                tint = Color.White,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
                     }
                 }
+                } // 关闭拖动提示容器
 
                 // 缩小成悬浮球按钮 - 右侧 (纯图标)，切换到语音球模式
                 IconButton(
