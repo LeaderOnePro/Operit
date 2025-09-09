@@ -8,6 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -15,11 +18,11 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
+import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 
 /**
  * A composable function for rendering AI response messages in a Cursor IDE style. Supports text
@@ -40,6 +43,10 @@ fun AiMessageComposable(
     val showThinkingProcess by preferencesManager.showThinkingProcess.collectAsState(initial = true)
     val showStatusTags by preferencesManager.showStatusTags.collectAsState(initial = true)
 
+    // 链接预览弹窗状态
+    var showLinkDialog by remember { mutableStateOf(false) }
+    var linkToPreview by remember { mutableStateOf("") }
+
     // 创建自定义XML渲染器
     val xmlRenderer = remember(showThinkingProcess, showStatusTags) {
         CustomXmlRenderer(
@@ -49,8 +56,8 @@ fun AiMessageComposable(
     }
     val rememberedOnLinkClick = remember(context, onLinkClick) {
         onLinkClick ?: { url ->
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
+            linkToPreview = url
+            showLinkDialog = true
         }
     }
 
@@ -92,6 +99,17 @@ fun AiMessageComposable(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
             }
+        }
+
+        // 链接预览弹窗
+        if (showLinkDialog && linkToPreview.isNotEmpty()) {
+            LinkPreviewDialog(
+                url = linkToPreview,
+                onDismiss = {
+                    showLinkDialog = false
+                    linkToPreview = ""
+                }
+            )
         }
     }
 }
