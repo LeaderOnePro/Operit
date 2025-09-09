@@ -21,7 +21,9 @@ fun BubbleStyleChatMessage(
     aiTextColor: Color,
     systemMessageColor: Color,
     systemTextColor: Color,
-    isHidden: Boolean = false
+    isHidden: Boolean = false,
+    onDeleteMessage: ((Int) -> Unit)? = null,
+    index: Int = -1
 ) {
     when (message.sender) {
         "user" -> {
@@ -50,7 +52,12 @@ fun BubbleStyleChatMessage(
             SummaryMessageComposable(
                 message = message,
                 backgroundColor = systemMessageColor.copy(alpha = 0.7f),
-                textColor = systemTextColor
+                textColor = systemTextColor,
+                onDelete = {
+                    if (index != -1) {
+                        onDeleteMessage?.invoke(index)
+                    }
+                }
             )
         }
     }

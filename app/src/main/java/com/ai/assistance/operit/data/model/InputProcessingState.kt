@@ -23,6 +23,9 @@ sealed class InputProcessingState {
     /** 新增：正在处理工具结果 */
     data class ProcessingToolResult(val toolName: String) : InputProcessingState()
 
+    /** 新增：正在总结记忆 */
+    data class Summarizing(val message: String) : InputProcessingState()
+
     /** 处理完成 */
     object Completed : InputProcessingState()
 

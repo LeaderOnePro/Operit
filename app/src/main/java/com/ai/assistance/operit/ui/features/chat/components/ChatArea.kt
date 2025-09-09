@@ -275,6 +275,8 @@ private fun MessageItem(
                     thinkingTextColor = thinkingTextColor,
                     supportToolMarkup = true,
                     initialThinkingExpanded = true,
+                    onDeleteMessage = onDeleteMessage,
+                    index = index
                 )
             }
 
