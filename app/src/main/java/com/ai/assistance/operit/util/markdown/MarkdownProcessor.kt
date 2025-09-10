@@ -7,6 +7,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.ai.assistance.operit.util.stream.*
 import com.ai.assistance.operit.util.stream.plugins.*
 import com.ai.assistance.operit.util.stream.plugins.StreamXmlPlugin
+import com.ai.assistance.operit.util.stream.plugins.StreamPlanExecutionPlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -31,6 +32,7 @@ enum class MarkdownProcessorType {
     BLOCK_LATEX, // LaTeX块级公式
     TABLE, // 表格支持
     XML_BLOCK, // XML块级元素
+    PLAN_EXECUTION, // 计划执行XML块
  
     // 内联处理器
     BOLD,
@@ -98,7 +100,8 @@ object NestedMarkdownProcessor {
                     StreamMarkdownBlockLaTeXPlugin(includeDelimiters = false),
                     StreamMarkdownTablePlugin(),
                     StreamMarkdownImagePlugin(),
-                    StreamXmlPlugin(includeTagsInOutput = true) // 使用现有的StreamXmlPlugin
+                    StreamXmlPlugin(includeTagsInOutput = true), // 使用现有的StreamXmlPlugin
+                    StreamPlanExecutionPlugin()
             )
 
     /** 内联插件列表 */
@@ -133,6 +136,7 @@ object NestedMarkdownProcessor {
             is StreamMarkdownBlockLaTeXPlugin -> MarkdownProcessorType.BLOCK_LATEX
             is StreamMarkdownTablePlugin -> MarkdownProcessorType.TABLE
             is StreamXmlPlugin -> MarkdownProcessorType.XML_BLOCK
+            is StreamPlanExecutionPlugin -> MarkdownProcessorType.PLAN_EXECUTION
             else -> MarkdownProcessorType.PLAIN_TEXT
         }
     }
