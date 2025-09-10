@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
 
 /**
  * 任务执行器，负责执行计划图中的任务
@@ -98,7 +99,7 @@ class TaskExecutor(
     ): Stream<String> = stream {
         try {
             val summaryStream = executeFinalSummary(
-                graph.finalSummaryInstruction,
+                graph,
                 originalMessage,
                 chatHistory,
                 workspacePath,
@@ -178,6 +179,14 @@ class TaskExecutor(
         onNonFatalError: suspend (error: String) -> Unit,
         onMessage: suspend (String) -> Unit
     ) {
+        // 从协程上下文中获取当前Job，用于支持取消操作
+        val job = coroutineContext[Job]
+        if (job == null) {
+            onMessage("""<update id="${task.id}" status="FAILED" error="Task execution context error"/>""" + "\n")
+            return
+        }
+
+        runningTasks[task.id] = job
         try {
             onMessage("""<update id="${task.id}" status="IN_PROGRESS"/>""" + "\n")
             
@@ -192,7 +201,7 @@ class TaskExecutor(
             // 调用 EnhancedAIService 执行任务
             val stream = enhancedAIService.sendMessage(
                 message = fullInstruction,
-                chatHistory = chatHistory,
+                chatHistory = emptyList(), // 子任务不应继承主聊天历史，上下文已在指令中提供
                 workspacePath = workspacePath,
                 functionType = FunctionType.CHAT,
                 promptFunctionType = PromptFunctionType.CHAT,
@@ -202,7 +211,8 @@ class TaskExecutor(
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError,
-                customSystemPromptTemplate = com.ai.assistance.operit.core.config.SystemPromptConfig.SUBTASK_AGENT_PROMPT_TEMPLATE
+                customSystemPromptTemplate = com.ai.assistance.operit.core.config.SystemPromptConfig.SUBTASK_AGENT_PROMPT_TEMPLATE,
+                isSubTask = true
             )
             
             // 收集流式响应
@@ -222,15 +232,24 @@ class TaskExecutor(
             onMessage("""<update id="${task.id}" status="COMPLETED"/>""" + "\n")
             
         } catch (e: Exception) {
-            Log.e(TAG, "执行任务 ${task.id} 时发生错误", e)
-            val errorMessage = e.message ?: "Unknown error"
-            val escapedError = errorMessage.replace("\"", "&quot;")
-            onMessage("""<update id="${task.id}" status="FAILED" error="$escapedError"/>""" + "\n")
-            
-            // 即使失败也要存储结果，避免阻塞其他任务
-            taskMutex.withLock {
-                taskResults[task.id] = "任务执行失败: ${e.message}"
+            // 捕获并处理异常，包括取消异常
+            if (e is CancellationException) {
+                Log.d(TAG, "Task ${task.id} was cancelled.")
+                onMessage("""<update id="${task.id}" status="FAILED" error="任务已取消"/>""" + "\n")
+            } else {
+                Log.e(TAG, "执行任务 ${task.id} 时发生错误", e)
+                val errorMessage = e.message ?: "Unknown error"
+                val escapedError = errorMessage.replace("\"", "&quot;")
+                onMessage("""<update id="${task.id}" status="FAILED" error="$escapedError"/>""" + "\n")
+                
+                // 即使失败也要存储结果，避免阻塞其他任务
+                taskMutex.withLock {
+                    taskResults[task.id] = "任务执行失败: ${e.message}"
+                }
             }
+        } finally {
+            // 确保任务执行完毕后从正在运行的任务列表中移除
+            runningTasks.remove(task.id)
         }
     }
     
@@ -277,7 +296,7 @@ ${task.instruction}
      * 执行最终汇总任务
      */
     private suspend fun executeFinalSummary(
-        summaryInstruction: String,
+        graph: ExecutionGraph,
         originalMessage: String,
         chatHistory: List<Pair<String, String>>,
         workspacePath: String?,
@@ -287,14 +306,14 @@ ${task.instruction}
     ): Stream<String> {
         try {
             // 构建汇总上下文
-            val summaryContext = buildSummaryContext(originalMessage)
+            val summaryContext = buildSummaryContext(originalMessage, graph)
             
             // 构建完整的汇总指令
             val fullSummaryInstruction = """
 $summaryContext
 
 请根据以上所有子任务的执行结果，完成以下汇总任务:
-$summaryInstruction
+$graph.finalSummaryInstruction
 
 请提供一个完整、连贯的最终回答。
             """.trim()
@@ -323,16 +342,28 @@ $summaryInstruction
     /**
      * 构建汇总上下文
      */
-    private suspend fun buildSummaryContext(originalMessage: String): String {
+    private suspend fun buildSummaryContext(originalMessage: String, graph: ExecutionGraph): String {
         val contextBuilder = StringBuilder()
         
         contextBuilder.appendLine("原始用户请求: $originalMessage")
-        contextBuilder.appendLine("各子任务执行结果:")
+        
+        // 叶子任务是指没有被其他任何任务依赖的任务
+        val allDependencyIds = graph.tasks.flatMap { it.dependencies }.toSet()
+        val allTaskIds = graph.tasks.map { it.id }.toSet()
+        val leafTaskIds = allTaskIds - allDependencyIds
+        
+        contextBuilder.appendLine("各关键子任务执行结果:")
+        
+        // 如果找到了叶子任务，就只用它们的结果。否则，使用所有任务的结果作为后备。
+        val taskIdsToSummarize = if (leafTaskIds.isNotEmpty()) leafTaskIds else allTaskIds
         
         taskMutex.withLock {
-            taskResults.forEach { (taskId, result) ->
-                contextBuilder.appendLine("- 任务 $taskId: $result")
-                contextBuilder.appendLine()
+            taskIdsToSummarize.forEach { taskId ->
+                taskResults[taskId]?.let { result ->
+                    val taskName = graph.tasks.find { it.id == taskId }?.name ?: taskId
+                    contextBuilder.appendLine("- $taskName: $result")
+                    contextBuilder.appendLine()
+                }
             }
         }
         

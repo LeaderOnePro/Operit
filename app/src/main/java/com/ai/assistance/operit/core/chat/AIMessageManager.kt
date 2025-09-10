@@ -161,6 +161,11 @@ object AIMessageManager {
                 if (shouldUseDeepSearch) {
                     Log.d(TAG, "启用深度搜索模式处理消息")
                     
+                    // 设置执行计划的特定UI状态
+                    enhancedAiService.setInputProcessingState(
+                        com.ai.assistance.operit.data.model.InputProcessingState.ExecutingPlan("正在执行深度搜索...")
+                    )
+                    
                     // 使用深度搜索模式
                     return@withContext planModeManager.executeDeepSearchMode(
                         userMessage = messageContent,
