@@ -336,7 +336,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 withContext(Dispatchers.IO) {
                     // 仅当会话首次启动时开启服务
                     if (!isSubTask) {
-                        startAiService()
+                    startAiService()
                     }
 
                     // Process the input message for any conversation markup (e.g., for AI planning)
@@ -348,8 +348,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // Update state to show we're processing
                     if (!isSubTask) {
-                        withContext(Dispatchers.Main) {
-                            _inputProcessingState.value = InputProcessingState.Processing("正在处理消息...")
+                    withContext(Dispatchers.Main) {
+                        _inputProcessingState.value = InputProcessingState.Processing("正在处理消息...")
                         }
                     }
 
@@ -370,8 +370,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // Update UI state to connecting
                     if (!isSubTask) {
-                        withContext(Dispatchers.Main) {
-                            _inputProcessingState.value = InputProcessingState.Connecting("正在连接AI服务...")
+                    withContext(Dispatchers.Main) {
+                        _inputProcessingState.value = InputProcessingState.Connecting("正在连接AI服务...")
                         }
                     }
 
@@ -415,9 +415,9 @@ class EnhancedAIService private constructor(private val context: Context) {
                         // 第一次收到响应，更新状态
                         if (isFirstChunk) {
                             if (!isSubTask) {
-                                withContext(Dispatchers.Main) {
-                                    _inputProcessingState.value =
-                                            InputProcessingState.Receiving("正在接收AI响应...")
+                            withContext(Dispatchers.Main) {
+                                _inputProcessingState.value =
+                                        InputProcessingState.Receiving("正在接收AI响应...")
                                 }
                             }
                             isFirstChunk = false
@@ -727,8 +727,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // Ensure input processing state is updated to completed
         if (!isSubTask) {
-            withContext(Dispatchers.Main) {
-                _inputProcessingState.value = InputProcessingState.Completed
+        withContext(Dispatchers.Main) {
+            _inputProcessingState.value = InputProcessingState.Completed
             }
         }
 
@@ -746,8 +746,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         if (!isSubTask) {
-            // 在会话结束后停止服务
-            stopAiService()
+        // 在会话结束后停止服务
+        stopAiService()
         }
     }
 
@@ -761,15 +761,15 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // Ensure input processing state is updated to completed
         if (!isSubTask) {
-            withContext(Dispatchers.Main) {
-                _inputProcessingState.value = InputProcessingState.Completed
+        withContext(Dispatchers.Main) {
+            _inputProcessingState.value = InputProcessingState.Completed
             }
         }
 
         Log.d(TAG, "Wait for user need - skipping problem library analysis")
         if (!isSubTask) {
-            // 在会话结束后停止服务
-            stopAiService()
+        // 在会话结束后停止服务
+        stopAiService()
         }
     }
 
@@ -789,10 +789,10 @@ class EnhancedAIService private constructor(private val context: Context) {
         val startTime = System.currentTimeMillis()
         
         if (!isSubTask) {
-            withContext(Dispatchers.Main) {
-                val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
-                val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
-                _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
+        withContext(Dispatchers.Main) {
+            val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
+            val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
+            _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
             }
         }
 
@@ -917,8 +917,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // Add transition state
         if (!isSubTask) {
-            withContext(Dispatchers.Main) {
-                _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
+        withContext(Dispatchers.Main) {
+            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
             }
         }
 
@@ -947,8 +947,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // Clearly show we're preparing to send tool result to AI
         if (!isSubTask) {
-            withContext(Dispatchers.Main) {
-                _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
+        withContext(Dispatchers.Main) {
+            _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
             }
         }
 
@@ -977,10 +977,10 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 context.isConversationActive.set(false)
                 if (!isSubTask) {
-                    withContext(Dispatchers.Main) {
-                        _inputProcessingState.value = InputProcessingState.Completed
-                    }
-                    stopAiService()
+                withContext(Dispatchers.Main) {
+                    _inputProcessingState.value = InputProcessingState.Completed
+                }
+                stopAiService()
                 }
                 return // Stop further processing
             }
@@ -1008,9 +1008,9 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 // 更新状态为接收中
                 if (!isSubTask) {
-                    withContext(Dispatchers.Main) {
-                        _inputProcessingState.value =
-                                InputProcessingState.Receiving("正在接收工具执行后的AI响应...")
+                withContext(Dispatchers.Main) {
+                    _inputProcessingState.value =
+                            InputProcessingState.Receiving("正在接收工具执行后的AI响应...")
                     }
                 }
 

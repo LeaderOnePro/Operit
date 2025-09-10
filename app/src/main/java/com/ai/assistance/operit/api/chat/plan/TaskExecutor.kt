@@ -237,15 +237,15 @@ class TaskExecutor(
                 Log.d(TAG, "Task ${task.id} was cancelled.")
                 onMessage("""<update id="${task.id}" status="FAILED" error="任务已取消"/>""" + "\n")
             } else {
-                Log.e(TAG, "执行任务 ${task.id} 时发生错误", e)
-                val errorMessage = e.message ?: "Unknown error"
-                val escapedError = errorMessage.replace("\"", "&quot;")
-                onMessage("""<update id="${task.id}" status="FAILED" error="$escapedError"/>""" + "\n")
-                
-                // 即使失败也要存储结果，避免阻塞其他任务
-                taskMutex.withLock {
-                    taskResults[task.id] = "任务执行失败: ${e.message}"
-                }
+            Log.e(TAG, "执行任务 ${task.id} 时发生错误", e)
+            val errorMessage = e.message ?: "Unknown error"
+            val escapedError = errorMessage.replace("\"", "&quot;")
+            onMessage("""<update id="${task.id}" status="FAILED" error="$escapedError"/>""" + "\n")
+            
+            // 即使失败也要存储结果，避免阻塞其他任务
+            taskMutex.withLock {
+                taskResults[task.id] = "任务执行失败: ${e.message}"
+            }
             }
         } finally {
             // 确保任务执行完毕后从正在运行的任务列表中移除
@@ -318,7 +318,7 @@ $graph.finalSummaryInstruction
 请提供一个完整、连贯的最终回答。
             """.trim()
 
-            // 调用 EnhancedAIService 执行汇总并直接返回流
+            // 调用 EnhancedAIService 执行汇总 - 汇总阶段不是子任务，走正常流程
             return enhancedAIService.sendMessage(
                 message = fullSummaryInstruction,
                 chatHistory = chatHistory,
@@ -330,7 +330,8 @@ $graph.finalSummaryInstruction
                 enableMemoryAttachment = false,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
-                onNonFatalError = onNonFatalError
+                onNonFatalError = onNonFatalError,
+                isSubTask = false // 关键修改：汇总不是子任务，让其走正常的状态管理流程
             )
 
         } catch (e: Exception) {
@@ -362,7 +363,7 @@ $graph.finalSummaryInstruction
                 taskResults[taskId]?.let { result ->
                     val taskName = graph.tasks.find { it.id == taskId }?.name ?: taskId
                     contextBuilder.appendLine("- $taskName: $result")
-                    contextBuilder.appendLine()
+                contextBuilder.appendLine()
                 }
             }
         }
