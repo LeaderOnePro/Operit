@@ -300,7 +300,7 @@ private fun ExecutionGraphDisplay(
             if (logs.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 LazyColumn(
-                    modifier = Modifier.height(60.dp),
+                    modifier = Modifier.height(36.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     items(logs.takeLast(3)) { log ->
@@ -435,11 +435,11 @@ private fun calculateNodePositions(
             levels[task.id] = maxDepLevel + 1
         }
 
-    // Smaller, more compact nodes
-    val nodeWidth = 120f
-    val nodeHeight = 70f
-    val horizontalSpacing = 30f
-    val verticalSpacing = 40f
+    // Much larger, more spacious nodes
+    val nodeWidth = 300f
+    val nodeHeight = 120f
+    val horizontalSpacing = 50f
+    val verticalSpacing = 60f
 
     val nodesByLevel = levels.entries.groupBy({ it.value }) { it.key }
 

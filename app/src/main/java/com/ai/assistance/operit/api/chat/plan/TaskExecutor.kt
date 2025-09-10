@@ -41,7 +41,7 @@ class TaskExecutor(
      * @param onNonFatalError 非致命错误回调
      * @return 流式返回执行过程和最终结果
      */
-    suspend fun executeGraph(
+    suspend fun executeSubtasks(
         graph: ExecutionGraph,
         originalMessage: String,
         chatHistory: List<Pair<String, String>>,
@@ -49,66 +49,72 @@ class TaskExecutor(
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit
-    ): Pair<Stream<String>, Deferred<String?>> {
-        val summaryDeferred = CompletableDeferred<String?>()
+    ): Stream<String> = stream {
+        try {
+            taskResults.clear()
+            runningTasks.clear()
 
-        val stream = stream<String> {
-            try {
-                taskResults.clear()
-                runningTasks.clear()
+            val (isValid, errorMessage) = PlanParser.validateExecutionGraph(graph)
+            if (!isValid) {
+                emit("<error>❌ 执行图验证失败: $errorMessage</error>\n")
+                return@stream
+            }
 
-                val (isValid, errorMessage) = PlanParser.validateExecutionGraph(graph)
-                if (!isValid) {
-                    emit("<error>❌ 执行图验证失败: $errorMessage</error>\n")
-                    summaryDeferred.complete(null)
-                    return@stream
-                }
+            val sortedTasks = PlanParser.topologicalSort(graph)
+            if (sortedTasks.isEmpty()) {
+                emit("<error>❌ 无法对任务进行拓扑排序，可能存在循环依赖</error>\n")
+                return@stream
+            }
 
-                val sortedTasks = PlanParser.topologicalSort(graph)
-                if (sortedTasks.isEmpty()) {
-                    emit("<error>❌ 无法对任务进行拓扑排序，可能存在循环依赖</error>\n")
-                    summaryDeferred.complete(null)
-                    return@stream
-                }
+            emit("<log>📋 开始执行计划，共 ${sortedTasks.size} 个任务</log>\n")
 
-                emit("<log>📋 开始执行计划，共 ${sortedTasks.size} 个任务</log>\n")
-
-                val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+            coroutineScope {
+                val job = SupervisorJob()
+                val scope = CoroutineScope(Dispatchers.IO + job)
 
                 try {
                     executeTasksInOrder(scope, sortedTasks, originalMessage, chatHistory, workspacePath, maxTokens, tokenUsageThreshold, onNonFatalError) { message ->
                         emit(message)
                     }
-
-                    emit("<log>🎯 所有子任务执行完成，开始汇总结果...</log>\n")
-
-                    val summaryResult = executeFinalSummary(
-                        graph.finalSummaryInstruction,
-                        originalMessage,
-                        chatHistory,
-                        workspacePath,
-                        maxTokens,
-                        tokenUsageThreshold,
-                        onNonFatalError
-                    )
-
-                    emit("<log>✅ 深度搜索模式执行完成</log>\n")
-                    summaryDeferred.complete(summaryResult)
-
                 } finally {
-                    scope.cancel()
+                    job.cancel() // 只取消与子任务相关的 Job
                     runningTasks.clear()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "执行计划时发生错误", e)
-                emit("<error>❌ 执行计划时发生错误: ${e.message}</error>\n")
-                summaryDeferred.complete(null)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "执行子任务时发生错误", e)
+            emit("<error>❌ 执行子任务时发生错误: ${e.message}</error>\n")
         }
-        @Suppress("UNCHECKED_CAST")
-        return Pair(stream, summaryDeferred as Deferred<String?>)
     }
-    
+
+    suspend fun summarize(
+        graph: ExecutionGraph,
+        originalMessage: String,
+        chatHistory: List<Pair<String, String>>,
+        workspacePath: String?,
+        maxTokens: Int,
+        tokenUsageThreshold: Double,
+        onNonFatalError: suspend (error: String) -> Unit
+    ): Stream<String> = stream {
+        try {
+            val summaryStream = executeFinalSummary(
+                graph.finalSummaryInstruction,
+                originalMessage,
+                chatHistory,
+                workspacePath,
+                maxTokens,
+                tokenUsageThreshold,
+                onNonFatalError
+            )
+
+            summaryStream.collect { chunk ->
+                emit(chunk)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "执行最终汇总时发生错误", e)
+        }
+    }
+
     /**
      * 按依赖关系顺序执行任务
      */
@@ -195,7 +201,8 @@ class TaskExecutor(
                 enableMemoryAttachment = false,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
-                onNonFatalError = onNonFatalError
+                onNonFatalError = onNonFatalError,
+                customSystemPromptTemplate = com.ai.assistance.operit.core.config.SystemPromptConfig.SUBTASK_AGENT_PROMPT_TEMPLATE
             )
             
             // 收集流式响应
@@ -277,7 +284,7 @@ ${task.instruction}
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit
-    ): String {
+    ): Stream<String> {
         try {
             // 构建汇总上下文
             val summaryContext = buildSummaryContext(originalMessage)
@@ -291,11 +298,9 @@ $summaryInstruction
 
 请提供一个完整、连贯的最终回答。
             """.trim()
-            
-            val resultBuilder = StringBuilder()
-            
-            // 调用 EnhancedAIService 执行汇总
-            val stream = enhancedAIService.sendMessage(
+
+            // 调用 EnhancedAIService 执行汇总并直接返回流
+            return enhancedAIService.sendMessage(
                 message = fullSummaryInstruction,
                 chatHistory = chatHistory,
                 workspacePath = workspacePath,
@@ -308,17 +313,10 @@ $summaryInstruction
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError
             )
-            
-            // 收集并输出流式响应
-            stream.collect { chunk ->
-                resultBuilder.append(chunk)
-            }
-            
-            return resultBuilder.toString().trim()
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "执行最终汇总时发生错误", e)
-            return "汇总执行失败: ${e.message}"
+            return stream { emit("汇总执行失败: ${e.message}") }
         }
     }
     

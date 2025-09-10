@@ -142,7 +142,7 @@ fun AIChatScreen(
     val isLoading by actualViewModel.isLoading.collectAsState()
     val errorMessage by actualViewModel.errorMessage.collectAsState()
     val inputProcessingState by actualViewModel.inputProcessingState.collectAsState()
-    val planItems by actualViewModel.planItems.collectAsState()
+
     val enableAiPlanning by actualViewModel.enableAiPlanning.collectAsState()
     val enableThinkingMode by actualViewModel.enableThinkingMode.collectAsState() // 收集思考模式状态
     val enableThinkingGuidance by
@@ -560,7 +560,6 @@ fun AIChatScreen(
                                 actualViewModel = actualViewModel,
                                 showChatHistorySelector = showChatHistorySelector,
                                 chatHistory = chatHistory,
-                                planItems = planItems,
                                 enableAiPlanning = enableAiPlanning,
                                 isLoading = isLoading,
                                 userMessageColor = userMessageColor,

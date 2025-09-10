@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.AiReference
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.data.model.PlanItem
+
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ContentCut
@@ -82,8 +82,6 @@ fun ChatArea(
     chatHistory: List<ChatMessage>,
     scrollState: ScrollState,
     aiReferences: List<AiReference> = emptyList(),
-    planItems: List<PlanItem> = emptyList(),
-    enablePlanning: Boolean = false,
     isLoading: Boolean,
     userMessageColor: Color,
     aiMessageColor: Color,
@@ -111,12 +109,7 @@ fun ChatArea(
     Column(modifier = modifier) {
         // 移除References display
 
-        // Plan display when planning is enabled and there are plan items
-        if (enablePlanning && planItems.isNotEmpty()) {
-            PlanGraphDisplay(planItems = planItems, modifier = Modifier.fillMaxWidth())
-        } else {
-            // 删除全部不必要的诊断日志
-        }
+        // Plan display removed
 
         // 改用普通Column替代LazyColumn，避免复杂的回收逻辑带来的性能问题
         Column(

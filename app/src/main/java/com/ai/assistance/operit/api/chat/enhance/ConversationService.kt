@@ -156,7 +156,8 @@ class ConversationService(private val context: Context) {
             workspacePath: String?,
             packageManager: PackageManager,
             promptFunctionType: PromptFunctionType,
-            thinkingGuidance: Boolean = false
+            thinkingGuidance: Boolean = false,
+            customSystemPromptTemplate: String? = null
     ): List<Pair<String, String>> {
         val preparedHistory = mutableListOf<Pair<String, String>>()
         conversationMutex.withLock {
@@ -185,7 +186,7 @@ class ConversationService(private val context: Context) {
                         )
 
                 // 获取自定义系统提示模板
-                val customSystemPromptTemplate = apiPreferences.customSystemPromptTemplateFlow.first()
+                val finalCustomSystemPromptTemplate = customSystemPromptTemplate ?: apiPreferences.customSystemPromptTemplateFlow.first()
 
                 // 获取系统提示词，现在传入workspacePath
                 val systemPrompt =
@@ -195,7 +196,7 @@ class ConversationService(private val context: Context) {
                         planningEnabled,
                         introPrompt,
                                 thinkingGuidance,
-                                customSystemPromptTemplate
+                                finalCustomSystemPromptTemplate
                 )
 
                 // 构建waifu特殊规则

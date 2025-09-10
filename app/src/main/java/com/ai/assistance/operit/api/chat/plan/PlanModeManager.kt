@@ -108,7 +108,7 @@ class PlanModeManager(
             // emit("\n" + "=".repeat(50) + "\n")
             
             // 第二步：执行计划
-            val (executionStream, summaryDeferred) = taskExecutor.executeGraph(
+            val executionStream = taskExecutor.executeSubtasks(
                 executionGraph,
                 userMessage,
                 chatHistory,
@@ -123,13 +123,26 @@ class PlanModeManager(
                 emit(message)
             }
             
+            emit("<log>🎯 所有子任务执行完成，开始汇总结果...</log>\n")
+            
             emit("</plan>\n")
             
-            // 等待并输出最终总结
-            val summary = summaryDeferred.await()
-            if (summary != null) {
-                emit(summary)
+            // 第三步：汇总结果
+            val summaryStream = taskExecutor.summarize(
+                executionGraph,
+                userMessage,
+                chatHistory,
+                workspacePath,
+                maxTokens,
+                tokenUsageThreshold,
+                onNonFatalError
+            )
+
+            summaryStream.collect { message ->
+                emit(message)
             }
+            
+            
             
         } catch (e: Exception) {
             Log.e(TAG, "深度搜索模式执行失败", e)

@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.data.model.PlanItem
+
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import java.io.File
@@ -78,7 +78,6 @@ fun ChatScreenContent(
         actualViewModel: ChatViewModel,
         showChatHistorySelector: Boolean,
         chatHistory: List<ChatMessage>,
-        planItems: List<PlanItem>,
         enableAiPlanning: Boolean,
         isLoading: Boolean,
         userMessageColor: Color,
@@ -156,8 +155,6 @@ fun ChatScreenContent(
                 ChatArea(
                         chatHistory = chatHistory,
                         scrollState = scrollState,
-                        planItems = planItems,
-                        enablePlanning = enableAiPlanning,
                         isLoading = isLoading,
                         userMessageColor = userMessageColor,
                         aiMessageColor = aiMessageColor,
@@ -207,8 +204,6 @@ fun ChatScreenContent(
                 ChatArea(
                         chatHistory = chatHistory,
                         scrollState = scrollState,
-                        planItems = planItems,
-                        enablePlanning = enableAiPlanning,
                         isLoading = isLoading,
                         userMessageColor = userMessageColor,
                         aiMessageColor = aiMessageColor,

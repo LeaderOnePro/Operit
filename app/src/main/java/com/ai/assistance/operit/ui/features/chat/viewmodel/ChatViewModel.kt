@@ -18,7 +18,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.data.model.PlanItem
+
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.InvitationRepository
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
@@ -158,11 +158,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         }
                     }
             )
-    private val planItemsDelegate =
-            PlanItemsDelegate(
-                    viewModelScope = viewModelScope,
-                    getEnhancedAiService = { enhancedAiService }
-            )
+
 
     // Break circular dependency with lateinit
     private lateinit var chatHistoryDelegate: ChatHistoryDelegate
@@ -235,8 +231,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val outputTokenCount: StateFlow<Int> by lazy { tokenStatsDelegate.cumulativeOutputTokensFlow }
     val perRequestTokenCount: StateFlow<Pair<Int, Int>?> by lazy { tokenStatsDelegate.perRequestTokenCountFlow }
 
-    // 计划项相关
-    val planItems: StateFlow<List<PlanItem>> by lazy { planItemsDelegate.planItems }
+
 
     // 悬浮窗相关
     val isFloatingMode: StateFlow<Boolean> by lazy { floatingWindowDelegate.isFloatingMode }
@@ -308,7 +303,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         onTokenStatisticsLoaded = { inputTokens, outputTokens, windowSize ->
                             tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, windowSize)
                         },
-                        resetPlanItems = { planItemsDelegate.clearPlanItems() },
+
                         getEnhancedAiService = { enhancedAiService },
                         ensureAiServiceAvailable = { ensureAiServiceAvailable() },
                         getChatStatistics = {
@@ -452,56 +447,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             }
         }
 
-        // 设置输入处理状态收集和计划项收集
-        viewModelScope.launch {
-            try {
-                var planItemsSetupComplete = false
-                var retryCount = 0
-                val maxRetries = 3
-
-                while (!planItemsSetupComplete && retryCount < maxRetries) {
-                    // 设置计划项收集
-                    if (!planItemsSetupComplete) {
-                        try {
-                            Log.d(TAG, "设置计划项收集，尝试 ${retryCount + 1}/${maxRetries}")
-                            planItemsDelegate.setupPlanItemsCollection()
-                            planItemsSetupComplete = true
-                            Log.d(TAG, "计划项收集设置成功")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "设置计划项收集时出错: ${e.message}", e)
-                            // 修改：对于重要的初始化错误，使用错误弹窗而不是仅记录日志
-                            if (retryCount == maxRetries - 1) {
-                                uiStateDelegate.showErrorMessage("无法初始化计划项: ${e.message}")
-                            }
-                        }
-                    }
-
-                    // 如果都已完成，直接退出循环
-                    if (planItemsSetupComplete) {
-                        break
-                    }
-
-                    // 如果还未完成设置，则等待一段时间后重试
-                    retryCount++
-                    if (retryCount < maxRetries) {
-                        kotlinx.coroutines.delay(500L) // 延迟500毫秒后重试
-                    }
-                }
-
-                // 记录最终设置状态
-                if (!planItemsSetupComplete) {
-                    Log.e(TAG, "无法设置计划项收集，已达到最大重试次数")
-                }
-
-                // 只要有一项设置成功，就标记整体服务收集器设置为已完成
-                if (planItemsSetupComplete) {
-                    serviceCollectorSetupComplete = true
-                    Log.d(TAG, "服务收集器设置已标记为完成")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "设置服务收集器时发生异常: ${e.message}", e)
-            }
-        }
+        // 标记服务收集器设置为已完成
+        serviceCollectorSetupComplete = true
+        Log.d(TAG, "服务收集器设置已标记为完成")
     }
 
     // API配置相关方法

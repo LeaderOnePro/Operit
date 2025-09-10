@@ -27,7 +27,7 @@ class ChatHistoryDelegate(
         private val viewModelScope: CoroutineScope,
         private val onChatHistoryLoaded: (List<ChatMessage>) -> Unit,
         private val onTokenStatisticsLoaded: (inputTokens: Int, outputTokens: Int, windowSize: Int) -> Unit,
-        private val resetPlanItems: () -> Unit,
+
         private val getEnhancedAiService: () -> EnhancedAIService?,
         private val ensureAiServiceAvailable: () -> Unit = {}, // 确保AI服务可用的回调
         private val getChatStatistics: () -> Triple<Int, Int, Int> = { Triple(0, 0, 0) }, // 获取（输入token, 输出token, 窗口大小）
@@ -102,8 +102,7 @@ class ChatHistoryDelegate(
             if (selectedChat != null) {
                 onTokenStatisticsLoaded(selectedChat.inputTokens, selectedChat.outputTokens, selectedChat.currentWindowSize)
 
-                // 清空并重新提取计划项
-                resetPlanItems()
+
             }
         } catch (e: Exception) {
             Log.e(TAG, "加载聊天消息失败", e)
@@ -149,7 +148,6 @@ class ChatHistoryDelegate(
             // --- 结束 ---
 
             onTokenStatisticsLoaded(0, 0, 0)
-            resetPlanItems()
         }
     }
 
@@ -447,7 +445,6 @@ class ChatHistoryDelegate(
 
             onChatHistoryLoaded(newChat.messages)
             onTokenStatisticsLoaded(0, 0, 0)
-            resetPlanItems()
         }
     }
 

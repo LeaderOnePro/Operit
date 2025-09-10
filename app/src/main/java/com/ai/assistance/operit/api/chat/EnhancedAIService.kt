@@ -18,7 +18,6 @@ import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.InputProcessingState
-import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolResult
@@ -232,10 +231,6 @@ class EnhancedAIService private constructor(private val context: Context) {
     private val _perRequestTokenCounts = MutableStateFlow<Pair<Int, Int>?>(null)
     val perRequestTokenCounts: StateFlow<Pair<Int, Int>?> = _perRequestTokenCounts.asStateFlow()
 
-    // Plan items tracking
-    private val _planItems = MutableStateFlow<List<PlanItem>>(emptyList())
-    val planItems = _planItems.asStateFlow()
-
     // Conversation management
     private val streamBuffer = StringBuilder()
     private val roundManager = ConversationRoundManager()
@@ -296,110 +291,6 @@ class EnhancedAIService private constructor(private val context: Context) {
         return InputProcessor.processUserInput(input)
     }
 
-    /** Extract and update plan items from content */
-    private fun extractPlanItems(content: String) {
-        // Only extract plan items if planning is enabled
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (planningEnabled) {
-                    Log.d(TAG, "计划模式已启用，开始提取计划项")
-
-                    // 获取当前的计划项
-                    val existingItems = _planItems.value
-
-                    // 始终传入现有的计划项，让PlanItemParser处理合并和更新
-                    val updatedPlanItems =
-                            ConversationMarkupManager.extractPlanItems(content, existingItems)
-
-                    if (updatedPlanItems.isNotEmpty()) {
-                        // 检查计划项是否有变化
-                        if (updatedPlanItems != existingItems) {
-                            Log.d(TAG, "计划项有变化，更新状态流")
-                            _planItems.value = updatedPlanItems
-                        }
-                    } else if (_planItems.value.isNotEmpty()) {
-                        // 即使没有提取到新的计划项，也保留现有的计划项
-                        Log.d(TAG, "保留现有计划项")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "提取计划项时发生错误: ${e.message}")
-                // 错误时也保留现有计划项，避免因为异常导致UI丢失显示
-            }
-        }
-    }
-
-    /** Clear all plan items */
-    fun clearPlanItems() {
-        toolProcessingScope.launch {
-            try {
-                Log.d(TAG, "清除所有计划项")
-                _planItems.value = emptyList()
-            } catch (e: Exception) {
-                Log.e(TAG, "清除计划项时发生错误", e)
-            }
-        }
-    }
-
-    /**
-     * Re-extract plan items from the entire chat history This helps recover plan items in case they
-     * were lost due to UI state issues
-     */
-    private fun reExtractPlanItems(chatHistory: List<Pair<String, String>>) {
-        if (chatHistory.isEmpty()) {
-            Log.d(TAG, "空聊天历史，跳过计划项重新提取")
-            return
-        }
-
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (!planningEnabled) {
-                    Log.d(TAG, "计划模式未启用，跳过计划项重新提取")
-                    return@launch
-                }
-
-                // 如果当前已有计划项，不进行重新提取
-                if (_planItems.value.isNotEmpty()) {
-                    Log.d(
-                            TAG,
-                            "当前已有计划项，无需重新提取: ${_planItems.value.map { "${it.id}: ${it.status}" }}"
-                    )
-                    return@launch
-                }
-
-                Log.d(TAG, "开始从历史聊天中重新提取计划项")
-                // 获取所有助手消息内容
-                val assistantMessages =
-                        chatHistory.filter { it.first == "assistant" }.map { it.second }
-
-                // 合并提取所有计划项的逻辑
-                var accumulatedItems = _planItems.value
-
-                for (content in assistantMessages) {
-                    // 使用新的带有现有计划项参数的方法
-                    accumulatedItems =
-                            ConversationMarkupManager.extractPlanItems(content, accumulatedItems)
-                }
-
-                // 只有在找到计划项时才更新状态流
-                if (accumulatedItems.isNotEmpty() && accumulatedItems != _planItems.value) {
-                    Log.d(
-                            TAG,
-                            "从历史聊天中重新提取到计划项: ${accumulatedItems.map { "${it.id}: ${it.status}" }}"
-                    )
-                    _planItems.value = accumulatedItems
-                    Log.d(TAG, "已更新计划项状态流")
-                } else if (accumulatedItems.isEmpty()) {
-                    Log.d(TAG, "未从历史聊天中提取到任何计划项")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "重新提取计划项时发生错误: ${e.message}", e)
-            }
-        }
-    }
-
     /** Send a message to the AI service */
     suspend fun sendMessage(
         message: String,
@@ -412,7 +303,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         enableMemoryAttachment: Boolean = true,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        onNonFatalError: suspend (error: String) -> Unit = {}
+        onNonFatalError: suspend (error: String) -> Unit = {},
+        customSystemPromptTemplate: String? = null
     ): Stream<String> {
         Log.d(
                 TAG,
@@ -458,7 +350,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     processedInput,
                                     workspacePath,
                                     promptFunctionType,
-                                    thinkingGuidance
+                                    thinkingGuidance,
+                                    customSystemPromptTemplate
                             )
                     
                     // 关键修复：用准备好的历史记录（包含了系统提示）去同步更新内部的 conversationHistory 状态
@@ -723,9 +616,6 @@ class EnhancedAIService private constructor(private val context: Context) {
                 // 更新轮次管理器显示内容
                 roundManager.updateContent(enhancedContent)
             }
-
-            // 提取计划项
-            extractPlanItems(enhancedContent)
 
             // Handle task completion marker
             if (ConversationMarkupManager.containsTaskCompletion(enhancedContent)) {
@@ -1180,60 +1070,6 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /**
-     * Extract plan items from chat history without sending a message This is used by ChatViewModel
-     * to restore plan items when switching chats or on app startup
-     */
-    fun extractPlansFromHistory(chatHistory: List<Pair<String, String>>) {
-        if (chatHistory.isEmpty()) {
-            Log.d(TAG, "extractPlansFromHistory: 空聊天历史，跳过计划项提取")
-            return
-        }
-
-        Log.d(TAG, "extractPlansFromHistory: 从 ${chatHistory.size} 条聊天记录中提取计划项")
-
-        // 确保计划项状态流为空，以便重新填充
-        _planItems.value = emptyList()
-
-        // 提取所有助手消息
-        val assistantMessages = chatHistory.filter { it.first == "assistant" }.map { it.second }
-        Log.d(TAG, "extractPlansFromHistory: 找到 ${assistantMessages.size} 条助手消息")
-
-        // 从每条助手消息中提取计划项
-        var accumulatedItems = emptyList<PlanItem>()
-
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (!planningEnabled) {
-                    Log.d(TAG, "extractPlansFromHistory: 计划模式未启用，跳过提取")
-                    return@launch
-                }
-
-                // 按时间顺序处理每条消息
-                for (content in assistantMessages) {
-                    // 使用带有现有计划项参数的方法提取计划项
-                    accumulatedItems =
-                            ConversationMarkupManager.extractPlanItems(content, accumulatedItems)
-                }
-
-                // 只有找到计划项时才更新状态流
-                if (accumulatedItems.isNotEmpty()) {
-                    Log.d(
-                            TAG,
-                            "extractPlansFromHistory: 从历史聊天中提取到计划项: ${accumulatedItems.map { "${it.id}: ${it.status}" }}"
-                    )
-                    _planItems.value = accumulatedItems
-                    Log.d(TAG, "extractPlansFromHistory: 已更新计划项状态流")
-                } else {
-                    Log.d(TAG, "extractPlansFromHistory: 未从历史聊天中提取到任何计划项")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "extractPlansFromHistory: 提取计划项时发生错误: ${e.message}", e)
-            }
-        }
-    }
-
-    /**
      * 生成对话总结
      * @param messages 要总结的消息列表
      * @return 生成的总结文本
@@ -1280,7 +1116,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             processedInput: String,
             workspacePath: String?,
             promptFunctionType: PromptFunctionType,
-            thinkingGuidance: Boolean
+            thinkingGuidance: Boolean,
+            customSystemPromptTemplate: String? = null
     ): List<Pair<String, String>> {
         return conversationService.prepareConversationHistory(
                 chatHistory,
@@ -1288,7 +1125,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 workspacePath,
                 packageManager,
                 promptFunctionType,
-                thinkingGuidance
+                thinkingGuidance,
+                customSystemPromptTemplate
         )
     }
 
@@ -1320,7 +1158,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         // 停止AI服务并关闭屏幕常亮
         stopAiService()
 
-        Log.d(TAG, "Conversation cancellation complete - all state reset except plan items")
+        Log.d(TAG, "Conversation cancellation complete")
     }
 
     /** Cancel all tool executions */
