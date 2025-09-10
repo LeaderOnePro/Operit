@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.chat
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.api.chat.plan.PlanModeManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.MemoryQueryResultData
 import com.ai.assistance.operit.data.model.AITool
@@ -10,12 +11,14 @@ import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.WorkspaceAttachmentProcessor
 import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
@@ -41,10 +44,12 @@ object AIMessageManager {
 
     private lateinit var toolHandler: AIToolHandler
     private lateinit var context: Context
+    private lateinit var apiPreferences: ApiPreferences
 
     fun initialize(context: Context) {
         this.context = context
         toolHandler = AIToolHandler.getInstance(context)
+        apiPreferences = ApiPreferences.getInstance(context)
     }
 
     /**
@@ -141,8 +146,36 @@ object AIMessageManager {
         onNonFatalError: suspend (error: String) -> Unit
     ): SharedStream<String> {
         val memory = getMemoryFromMessages(chatHistory)
-        // 返回一个共享流
+        
+        // 检查是否启用了深度搜索模式（计划模式）
+        val isDeepSearchEnabled = apiPreferences.enableAiPlanningFlow.first()
+        
         return withContext(Dispatchers.IO) {
+            if (isDeepSearchEnabled) {
+                // 创建计划模式管理器
+                val planModeManager = PlanModeManager(context, enhancedAiService)
+                
+                // 检查消息是否适合使用深度搜索模式
+                val shouldUseDeepSearch = planModeManager.shouldUseDeepSearchMode(messageContent)
+                
+                if (shouldUseDeepSearch) {
+                    Log.d(TAG, "启用深度搜索模式处理消息")
+                    
+                    // 使用深度搜索模式
+                    return@withContext planModeManager.executeDeepSearchMode(
+                        userMessage = messageContent,
+                        chatHistory = memory,
+                        workspacePath = workspacePath,
+                        maxTokens = maxTokens,
+                        tokenUsageThreshold = tokenUsageThreshold,
+                        onNonFatalError = onNonFatalError
+                    ).share(scope)
+                } else {
+                    Log.d(TAG, "消息不适合深度搜索模式，使用普通模式")
+                }
+            }
+            
+            // 使用普通模式
             enhancedAiService.sendMessage(
                 message = messageContent,
                 chatHistory = memory, // Correct parameter name is chatHistory

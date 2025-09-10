@@ -219,7 +219,8 @@ fun StreamMarkdownRenderer(
                 val isInlineContainer =
                         tempBlockType != MarkdownProcessorType.CODE_BLOCK &&
                                 tempBlockType != MarkdownProcessorType.BLOCK_LATEX &&
-                                tempBlockType != MarkdownProcessorType.XML_BLOCK
+                                tempBlockType != MarkdownProcessorType.XML_BLOCK &&
+                                tempBlockType != MarkdownProcessorType.PLAN_EXECUTION
 
                 // 为新块创建并添加节点
                 val newNode = MarkdownNode(type = tempBlockType)
@@ -438,7 +439,8 @@ fun StreamMarkdownRenderer(
                     val isInlineContainer =
                             tempBlockType != MarkdownProcessorType.CODE_BLOCK &&
                                     tempBlockType != MarkdownProcessorType.BLOCK_LATEX &&
-                                    tempBlockType != MarkdownProcessorType.XML_BLOCK
+                                    tempBlockType != MarkdownProcessorType.XML_BLOCK &&
+                                    tempBlockType != MarkdownProcessorType.PLAN_EXECUTION
 
                     // 为新块创建并添加节点
                     val newNode = MarkdownNode(type = tempBlockType)
@@ -1033,6 +1035,13 @@ fun StableMarkdownNodeRenderer(
                     xmlContent = content,
                     modifier = Modifier.fillMaxWidth(),
                     textColor = textColor
+            )
+        }
+
+        MarkdownProcessorType.PLAN_EXECUTION -> {
+            PlanExecutionRenderer(
+                content = content,
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
