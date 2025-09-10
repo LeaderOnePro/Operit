@@ -52,6 +52,7 @@ class UserPreferencesManager(private val context: Context) {
 
         // 分类锁定状态
         private val BIRTH_DATE_LOCKED = booleanPreferencesKey("birth_date_locked")
+        private val GENDER_LOCKED = booleanPreferencesKey("gender_locked")
         private val PERSONALITY_LOCKED = booleanPreferencesKey("personality_locked")
         private val IDENTITY_LOCKED = booleanPreferencesKey("identity_locked")
         private val OCCUPATION_LOCKED = booleanPreferencesKey("occupation_locked")
@@ -634,6 +635,7 @@ class UserPreferencesManager(private val context: Context) {
             context.userPreferencesDataStore.data.map { preferences ->
                 mapOf(
                         "birthDate" to (preferences[BIRTH_DATE_LOCKED] ?: false),
+                        "gender" to (preferences[GENDER_LOCKED] ?: false),
                         "personality" to (preferences[PERSONALITY_LOCKED] ?: false),
                         "identity" to (preferences[IDENTITY_LOCKED] ?: false),
                         "occupation" to (preferences[OCCUPATION_LOCKED] ?: false),
@@ -654,6 +656,7 @@ class UserPreferencesManager(private val context: Context) {
         context.userPreferencesDataStore.edit { preferences ->
             when (category) {
                 "birthDate" -> preferences[BIRTH_DATE_LOCKED] = locked
+                "gender" -> preferences[GENDER_LOCKED] = locked
                 "personality" -> preferences[PERSONALITY_LOCKED] = locked
                 "identity" -> preferences[IDENTITY_LOCKED] = locked
                 "occupation" -> preferences[OCCUPATION_LOCKED] = locked

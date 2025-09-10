@@ -49,65 +49,64 @@ class TaskExecutor(
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit
-    ): Stream<String> = stream {
-        
-        try {
-            // 清空之前的结果
-            taskResults.clear()
-            runningTasks.clear()
-            
-            // 验证执行图
-            val (isValid, errorMessage) = PlanParser.validateExecutionGraph(graph)
-            if (!isValid) {
-                emit("❌ 执行图验证失败: $errorMessage")
-                return@stream
-            }
-            
-            // 获取拓扑排序后的任务列表
-            val sortedTasks = PlanParser.topologicalSort(graph)
-            if (sortedTasks.isEmpty()) {
-                emit("❌ 无法对任务进行拓扑排序，可能存在循环依赖")
-                return@stream
-            }
-            
-            emit("📋 开始执行计划，共 ${sortedTasks.size} 个任务\n")
-            
-            // 按依赖关系执行任务
-            val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-            
+    ): Pair<Stream<String>, Deferred<String?>> {
+        val summaryDeferred = CompletableDeferred<String?>()
+
+        val stream = stream<String> {
             try {
-                // 执行所有任务
-                executeTasksInOrder(scope, sortedTasks, originalMessage, chatHistory, workspacePath, maxTokens, tokenUsageThreshold, onNonFatalError) { message ->
-                    emit(message)
-                }
-                
-                emit("\n🎯 所有子任务执行完成，开始汇总结果...\n")
-                
-                // 执行最终汇总
-                val finalResult = executeFinalSummary(
-                    graph.finalSummaryInstruction,
-                    originalMessage,
-                    chatHistory,
-                    workspacePath,
-                    maxTokens,
-                    tokenUsageThreshold,
-                    onNonFatalError
-                ) { message ->
-                    emit(message)
-                }
-                
-                emit("\n✅ 深度搜索模式执行完成\n")
-                
-            } finally {
-                // 清理资源
-                scope.cancel()
+                taskResults.clear()
                 runningTasks.clear()
+
+                val (isValid, errorMessage) = PlanParser.validateExecutionGraph(graph)
+                if (!isValid) {
+                    emit("<error>❌ 执行图验证失败: $errorMessage</error>\n")
+                    summaryDeferred.complete(null)
+                    return@stream
+                }
+
+                val sortedTasks = PlanParser.topologicalSort(graph)
+                if (sortedTasks.isEmpty()) {
+                    emit("<error>❌ 无法对任务进行拓扑排序，可能存在循环依赖</error>\n")
+                    summaryDeferred.complete(null)
+                    return@stream
+                }
+
+                emit("<log>📋 开始执行计划，共 ${sortedTasks.size} 个任务</log>\n")
+
+                val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+                try {
+                    executeTasksInOrder(scope, sortedTasks, originalMessage, chatHistory, workspacePath, maxTokens, tokenUsageThreshold, onNonFatalError) { message ->
+                        emit(message)
+                    }
+
+                    emit("<log>🎯 所有子任务执行完成，开始汇总结果...</log>\n")
+
+                    val summaryResult = executeFinalSummary(
+                        graph.finalSummaryInstruction,
+                        originalMessage,
+                        chatHistory,
+                        workspacePath,
+                        maxTokens,
+                        tokenUsageThreshold,
+                        onNonFatalError
+                    )
+
+                    emit("<log>✅ 深度搜索模式执行完成</log>\n")
+                    summaryDeferred.complete(summaryResult)
+
+                } finally {
+                    scope.cancel()
+                    runningTasks.clear()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "执行计划时发生错误", e)
+                emit("<error>❌ 执行计划时发生错误: ${e.message}</error>\n")
+                summaryDeferred.complete(null)
             }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "执行计划时发生错误", e)
-            emit("❌ 执行计划时发生错误: ${e.message}")
         }
+        @Suppress("UNCHECKED_CAST")
+        return Pair(stream, summaryDeferred as Deferred<String?>)
     }
     
     /**
@@ -138,7 +137,7 @@ class TaskExecutor(
             
             if (readyTasks.isEmpty()) {
                 // 如果没有就绪的任务，说明存在问题
-                onMessage("❌ 无法找到可执行的任务，可能存在依赖问题")
+                onMessage("<error>❌ 无法找到可执行的任务，可能存在依赖问题</error>\n")
                 break
             }
             
@@ -174,7 +173,7 @@ class TaskExecutor(
         onMessage: suspend (String) -> Unit
     ) {
         try {
-            onMessage("🔄 开始执行任务: ${task.name} (${task.id})")
+            onMessage("""<update id="${task.id}" status="IN_PROGRESS"/>""" + "\n")
             
             // 构建任务的上下文信息
             val contextInfo = buildTaskContext(task, originalMessage)
@@ -213,11 +212,13 @@ class TaskExecutor(
                 taskResults[task.id] = result
             }
             
-            onMessage("✅ 任务完成: ${task.name}\n")
+            onMessage("""<update id="${task.id}" status="COMPLETED"/>""" + "\n")
             
         } catch (e: Exception) {
             Log.e(TAG, "执行任务 ${task.id} 时发生错误", e)
-            onMessage("❌ 任务失败: ${task.name} - ${e.message}\n")
+            val errorMessage = e.message ?: "Unknown error"
+            val escapedError = errorMessage.replace("\"", "&quot;")
+            onMessage("""<update id="${task.id}" status="FAILED" error="$escapedError"/>""" + "\n")
             
             // 即使失败也要存储结果，避免阻塞其他任务
             taskMutex.withLock {
@@ -275,8 +276,7 @@ ${task.instruction}
         workspacePath: String?,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        onNonFatalError: suspend (error: String) -> Unit,
-        onMessage: suspend (String) -> Unit
+        onNonFatalError: suspend (error: String) -> Unit
     ): String {
         try {
             // 构建汇总上下文
@@ -312,14 +312,12 @@ $summaryInstruction
             // 收集并输出流式响应
             stream.collect { chunk ->
                 resultBuilder.append(chunk)
-                onMessage(chunk)
             }
             
             return resultBuilder.toString().trim()
             
         } catch (e: Exception) {
             Log.e(TAG, "执行最终汇总时发生错误", e)
-            onMessage("❌ 最终汇总失败: ${e.message}")
             return "汇总执行失败: ${e.message}"
         }
     }

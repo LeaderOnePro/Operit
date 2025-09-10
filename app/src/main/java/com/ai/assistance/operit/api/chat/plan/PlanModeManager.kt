@@ -81,8 +81,8 @@ class PlanModeManager(
     ): Stream<String> = stream {
         
         try {
-            emit("🧠 启动深度搜索模式...\n")
-            emit("📊 正在分析您的请求并生成执行计划...\n")
+            emit("<log>🧠 启动深度搜索模式...</log>\n")
+            emit("<log>📊 正在分析您的请求并生成执行计划...</log>\n")
             
             // 第一步：生成执行计划
             val executionGraph = generateExecutionPlan(
@@ -95,19 +95,20 @@ class PlanModeManager(
             )
             
             if (executionGraph == null) {
-                emit("❌ 无法生成有效的执行计划，切换回普通模式")
+                emit("<error>❌ 无法生成有效的执行计划，切换回普通模式</error>\n")
                 return@stream
             }
             
-            // 将执行计划序列化为JSON，并使用<plan>标签包裹，以便UI能够正确渲染
+            emit("<plan>\n")
+            
             val gson = Gson()
             val planJson = gson.toJson(executionGraph)
-            emit("<plan>$planJson</plan>")
+            emit("<graph><![CDATA[$planJson]]></graph>\n")
 
-            emit("\n" + "=".repeat(50) + "\n")
+            // emit("\n" + "=".repeat(50) + "\n")
             
             // 第二步：执行计划
-            val executionStream = taskExecutor.executeGraph(
+            val (executionStream, summaryDeferred) = taskExecutor.executeGraph(
                 executionGraph,
                 userMessage,
                 chatHistory,
@@ -122,9 +123,17 @@ class PlanModeManager(
                 emit(message)
             }
             
+            emit("</plan>\n")
+            
+            // 等待并输出最终总结
+            val summary = summaryDeferred.await()
+            if (summary != null) {
+                emit(summary)
+            }
+            
         } catch (e: Exception) {
             Log.e(TAG, "深度搜索模式执行失败", e)
-            emit("❌ 深度搜索模式执行失败: ${e.message}")
+            emit("<error>❌ 深度搜索模式执行失败: ${e.message}</error>\n")
         }
     }
     

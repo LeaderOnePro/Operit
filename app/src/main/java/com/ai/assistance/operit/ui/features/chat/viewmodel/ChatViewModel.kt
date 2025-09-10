@@ -72,6 +72,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    // 添加自动朗读状态
+    private val _isAutoReadEnabled = MutableStateFlow(false)
+    val isAutoReadEnabled: StateFlow<Boolean> = _isAutoReadEnabled.asStateFlow()
+
     fun showInvitationPanel() {
         _generatedInvitationMessage.value = invitationManager.generateInvitationMessage()
         _showInvitationPanel.value = true
@@ -351,7 +355,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                                 tokenStatsDelegate.getCumulativeTokenCounts()
                             val windowSize = tokenStatsDelegate.getLastCurrentWindowSize()
                             chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, windowSize)
-                        }
+                        },
+                        // 传递自动朗读状态和方法
+                        getIsAutoReadEnabled = { isAutoReadEnabled.value },
+                        speakMessage = ::speakMessage
                 )
 
         // Finally initialize floating window delegate
@@ -1482,6 +1489,28 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "停止朗读失败", e)
             }
+        }
+    }
+
+    fun toggleAutoRead() {
+        _isAutoReadEnabled.value = !_isAutoReadEnabled.value
+        // 如果关闭，则也停止当前语音
+        if (!_isAutoReadEnabled.value) {
+            stopSpeaking()
+        }
+    }
+
+    fun disableAutoRead() {
+        if (_isAutoReadEnabled.value) {
+            _isAutoReadEnabled.value = false
+            stopSpeaking()
+        }
+    }
+
+    fun enableAutoReadAndSpeak(content: String) {
+        if (!_isAutoReadEnabled.value) {
+            _isAutoReadEnabled.value = true
+            speakMessage(content)
         }
     }
 }

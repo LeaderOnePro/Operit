@@ -38,8 +38,10 @@ class MessageProcessingDelegate(
         private val saveCurrentChat: () -> Unit,
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
-        private val onTurnComplete: () -> Unit
-        // toolHandler is no longer needed here
+        private val onTurnComplete: () -> Unit,
+        // 添加自动朗读相关的回调
+        private val getIsAutoReadEnabled: () -> Boolean,
+        private val speakMessage: (String) -> Unit
 ) {
     companion object {
         private const val TAG = "MessageProcessingDelegate"
@@ -284,6 +286,10 @@ class MessageProcessingDelegate(
                                     
                                     withContext(Dispatchers.Main) {
                                         addMessageToChat(sentenceMessage)
+                                        // 如果启用了自动朗读，则朗读当前句子
+                                        if (getIsAutoReadEnabled()) {
+                                            speakMessage(sentence)
+                                        }
                                         _scrollToBottomEvent.tryEmit(Unit)
                                     }
                                 }
@@ -293,7 +299,13 @@ class MessageProcessingDelegate(
                         } else {
                             // 普通模式，直接清理流
                             val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
-                            withContext(Dispatchers.Main) { addMessageToChat(finalMessage) }
+                            withContext(Dispatchers.Main) {
+                                addMessageToChat(finalMessage)
+                                // 如果启用了自动朗读，则朗读完整消息
+                                if (getIsAutoReadEnabled()) {
+                                    speakMessage(finalContent)
+                                }
+                            }
                         }
                     }
                 } catch (e: UninitializedPropertyAccessException) {
@@ -305,7 +317,13 @@ class MessageProcessingDelegate(
                     try {
                         val finalContent = aiMessage.content
                         val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
-                        withContext(Dispatchers.Main) { addMessageToChat(finalMessage) }
+                        withContext(Dispatchers.Main) {
+                            addMessageToChat(finalMessage)
+                            // 如果启यो-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------t--了自动朗读，也朗读最终消息
+                            // if (getIsAutoReadEnabled()) {
+                            //     speakMessage(finalContent)
+                            // }
+                        }
                     } catch (ex: Exception) {
                         Log.e(TAG, "回退到普通模式也失败", ex)
                     }

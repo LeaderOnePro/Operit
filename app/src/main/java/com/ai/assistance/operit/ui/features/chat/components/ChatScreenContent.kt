@@ -58,8 +58,19 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.res.stringResource
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.components.MessageEditor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Icon
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreenContent(
         modifier: Modifier = Modifier,
@@ -128,6 +139,7 @@ fun ChatScreenContent(
     
     // 监听朗读状态
     val isPlaying by actualViewModel.isPlaying.collectAsState()
+    val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
 
     val onSelectMessageToEditCallback = remember(editingMessageIndex, editingMessageContent, editingMessageType) {
         { index: Int, message: ChatMessage, senderType: String ->
@@ -212,6 +224,7 @@ fun ChatScreenContent(
                         onDeleteMessage = { index -> actualViewModel.deleteMessage(index) },
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
+                        onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
                         chatStyle = chatStyle // Pass chat style
                 )
             }
@@ -219,21 +232,26 @@ fun ChatScreenContent(
 
         // 停止朗读按钮
         AnimatedVisibility(
-            visible = isPlaying,
+            visible = isPlaying || isAutoReadEnabled,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 80.dp)
         ) {
-            FloatingActionButton(
-                onClick = { actualViewModel.stopSpeaking() },
-                modifier = Modifier.size(56.dp),
+            SmallFloatingActionButton(
+                onClick = {
+                    if (isAutoReadEnabled) {
+                        actualViewModel.disableAutoRead()
+                    } else {
+                        actualViewModel.stopSpeaking()
+                    }
+                },
                 containerColor = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary
             ) {
                 Icon(
-                    imageVector = Icons.Default.Stop,
+                    imageVector = Icons.Filled.Stop,
                     contentDescription = stringResource(R.string.stop_reading),
                     modifier = Modifier.size(24.dp)
                 )

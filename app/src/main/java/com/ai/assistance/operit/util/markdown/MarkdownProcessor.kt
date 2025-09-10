@@ -100,8 +100,8 @@ object NestedMarkdownProcessor {
                     StreamMarkdownBlockLaTeXPlugin(includeDelimiters = false),
                     StreamMarkdownTablePlugin(),
                     StreamMarkdownImagePlugin(),
-                    StreamXmlPlugin(includeTagsInOutput = true), // 使用现有的StreamXmlPlugin
-                    StreamPlanExecutionPlugin()
+                    StreamPlanExecutionPlugin(),
+                    StreamXmlPlugin(includeTagsInOutput = true) // 使用现有的StreamXmlPlugin
             )
 
     /** 内联插件列表 */

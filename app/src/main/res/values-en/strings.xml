@@ -239,6 +239,7 @@
     <!-- Context Menu -->
     <string name="copy_message">Copy Message</string>
     <string name="read_message">Read Message</string>
+    <string name="auto_read_message">Auto Read</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
     <string name="select_copy">Select Copy</string>
