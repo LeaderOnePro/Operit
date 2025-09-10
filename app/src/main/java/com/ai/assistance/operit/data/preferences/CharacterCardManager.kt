@@ -326,7 +326,7 @@ class CharacterCardManager private constructor(private val context: Context) {
         preferences[nameKey] = "Operit"
         preferences[descriptionKey] = "系统默认的角色卡配置"
         preferences[characterSettingKey] = "你是Operit，一个全能AI助手，旨在解决用户提出的任何任务。"
-        preferences[openingStatementKey] = "你好！我是Operit，你的全能AI助手。有什么可以帮助你的吗？" // 新增
+        preferences[openingStatementKey] = ""
         preferences[otherContentKey] = "保持有帮助的语气，并清楚地传达限制。"
         preferences[attachedTagIdsKey] = setOf<String>()
         preferences[advancedCustomPromptKey] = ""

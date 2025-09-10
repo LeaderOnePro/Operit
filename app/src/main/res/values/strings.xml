@@ -1932,7 +1932,6 @@
     <string name="memory_desc">记忆选择包括了用户偏好和该偏好下的记忆库。如果想要新的记忆库，可以去设置新建一个用户偏好并在这里选择</string>
     <string name="memory_attachment">记忆附着</string>
     <string name="memory_attachment_desc">开启后，发送消息时会自动从记忆库中检索并附加相关内容，但这可能会影响AI回答的焦点。</string>
-    <string name="ai_planning_desc">允许AI创建并执行多步骤任务计划。启用后，AI将以更结构化的方式展示其思考和执行过程。关闭后，AI将恢复为普通的对话模式。</string>
     <string name="thinking_mode">思考模式</string>
     <string name="thinking_mode_desc">目前只支持Gemini、Qwen3和Claude，能够启用内置的思考。</string>
     <string name="thinking_guidance">思考引导</string>
