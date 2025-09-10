@@ -217,9 +217,9 @@ private fun ExecutionGraphDisplay(
             .padding(horizontal = 4.dp, vertical = 2.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             // Header with icon
@@ -248,8 +248,15 @@ private fun ExecutionGraphDisplay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
+                            )
+                        )
+                    )
                     .padding(4.dp)
             ) {
                 WorkflowGraph(
