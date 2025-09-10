@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
+import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import androidx.compose.foundation.Image
@@ -62,6 +63,10 @@ fun BubbleAiMessageComposable(
         }
     }
 
+    // 链接预览弹窗状态
+    var showLinkDialog by remember { mutableStateOf(false) }
+    var linkToPreview by remember { mutableStateOf("") }
+
     val xmlRenderer = remember(showThinkingProcess, showStatusTags) {
         CustomXmlRenderer(
             showThinkingProcess = showThinkingProcess,
@@ -70,8 +75,8 @@ fun BubbleAiMessageComposable(
     }
     val rememberedOnLinkClick = remember(context, onLinkClick) {
         onLinkClick ?: { url ->
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
+            linkToPreview = url
+            showLinkDialog = true
         }
     }
 
@@ -174,5 +179,16 @@ fun BubbleAiMessageComposable(
                 }
             }
         }
+    }
+
+    // 链接预览弹窗
+    if (showLinkDialog && linkToPreview.isNotEmpty()) {
+        LinkPreviewDialog(
+            url = linkToPreview,
+            onDismiss = {
+                showLinkDialog = false
+                linkToPreview = ""
+            }
+        )
     }
 }

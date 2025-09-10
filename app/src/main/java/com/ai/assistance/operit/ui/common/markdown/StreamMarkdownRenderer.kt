@@ -1121,7 +1121,7 @@ fun StableMarkdownNodeRenderer(
     }
 }
 
-/** 扩展函数，用于处理Markdown文本中的链接点击事件 */
+/** 扩展函数，用于处理Markdown文本中的链接点击事件，现在会安全地处理链接点击 */
 private fun Modifier.handleLinkClicks(
     onLinkClick: ((String) -> Unit)?,
     textLayoutResult: TextLayoutResult?,
@@ -1138,6 +1138,7 @@ private fun Modifier.handleLinkClicks(
                         annotatedString.getStringAnnotations("URL", position, position)
                             .firstOrNull()?.let { annotation ->
                                 up.consume()
+                                // 使用回调处理链接点击，现在会显示预览弹窗
                                 onLinkClick(annotation.item)
                             }
                     }

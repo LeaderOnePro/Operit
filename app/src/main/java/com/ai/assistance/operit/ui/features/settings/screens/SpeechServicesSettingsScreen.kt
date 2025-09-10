@@ -59,6 +59,7 @@ import com.ai.assistance.operit.api.voice.VoiceServiceFactory.VoiceServiceType
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import com.ai.assistance.operit.ui.components.CustomScaffold
+import com.ai.assistance.operit.api.voice.SiliconFlowVoiceProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +81,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
     var ttsHttpMethodInput by remember(httpConfig) { mutableStateOf(httpConfig.httpMethod) }
     var ttsRequestBodyInput by remember(httpConfig) { mutableStateOf(httpConfig.requestBody) }
     var ttsContentTypeInput by remember(httpConfig) { mutableStateOf(httpConfig.contentType) }
+    var ttsVoiceIdInput by remember(httpConfig) { mutableStateOf(httpConfig.voiceId) }
     var ttsJsonError by remember { mutableStateOf<String?>(null) }
     var httpMethodDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -99,7 +101,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                 }
             }
             VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
-                ttsApiKeyInput.isNotBlank()
+                ttsApiKeyInput.isNotBlank() && ttsVoiceIdInput.isNotBlank()
             }
             VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> true
         }
@@ -140,7 +142,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             headers = emptyMap(),
                             httpMethod = "",
                             requestBody = "",
-                            contentType = ""
+                            contentType = "",
+                            voiceId = ttsVoiceIdInput
                         )
                     )
                 }
@@ -399,6 +402,73 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                     placeholder = { Text("请输入您的硅基流动API密钥") },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // 音色选择
+                                var voiceDropdownExpanded by remember { mutableStateOf(false) }
+                                val availableVoices = remember { SiliconFlowVoiceProvider.AVAILABLE_VOICES }
+                                val selectedVoiceName = remember(ttsVoiceIdInput) {
+                                    availableVoices.find { it.id == ttsVoiceIdInput }?.name ?: "自定义音色"
+                                }
+
+                                Text(
+                                    text = "音色设置",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // 预设音色选择下拉菜单
+                                ExposedDropdownMenuBox(
+                                    expanded = voiceDropdownExpanded,
+                                    onExpandedChange = { voiceDropdownExpanded = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = selectedVoiceName,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("选择预设音色") },
+                                        trailingIcon = {
+                                            Icon(Icons.Default.ArrowDropDown, "选择音色")
+                                        },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = voiceDropdownExpanded,
+                                        onDismissRequest = { voiceDropdownExpanded = false }
+                                    ) {
+                                        availableVoices.forEach { voice ->
+                                            DropdownMenuItem(
+                                                text = { Text(voice.name) },
+                                                onClick = {
+                                                    ttsVoiceIdInput = voice.id
+                                                    voiceDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // 自定义音色ID输入框
+                                OutlinedTextField(
+                                    value = ttsVoiceIdInput,
+                                    onValueChange = { ttsVoiceIdInput = it },
+                                    label = { Text("音色ID（可直接输入）") },
+                                    placeholder = { Text("例如：FunAudioLLM/CosyVoice2-0.5B:charles 或用户自定义音色ID") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    supportingText = {
+                                        Text(
+                                            text = "支持系统预置音色和用户上传的自定义音色",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 )
                             }
                         }

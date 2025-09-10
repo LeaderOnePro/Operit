@@ -22,7 +22,9 @@ fun CursorStyleChatMessage(
         thinkingTextColor: Color,
         supportToolMarkup: Boolean = true,
         initialThinkingExpanded: Boolean = false,
-        overrideStream: Stream<String>? = null
+        overrideStream: Stream<String>? = null,
+        onDeleteMessage: ((Int) -> Unit)? = null,
+        index: Int = -1
 ) {
     when (message.sender) {
         "user" -> {
@@ -51,7 +53,12 @@ fun CursorStyleChatMessage(
             SummaryMessageComposable(
                     message = message,
                     backgroundColor = systemMessageColor.copy(alpha = 0.7f),
-                    textColor = systemTextColor
+                    textColor = systemTextColor,
+                    onDelete = {
+                        if (index != -1) {
+                            onDeleteMessage?.invoke(index)
+                        }
+                    }
             )
         }
     }

@@ -41,9 +41,11 @@ object VoiceServiceFactory {
                 }
                 VoiceServiceType.SILICONFLOW_TTS -> {
                     val httpConfig = prefs.ttsHttpConfigFlow.first()
-                    SiliconFlowVoiceProvider(context).apply {
-                        setApiKey(httpConfig.apiKey)
-                    }
+                    SiliconFlowVoiceProvider(
+                        context = context,
+                        apiKey = httpConfig.apiKey,
+                        initialVoiceId = httpConfig.voiceId
+                    )
                 }
             }
         }

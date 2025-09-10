@@ -252,6 +252,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
 
+    private val _isSummarizing = MutableStateFlow(false)
+
     // 添加WebView刷新控制流 - 使用Int计数器避免重复刷新问题
     private val _webViewRefreshCounter = MutableStateFlow(0)
     val webViewRefreshCounter: StateFlow<Int> = _webViewRefreshCounter
@@ -412,7 +414,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 enhancedAiService?.inputProcessingState?.collect { state ->
-                    if (::messageProcessingDelegate.isInitialized) {
+                    if (state is com.ai.assistance.operit.data.model.InputProcessingState.Completed && _isSummarizing.value) {
+                        messageProcessingDelegate.handleInputProcessingState(
+                            com.ai.assistance.operit.data.model.InputProcessingState.Summarizing("正在总结记忆...")
+                        )
+                    } else if (::messageProcessingDelegate.isInitialized) {
                         messageProcessingDelegate.handleInputProcessingState(state)
                     }
                 }
@@ -763,17 +769,44 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             )
         
         if (isShouldGenerateSummary) {
+            _isSummarizing.value = true
             // 1. 在调用挂起函数之前，根据当前的消息快照预先计算好插入位置
             val insertPosition = chatHistoryDelegate.findProperSummaryPosition(currentMessages)
 
             // 2. 异步触发总结生成
             viewModelScope.launch(Dispatchers.IO) {
-                enhancedAiService?.let { service ->
-                    // 传入快照进行总结
-                    val summaryMessage = AIMessageManager.summarizeMemory(service, currentMessages)
-                    summaryMessage?.let {
-                        // 3. 使用预先计算好的位置插入总结消息
-                        chatHistoryDelegate.addSummaryMessage(it, insertPosition)
+                try {
+                    enhancedAiService?.let { service ->
+                        // 传入快照进行总结
+                        val summaryMessage = AIMessageManager.summarizeMemory(service, currentMessages)
+                        summaryMessage?.let {
+                            // 3. 使用预先计算好的位置插入总结消息
+                            chatHistoryDelegate.addSummaryMessage(it, insertPosition)
+
+                            // 4. 更新窗口大小
+                            val newHistoryForTokens = AIMessageManager.getMemoryFromMessages(chatHistoryDelegate.chatHistory.value)
+                            val chatService = service.getAIServiceForFunction(com.ai.assistance.operit.data.model.FunctionType.CHAT)
+                            val newWindowSize = chatService.calculateInputTokens("", newHistoryForTokens)
+                            val inputTokens = tokenStatsDelegate.cumulativeInputTokensFlow.value
+                            val outputTokens = tokenStatsDelegate.cumulativeOutputTokensFlow.value
+                            chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, newWindowSize)
+                            // 更新UI上的显示
+                            withContext(Dispatchers.Main){
+                                tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, newWindowSize)
+                            }
+                            Log.d(TAG, "总结完成，更新窗口大小为: $newWindowSize")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "生成总结时出错: ${e.message}", e)
+                    uiStateDelegate.showErrorMessage("生成聊天总结时出错: ${e.message}")
+                } finally {
+                    _isSummarizing.value = false
+                    // 如果UI还在显示总结状态，则更新为完成
+                    if (messageProcessingDelegate.inputProcessingState.value is com.ai.assistance.operit.data.model.InputProcessingState.Summarizing) {
+                        messageProcessingDelegate.handleInputProcessingState(
+                            com.ai.assistance.operit.data.model.InputProcessingState.Completed
+                        )
                     }
                 }
             }

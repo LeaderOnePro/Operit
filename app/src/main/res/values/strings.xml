@@ -317,6 +317,7 @@
     <string name="tool_weather">天气查询</string>
     <string name="tool_calculator">计算器</string>
     <string name="tool_web_search">网络搜索</string>
+    <string name="ai_planning_desc">允许AI创建并执行多步骤任务计划。启用后，AI将以更结构化的方式展示其思考和执行过程。关闭后，AI将恢复为普通的对话模式。</string>
     <string name="enhanced_service_not_initialized">增强AI服务未初始化，请检查设置</string>
     <string name="ui_automation_in_progress">正在执行界面任务...</string>
     
@@ -815,7 +816,7 @@
     <string name="auto_approve_desc">将会自动把较为安全的工具直接执行而不询问。对于具体的分组批准，请前往设置-工具权限管理进行操作。</string>
     <string name="enabled">已开启</string>
     <string name="ask">询问</string>
-    <string name="ai_planning_mode">AI计划模式:</string>
+    <string name="ai_planning_mode">深度搜索:</string>
     <string name="disabled">已关闭</string>
     
     <!-- Termux 相关 -->
@@ -1920,7 +1921,7 @@
     <string name="memory_attachment_active">记忆附着已激活</string>
     <string name="thinking_mode_active">思考模式已激活</string>
     <string name="thinking_guidance_active">思考引导已激活</string>
-    <string name="ai_planning_active">AI计划模式已激活</string>
+    <string name="ai_planning_active">深度搜索已激活</string>
     <string name="auto_approve_active">自动批准已激活</string>
     <string name="settings_options">设置选项</string>
     <string name="model_config">模型配置</string>
@@ -1931,7 +1932,6 @@
     <string name="memory_desc">记忆选择包括了用户偏好和该偏好下的记忆库。如果想要新的记忆库，可以去设置新建一个用户偏好并在这里选择</string>
     <string name="memory_attachment">记忆附着</string>
     <string name="memory_attachment_desc">开启后，发送消息时会自动从记忆库中检索并附加相关内容，但这可能会影响AI回答的焦点。</string>
-    <string name="ai_planning_desc">能够生成一系列计划进行执行（效果一般，不建议启用，未来将会进行替换）。</string>
     <string name="thinking_mode">思考模式</string>
     <string name="thinking_mode_desc">目前只支持Gemini、Qwen3和Claude，能够启用内置的思考。</string>
     <string name="thinking_guidance">思考引导</string>

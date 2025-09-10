@@ -98,7 +98,7 @@ fun ModelApiSettingsSection(
             ApiProviderType.BAIDU ->
                     "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions"
             ApiProviderType.ALIYUN ->
-                    "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+                    "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
             ApiProviderType.XUNFEI -> "https://spark-api-open.xf-yun.com/v2/chat/completions"
             ApiProviderType.ZHIPU ->
                     "https://open.bigmodel.cn/api/paas/v4/chat/completions"
@@ -230,14 +230,14 @@ fun ModelApiSettingsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
+                Text(
+                    text = stringResource(R.string.endpoint_completion_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                    lineHeight = 16.sp
+                )
             }
-            Text(
-                text = stringResource(R.string.endpoint_completion_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-                lineHeight = 16.sp
-            )
  
              // API密钥输入
              OutlinedTextField(

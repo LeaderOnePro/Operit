@@ -171,7 +171,7 @@ fun ChatInputSection(
                     is InputProcessingState.ProcessingToolResult -> MaterialTheme.colorScheme.tertiary.copy(
                         alpha = 0.8f
                     ) to "正在处理工具结果: ${inputState.toolName}"
-
+                    is InputProcessingState.Summarizing -> MaterialTheme.colorScheme.tertiary to inputState.message
                     is InputProcessingState.Receiving -> MaterialTheme.colorScheme.secondary to inputState.message
                     else -> MaterialTheme.colorScheme.primary to ""
                 }
@@ -179,6 +179,7 @@ fun ChatInputSection(
                 val progressValue = when (inputState) {
                     is InputProcessingState.Processing -> 0.3f
                     is InputProcessingState.Connecting -> 0.6f
+                    is InputProcessingState.Summarizing -> 0.9f
                     else -> 1f
                 }
 
