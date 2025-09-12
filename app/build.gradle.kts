@@ -11,6 +11,15 @@ android {
     namespace = "com.ai.assistance.operit"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.keystore") // 项目根目录下的自定义密钥
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.ai.assistance.operit"
         minSdk = 26
@@ -27,7 +36,7 @@ android {
             // Explicitly specify the ABIs to support. This ensures that native libraries
             // for both 32-bit and 64-bit ARM devices are included in the APK,
             // resolving conflicts between dependencies with different native library sets.
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
 
@@ -39,7 +48,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
