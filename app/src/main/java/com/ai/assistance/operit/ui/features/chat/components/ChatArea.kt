@@ -72,6 +72,17 @@ import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorS
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 
+/**
+ * 清理消息中的XML标签，保留纯文本内容和换行格式
+ */
+private fun cleanXmlTags(content: String): String {
+    return content
+        .replace(Regex("<[^>]*>"), "") // 移除所有XML/HTML标签
+        .replace(Regex("[ \t]+"), " ") // 将多个空格和制表符替换为单个空格，但保留换行符
+        .replace(Regex("\n+"), "\n") // 将多个连续换行符替换为单个换行符
+        .trim() // 移除首尾空白
+}
+
 enum class ChatStyle {
     CURSOR,
     BUBBLE
@@ -314,7 +325,8 @@ private fun MessageItem(
                 onClick = {
                     val clipboardManager =
                         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clipData = ClipData.newPlainText("聊天消息", message.content)
+                    val cleanContent = cleanXmlTags(message.content)
+                    val clipData = ClipData.newPlainText("聊天消息", cleanContent)
                     clipboardManager.setPrimaryClip(clipData)
                     Toast.makeText(context, context.getString(R.string.message_copied), Toast.LENGTH_SHORT).show()
                     onCopyMessage?.invoke(message)
@@ -505,7 +517,7 @@ private fun MessageItem(
 
         if (showSelectableCopyDialog) {
             SelectableCopyDialog(
-                text = message.content,
+                text = cleanXmlTags(message.content),
                 onDismiss = { showSelectableCopyDialog = false }
             )
         }

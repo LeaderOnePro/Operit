@@ -358,7 +358,7 @@ class MessageProcessingDelegate(
             Log.d(TAG, "流收集任务已取消")
 
             withContext(Dispatchers.IO) {
-                getEnhancedAiService()?.cancelConversation()
+                AIMessageManager.cancelCurrentOperation()
                 saveCurrentChat()
             }
         }

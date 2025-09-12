@@ -42,6 +42,9 @@ object AIMessageManager {
     // 使用独立的协程作用域，确保AI操作的生命周期独立于任何特定的ViewModel
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    private var activeEnhancedAiService: EnhancedAIService? = null
+    private var activePlanModeManager: PlanModeManager? = null
+
     private lateinit var toolHandler: AIToolHandler
     private lateinit var context: Context
     private lateinit var apiPreferences: ApiPreferences
@@ -145,6 +148,7 @@ object AIMessageManager {
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit
     ): SharedStream<String> {
+        activeEnhancedAiService = enhancedAiService // Keep a reference to the service for cancellation
         val memory = getMemoryFromMessages(chatHistory)
         
         // 检查是否启用了深度搜索模式（计划模式）
@@ -159,6 +163,7 @@ object AIMessageManager {
                 val shouldUseDeepSearch = planModeManager.shouldUseDeepSearchMode(messageContent)
                 
                 if (shouldUseDeepSearch) {
+                    activePlanModeManager = planModeManager // Store active manager
                     Log.d(TAG, "启用深度搜索模式处理消息")
                     
                     // 设置执行计划的特定UI状态
@@ -176,8 +181,11 @@ object AIMessageManager {
                         onNonFatalError = onNonFatalError
                     ).share(scope)
                 } else {
+                    activePlanModeManager = null // Clear manager if not used
                     Log.d(TAG, "消息不适合深度搜索模式，使用普通模式")
                 }
+            } else {
+                activePlanModeManager = null // Clear manager if disabled
             }
             
             // 使用普通模式
@@ -194,6 +202,29 @@ object AIMessageManager {
                 onNonFatalError = onNonFatalError
             ).share(scope) // 使用.share()将其转换为共享流
         }
+    }
+
+    /**
+     * 取消当前正在进行的AI操作。
+     * 这会同时尝试取消计划执行（如果正在进行）和底层的AI流。
+     */
+    fun cancelCurrentOperation() {
+        Log.d(TAG, "请求取消当前AI操作...")
+
+        // 1. 取消计划模式（如果正在运行）
+        activePlanModeManager?.let {
+            Log.d(TAG, "正在取消计划模式执行...")
+            it.cancel()
+            activePlanModeManager = null // 取消后清除引用
+        }
+
+        // 2. 取消底层的 EnhancedAIService（处理普通流和工具调用）
+        activeEnhancedAiService?.let {
+            Log.d(TAG, "正在取消 EnhancedAIService 对话...")
+            it.cancelConversation()
+        }
+
+        Log.d(TAG, "AI操作取消请求已发送。")
     }
 
     /**
