@@ -133,7 +133,8 @@ class ChatHistoryDelegate(
                 val openingMessage = ChatMessage(
                     sender = "ai",
                     content = activeCard.openingStatement,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    roleName = activeCard.name // 使用角色卡的名称
                 )
                 // 将开场白添加到新聊天的消息列表中
                 val messagesWithOpening = listOf(openingMessage)

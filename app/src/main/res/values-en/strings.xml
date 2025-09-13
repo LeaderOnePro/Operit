@@ -242,7 +242,7 @@
     <string name="auto_read_message">Auto Read</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
-    <string name="select_copy">Select Copy</string>
+
     <string name="modify_memory">Modify Memory</string>
     <string name="delete_from_here">Delete From Here</string>
     <string name="load_more_history">Load more history messages...</string>
@@ -1312,7 +1312,7 @@
     <!-- Toast Messages -->
     <string name="confirmation_code_copied">Confirmation code copied!</string>
     <string name="message_copied">Message copied to clipboard</string>
-    <string name="selection_copied">Selection copied</string>
+
     <string name="requesting_root">Requesting Root permission...</string>
     <string name="root_granted">Root permission granted</string>
     <string name="root_denied">Root permission denied</string>

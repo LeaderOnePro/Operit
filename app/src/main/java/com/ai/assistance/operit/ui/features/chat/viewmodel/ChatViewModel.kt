@@ -76,6 +76,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _isAutoReadEnabled = MutableStateFlow(false)
     val isAutoReadEnabled: StateFlow<Boolean> = _isAutoReadEnabled.asStateFlow()
 
+    // 添加回复相关状态
+    private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
+    val replyToMessage: StateFlow<ChatMessage?> = _replyToMessage.asStateFlow()
+
     fun showInvitationPanel() {
         _generatedInvitationMessage.value = invitationManager.generateInvitationMessage()
         _showInvitationPanel.value = true
@@ -779,7 +783,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
                 maxTokens = maxTokens,
                 //如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
-                tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble()
+                tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble(),
+                replyToMessage = replyToMessage.value // 传递回复消息
         )
 
         // 在sendMessageInternal中，添加对nonFatalErrorEvent的收集
@@ -801,6 +806,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
         // 重置附件面板状态 - 在发送消息后关闭附件面板
         resetAttachmentPanelState()
+
+        // 清除回复状态
+        clearReplyToMessage()
     }
 
     fun cancelCurrentMessage() {
@@ -1459,6 +1467,31 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         if (!_isAutoReadEnabled.value) {
             _isAutoReadEnabled.value = true
             speakMessage(content)
+        }
+    }
+
+    /** 设置回复目标消息 */
+    fun setReplyToMessage(message: ChatMessage) {
+        _replyToMessage.value = message
+    }
+
+    /** 清除回复状态 */
+    fun clearReplyToMessage() {
+        _replyToMessage.value = null
+    }
+
+    /** 生成回复消息的摘要 */
+    private fun generateReplyPreview(message: ChatMessage): String {
+        val content = message.content
+        val cleanContent = content
+            .replace(Regex("<[^>]*>"), "") // 移除XML标签
+            .trim()
+        
+        // 限制长度为50个字符
+        return if (cleanContent.length > 50) {
+            cleanContent.take(50) + "..."
+        } else {
+            cleanContent
         }
     }
 }

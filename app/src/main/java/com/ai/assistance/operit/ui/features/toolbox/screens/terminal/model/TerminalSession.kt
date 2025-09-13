@@ -54,7 +54,7 @@ class TerminalSession(
 
     /** 当前用户 (如果使用su命令切换了用户) 此属性应当只影响当前会话，不影响其他会话 */
     var currentUser: String? = null
-        private set // 使属性只能从类内部修改
+        internal set // 使属性可以从包内部修改（用于同步远程状态）
 
     /** 工作目录 */
     var workingDirectory: String = initialDirectory ?: "/data/data/com.termux/files/home"

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,12 +40,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.animations.SimpleAnimatedVisibility
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.util.ChatUtils
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun ChatInputSection(
@@ -68,7 +72,9 @@ fun ChatInputSection(
     modifier: Modifier = Modifier,
     externalAttachmentPanelState: Boolean? = null,
     onAttachmentPanelStateChange: ((Boolean) -> Unit)? = null,
-    showInputProcessingStatus: Boolean = true
+    showInputProcessingStatus: Boolean = true,
+    replyToMessage: ChatMessage? = null, // 回复目标消息
+    onClearReply: (() -> Unit)? = null // 清除回复状态的回调
 ) {
     val showTokenLimitDialog = remember { mutableStateOf(false) }
 
@@ -162,6 +168,58 @@ fun ChatInputSection(
 
     Surface(color = surfaceColor) {
         Column {
+            // Reply preview section
+            replyToMessage?.let { message ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Reply,
+                            contentDescription = "回复",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        val previewText = message.content
+                            .replace(Regex("<[^>]*>"), "") // 移除XML标签
+                            .trim()
+                            .let { if (it.length > 50) it.take(50) + "..." else it }
+                        Text(
+                            text = "${stringResource(R.string.reply_message)}: $previewText",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        IconButton(
+                            onClick = { onClearReply?.invoke() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "取消回复",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Input processing indicator
             SimpleAnimatedVisibility(visible = showInputProcessingStatus && inputState !is InputProcessingState.Idle && inputState !is InputProcessingState.Completed) {
                 val (progressColor, message) = when (inputState) {

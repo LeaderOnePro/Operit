@@ -70,9 +70,22 @@ object AIMessageManager {
         attachments: List<AttachmentInfo>,
         enableMemoryAttachment: Boolean,
         enableWorkspaceAttachment: Boolean = false,
-        workspacePath: String? = null
+        workspacePath: String? = null,
+        replyToMessage: ChatMessage? = null // 新增回复消息参数
     ): String {
-        // 1. 根据开关决定是否查询知识库
+        // 1. 构建回复标签（如果有回复消息）
+        val replyTag = replyToMessage?.let { message ->
+            val cleanContent = message.content
+                .replace(Regex("<[^>]*>"), "") // 移除XML标签
+                .trim()
+                .let { if (it.length > 100) it.take(100) + "..." else it }
+            
+            val roleName = message.roleName ?: if (message.sender == "ai") "AI" else "用户"
+            val instruction = "用户正在回复你之前的这条消息："
+            "<reply_to sender=\"${roleName}\" timestamp=\"${message.timestamp}\">${instruction}\"${cleanContent}\"</reply_to>"
+        } ?: ""
+
+        // 2. 根据开关决定是否查询知识库
         val memoryTag = if (enableMemoryAttachment && messageText.isNotBlank() && !messageText.contains("<memory>", ignoreCase = true)) {
             val queryTool = AITool(
                 name = "query_knowledge_library",
@@ -89,7 +102,7 @@ object AIMessageManager {
             } else ""
         } else ""
 
-        // 2. 根据开关决定是否生成工作区附着
+        // 3. 根据开关决定是否生成工作区附着
         val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank()) {
             try {
                 val workspaceContent = WorkspaceAttachmentProcessor.generateWorkspaceAttachment(
@@ -103,7 +116,7 @@ object AIMessageManager {
             }
         } else ""
 
-        // 3. 构建附件标签
+        // 4. 构建附件标签
         val attachmentTags = if (attachments.isNotEmpty()) {
             attachments.joinToString(" ") { attachment ->
                 "<attachment " +
@@ -116,8 +129,8 @@ object AIMessageManager {
             }
         } else ""
 
-        // 4. 组合最终消息
-        return listOf(messageText, attachmentTags, memoryTag, workspaceTag)
+        // 5. 组合最终消息
+        return listOf(messageText, attachmentTags, memoryTag, workspaceTag, replyTag)
             .filter { it.isNotBlank() }
             .joinToString(" ")
     }
@@ -274,7 +287,8 @@ object AIMessageManager {
                 ChatMessage(
                     sender = "summary",
                     content = summary.trim(),
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    roleName = "system" // 总结消息的角色名
                 )
             }
         } catch (e: Exception) {

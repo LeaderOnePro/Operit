@@ -123,6 +123,30 @@ object WaifuMessageProcessor {
             .replace(Regex("<plan_item[^>]*/>"), "")
             // 移除emotion标签（因为已经在processEmotionTags中处理过了）
             .replace(Regex("<emotion[^>]*>.*?</emotion>", RegexOption.DOT_MATCHES_ALL), "")
+            
+            // --- 新增：移除Markdown相关标记 ---
+            // 1. 移除图片和链接，保留替代文本或链接文本
+            .replace(Regex("!?\\[(.*?)\\]\\(.*?\\)"), "$1")
+            // 2. 移除标题标记
+            .replace(Regex("^#+\\s*", RegexOption.MULTILINE), "")
+            // 3. 移除引用标记
+            .replace(Regex("^>\\s*", RegexOption.MULTILINE), "")
+            // 4. 移除列表标记
+            .replace(Regex("^[\\*\\-\\+]\\s+", RegexOption.MULTILINE), "")
+            .replace(Regex("^\\d+\\.\\s+", RegexOption.MULTILINE), "")
+            // 5. 移除代码块标记
+            .replace(Regex("```[a-zA-Z]*\\n?|\\n?```"), "")
+            // 6. 移除加粗、斜体、删除线 (注意顺序和互斥)
+            .replace(Regex("(\\*\\*\\*|___)(.+?)\\1"), "$2") // 加粗斜体
+            .replace(Regex("(\\*\\*|__(?!MD_ENTITY__))(.+?)\\1"), "$2") // 加粗 (避免匹配占位符)
+            .replace(Regex("(\\*|_)(.+?)\\1"), "$2")        // 斜体
+            .replace(Regex("~~(.+?)~~"), "$1")              // 删除线
+            // 7. 移除行内代码
+            .replace(Regex("`(.+?)`"), "$1")
+            // 8. 移除水平线
+            .replace(Regex("^[-_*]{3,}\\s*$", RegexOption.MULTILINE), "")
+            // --- Markdown移除结束 ---
+            
             // 移除其他常见的XML标签
             .replace(Regex("<[^>]*>"), "")
             // 清理多余的空白

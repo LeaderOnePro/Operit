@@ -170,6 +170,7 @@ fun ChatScreenContent(
                         onDeleteMessage = { index -> actualViewModel.deleteMessage(index) },
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
+                        onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
                         topPadding = headerHeight,
                         chatStyle = chatStyle // Pass chat style
                 )
@@ -219,6 +220,7 @@ fun ChatScreenContent(
                         onDeleteMessage = { index -> actualViewModel.deleteMessage(index) },
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
+                        onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
                         chatStyle = chatStyle // Pass chat style
                 )

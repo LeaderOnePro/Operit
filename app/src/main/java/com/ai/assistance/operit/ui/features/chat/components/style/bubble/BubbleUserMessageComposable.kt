@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.ScreenshotMonitor
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.Image
+import androidx.compose.ui.res.stringResource
+import com.ai.assistance.operit.R
 import coil.compose.rememberAsyncImagePainter
 import android.net.Uri
 import android.util.Log
@@ -83,12 +86,52 @@ fun BubbleUserMessageComposable(
     val parseResult = remember(message.content) { parseMessageContent(message.content) }
     val textContent = parseResult.processedText
     val trailingAttachments = parseResult.trailingAttachments
+    val replyInfo = parseResult.replyInfo
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
+        // Display reply info above attachments if present
+        replyInfo?.let { reply ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Surface(
+                    modifier = Modifier.padding(start = 64.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp, 8.dp, 2.dp, 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Reply,
+                            contentDescription = "回复",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Text(
+                            text = "${reply.sender}: ${reply.content}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
         // Display trailing attachments above the message bubble
         if (trailingAttachments.isNotEmpty()) {
             // Display attachment row above the bubble
@@ -273,7 +316,15 @@ fun BubbleUserMessageComposable(
 /** Result of parsing message content, containing processed text and trailing attachments */
 data class MessageParseResult(
     val processedText: String,
-    val trailingAttachments: List<AttachmentData>
+    val trailingAttachments: List<AttachmentData>,
+    val replyInfo: ReplyInfo? = null // 新增回复信息
+)
+
+/** Data class for reply information */
+data class ReplyInfo(
+    val sender: String,
+    val timestamp: Long,
+    val content: String
 )
 
 /**
@@ -284,6 +335,30 @@ private fun parseMessageContent(content: String): MessageParseResult {
     // First, strip out any <memory> tags so they are not displayed in the UI.
     var cleanedContent =
         content.replace(Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL), "").trim()
+
+    // Extract reply information
+    val replyRegex = Regex("<reply_to\\s+sender=\"([^\"]+)\"\\s+timestamp=\"([^\"]+)\">([^<]*)</reply_to>")
+    val replyMatch = replyRegex.find(cleanedContent)
+    val replyInfo = replyMatch?.let { match ->
+        val fullContent = match.groupValues[3]
+        // 指示语，用于从回复内容中提取纯净的预览文本
+        val instruction = "用户正在回复你之前的这条消息："
+        val displayContent = fullContent
+            .removePrefix(instruction)
+            .trim()
+            .removeSurrounding("\"")
+
+        ReplyInfo(
+            sender = match.groupValues[1],
+            timestamp = match.groupValues[2].toLongOrNull() ?: 0L,
+            content = displayContent
+        )
+    }
+    
+    // Remove reply tag from content
+    cleanedContent = replyMatch?.let { 
+        cleanedContent.replace(it.value, "").trim() 
+    } ?: cleanedContent
 
     val workspaceAttachments = mutableListOf<AttachmentData>()
     // Extract workspace context as a special attachment
@@ -310,7 +385,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
 
     // 先用简单的分割方式检测有没有附件标签
     if (!cleanedContent.contains("<attachment")) {
-        return MessageParseResult(cleanedContent, workspaceAttachments)
+        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
     }
 
     try {
@@ -323,7 +398,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
         // Get all matches
         val matches = attachmentPattern.findAll(cleanedContent).toList()
         if (matches.isEmpty()) {
-            return MessageParseResult(cleanedContent, workspaceAttachments)
+            return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
         }
 
         // Determine which attachments form a contiguous block at the end
@@ -405,11 +480,11 @@ private fun parseMessageContent(content: String): MessageParseResult {
         }
 
         trailingAttachments.addAll(0, workspaceAttachments)
-        return MessageParseResult(messageText.toString(), trailingAttachments)
+        return MessageParseResult(messageText.toString(), trailingAttachments, replyInfo)
     } catch (e: Exception) {
         // 如果解析失败，返回原始内容
         android.util.Log.e("BubbleUserMessageComposable", "解析消息内容失败", e)
-        return MessageParseResult(cleanedContent, workspaceAttachments)
+        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
     }
 }
 

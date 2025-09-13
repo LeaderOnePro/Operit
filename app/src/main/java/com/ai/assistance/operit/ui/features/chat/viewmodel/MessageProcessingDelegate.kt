@@ -14,6 +14,7 @@ import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,9 @@ class MessageProcessingDelegate(
     companion object {
         private const val TAG = "MessageProcessingDelegate"
     }
+
+    // 角色卡管理器
+    private val characterCardManager = CharacterCardManager.getInstance(context)
 
     private val _userMessage = MutableStateFlow("")
     val userMessage: StateFlow<String> = _userMessage.asStateFlow()
@@ -92,7 +96,8 @@ class MessageProcessingDelegate(
             enableMemoryAttachment: Boolean = true, // 新增参数
             enableWorkspaceAttachment: Boolean = false, // 新增工作区附着参数
             maxTokens: Int,
-            tokenUsageThreshold: Double
+            tokenUsageThreshold: Double,
+            replyToMessage: ChatMessage? = null // 新增回复消息参数
     ) {
         if (_userMessage.value.isBlank() && attachments.isEmpty()) return
         if (_isLoading.value) return
@@ -123,10 +128,15 @@ class MessageProcessingDelegate(
                 attachments,
                 enableMemoryAttachment,
                 enableWorkspaceAttachment,
-                workspacePath
+                workspacePath,
+                replyToMessage
             )
 
-            addMessageToChat(ChatMessage(sender = "user", content = finalMessageContent))
+            addMessageToChat(ChatMessage(
+                sender = "user", 
+                content = finalMessageContent,
+                roleName = "用户" // 用户消息的角色名固定为"用户"
+            ))
 
             lateinit var aiMessage: ChatMessage
             try {
@@ -184,10 +194,18 @@ class MessageProcessingDelegate(
                 // 更新当前响应流，使其可以被其他组件（如悬浮窗）访问
                 currentResponseStream = sharedCharStream
 
+                // 获取当前激活角色卡的名称
+                val currentRoleName = try {
+                    characterCardManager.activeCharacterCardFlow.first().name
+                } catch (e: Exception) {
+                    "Operit" // 默认角色名
+                }
+
                 aiMessage = ChatMessage(
                     sender = "ai", 
                     contentStream = sharedCharStream,
-                    timestamp = System.currentTimeMillis()+50
+                    timestamp = System.currentTimeMillis()+50,
+                    roleName = currentRoleName
                 )
                 Log.d(
                     TAG,
@@ -251,6 +269,13 @@ class MessageProcessingDelegate(
                             val charDelay = apiPreferences.waifuCharDelayFlow.first().toLong()
                             val removePunctuation = apiPreferences.waifuRemovePunctuationFlow.first()
                             
+                            // 获取当前角色名
+                            val currentRoleName = try {
+                                characterCardManager.activeCharacterCardFlow.first().name
+                            } catch (e: Exception) {
+                                "Operit" // 默认角色名
+                            }
+                            
                             // 删除原始的空消息（因为在waifu模式下我们没有显示流式过程）
                             // 不需要显示空的AI消息
                             
@@ -281,7 +306,8 @@ class MessageProcessingDelegate(
                                         sender = "ai",
                                         content = sentence,
                                         contentStream = null,
-                                        timestamp = System.currentTimeMillis() + index * 10 // 确保时间戳不同
+                                        timestamp = System.currentTimeMillis() + index * 10, // 确保时间戳不同
+                                        roleName = currentRoleName // 使用已获取的角色名
                                     )
                                     
                                     withContext(Dispatchers.Main) {

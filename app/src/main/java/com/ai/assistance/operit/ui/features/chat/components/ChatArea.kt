@@ -57,15 +57,12 @@ import com.ai.assistance.operit.data.model.ChatMessage
 
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.ContentCut
+
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.OutlinedTextField
+
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
@@ -110,6 +107,7 @@ fun ChatArea(
     onDeleteMessagesFrom: ((Int) -> Unit)? = null,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调参数
     onAutoReadMessage: ((String) -> Unit)? = null, // 添加自动朗读回调参数
+    onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调参数
     messagesPerPage: Int = 10, // 每页显示的消息数量
     topPadding: Dp = 0.dp,
     chatStyle: ChatStyle = ChatStyle.CURSOR // 新增参数，默认为CURSOR风格
@@ -187,6 +185,7 @@ fun ChatArea(
                         onDeleteMessagesFrom = onDeleteMessagesFrom,
                         onSpeakMessage = onSpeakMessage, // 传递朗读回调
                         onAutoReadMessage = onAutoReadMessage, // 传递自动朗读回调
+                        onReplyToMessage = onReplyToMessage, // 传递回复回调
                         chatStyle = chatStyle, // 传递风格
                         isHidden = shouldHide // 新增参数控制隐藏
                     )
@@ -249,12 +248,13 @@ private fun MessageItem(
     onDeleteMessagesFrom: ((Int) -> Unit)?,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
     onAutoReadMessage: ((String) -> Unit)? = null, // 添加自动朗读回调
+    onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调
     chatStyle: ChatStyle, // 新增参数
     isHidden: Boolean = false // 新增参数控制隐藏
 ) {
     val context = LocalContext.current
     var showContextMenu by remember { mutableStateOf(false) }
-    var showSelectableCopyDialog by remember { mutableStateOf(false) }
+
 
     // 只有用户和AI的消息才能被操作
     val isActionable = message.sender == "user" || message.sender == "ai"
@@ -343,29 +343,7 @@ private fun MessageItem(
                 modifier = Modifier.height(36.dp)
             )
 
-            // 框选复制选项
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(id = R.string.select_copy),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
-                    )
-                },
-                onClick = {
-                    showSelectableCopyDialog = true
-                    showContextMenu = false
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.ContentCut,
-                        contentDescription = stringResource(id = R.string.select_copy),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                },
-                modifier = Modifier.height(36.dp)
-            )
+
 
             // 朗读消息选项
             DropdownMenuItem(
@@ -513,63 +491,39 @@ private fun MessageItem(
                 },
                 modifier = Modifier.height(36.dp)
             )
-        }
 
-        if (showSelectableCopyDialog) {
-            SelectableCopyDialog(
-                text = cleanXmlTags(message.content),
-                onDismiss = { showSelectableCopyDialog = false }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SelectableCopyDialog(text: String, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    var textFieldValue by remember { mutableStateOf(TextFieldValue(text)) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(id = R.string.select_copy)) },
+            // 回复选项
+            if (message.sender == "ai") {
+                DropdownMenuItem(
         text = {
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { textFieldValue = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 300.dp),
-                readOnly = true
+                        Text(
+                            stringResource(R.string.reply_message),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 13.sp
             )
         },
-        confirmButton = {
-            TextButton(
                 onClick = {
-                    val selectedText = textFieldValue.text.substring(
-                        textFieldValue.selection.start,
-                        textFieldValue.selection.end
-                    )
-                    if (selectedText.isNotEmpty()) {
-                        val clipboardManager =
-                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clipData = ClipData.newPlainText("selected text", selectedText)
-                        clipboardManager.setPrimaryClip(clipData)
-                        Toast.makeText(context, context.getString(R.string.selection_copied), Toast.LENGTH_SHORT).show()
-                    }
-                    onDismiss()
-                },
-                enabled = !textFieldValue.selection.collapsed
-            ) {
-                Text(stringResource(id = R.string.copy))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.cancel))
+                        onReplyToMessage?.invoke(message)
+                        showContextMenu = false
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Reply,
+                            contentDescription = stringResource(R.string.reply_message),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    modifier = Modifier.height(36.dp)
+                )
             }
         }
-    )
+
+
 }
+}
+
+
 
 @Composable
 private fun LoadingDotsIndicator(textColor: Color) {

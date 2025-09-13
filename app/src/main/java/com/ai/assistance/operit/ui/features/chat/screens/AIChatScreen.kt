@@ -209,6 +209,9 @@ fun AIChatScreen(
     // 添加WebView刷新相关状态
     val webViewRefreshCounter by actualViewModel.webViewRefreshCounter.collectAsState()
 
+    // Collect reply state
+    val replyToMessage by actualViewModel.replyToMessage.collectAsState()
+
     // Floating window mode state
     val isFloatingMode by actualViewModel.isFloatingMode.collectAsState()
     val canDrawOverlays = remember { mutableStateOf(Settings.canDrawOverlays(context)) }
@@ -501,7 +504,9 @@ fun AIChatScreen(
                                 onAttachmentPanelStateChange = { newState ->
                                     actualViewModel.updateAttachmentPanelState(newState)
                                 },
-                                showInputProcessingStatus = showInputProcessingStatus
+                                showInputProcessingStatus = showInputProcessingStatus,
+                                replyToMessage = replyToMessage,
+                                onClearReply = { actualViewModel.clearReplyToMessage() }
                         )
                     }
                 }

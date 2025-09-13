@@ -944,9 +944,10 @@
     <string name="copy_message">复制消息</string>
     <string name="read_message">朗读消息</string>
     <string name="auto_read_message">自动朗读</string>
+    <string name="reply_message">回复</string>
     <string name="stop_reading">停止朗读</string>
     <string name="edit_and_resend">编辑并重发</string>
-    <string name="select_copy">框选复制</string>
+
     <string name="modify_memory">修改记忆</string>
     <string name="delete_from_here">删除到此</string>
     <string name="load_more_history">加载更多历史消息...</string>
@@ -1329,7 +1330,7 @@
     <!-- Toast 消息 -->
     <string name="confirmation_code_copied">返回码已复制！</string>
     <string name="message_copied">消息已复制到剪贴板</string>
-    <string name="selection_copied">已复制选中内容</string>
+
     <string name="requesting_root">正在请求Root权限...</string>
     <string name="root_granted">Root权限已授予</string>
     <string name="root_denied">Root权限请求被拒绝</string>
