@@ -793,12 +793,6 @@ class PluginLoadingState {
             ) {
                 // 根据初始化状态显示不同的消息
                 when (status) {
-                    MCPStarter.PluginInitStatus.TERMUX_NOT_RUNNING -> {
-                        updateMessage(context.getString(R.string.plugin_termux_not_running))
-                    }
-                    MCPStarter.PluginInitStatus.TERMUX_NOT_AUTHORIZED -> {
-                        updateMessage(context.getString(R.string.plugin_termux_not_authorized))
-                    }
                     MCPStarter.PluginInitStatus.NODEJS_MISSING -> {
                         updateMessage(context.getString(R.string.plugin_nodejs_missing))
                     }

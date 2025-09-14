@@ -242,6 +242,8 @@
     <string name="auto_read_message">Auto Read</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
+    <string name="reply_message">Reply</string>
+    <string name="select_copy">Select &amp; Copy</string>
 
     <string name="modify_memory">Modify Memory</string>
     <string name="delete_from_here">Delete From Here</string>
@@ -768,7 +770,7 @@
     <string name="overlay_permission">Overlay Permission</string>
     <string name="battery_optimization">Battery Optimization Exemption</string>
     <string name="location_permission">Location Permission</string>
-    <string name="termux_terminal">Termux Terminal</string>
+    <string name="operit_terminal">Operit Terminal</string>
     
     <!-- Permission Level Descriptions -->
     <string name="permission_level_standard">Standard Permission</string>
@@ -918,6 +920,7 @@
     <string name="ok">OK</string>
     <string name="select_download_source">Select Download Source</string>
     <string name="select_download_source_desc">Please select a download source suitable for your network:</string>
+    <string name="mirror_download">%1$s Mirror Download</string>
     <string name="china_mirror">China Accelerated Mirror</string>
     <string name="china_mirror_desc">Accelerated via ghfast.top, recommended for users in China</string>
     <string name="github_source">GitHub Original Link</string>
@@ -2482,5 +2485,26 @@
     <string name="delete_character_card_confirm">Are you sure you want to delete character card "%1$s"? This action cannot be undone.</string>
     <string name="delete_tag">Delete Tag</string>
     <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
+
+    <!-- OperitTerminal Wizard Card -->
+    <string name="operit_terminal_wizard_title">OperitTerminal Setup Wizard</string>
+    <string name="operit_terminal_not_installed">OperitTerminal not installed</string>
+    <string name="operit_terminal_update_available">OperitTerminal update available</string>
+    <string name="operit_terminal_up_to_date">OperitTerminal is up to date</string>
+    <string name="operit_terminal_install_description">OperitTerminal is a powerful terminal application that provides a complete Linux environment and package management capabilities. We need to install this application first.</string>
+    <string name="operit_terminal_install_button">Install OperitTerminal</string>
+    <string name="operit_terminal_update_description">A new version of OperitTerminal is available. It is recommended to update for better features and compatibility.</string>
+    <string name="operit_terminal_release_notes">Release Notes: %1$s</string>
+    <string name="operit_terminal_update_button">Update OperitTerminal</string>
+    <string name="operit_terminal_latest_description">Congratulations! You have installed the latest version of OperitTerminal and can start using its powerful terminal features.</string>
+    <string name="operit_terminal_open_button">Open OperitTerminal</string>
+
+    <!-- Function Types -->
+    <string name="function_type_translation">Translation Function</string>
+
+    <!-- Function Descriptions -->
+    <string name="function_desc_translation">Provides multi-language translation functionality, supporting language conversion of text content. It is recommended to use models that support multiple languages.</string>
+    <!-- Model Configuration -->
+    <string name="overseas_provider_warning">Detected that you are in mainland China but selected an overseas service provider. Please confirm whether you have enabled proxy tools</string>
 
 </resources> 

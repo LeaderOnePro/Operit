@@ -33,10 +33,6 @@ This folder contains bundled applications that can be installed directly from th
    * Version: See shizuku_version.txt
    * Used for advanced system operations
 
-2. **termux.apk** - Termux terminal emulator 
-   * Provides a Linux command-line environment
-   * Used by the Terminal feature in the app
-
 ## Assets Folders
 
 - **js/** - JavaScript files and shell scripts for various features

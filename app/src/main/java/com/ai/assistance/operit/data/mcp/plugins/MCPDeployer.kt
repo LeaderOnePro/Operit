@@ -3,10 +3,10 @@ package com.ai.assistance.operit.data.mcp.plugins
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.model.TerminalSessionManager
+import com.ai.assistance.operit.terminal.TerminalManager
 import com.google.gson.JsonParser
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -118,88 +118,53 @@ class MCPDeployer(private val context: Context) {
             serverName: String?
     ): Boolean = withContext(Dispatchers.IO) {
         try {
+            // 获取终端管理器
+            val terminalManager = TerminalManager.getInstance(context)
+            
+            // 确保已连接到终端服务
+            if (!terminalManager.isConnected()) {
+                val connected = terminalManager.initialize()
+                if (!connected) {
+                    statusCallback(DeploymentStatus.Error("无法连接到终端服务"))
+                    return@withContext false
+                }
+            }
+            
             // 获取终端会话
-            val session = TerminalSessionManager.createSession("MCP-Deploy-$pluginId")
-
-            // 执行命令
-            val successFlag = AtomicBoolean(true)
-
-            // 定义Termux数据目录路径
-            val termuxPluginDir =
-                    "/data/data/com.termux/files/home/mcp_plugins/${pluginId.split("/").last()}"
-
-            // 首先创建Termux目标目录
-            statusCallback(DeploymentStatus.InProgress("创建Termux目录: $termuxPluginDir"))
-
-            TerminalSessionManager.executeSessionCommand(
-                    context = context,
-                    session = session,
-                    command = "mkdir -p $termuxPluginDir",
-                    onOutput = { output -> Log.d(TAG, "创建目录输出: $output") },
-                    onInteractivePrompt = { prompt, executionId ->
-                        Log.w(TAG, "创建目录出现交互提示: $prompt ($executionId)")
-                        null
-                    },
-                    onComplete = { exitCode, success ->
-                        if (!success) {
-                            Log.e(TAG, "创建Termux目录失败，退出码: $exitCode")
-                            successFlag.set(false)
-                        }
-                    }
-            )
-
-            if (!successFlag.get()) {
-                statusCallback(DeploymentStatus.Error("创建Termux目录失败"))
+            val sessionId = terminalManager.createSession()
+            if (sessionId == null) {
+                statusCallback(DeploymentStatus.Error("无法创建终端会话"))
                 return@withContext false
             }
 
-            // 复制插件文件到Termux目录
-            statusCallback(DeploymentStatus.InProgress("复制插件文件到Termux目录..."))
+            // 定义插件在应用内部的存储路径
+            val pluginHomeDir = "${context.filesDir.path}/mcp_plugins"
+            val pluginDir = "$pluginHomeDir/${pluginId.split("/").last()}"
 
-            TerminalSessionManager.executeSessionCommand(
-                    context = context,
-                    session = session,
-                    command = "cp -r $pluginPath/* $termuxPluginDir/",
-                    onOutput = { output -> Log.d(TAG, "复制文件输出: $output") },
-                    onInteractivePrompt = { prompt, executionId ->
-                        Log.w(TAG, "复制文件出现交互提示: $prompt ($executionId)")
-                        null
-                    },
-                    onComplete = { exitCode, success ->
-                        if (!success) {
-                            Log.e(TAG, "复制文件到Termux目录失败，退出码: $exitCode")
-                            successFlag.set(false)
-                        }
-                    }
-            )
+            // 首先创建插件目录
+            statusCallback(DeploymentStatus.InProgress("创建插件目录: $pluginDir"))
 
-            if (!successFlag.get()) {
-                statusCallback(DeploymentStatus.Error("复制文件到Termux目录失败"))
+            val mkdirExecuted = terminalManager.executeCommand(sessionId, "mkdir -p $pluginDir")
+            if (mkdirExecuted == null) {
+                statusCallback(DeploymentStatus.Error("创建插件目录失败"))
                 return@withContext false
             }
 
-            // 切换到Termux插件目录
-            statusCallback(DeploymentStatus.InProgress("切换到Termux插件目录"))
+            // 复制插件文件到目标目录
+            statusCallback(DeploymentStatus.InProgress("复制插件文件到目标目录..."))
 
-            TerminalSessionManager.executeSessionCommand(
-                    context = context,
-                    session = session,
-                    command = "cd $termuxPluginDir",
-                    onOutput = { output -> Log.d(TAG, "目录切换输出: $output") },
-                    onInteractivePrompt = { prompt, executionId ->
-                        Log.w(TAG, "目录切换出现交互提示: $prompt ($executionId)")
-                        null
-                    },
-                    onComplete = { exitCode, success ->
-                        if (!success) {
-                            Log.e(TAG, "切换目录失败，退出码: $exitCode")
-                            successFlag.set(false)
-                        }
-                    }
-            )
+            val copyExecuted = terminalManager.executeCommand(sessionId, "cp -r $pluginPath/* $pluginDir/")
+            if (copyExecuted == null) {
+                statusCallback(DeploymentStatus.Error("复制文件到目标目录失败"))
+                return@withContext false
+            }
 
-            if (!successFlag.get()) {
-                statusCallback(DeploymentStatus.Error("切换到Termux插件目录失败"))
+            // 切换到插件目录
+            statusCallback(DeploymentStatus.InProgress("切换到插件目录"))
+
+            val cdExecuted = terminalManager.executeCommand(sessionId, "cd $pluginDir")
+            if (cdExecuted == null) {
+                statusCallback(DeploymentStatus.Error("切换到插件目录失败"))
                 return@withContext false
             }
 
@@ -234,34 +199,10 @@ class MCPDeployer(private val context: Context) {
                 )
                 Log.d(TAG, "执行命令 (${index + 1}/${deployCommands.size}): $cleanCommand")
 
-                val commandSuccess = AtomicBoolean(true)
-
-                TerminalSessionManager.executeSessionCommand(
-                        context = context,
-                        session = session,
-                        command = cleanCommand,
-                        onOutput = { output ->
-                            val trimmedOutput = output.trim()
-                            if (trimmedOutput.isNotEmpty()) {
-                                Log.d(TAG, "命令输出: $trimmedOutput")
-                                statusCallback(
-                                        DeploymentStatus.InProgress("输出: $trimmedOutput")
-                                )
-                            }
-                        },
-                        onInteractivePrompt = { prompt, executionId ->
-                            Log.d(TAG, "收到交互式提示: $prompt (执行ID: $executionId)")
-                            statusCallback(DeploymentStatus.InProgress("需要交互: $prompt"))
-                            null
-                        },
-                        onComplete = { exitCode, success ->
-                            Log.d(TAG, "命令'$cleanCommand'执行完成: 退出码=$exitCode, 成功=$success")
-                            commandSuccess.set(success)
-                        }
-                )
+                val commandExecuted = terminalManager.executeCommand(sessionId, cleanCommand)
 
                 // 如果命令失败
-                if (!commandSuccess.get()) {
+                if (commandExecuted == null) {
                     if (isNonCriticalCommand) {
                         // 对于非关键命令，即使失败也继续
                         Log.w(TAG, "非关键命令执行失败，但将继续部署: $cleanCommand")
@@ -282,7 +223,7 @@ class MCPDeployer(private val context: Context) {
             // 构建部署成功消息
             val successMessage = StringBuilder()
             successMessage.append("插件部署成功: $pluginId\n")
-            successMessage.append("Termux部署路径: $termuxPluginDir\n")
+            successMessage.append("部署路径: $pluginDir\n")
 
             // 如果有MCP配置，添加服务器名称
             val finalServerName = serverName ?: pluginId.split("/").last().lowercase()

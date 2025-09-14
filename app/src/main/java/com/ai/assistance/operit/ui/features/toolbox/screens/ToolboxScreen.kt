@@ -40,7 +40,7 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.filemanager.FileMana
 import com.ai.assistance.operit.ui.features.toolbox.screens.logcat.LogcatScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.shellexecutor.ShellExecutorScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.screens.TerminalScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminalconfig.TerminalAutoConfigScreen
+// import com.ai.assistance.operit.ui.features.toolbox.screens.terminalconfig.TerminalAutoConfigScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.uidebugger.UIDebuggerScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -486,7 +486,12 @@ fun TerminalToolScreen(navController: NavController) {
 fun TerminalAutoConfigToolScreen(navController: NavController) {
         CustomScaffold() { paddingValues ->
                 Box(modifier = Modifier.padding(paddingValues)) {
-                        TerminalAutoConfigScreen(navController = navController)
+                        // TODO: 需要重构以适配新的终端架构
+                        // TerminalAutoConfigScreen(navController = navController)
+                        Text(
+                            text = "终端自动配置功能正在重构中...",
+                            modifier = Modifier.padding(16.dp)
+                        )
                 }
         }
 }

@@ -1,16 +1,12 @@
 package com.ai.assistance.operit.data.mcp.plugins
 
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import android.os.Environment
 import android.util.Log
 import com.ai.assistance.operit.core.tools.mcp.MCPManager
 import com.ai.assistance.operit.core.tools.mcp.MCPServerConfig
-import com.ai.assistance.operit.core.tools.system.termux.TermuxAuthorizer
-import com.ai.assistance.operit.core.tools.system.termux.TermuxUtils
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import com.ai.assistance.operit.data.mcp.MCPRepository
+import com.ai.assistance.operit.terminal.TerminalManager
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
@@ -38,12 +34,12 @@ class MCPStarter(private val context: Context) {
 
     // Coroutine scope for async operations
     private val starterScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val terminalManager = TerminalManager.getInstance(context)
 
     /** Plugin initialization status enum */
     enum class PluginInitStatus {
         SUCCESS,
-        TERMUX_NOT_RUNNING,
-        TERMUX_NOT_AUTHORIZED,
+        TERMINAL_SERVICE_UNAVAILABLE,
         NODEJS_MISSING,
         BRIDGE_FAILED,
         OTHER_ERROR
@@ -59,27 +55,34 @@ class MCPStarter(private val context: Context) {
 
     /** Check if Node.js is installed in Termux */
     private suspend fun isNodeJsInstalled(): Boolean {
-        // If Termux is not running, Node.js can't be accessed
-        if (!TermuxUtils.isTermuxRunning(context)) {
+        if (!terminalManager.isConnected()) {
+            if (!terminalManager.initialize()) {
+                Log.e(TAG, "Failed to initialize TerminalManager")
+                return false
+            }
+        }
+
+        // Try to find an existing session, or create a new one
+        val sessionId = terminalManager.createSession()
+
+        if (sessionId == null) {
+            Log.e(TAG, "Failed to create terminal session")
             return false
         }
 
         try {
-            // Use TermuxCommandExecutor to run command directly in Termux
-            val result = com.ai.assistance.operit.core.tools.system.TermuxCommandExecutor.executeCommand(
-                context = context,
-                command = "command -v node"
-            )
-            return result.success && result.stdout.contains("node")
+            val result = terminalManager.executeCommand(sessionId, "command -v node")
+            return result != null && result.contains("node")
         } catch (e: Exception) {
             Log.e(TAG, "Error checking Node.js installation: ${e.message}")
             return false
         }
     }
 
-    /** Check if Termux is authorized */
-    private suspend fun isTermuxAuthorized(): Boolean {
-        return TermuxAuthorizer.isTermuxAuthorized(context)
+    /** Check if terminal service is connected and initialized */
+    private suspend fun isTerminalServiceConnected(): Boolean {
+        if (terminalManager.isConnected()) return true
+        return terminalManager.initialize()
     }
 
     /** Initialize and start the bridge */
@@ -89,15 +92,9 @@ class MCPStarter(private val context: Context) {
             if (pingResult != null) return true
         }
 
-        // Check if Termux is running
-        if (!TermuxUtils.isTermuxRunning(context)) {
-            Log.e(TAG, "Termux is not running. Please start Termux first.")
-            return false
-        }
-
-        // Check if Termux is authorized
-        if (!isTermuxAuthorized()) {
-            Log.e(TAG, "Termux is not authorized. Please authorize Termux first.")
+        // Check if terminal service is available
+        if (!isTerminalServiceConnected()) {
+            Log.e(TAG, "Terminal service is not connected. Please start it first.")
             return false
         }
 
@@ -247,11 +244,8 @@ class MCPStarter(private val context: Context) {
             if (!initBridge()) {
                 // Check specifically if Termux is not running, not authorized, or Node.js is missing
                 when {
-                    !TermuxUtils.isTermuxRunning(context) -> {
-                        statusCallback(StartStatus.TermuxNotRunning())
-                    }
-                    !isTermuxAuthorized() -> {
-                        statusCallback(StartStatus.TermuxNotAuthorized())
+                    !isTerminalServiceConnected() -> {
+                        statusCallback(StartStatus.TerminalServiceUnavailable())
                     }
                     !isNodeJsInstalled() -> {
                         statusCallback(StartStatus.NodeJsMissing())
@@ -322,17 +316,10 @@ class MCPStarter(private val context: Context) {
     ) {
         starterScope.launch {
             try {
-                // Check if Termux is running first
-                if (!TermuxUtils.isTermuxRunning(context)) {
-                    Log.e(TAG, "Termux is not running. Please start Termux first.")
-                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.TERMUX_NOT_RUNNING)
-                    return@launch
-                }
-
-                // Check if Termux is authorized
-                if (!isTermuxAuthorized()) {
-                    Log.e(TAG, "Termux is not authorized. Please authorize Termux first.")
-                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.TERMUX_NOT_AUTHORIZED)
+                // Check if terminal service is available
+                if (!isTerminalServiceConnected()) {
+                    Log.e(TAG, "Terminal service is not connected. Please start it first.")
+                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.TERMINAL_SERVICE_UNAVAILABLE)
                     return@launch
                 }
 
@@ -581,11 +568,8 @@ class MCPStarter(private val context: Context) {
         data class InProgress(val message: String) : StartStatus()
         data class Success(val message: String) : StartStatus()
         data class Error(val message: String) : StartStatus()
-        data class TermuxNotRunning(
-                val message: String = "Termux未运行，请先启动Termux"
-        ) : StartStatus()
-        data class TermuxNotAuthorized(
-                val message: String = "Termux未授权，请先授权Termux"
+        data class TerminalServiceUnavailable(
+                val message: String = "终端服务不可用，请先启动它"
         ) : StartStatus()
         data class NodeJsMissing(
                 val message: String = "Termux中未安装Node.js，请先安装"

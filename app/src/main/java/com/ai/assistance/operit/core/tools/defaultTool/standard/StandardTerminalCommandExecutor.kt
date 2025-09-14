@@ -5,10 +5,11 @@ import android.util.Log
 import com.ai.assistance.operit.core.tools.*
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.model.TerminalSessionManager
+import com.ai.assistance.operit.terminal.TerminalManager
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
 
 /** 终端命令执行工具 - 非流式输出版本 执行终端命令并一次性收集全部输出后返回 */
 class StandardTerminalCommandExecutor(private val context: Context) {
@@ -29,22 +30,35 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                 val withSessionId =
                         tool.parameters.find { param -> param.name == "session_id" }?.value
 
-                // 获取会话
-                val session =
-                        if (!withSessionId.isNullOrEmpty()) {
-                            TerminalSessionManager.sessions.find {
-                                    s:
-                                            com.ai.assistance.operit.ui.features.toolbox.screens.terminal.model.TerminalSession
-                                ->
-                                s.id == withSessionId
-                            }
+                // 获取终端管理器
+                Log.d(TAG, "Getting TerminalManager instance")
+                val terminalManager = TerminalManager.getInstance(context)
+                
+                // 确保已连接到终端服务
+                Log.d(TAG, "Checking if terminal service is connected")
+                if (!terminalManager.isConnected()) {
+                    Log.d(TAG, "Terminal service not connected, initializing...")
+                    val connected = terminalManager.initialize()
+                    if (!connected) {
+                        Log.e(TAG, "Failed to connect to terminal service")
+                        return@runBlocking ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "无法连接到终端服务"
+                        )
+                    }
+                }
+
+                // 获取或创建会话
+                val sessionId = if (!withSessionId.isNullOrEmpty()) {
+                    withSessionId
                         } else {
-                            // 如果没有指定会话ID，使用当前活动会话，或者创建一个新会话
-                            TerminalSessionManager.getActiveSession()
-                                    ?: TerminalSessionManager.createSession("命令执行会话")
+                    // 创建新会话
+                    terminalManager.createSession()
                         }
 
-                if (session == null) {
+                if (sessionId == null) {
                     return@runBlocking ToolResult(
                             toolName = tool.name,
                             success = false,
@@ -53,64 +67,55 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                     )
                 }
 
-                // 收集输出
-                val outputBuffer = StringBuilder()
-                var exitCode = -1
-                var success = false
-
-                val result =
-                        withTimeoutOrNull(timeout) {
-                            suspendCoroutine { continuation ->
-                                // 创建完成时的处理程序
-                                val onComplete: (Int, Boolean) -> Unit = { code, isSuccess ->
-                                    exitCode = code
-                                    success = isSuccess
-                                    continuation.resume(Unit)
+                // 执行命令并收集Flow输出
+                val outputFlow = terminalManager.executeCommandFlow(sessionId, command)
+                
+                if (outputFlow != null) {
+                    // 收集所有输出事件
+                    val events = mutableListOf<String>()
+                    var exitCode = 0
+                    var hasCompleted = false
+                    
+                    // 使用withTimeout防止无限等待
+                    try {
+                        withTimeout(timeout) {
+                            outputFlow.collect { event ->
+                                if (event.outputChunk.isNotEmpty()) {
+                                    events.add(event.outputChunk)
                                 }
-
-                                // 使用会话管理器执行命令
-                                GlobalScope.launch {
-                                    TerminalSessionManager.executeSessionCommand(
-                                            context = context,
-                                            session = session,
-                                            command = command,
-                                            onOutput = { outputBuffer.appendLine(it) },
-                                            onInteractivePrompt = { prompt, _ ->
-                                                outputBuffer.appendLine("[交互式提示] $prompt (自动跳过)")
-                                            },
-                                            onComplete = onComplete
-                                    )
+                                if (event.isCompleted) {
+                                    exitCode = 0
+                                    hasCompleted = true
                                 }
                             }
-                            Unit
                         }
-
-                if (result == null) {
-                    // 超时
-                    ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result =
-                                    TerminalCommandResultData(
-                                            command = command,
-                                            output = outputBuffer.toString() + "\n[命令执行超时]",
-                                            exitCode = -1,
-                                            sessionId = session.id
-                                    ),
-                            error = "命令执行超时"
-                    )
-                } else {
+                    } catch (e: TimeoutCancellationException) {
+                        Log.w(TAG, "Command execution timed out after ${timeout}ms")
+                        hasCompleted = true
+                        exitCode = -1
+                    }
+                    
+                    val fullOutput = events.joinToString("")
+                    Log.d(TAG, "Command output collected: '$fullOutput', exitCode: $exitCode")
+                    
                     // 成功执行
                     ToolResult(
                             toolName = tool.name,
-                            success = success,
-                            result =
-                                    TerminalCommandResultData(
-                                            command = command,
-                                            output = outputBuffer.toString(),
-                                            exitCode = exitCode,
-                                            sessionId = session.id
-                                    )
+                            success = hasCompleted && exitCode == 0,
+                            result = TerminalCommandResultData(
+                                    command = command,
+                                    output = fullOutput,
+                                    exitCode = exitCode,
+                                    sessionId = sessionId
+                            )
+                    )
+                } else {
+                    // 命令执行失败
+                    ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "终端命令执行失败或超时"
                     )
                 }
             } catch (e: Exception) {

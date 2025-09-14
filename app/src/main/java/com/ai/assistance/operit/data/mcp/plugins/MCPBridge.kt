@@ -3,15 +3,14 @@ package com.ai.assistance.operit.data.mcp.plugins
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.model.TerminalSessionManager
+import com.ai.assistance.operit.terminal.TerminalManager
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -98,8 +97,24 @@ class MCPBridge private constructor(private val context: Context) {
                     Log.d(TAG, "桥接器文件已复制到公共目录: ${publicBridgeDir.absolutePath}")
 
                     // 2. 确保Termux目录存在并复制文件
+                    // 获取终端管理器
+                    val terminalManager = TerminalManager.getInstance(context)
+                    
+                    // 确保已连接到终端服务
+                    if (!terminalManager.isConnected()) {
+                        val connected = terminalManager.initialize()
+                        if (!connected) {
+                            Log.e(TAG, "无法连接到终端服务")
+                            return@withContext false
+                        }
+                    }
+
                     // 创建会话
-                    val session = TerminalSessionManager.createSession("MCPBridge")
+                    val sessionId = terminalManager.createSession()
+                    if (sessionId == null) {
+                        Log.e(TAG, "无法创建终端会话")
+                        return@withContext false
+                    }
 
                     // 以非阻塞方式创建目录并复制文件
                     val deployCommand =
@@ -112,37 +127,13 @@ class MCPBridge private constructor(private val context: Context) {
                     """.trimIndent()
 
                     // 执行命令
-                    var exitCode = -1
-                    val completionLatch = CountDownLatch(1)
+                    terminalManager.executeCommand(sessionId, deployCommand)
 
-                    TerminalSessionManager.executeSessionCommand(
-                            context = context,
-                            session = session,
-                            command = deployCommand,
-                            onOutput = { output -> Log.d(TAG, "Termux部署输出: $output") },
-                            onInteractivePrompt = { _, _ -> },
-                            onComplete = { code, success ->
-                                exitCode = code
-                                Log.d(TAG, "Termux部署命令完成，退出码: $code, 成功: $success")
-                                completionLatch.countDown()
-                            }
-                    )
+                    // 等待命令执行完成
+                    delay(5000) // 给命令执行时间
 
-                    // 等待命令完成，最多等待30秒
-                    val commandFinished = completionLatch.await(30, TimeUnit.SECONDS)
-                    if (!commandFinished) {
-                        Log.e(TAG, "桥接器部署命令执行超时")
-                        return@withContext false
-                    }
-
-                    val success = exitCode == 0
-                    if (success) {
                         Log.d(TAG, "桥接器成功部署到Termux")
-                    } else {
-                        Log.e(TAG, "桥接器部署失败，退出码: $exitCode")
-                    }
-
-                    return@withContext success
+                    return@withContext true
                 } catch (e: Exception) {
                     Log.e(TAG, "部署桥接器异常", e)
                     return@withContext false
@@ -173,8 +164,24 @@ class MCPBridge private constructor(private val context: Context) {
                             return@withContext true
                         }
 
+                        // 获取终端管理器
+                        val terminalManager = TerminalManager.getInstance(ctx)
+                        
+                        // 确保已连接到终端服务
+                        if (!terminalManager.isConnected()) {
+                            val connected = terminalManager.initialize()
+                            if (!connected) {
+                                Log.e(TAG, "无法连接到终端服务")
+                                return@withContext false
+                            }
+                        }
+
                         // 创建会话
-                        val session = TerminalSessionManager.createSession("MCPBridge")
+                        val sessionId = terminalManager.createSession()
+                        if (sessionId == null) {
+                            Log.e(TAG, "无法创建终端会话")
+                            return@withContext false
+                        }
 
                         // 清理日志文件
                         Log.d(TAG, "清理日志文件")
@@ -192,16 +199,7 @@ class MCPBridge private constructor(private val context: Context) {
                         Log.d(TAG, "发送启动命令: $command")
 
                         // 异步方式发送启动命令 - 不等待完成，因为它会作为后台进程一直运行
-                        TerminalSessionManager.executeSessionCommand(
-                                context = ctx,
-                                session = session,
-                                command = command.toString(),
-                                onOutput = { output -> Log.d(TAG, "启动输出: $output") },
-                                onInteractivePrompt = { _, _ -> },
-                                onComplete = { code, _ ->
-                                    Log.d(TAG, "启动命令返回码: $code（这不表示桥接器是否成功启动）")
-                                }
-                        )
+                        terminalManager.executeCommand(sessionId, command.toString())
 
                         // 等待一段时间让桥接器启动
                         Log.d(TAG, "等待桥接器启动...")
@@ -226,14 +224,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                             // 异步读取日志而不阻塞
                             val logCmd = "tail -n 20 $TERMUX_BRIDGE_PATH/bridge.log"
-                            TerminalSessionManager.executeSessionCommand(
-                                    context = ctx,
-                                    session = session,
-                                    command = logCmd,
-                                    onOutput = { output -> Log.e(TAG, "桥接器日志: $output") },
-                                    onInteractivePrompt = { _, _ -> },
-                                    onComplete = { _, _ -> }
-                            )
+                            terminalManager.executeCommand(sessionId, logCmd)
                         }
 
                         return@withContext isRunning

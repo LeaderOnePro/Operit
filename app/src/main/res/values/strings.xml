@@ -767,7 +767,7 @@
     <string name="overlay_permission">悬浮窗权限</string>
     <string name="battery_optimization">电池优化豁免</string>
     <string name="location_permission">位置权限</string>
-    <string name="termux_terminal">Termux终端</string>
+    <string name="operit_terminal">Operit终端</string>
     
     <!-- 权限级别描述 -->
     <string name="permission_level_standard">标准权限</string>
@@ -916,10 +916,12 @@
     <string name="ok">确定</string>
     <string name="select_download_source">选择下载源</string>
     <string name="select_download_source_desc">请选择适合您网络环境的下载源：</string>
+    <string name="mirror_download">%1$s 镜像下载</string>
     <string name="china_mirror">国内加速镜像</string>
-    <string name="china_mirror_desc">通过ghfast.top加速，推荐国内用户使用</string>
+    <string name="china_mirror_desc">通过国内镜像服务器下载，速度更快</string>
     <string name="github_source">GitHub原始链接</string>
     <string name="github_source_desc">直接从GitHub官方服务器下载，速度可能较慢</string>
+    <string name="no_mirrors_found">未找到可用的镜像源</string>
     <string name="developer">开发者</string>
     <string name="contact">联系方式</string>
     <string name="project_url">项目地址</string>
@@ -947,6 +949,7 @@
     <string name="reply_message">回复</string>
     <string name="stop_reading">停止朗读</string>
     <string name="edit_and_resend">编辑并重发</string>
+    <string name="select_copy">选择并复制</string>
 
     <string name="modify_memory">修改记忆</string>
     <string name="delete_from_here">删除到此</string>
@@ -1754,6 +1757,19 @@
     <string name="perm_desc_read_sms">允许应用读取短信</string>
     <string name="perm_desc_receive_wap_push">允许应用接收WAP推送消息</string>
     <string name="perm_desc_receive_mms">允许应用接收彩信</string>
+    
+    <!-- OperitTerminal Wizard Card -->
+    <string name="operit_terminal_wizard_title">OperitTerminal 设置向导</string>
+    <string name="operit_terminal_not_installed">OperitTerminal 未安装</string>
+    <string name="operit_terminal_update_available">OperitTerminal 有更新可用</string>
+    <string name="operit_terminal_up_to_date">OperitTerminal 已是最新版本</string>
+    <string name="operit_terminal_install_description">OperitTerminal 是一个功能强大的终端应用，提供完整的 Linux 环境和包管理功能。我们需要先安装这个应用。</string>
+    <string name="operit_terminal_install_button">安装 OperitTerminal</string>
+    <string name="operit_terminal_update_description">发现 OperitTerminal 的新版本，建议更新以获得更好的功能和兼容性。</string>
+    <string name="operit_terminal_release_notes">更新说明：%1$s</string>
+    <string name="operit_terminal_update_button">更新 OperitTerminal</string>
+    <string name="operit_terminal_latest_description">恭喜！您已安装最新版本的 OperitTerminal，可以开始使用其强大的终端功能。</string>
+    <string name="operit_terminal_open_button">打开 OperitTerminal</string>
     
     <!-- Functional Config Screen -->
     <string name="functional_model_config_title">功能模型配置设置</string>

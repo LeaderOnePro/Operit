@@ -25,9 +25,6 @@
     <!-- 持续高性能模式 -->
     <uses-permission android:name="android.permission.SUSTAINED_PERFORMANCE_MODE" />
     
-    <!-- Termux permissions -->
-    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
-    
     <!-- 闹钟权限 -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     
@@ -161,11 +158,6 @@
                 <action android:name="com.ai.assistance.operit.EXECUTE_JS" />
             </intent-filter>
         </receiver>
-        
-        <!-- Termux命令结果服务 -->
-        <service
-            android:name=".services.TermuxCommandResultService"
-            android:exported="false" />
         
         <service
             android:name=".services.UIDebuggerService"

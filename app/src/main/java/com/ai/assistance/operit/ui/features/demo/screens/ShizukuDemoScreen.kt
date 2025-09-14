@@ -26,14 +26,13 @@ import com.ai.assistance.operit.core.tools.system.AndroidPermissionLevel
 import com.ai.assistance.operit.core.tools.system.AccessibilityProviderInstaller
 import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
 import com.ai.assistance.operit.core.tools.system.ShizukuInstaller
-import com.ai.assistance.operit.core.tools.system.termux.TermuxInstaller
 import com.ai.assistance.operit.data.repository.UIHierarchyManager
 import com.ai.assistance.operit.ui.features.demo.components.*
 import com.ai.assistance.operit.ui.features.demo.viewmodel.ShizukuDemoViewModel
 import com.ai.assistance.operit.ui.features.demo.wizards.AccessibilityWizardCard
+import com.ai.assistance.operit.ui.features.demo.wizards.OperitTerminalWizardCard
 import com.ai.assistance.operit.ui.features.demo.wizards.RootWizardCard
 import com.ai.assistance.operit.ui.features.demo.wizards.ShizukuWizardCard
-import com.ai.assistance.operit.ui.features.demo.wizards.TermuxWizardCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,11 +79,6 @@ fun ShizukuDemoScreen(
     DisposableEffect(Unit) {
         val shizukuListener: () -> Unit = {
             scope.launch(Dispatchers.IO) { viewModel.refreshStatus(context) }
-        }
-
-        // 添加单独的Termux状态监听
-        val termuxListener: () -> Unit = {
-            scope.launch(Dispatchers.IO) { viewModel.checkTermuxAuthState(context) }
         }
 
         ShizukuAuthorizer.addStateChangeListener(shizukuListener)
@@ -138,9 +132,7 @@ fun ShizukuDemoScreen(
                 isShizukuInstalled = uiState.isShizukuInstalled.value,
                 isShizukuRunning = uiState.isShizukuRunning.value,
                 hasShizukuPermission = uiState.hasShizukuPermission.value,
-                isTermuxInstalled = uiState.isTermuxInstalled.value,
-                isTermuxAuthorized = uiState.isTermuxAuthorized.value,
-                isTermuxFullyConfigured = viewModel.isTermuxFullyConfigured.value,
+                isOperitTerminalInstalled = uiState.isOperitTerminalInstalled.value,
                 isDeviceRooted = uiState.isDeviceRooted.value,
                 hasRootAccess = uiState.hasRootAccess.value,
                 isAccessibilityProviderInstalled = uiState.isAccessibilityProviderInstalled.value,
@@ -235,24 +227,9 @@ fun ShizukuDemoScreen(
                         viewModel.toggleShizukuWizard()
                     }
                 },
-                onTermuxClick = {
-                    // 处理Termux - 不再依赖当前权限级别和Shizuku
-                    if (!uiState.isTermuxInstalled.value) {
-                        // 如果未安装，显示向导
-                        viewModel.toggleTermuxWizard()
-                    } else if (!uiState.isTermuxAuthorized.value) {
-                        // 如果未授权，显示向导
-                        viewModel.toggleTermuxWizard()
-                    } else if (!viewModel.isTermuxRunning.value) {
-                        // 如果已授权但未运行，直接尝试启动
-                        scope.launch(Dispatchers.IO) { viewModel.startTermux(context) }
-                    } else if (!viewModel.isTermuxFullyConfigured.value) {
-                        // 如果已授权且运行但未完全配置，显示向导
-                        viewModel.toggleTermuxWizard()
-                    } else {
-                        // 如果已完全配置，尝试打开Termux
-                        scope.launch(Dispatchers.IO) { viewModel.startTermux(context) }
-                    }
+                onOperitTerminalClick = {
+                    // 点击时总是打开向导
+                    viewModel.toggleOperitTerminalWizard()
                 },
                 onRootClick = {
                     // 处理Root权限
@@ -269,14 +246,7 @@ fun ShizukuDemoScreen(
         )
 
         // 组合向导卡片到一个专门的设置区域
-        val needTermuxSetupGuide =
-                (currentDisplayedPermissionLevel == AndroidPermissionLevel.DEBUGGER ||
-                        currentDisplayedPermissionLevel == AndroidPermissionLevel.ROOT ||
-                        currentDisplayedPermissionLevel == AndroidPermissionLevel.ADMIN) &&
-                        (!uiState.isTermuxInstalled.value ||
-                                !uiState.isTermuxAuthorized.value ||
-                                !viewModel.isTermuxRunning.value ||
-                                !viewModel.isTermuxFullyConfigured.value)
+        val needOperitTerminalSetupGuide = !uiState.isOperitTerminalInstalled.value || viewModel.isOperitTerminalUpdateNeeded.value
 
         // 检查Shizuku版本状态 - 使用remember缓存结果，避免每次重组时重复调用
         val (installedVersion, bundledVersion, isUpdateNeeded) =
@@ -323,7 +293,7 @@ fun ShizukuDemoScreen(
                             isAccessibilityUpdateNeeded)
 
 
-        val needSetupGuide = needTermuxSetupGuide || needShizukuSetupGuide || needRootSetupGuide || needAccessibilitySetupGuide
+        val needSetupGuide = needOperitTerminalSetupGuide || needShizukuSetupGuide || needRootSetupGuide || needAccessibilitySetupGuide
 
         if (needSetupGuide) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -682,175 +652,23 @@ fun ShizukuDemoScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Termux向导卡片 - 如果Termux未完全设置则显示（不再依赖Shizuku）
-            if (needTermuxSetupGuide) {
-                TermuxWizardCard(
-                        isTermuxInstalled = uiState.isTermuxInstalled.value,
-                        isTermuxAuthorized = uiState.isTermuxAuthorized.value,
-                        showWizard = uiState.showTermuxWizard.value,
-                        onToggleWizard = { viewModel.toggleTermuxWizard() },
-                        onInstallBundled = {
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    val success =
-                                            withContext(Dispatchers.IO) {
-                                                TermuxInstaller.installBundledTermux(context)
-                                            }
-                                    withContext(Dispatchers.Main) {
-                                        if (success) {
-                                            Toast.makeText(
-                                                            context,
-                                                            context.getString(
-                                                                    R.string
-                                                                            .shizuku_demo_termux_install_success
-                                                            ),
-                                                            Toast.LENGTH_LONG
-                                                    )
-                                                    .show()
-                                        } else {
-                                            // 如果无法通过内置安装，尝试跳转到下载页面
-                                            Toast.makeText(
-                                                            context,
-                                                            context.getString(
-                                                                    R.string
-                                                                            .shizuku_demo_termux_install_failed_store
-                                                            ),
-                                                            Toast.LENGTH_SHORT
-                                                    )
-                                                    .show()
-                                            try {
-                                                val intent = Intent(Intent.ACTION_VIEW)
-                                                intent.data =
-                                                        Uri.parse(
-                                                                "https://f-droid.org/packages/com.termux/"
-                                                        )
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(
-                                                                context,
-                                                                context.getString(
-                                                                        R.string
-                                                                                .shizuku_demo_termux_download_failed
-                                                                ),
-                                                                Toast.LENGTH_SHORT
-                                                        )
-                                                        .show()
-                                            }
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("ShizukuDemo", "安装内置Termux时出错", e)
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(
-                                                        context,
-                                                        context.getString(
-                                                                R.string.toast_operation_failed,
-                                                                e.message ?: ""
-                                                        ),
-                                                        Toast.LENGTH_SHORT
-                                                )
-                                                .show()
-                                    }
-                                }
-                            }
-                        },
-                        onOpenTermux = {
-                            scope.launch(Dispatchers.IO) { viewModel.startTermux(context) }
-                        },
-                        onAuthorizeTermux = {
-                            scope.launch(Dispatchers.IO) {
-                                viewModel.ensureTermuxRunningAndAuthorize(context)
-                            }
-                        },
-                        isTunaSourceEnabled = viewModel.isTunaSourceEnabled.value,
-                        isPythonInstalled = viewModel.isPythonInstalled.value,
-                        isUvInstalled = viewModel.isUvInstalled.value,
-                        isNodeInstalled = viewModel.isNodeInstalled.value,
-                        isTermuxRunning = viewModel.isTermuxRunning.value,
-                        isTermuxBatteryOptimizationExempted =
-                                viewModel.isTermuxBatteryOptimizationExempted.value,
-                        onRequestTermuxBatteryOptimization = {
-                            scope.launch(Dispatchers.IO) {
-                                viewModel.requestTermuxBatteryOptimization(context)
-                            }
-                        },
-                        onConfigureTunaSource = {
-                            scope.launch(Dispatchers.IO) { viewModel.configureTunaSource(context) }
-                        },
-                        onSkipTunaSource = {
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    // 显示提示对话框并标记清华源为已跳过
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(
-                                                        context,
-                                                        context.getString(
-                                                                R.string.toast_skip_tuna_source
-                                                        ),
-                                                        Toast.LENGTH_LONG
-                                                )
-                                                .show()
-                                    }
-                                    viewModel.skipTunaSource(context)
-                                } catch (e: Exception) {
-                                    Log.e("ShizukuDemo", "跳过清华源时出错: ${e.message}", e)
-
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(
-                                                        context,
-                                                        context.getString(
-                                                                R.string.toast_skip_tuna_source
-                                                        ),
-                                                        Toast.LENGTH_SHORT
-                                                )
-                                                .show()
-                                    }
-                                }
-                            }
-                        },
-                        onInstallPythonEnv = {
-                            scope.launch(Dispatchers.IO) { viewModel.installPython(context) }
-                        },
-                        onInstallUvEnv = {
-                            scope.launch(Dispatchers.IO) { viewModel.installUv(context) }
-                        },
-                        onInstallNodeEnv = {
-                            scope.launch(Dispatchers.IO) { viewModel.installNode(context) }
-                        },
-                        onDeleteConfig = {
-                            scope.launch(Dispatchers.IO) {
-                                viewModel.deleteTermuxConfigAndStart(context)
-                            }
-                        }
+            // OperitTerminal向导卡片
+            if (needOperitTerminalSetupGuide) {
+                OperitTerminalWizardCard(
+                    isInstalled = uiState.isOperitTerminalInstalled.value,
+                    installedVersion = viewModel.operitTerminalInstalledVersion.value,
+                    latestVersion = viewModel.operitTerminalLatestVersion.value,
+                    releaseNotes = viewModel.operitTerminalReleaseNotes.value,
+                    updateNeeded = viewModel.isOperitTerminalUpdateNeeded.value,
+                    showWizard = uiState.showOperitTerminalWizard.value,
+                    downloadUrl = viewModel.operitTerminalDownloadUrl.value,
+                    onToggleWizard = { viewModel.toggleOperitTerminalWizard() },
+                    onInstall = { viewModel.installOrUpdateOperitTerminal(context) },
+                    onUpdate = { viewModel.installOrUpdateOperitTerminal(context) },
+                    onOpen = { viewModel.openOperitTerminal(context) },
+                    onDownloadFromUrl = { url -> viewModel.downloadFromUrl(context, url) }
                 )
             }
         }
     }
-
-    // 显示命令结果对话框
-    CommandResultDialog(
-            showDialog = uiState.showResultDialogState.value,
-            onDismiss = {
-                // 只有当未在配置过程中时才允许手动关闭
-                if (!viewModel.isTermuxConfiguring.value) {
-                    viewModel.hideResultDialog()
-                    // 重置输出文本，准备下一次操作
-                    viewModel.updateOutputText(context.getString(R.string.welcome_termux_config))
-                }
-            },
-            title = uiState.resultDialogTitle.value,
-            content =
-                    if (viewModel.isTermuxConfiguring.value) {
-                        // 当正在配置时，显示实时输出
-                        "${viewModel.outputText.value}\n\n${if (viewModel.currentTask.value.isNotEmpty()) context.getString(R.string.executing_task, viewModel.currentTask.value) else ""}"
-                    } else {
-                        // 当配置完成时，显示最终结果
-                        viewModel.outputText.value
-                    },
-            context = context,
-            // 当正在配置时不显示按钮，不可复制，配置完成后恢复按钮
-            showButtons = !viewModel.isTermuxConfiguring.value,
-            allowCopy = !viewModel.isTermuxConfiguring.value,
-            isExecuting = viewModel.isTermuxConfiguring.value
-    )
 }

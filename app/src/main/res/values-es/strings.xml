@@ -1231,7 +1231,6 @@
     <!-- Context Menu -->
     <string name="copy_message">Copiar Mensaje</string>
     <string name="edit_and_resend">Editar y Reenviar</string>
-    <string name="select_copy">Seleccionar y Copiar</string>
     <string name="modify_memory">Modificar Memoria</string>
     <string name="delete_from_here">Eliminar desde aquí</string>
     <string name="load_more_history">Cargar más mensajes del historial...</string>
