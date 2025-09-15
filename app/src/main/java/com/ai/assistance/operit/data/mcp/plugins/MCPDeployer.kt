@@ -3,7 +3,7 @@ package com.ai.assistance.operit.data.mcp.plugins
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
-import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.core.tools.system.Terminal
 import com.google.gson.JsonParser
 import java.io.File
 
@@ -119,11 +119,11 @@ class MCPDeployer(private val context: Context) {
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             // 获取终端管理器
-            val terminalManager = TerminalManager.getInstance(context)
+            val terminal = Terminal.getInstance(context)
             
             // 确保已连接到终端服务
-            if (!terminalManager.isConnected()) {
-                val connected = terminalManager.initialize()
+            if (!terminal.isConnected()) {
+                val connected = terminal.initialize()
                 if (!connected) {
                     statusCallback(DeploymentStatus.Error("无法连接到终端服务"))
                     return@withContext false
@@ -131,7 +131,7 @@ class MCPDeployer(private val context: Context) {
             }
             
             // 获取终端会话
-            val sessionId = terminalManager.createSession()
+            val sessionId = terminal.createSession()
             if (sessionId == null) {
                 statusCallback(DeploymentStatus.Error("无法创建终端会话"))
                 return@withContext false
@@ -144,7 +144,7 @@ class MCPDeployer(private val context: Context) {
             // 首先创建插件目录
             statusCallback(DeploymentStatus.InProgress("创建插件目录: $pluginDir"))
 
-            val mkdirExecuted = terminalManager.executeCommand(sessionId, "mkdir -p $pluginDir")
+            val mkdirExecuted = terminal.executeCommand(sessionId, "mkdir -p $pluginDir")
             if (mkdirExecuted == null) {
                 statusCallback(DeploymentStatus.Error("创建插件目录失败"))
                 return@withContext false
@@ -153,7 +153,7 @@ class MCPDeployer(private val context: Context) {
             // 复制插件文件到目标目录
             statusCallback(DeploymentStatus.InProgress("复制插件文件到目标目录..."))
 
-            val copyExecuted = terminalManager.executeCommand(sessionId, "cp -r $pluginPath/* $pluginDir/")
+            val copyExecuted = terminal.executeCommand(sessionId, "cp -r $pluginPath/* $pluginDir/")
             if (copyExecuted == null) {
                 statusCallback(DeploymentStatus.Error("复制文件到目标目录失败"))
                 return@withContext false
@@ -162,7 +162,7 @@ class MCPDeployer(private val context: Context) {
             // 切换到插件目录
             statusCallback(DeploymentStatus.InProgress("切换到插件目录"))
 
-            val cdExecuted = terminalManager.executeCommand(sessionId, "cd $pluginDir")
+            val cdExecuted = terminal.executeCommand(sessionId, "cd $pluginDir")
             if (cdExecuted == null) {
                 statusCallback(DeploymentStatus.Error("切换到插件目录失败"))
                 return@withContext false
@@ -199,7 +199,7 @@ class MCPDeployer(private val context: Context) {
                 )
                 Log.d(TAG, "执行命令 (${index + 1}/${deployCommands.size}): $cleanCommand")
 
-                val commandExecuted = terminalManager.executeCommand(sessionId, cleanCommand)
+                val commandExecuted = terminal.executeCommand(sessionId, cleanCommand)
 
                 // 如果命令失败
                 if (commandExecuted == null) {

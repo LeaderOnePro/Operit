@@ -5,11 +5,8 @@ import android.util.Log
 import com.ai.assistance.operit.core.tools.*
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
-import com.ai.assistance.operit.terminal.TerminalManager
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import com.ai.assistance.operit.core.tools.system.Terminal
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
 
 /** 终端命令执行工具 - 非流式输出版本 执行终端命令并一次性收集全部输出后返回 */
 class StandardTerminalCommandExecutor(private val context: Context) {
@@ -32,13 +29,13 @@ class StandardTerminalCommandExecutor(private val context: Context) {
 
                 // 获取终端管理器
                 Log.d(TAG, "Getting TerminalManager instance")
-                val terminalManager = TerminalManager.getInstance(context)
+                val terminal = Terminal.getInstance(context)
                 
                 // 确保已连接到终端服务
                 Log.d(TAG, "Checking if terminal service is connected")
-                if (!terminalManager.isConnected()) {
+                if (!terminal.isConnected()) {
                     Log.d(TAG, "Terminal service not connected, initializing...")
-                    val connected = terminalManager.initialize()
+                    val connected = terminal.initialize()
                     if (!connected) {
                         Log.e(TAG, "Failed to connect to terminal service")
                         return@runBlocking ToolResult(
@@ -55,7 +52,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                     withSessionId
                         } else {
                     // 创建新会话
-                    terminalManager.createSession()
+                    terminal.createSession()
                         }
 
                 if (sessionId == null) {
@@ -68,7 +65,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                 }
 
                 // 执行命令并收集Flow输出
-                val outputFlow = terminalManager.executeCommandFlow(sessionId, command)
+                val outputFlow = terminal.executeCommandFlow(sessionId, command)
                 
                 if (outputFlow != null) {
                     // 收集所有输出事件

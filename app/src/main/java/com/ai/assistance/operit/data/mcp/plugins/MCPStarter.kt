@@ -6,20 +6,17 @@ import com.ai.assistance.operit.core.tools.mcp.MCPManager
 import com.ai.assistance.operit.core.tools.mcp.MCPServerConfig
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import com.ai.assistance.operit.data.mcp.MCPRepository
-import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.core.tools.system.Terminal
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * MCP Plugin Starter
@@ -34,7 +31,7 @@ class MCPStarter(private val context: Context) {
 
     // Coroutine scope for async operations
     private val starterScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val terminalManager = TerminalManager.getInstance(context)
+    private val terminal = Terminal.getInstance(context)
 
     /** Plugin initialization status enum */
     enum class PluginInitStatus {
@@ -55,15 +52,15 @@ class MCPStarter(private val context: Context) {
 
     /** Check if Node.js is installed in Termux */
     private suspend fun isNodeJsInstalled(): Boolean {
-        if (!terminalManager.isConnected()) {
-            if (!terminalManager.initialize()) {
+        if (!terminal.isConnected()) {
+            if (!terminal.initialize()) {
                 Log.e(TAG, "Failed to initialize TerminalManager")
                 return false
             }
         }
 
         // Try to find an existing session, or create a new one
-        val sessionId = terminalManager.createSession()
+        val sessionId = terminal.createSession()
 
         if (sessionId == null) {
             Log.e(TAG, "Failed to create terminal session")
@@ -71,7 +68,7 @@ class MCPStarter(private val context: Context) {
         }
 
         try {
-            val result = terminalManager.executeCommand(sessionId, "command -v node")
+            val result = terminal.executeCommand(sessionId, "command -v node")
             return result != null && result.contains("node")
         } catch (e: Exception) {
             Log.e(TAG, "Error checking Node.js installation: ${e.message}")
@@ -81,8 +78,8 @@ class MCPStarter(private val context: Context) {
 
     /** Check if terminal service is connected and initialized */
     private suspend fun isTerminalServiceConnected(): Boolean {
-        if (terminalManager.isConnected()) return true
-        return terminalManager.initialize()
+        if (terminal.isConnected()) return true
+        return terminal.initialize()
     }
 
     /** Initialize and start the bridge */

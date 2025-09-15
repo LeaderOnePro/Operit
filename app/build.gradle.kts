@@ -71,6 +71,10 @@ android {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
+        
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/LICENSE-EPL-1.0.txt"
@@ -109,6 +113,7 @@ android {
 dependencies {
     implementation("com.github.jelmerk:hnswlib-core:1.2.1")
     implementation(project(":dragonbones"))
+    implementation(project(":terminal"))
     implementation(libs.androidx.ui.graphics.android)
     implementation(files("libs\\ffmpegkit.jar"))
     implementation(files("libs\\arsc.jar"))

@@ -3,7 +3,7 @@ package com.ai.assistance.operit.data.mcp.plugins
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.core.tools.system.Terminal
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -98,11 +98,11 @@ class MCPBridge private constructor(private val context: Context) {
 
                     // 2. 确保Termux目录存在并复制文件
                     // 获取终端管理器
-                    val terminalManager = TerminalManager.getInstance(context)
+                    val terminal = Terminal.getInstance(context)
                     
                     // 确保已连接到终端服务
-                    if (!terminalManager.isConnected()) {
-                        val connected = terminalManager.initialize()
+                    if (!terminal.isConnected()) {
+                        val connected = terminal.initialize()
                         if (!connected) {
                             Log.e(TAG, "无法连接到终端服务")
                             return@withContext false
@@ -110,7 +110,7 @@ class MCPBridge private constructor(private val context: Context) {
                     }
 
                     // 创建会话
-                    val sessionId = terminalManager.createSession()
+                    val sessionId = terminal.createSession()
                     if (sessionId == null) {
                         Log.e(TAG, "无法创建终端会话")
                         return@withContext false
@@ -127,7 +127,7 @@ class MCPBridge private constructor(private val context: Context) {
                     """.trimIndent()
 
                     // 执行命令
-                    terminalManager.executeCommand(sessionId, deployCommand)
+                    terminal.executeCommand(sessionId, deployCommand)
 
                     // 等待命令执行完成
                     delay(5000) // 给命令执行时间
@@ -165,11 +165,11 @@ class MCPBridge private constructor(private val context: Context) {
                         }
 
                         // 获取终端管理器
-                        val terminalManager = TerminalManager.getInstance(ctx)
+                        val terminal = Terminal.getInstance(ctx)
                         
                         // 确保已连接到终端服务
-                        if (!terminalManager.isConnected()) {
-                            val connected = terminalManager.initialize()
+                        if (!terminal.isConnected()) {
+                            val connected = terminal.initialize()
                             if (!connected) {
                                 Log.e(TAG, "无法连接到终端服务")
                                 return@withContext false
@@ -177,7 +177,7 @@ class MCPBridge private constructor(private val context: Context) {
                         }
 
                         // 创建会话
-                        val sessionId = terminalManager.createSession()
+                        val sessionId = terminal.createSession()
                         if (sessionId == null) {
                             Log.e(TAG, "无法创建终端会话")
                             return@withContext false
@@ -199,7 +199,7 @@ class MCPBridge private constructor(private val context: Context) {
                         Log.d(TAG, "发送启动命令: $command")
 
                         // 异步方式发送启动命令 - 不等待完成，因为它会作为后台进程一直运行
-                        terminalManager.executeCommand(sessionId, command.toString())
+                        terminal.executeCommand(sessionId, command.toString())
 
                         // 等待一段时间让桥接器启动
                         Log.d(TAG, "等待桥接器启动...")
@@ -224,7 +224,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                             // 异步读取日志而不阻塞
                             val logCmd = "tail -n 20 $TERMUX_BRIDGE_PATH/bridge.log"
-                            terminalManager.executeCommand(sessionId, logCmd)
+                            terminal.executeCommand(sessionId, logCmd)
                         }
 
                         return@withContext isRunning
