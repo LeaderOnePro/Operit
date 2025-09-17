@@ -170,13 +170,4 @@ object ToolGetter {
      * @return 计算器实现（只有标准版本）
      */
     fun getCalculator() = StandardCalculator
-
-    /**
-     * 获取AI电脑桌面工具
-     * @param context 应用上下文
-     * @return 电脑桌面工具实现（只有标准版本）
-     */
-    fun getComputerDesktopTools(context: Context): ComputerDesktopToolExecutor {
-        return ComputerDesktopToolExecutor(context)
-    }
 }

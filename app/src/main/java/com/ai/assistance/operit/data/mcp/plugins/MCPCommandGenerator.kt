@@ -29,6 +29,8 @@ class MCPCommandGenerator {
 
         when (projectStructure.type) {
             ProjectType.PYTHON -> {
+                commands.add("python3 -m venv venv")
+                commands.add("source venv/bin/activate")
                 // 首先检查README中是否有特定的pip安装命令
                 val pipInstallCommand = findSpecificPipInstallCommand(readmeContent)
 
@@ -53,25 +55,25 @@ class MCPCommandGenerator {
             ProjectType.TYPESCRIPT -> {
                 // TypeScript项目部署命令
                 if (projectStructure.hasPackageJson) {
-                    // 添加npm换源命令 - 使用国内淘宝镜像提高安装速度和成功率
-                    commands.add("npm config set registry https://registry.npmmirror.com")
+                    // 添加pnpm换源命令 - 使用国内淘宝镜像提高安装速度和成功率
+                    commands.add("pnpm config set registry https://registry.npmmirror.com")
                     commands.add("# 如果换源失败，将继续使用默认源")
 
                     // 安装依赖，禁用脚本执行
-                    commands.add("npm install --ignore-scripts")
+                    commands.add("pnpm install --ignore-scripts")
 
                     // 检查是否有构建脚本
                     // 使用已解析的scripts信息
                     if (projectStructure.packageJsonScripts != null) {
                         val scripts = projectStructure.packageJsonScripts
 
-                        // 首先尝试找到prepare脚本，这通常会在npm install时自动执行
+                        // 首先尝试找到prepare脚本，这通常会在pnpm install时自动执行
                         if (scripts.has("prepare")) {
                             val prepareScript = scripts.getString("prepare")
 
-                            // 如果prepare脚本是npm run xxx形式，则直接执行对应的脚本
-                            if (prepareScript.startsWith("npm run ")) {
-                                val targetScript = prepareScript.substring(8).trim()
+                            // 如果prepare脚本是pnpm run xxx形式，则直接执行对应的脚本
+                            if (prepareScript.startsWith("pnpm run ")) {
+                                val targetScript = prepareScript.substring(9).trim()
                                 if (scripts.has(targetScript)) {
                                     val actualScript = scripts.getString(targetScript)
 
@@ -115,10 +117,10 @@ class MCPCommandGenerator {
                             )
                         }
                     } else if (projectStructure.hasTypeScriptDependency) {
-                        commands.add("node ./node_modules/typescript/bin/tsc -p ./tsconfig.json")
+                        commands.add("pnpm exec tsc -p ./tsconfig.json")
                     } else if (projectStructure.hasTsConfig) {
-                        commands.add("npm install typescript --save-dev || true")
-                        commands.add("node ./node_modules/typescript/bin/tsc -p ./tsconfig.json")
+                        commands.add("pnpm add typescript --save-dev || true")
+                        commands.add("pnpm exec tsc -p ./tsconfig.json")
                     }
 
                     // 查找编译后的JS文件
@@ -138,16 +140,16 @@ class MCPCommandGenerator {
                 // Node.js项目部署命令
                 if (projectStructure.hasPackageJson) {
                     // 同样为Node.js项目添加换源设置
-                    commands.add("npm config set registry https://registry.npmmirror.com")
+                    commands.add("pnpm config set registry https://registry.npmmirror.com")
                     commands.add("# 如果换源失败，将继续使用默认源")
-                    commands.add("npm install")
+                    commands.add("pnpm install")
                 }
 
                 val mainFile = projectStructure.mainJsFile
                 if (mainFile != null) {
                     commands.add("node $mainFile")
                 } else {
-                    commands.add("npm start")
+                    commands.add("pnpm start")
                 }
             }
             ProjectType.UNKNOWN -> {
@@ -230,19 +232,19 @@ class MCPCommandGenerator {
     private fun processIndividualCommand(command: String): String {
         var result = command
 
-        // 处理npm run xxx形式的命令
-        val npmRunRegex = "npm\\s+run\\s+([\\w\\-]+)".toRegex()
-        val npmRunMatch = npmRunRegex.find(result)
-        if (npmRunMatch != null) {
-            val scriptName = npmRunMatch.groupValues[1]
+        // 处理pnpm run xxx形式的命令
+        val pnpmRunRegex = "pnpm\\s+run\\s+([\\w\\-]+)".toRegex()
+        val pnpmRunMatch = pnpmRunRegex.find(result)
+        if (pnpmRunMatch != null) {
+            val scriptName = pnpmRunMatch.groupValues[1]
             // 这里无法直接获取脚本内容，因为我们不在这个上下文中访问packageJson
             // 而是返回一个特殊标记，需要上层调用处理
-            return "##NPM_RUN_SCRIPT:$scriptName##"
+            return "##PNPM_RUN_SCRIPT:$scriptName##"
         }
 
         // 替换tsc命令
         if (result.contains("tsc ") || result == "tsc") {
-            result = result.replace("tsc", "node ./node_modules/typescript/bin/tsc")
+            result = result.replace("tsc", "pnpm exec tsc")
 
             // 只为TypeScript编译器命令添加tsconfig参数
             if (!result.contains("-p ") && !result.contains("--project ")) {
@@ -252,7 +254,7 @@ class MCPCommandGenerator {
 
         // 替换npx tsc命令
         if (result.contains("npx tsc")) {
-            result = result.replace("npx tsc", "node ./node_modules/typescript/bin/tsc")
+            result = result.replace("npx tsc", "pnpm exec tsc")
 
             // 只为TypeScript编译器命令添加tsconfig参数
             if (!result.contains("-p ") && !result.contains("--project ")) {
@@ -262,7 +264,7 @@ class MCPCommandGenerator {
 
         // 替换shx命令
         if (result.contains("shx ")) {
-            result = result.replace("shx ", "node ./node_modules/.bin/shx ")
+            result = result.replace("shx ", "pnpm exec shx ")
         }
 
         // 替换其他常见的npx命令
@@ -270,7 +272,7 @@ class MCPCommandGenerator {
         result =
                 npxRegex.replace(result) { matchResult ->
                     val packageName = matchResult.groupValues[1]
-                    "node ./node_modules/$packageName/bin/$packageName"
+                    "pnpm exec $packageName"
                 }
 
         return result

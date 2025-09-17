@@ -162,7 +162,6 @@ sealed class Screen(
                     onFormatConverterSelected = { navigateTo(FormatConverter) },
                     onFileManagerSelected = { navigateTo(FileManager) },
                     onTerminalSelected = { navigateTo(Terminal) },
-                    onTerminalAutoConfigSelected = { navigateTo(TerminalAutoConfig) },
                     onAppPermissionsSelected = { navigateTo(AppPermissions) },
                     onUIDebuggerSelected = { navigateTo(UIDebugger) },
                     onFFmpegToolboxSelected = { navigateTo(FFmpegToolbox) },

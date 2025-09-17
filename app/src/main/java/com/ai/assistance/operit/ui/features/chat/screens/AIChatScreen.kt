@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.ui.features.chat.screens
 
+import android.os.Build
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,8 +12,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +58,9 @@ import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import kotlinx.coroutines.launch
 
+
+
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview(showBackground = true)
@@ -221,6 +226,8 @@ fun AIChatScreen(
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
+    
+
 
     // 确保每次应用启动时正确处理配置界面的显示逻辑
     LaunchedEffect(apiKey) {
@@ -402,12 +409,16 @@ fun AIChatScreen(
 
     
 
-    // 当showWebView状态改变时，更新TopAppBar的actions
+    // 当showWebView或showAiComputer状态改变时，更新TopAppBar的actions
     // 使用DisposableEffect确保当AIChatScreen离开组合时，actions被清空
     DisposableEffect(showWebView, showAiComputer, appBarContentColor) {
         setTopBarActions {
             // AI电脑模式切换按钮
-            IconButton(onClick = { actualViewModel.onAiComputerButtonClick() }) {
+            IconButton(
+                    onClick = {
+                        actualViewModel.onAiComputerButtonClick()
+                    }
+            ) {
                 Icon(
                         imageVector = Icons.Default.Computer,
                         contentDescription = "AI电脑",
@@ -416,6 +427,7 @@ fun AIChatScreen(
                                 else appBarContentColor
                 )
             }
+            
             // Web开发模式切换按钮
             IconButton(
                     onClick = {
@@ -645,29 +657,7 @@ fun AIChatScreen(
             }
         }
 
-        // AI电脑作为浮层
-        Layout(
-            modifier = Modifier.fillMaxSize(),
-            content = {
-                // The content is composed unconditionally, keeping it "alive"
-                val currentChat = chatHistories.find { it.id == currentChatId }
-                ComputerScreen(
-                    actualViewModel = actualViewModel,
-                    currentChat = currentChat
-                )
-            }
-        ) { measurables, constraints ->
-            val placeable = measurables.first().measure(constraints)
-            layout(placeable.width, placeable.height) {
-                if (showAiComputer) {
-                    // When visible, place it on-screen.
-                    placeable.placeRelative(0, 0)
-                } else {
-                    // When not visible, place it off-screen to keep it alive but invisible.
-                    placeable.placeRelative(-placeable.width, -placeable.height)
-                }
-            }
-        }
+
 
 
         // Web开发模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
@@ -699,6 +689,30 @@ fun AIChatScreen(
                 val placeable = measurables.first().measure(constraints)
                 layout(placeable.width, placeable.height) {
                     if (showWebView) {
+                        // When visible, place it on-screen.
+                        placeable.placeRelative(0, 0)
+                    } else {
+                        // When not visible, place it off-screen to keep it alive but invisible.
+                        placeable.placeRelative(-placeable.width, -placeable.height)
+                    }
+                }
+            }
+        }
+
+        // AI电脑模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
+        Layout(
+            modifier = Modifier.fillMaxSize(),
+            content = {
+                // The content is composed unconditionally, keeping it "alive"
+                ComputerScreen()
+            }
+        ) { measurables, constraints ->
+            if (measurables.isEmpty()) {
+                layout(0, 0) {}
+            } else {
+                val placeable = measurables.first().measure(constraints)
+                layout(placeable.width, placeable.height) {
+                    if (showAiComputer) {
                         // When visible, place it on-screen.
                         placeable.placeRelative(0, 0)
                     } else {

@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.tools.system
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import com.ai.assistance.operit.terminal.CommandExecutionEvent
 import com.ai.assistance.operit.terminal.SessionDirectoryEvent
@@ -15,8 +16,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.transformWhile
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -73,8 +76,33 @@ class Terminal private constructor(private val context: Context) {
     /**
      * 创建新的终端会话
      */
-    fun createSession(): String {
-        return terminalManager.createNewSession().id
+    fun createSession(title: String? = null): String {
+        Log.d(TAG, "Creating new terminal session")
+        return terminalManager.createNewSession(title).id
+    }
+    
+    /**
+     * 创建新的终端会话并等待初始化完成
+     */
+    suspend fun createSessionAndWait(title: String? = null): String? {
+        Log.d(TAG, "Creating new terminal session and waiting for initialization")
+        val newSession = terminalManager.createNewSession(title)
+        
+        // 等待会话初始化完成
+        val initialized = withTimeoutOrNull(30000) { // 30秒超时
+            terminalManager.terminalState.first { state ->
+                val session = state.sessions.find { it.id == newSession.id }
+                session?.initState == com.ai.assistance.operit.terminal.data.SessionInitState.READY
+            }
+        }
+        
+        return if (initialized != null) {
+            Log.d(TAG, "Session ${newSession.id} initialized successfully")
+            newSession.id
+        } else {
+            Log.e(TAG, "Session initialization timeout for session: ${newSession.id}")
+            null
+        }
     }
     
     /**
@@ -96,13 +124,20 @@ class Terminal private constructor(private val context: Context) {
      */
     suspend fun executeCommand(sessionId: String, command: String): String? {
         terminalManager.switchToSession(sessionId)
-        val commandId = terminalManager.sendCommand(command)
-
+        
         val deferred = CompletableDeferred<String>()
+        val output = StringBuilder()
+        
+        // 生成命令ID
+        val commandId = java.util.UUID.randomUUID().toString()
+        
+        val collectorReady = CompletableDeferred<Unit>()
+        
+        // 先开始订阅事件流，然后再发送命令
         val job = scope.launch {
-            val output = StringBuilder()
             commandEvents
                 .filter { it.sessionId == sessionId && it.commandId == commandId }
+                .onStart { collectorReady.complete(Unit) } // 发出信号，表示已准备好收集
                 .collect { event ->
                     output.append(event.outputChunk)
                     if (event.isCompleted) {
@@ -110,6 +145,11 @@ class Terminal private constructor(private val context: Context) {
                     }
                 }
         }
+
+        collectorReady.await() // 等待收集器准备就绪
+        
+        // 现在发送命令，使用预生成的 commandId
+        terminalManager.sendInput(command, isCommand = true, commandId = commandId)
 
         val result = withTimeoutOrNull(300000) { // 5 分钟超时
             deferred.await()

@@ -35,7 +35,7 @@ class MCPBridge private constructor(private val context: Context) {
         private const val TAG = "MCPBridge"
         private const val DEFAULT_HOST = "127.0.0.1"
         private const val DEFAULT_PORT = 8752
-        private const val TERMUX_BRIDGE_PATH = "/data/data/com.termux/files/home/bridge"
+        private const val TERMUX_BRIDGE_PATH = "~/bridge"
         private var appContext: Context? = null
         
         @Volatile
@@ -50,17 +50,14 @@ class MCPBridge private constructor(private val context: Context) {
             }
         }
 
-        // 部署桥接器到Termux
-        suspend fun deployBridge(context: Context): Boolean {
+        // 部署桥接器到终端
+        suspend fun deployBridge(context: Context, sessionId: String? = null): Boolean {
             appContext = context.applicationContext
             return withContext(Dispatchers.IO) {
                 try {
-                    // 1. 首先将桥接器从assets复制到Download/Operit/bridge目录
-                    val downloadsDir =
-                            Environment.getExternalStoragePublicDirectory(
-                                    Environment.DIRECTORY_DOWNLOADS
-                            )
-                    val operitDir = File(downloadsDir, "Operit")
+                    // 1. 首先将桥接器从assets复制到sdcard/Download/Operit/bridge目录
+                    val sdcardPath = "/sdcard"
+                    val operitDir = File("$sdcardPath/Download/Operit")
                     if (!operitDir.exists()) {
                         operitDir.mkdirs()
                     }
@@ -96,7 +93,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                     Log.d(TAG, "桥接器文件已复制到公共目录: ${publicBridgeDir.absolutePath}")
 
-                    // 2. 确保Termux目录存在并复制文件
+                    // 2. 确保终端目录存在并复制文件
                     // 获取终端管理器
                     val terminal = Terminal.getInstance(context)
                     
@@ -109,30 +106,36 @@ class MCPBridge private constructor(private val context: Context) {
                         }
                     }
 
-                    // 创建会话
-                    val sessionId = terminal.createSession()
-                    if (sessionId == null) {
-                        Log.e(TAG, "无法创建终端会话")
-                        return@withContext false
+                    // 使用传入的sessionId或创建新的会话
+                    val actualSessionId = sessionId ?: run {
+                        val newSessionId = terminal.createSessionAndWait("mcp-bridge-deploy")
+                        if (newSessionId == null) {
+                            Log.e(TAG, "无法创建终端会话或会话初始化超时")
+                            return@withContext false
+                        }
+                        newSessionId
                     }
 
+                    // 使用sdcard路径而不是Android storage路径
+                    val sdcardBridgePath = "/sdcard/Download/Operit/bridge"
+                    
                     // 以非阻塞方式创建目录并复制文件
                     val deployCommand =
                             """
                         mkdir -p $TERMUX_BRIDGE_PATH && 
-                        cp -f ${outputFile.absolutePath} $TERMUX_BRIDGE_PATH/ && 
-                        cp -f ${packageJson.absolutePath} $TERMUX_BRIDGE_PATH/ && 
+                        cp -f $sdcardBridgePath/index.js $TERMUX_BRIDGE_PATH/ && 
+                        cp -f $sdcardBridgePath/package.json $TERMUX_BRIDGE_PATH/ && 
                         cd $TERMUX_BRIDGE_PATH && 
-                        ([ -d node_modules/uuid ] && [ -d node_modules/mcp-client ]) || npm install
+                        pnpm install
                     """.trimIndent()
 
                     // 执行命令
-                    terminal.executeCommand(sessionId, deployCommand)
+                    terminal.executeCommand(actualSessionId, deployCommand)
 
                     // 等待命令执行完成
-                    delay(5000) // 给命令执行时间
+                    delay(100) // 给命令执行时间
 
-                        Log.d(TAG, "桥接器成功部署到Termux")
+                    Log.d(TAG, "桥接器成功部署到终端")
                     return@withContext true
                 } catch (e: Exception) {
                     Log.e(TAG, "部署桥接器异常", e)
@@ -141,12 +144,13 @@ class MCPBridge private constructor(private val context: Context) {
             }
         }
 
-        // 在Termux中启动桥接器
+        // 在终端中启动桥接器
         suspend fun startBridge(
                 context: Context? = null,
                 port: Int = DEFAULT_PORT,
                 mcpCommand: String? = null,
-                mcpArgs: List<String>? = null
+                mcpArgs: List<String>? = null,
+                sessionId: String? = null
         ): Boolean =
                 withContext(Dispatchers.IO) {
                     try {
@@ -176,11 +180,14 @@ class MCPBridge private constructor(private val context: Context) {
                             }
                         }
 
-                        // 创建会话
-                        val sessionId = terminal.createSession()
-                        if (sessionId == null) {
-                            Log.e(TAG, "无法创建终端会话")
-                            return@withContext false
+                        // 使用传入的sessionId或创建新的会话
+                        val actualSessionId = sessionId ?: run {
+                            val newSessionId = terminal.createSessionAndWait("mcp-bridge-start")
+                            if (newSessionId == null) {
+                                Log.e(TAG, "无法创建终端会话或会话初始化超时")
+                                return@withContext false
+                            }
+                            newSessionId
                         }
 
                         // 清理日志文件
@@ -199,7 +206,8 @@ class MCPBridge private constructor(private val context: Context) {
                         Log.d(TAG, "发送启动命令: $command")
 
                         // 异步方式发送启动命令 - 不等待完成，因为它会作为后台进程一直运行
-                        terminal.executeCommand(sessionId, command.toString())
+                        Log.d(TAG, "进行桥接器启动...")
+                        terminal.executeCommand(actualSessionId, command.toString())
 
                         // 等待一段时间让桥接器启动
                         Log.d(TAG, "等待桥接器启动...")
@@ -224,7 +232,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                             // 异步读取日志而不阻塞
                             val logCmd = "tail -n 20 $TERMUX_BRIDGE_PATH/bridge.log"
-                            terminal.executeCommand(sessionId, logCmd)
+                            terminal.executeCommand(actualSessionId, logCmd)
                         }
 
                         return@withContext isRunning

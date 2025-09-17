@@ -32,6 +32,8 @@ class MCPStarter(private val context: Context) {
     // Coroutine scope for async operations
     private val starterScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val terminal = Terminal.getInstance(context)
+    private var pnpmInstalled: Boolean? = null
+    private var sharedSessionId: String? = null
 
     /** Plugin initialization status enum */
     enum class PluginInitStatus {
@@ -50,28 +52,45 @@ class MCPStarter(private val context: Context) {
         fun onAllPluginsVerified(verificationResults: List<VerificationResult>) {}
     }
 
-    /** Check if Node.js is installed in Termux */
-    private suspend fun isNodeJsInstalled(): Boolean {
+    /** Get or create shared session */
+    private suspend fun getOrCreateSharedSession(): String? {
+        if (sharedSessionId != null) {
+            return sharedSessionId
+        }
+
         if (!terminal.isConnected()) {
             if (!terminal.initialize()) {
                 Log.e(TAG, "Failed to initialize TerminalManager")
-                return false
+                return null
             }
         }
 
-        // Try to find an existing session, or create a new one
-        val sessionId = terminal.createSession()
+        // Create a shared session for all MCP operations
+        sharedSessionId = terminal.createSessionAndWait("mcp-operations")
+        if (sharedSessionId == null) {
+            Log.e(TAG, "Failed to create shared terminal session or session initialization timeout")
+        }
+        return sharedSessionId
+    }
 
+    /** Check if pnpm is installed in terminal */
+    private suspend fun isPnpmInstalled(): Boolean {
+        if (pnpmInstalled != null) return pnpmInstalled == true
+
+        val sessionId = getOrCreateSharedSession()
         if (sessionId == null) {
-            Log.e(TAG, "Failed to create terminal session")
+            pnpmInstalled = false
             return false
         }
 
         try {
-            val result = terminal.executeCommand(sessionId, "command -v node")
-            return result != null && result.contains("node")
+            val result = terminal.executeCommand(sessionId, "command -v pnpm")
+            val installed = result != null && result.contains("pnpm")
+            pnpmInstalled = installed
+            return installed
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking Node.js installation: ${e.message}")
+            Log.e(TAG, "Error checking pnpm installation: ${e.message}")
+            pnpmInstalled = false
             return false
         }
     }
@@ -95,20 +114,30 @@ class MCPStarter(private val context: Context) {
             return false
         }
 
-        // Check if Node.js is installed
-        if (!isNodeJsInstalled()) {
-            Log.e(TAG, "Node.js is not installed in Termux. Please install Node.js first.")
+        // Check if pnpm is installed
+        if (!isPnpmInstalled()) {
+            Log.e(TAG, "pnpm is not installed in terminal. Please install pnpm first.")
             return false
         }
 
-        // Deploy bridge to Termux
-        if (!MCPBridge.deployBridge(context)) {
+        // Get shared session for deployment and starting
+        val sessionId = getOrCreateSharedSession()
+        if (sessionId == null) {
+            Log.e(TAG, "Failed to get shared session for bridge initialization")
+            return false
+        }
+
+        // Deploy bridge to terminal
+        if (!MCPBridge.deployBridge(context, sessionId)) {
             Log.e(TAG, "Failed to deploy bridge")
             return false
         }
 
         // Start bridge
-        if (!MCPBridge.startBridge(context)) {
+        if (!MCPBridge.startBridge(
+            context = context,
+            sessionId = sessionId
+        )) {
             Log.e(TAG, "Failed to start bridge")
             return false
         }
@@ -244,8 +273,8 @@ class MCPStarter(private val context: Context) {
                     !isTerminalServiceConnected() -> {
                         statusCallback(StartStatus.TerminalServiceUnavailable())
                     }
-                    !isNodeJsInstalled() -> {
-                        statusCallback(StartStatus.NodeJsMissing())
+                    !isPnpmInstalled() -> {
+                        statusCallback(StartStatus.PnpmMissing())
                     }
                     else -> {
                         statusCallback(StartStatus.Error("Failed to initialize bridge"))
@@ -259,7 +288,7 @@ class MCPStarter(private val context: Context) {
             // Use MCPBridge instance
             val bridge = MCPBridge.getInstance(context)
             val termuxPluginDir =
-                    "/data/data/com.termux/files/home/mcp_plugins/${pluginId.split("/").last()}"
+                    "~/mcp_plugins/${pluginId.split("/").last()}"
 
             // Register MCP service
             val registerResult =
@@ -320,16 +349,11 @@ class MCPStarter(private val context: Context) {
                     return@launch
                 }
 
-                // Check if Node.js is installed
-                if (!isNodeJsInstalled()) {
-                    Log.e(TAG, "Node.js is not installed in Termux. Please install Node.js first.")
-                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.NODEJS_MISSING)
-                    return@launch
-                }
-
-                // Initialize bridge
+                // Initialize bridge, which also checks for pnpm
                 if (!initBridge()) {
-                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.BRIDGE_FAILED)
+                    // initBridge now handles setting the correct status
+                    val status = if (pnpmInstalled == false) PluginInitStatus.NODEJS_MISSING else PluginInitStatus.BRIDGE_FAILED
+                    progressListener.onAllPluginsStarted(0, 0, status)
                     return@launch
                 }
 
@@ -568,8 +592,8 @@ class MCPStarter(private val context: Context) {
         data class TerminalServiceUnavailable(
                 val message: String = "终端服务不可用，请先启动它"
         ) : StartStatus()
-        data class NodeJsMissing(
-                val message: String = "Termux中未安装Node.js，请先安装"
+        data class PnpmMissing(
+                val message: String = "终端中未安装pnpm，请先安装"
         ) : StartStatus()
     }
 
@@ -582,3 +606,4 @@ class MCPStarter(private val context: Context) {
             val details: String = ""
     )
 }
+

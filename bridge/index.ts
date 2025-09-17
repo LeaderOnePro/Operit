@@ -11,7 +11,8 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
-import { MCPClient } from 'mcp-client';
+import type { MCPClient } from 'mcp-client';
+import * as os from 'os';
 
 // Configuration
 interface BridgeConfig {
@@ -216,6 +217,7 @@ class McpBridge {
         console.log(`Connecting to remote MCP service ${serviceName} at ${endpoint}`);
 
         try {
+            const { MCPClient } = await import('mcp-client');
             const client = new MCPClient({
                 name: `bridge-client-for-${serviceName}`,
                 version: '1.0.0',
@@ -282,76 +284,71 @@ class McpBridge {
         cwd?: string
     ): void {
         if (!command) {
-            console.log(`No command specified for service ${serviceName}, skipping startup`);
+            console.log(`[${serviceName}] No command specified, skipping startup`);
             return;
         }
 
-        // 如果服务已运行，不需要重新启动
         if (this.isServiceActive(serviceName)) {
-            console.log(`Service ${serviceName} is already running`);
+            console.log(`[${serviceName}] Service is already running`);
             return;
         }
-
-        console.log(`Starting MCP process for ${serviceName}: ${command} ${args.join(' ')} in ${cwd || '.'}`);
 
         try {
+            const workingDir = path.join(os.homedir(), 'mcp_plugins', serviceName);
+            console.log(`[${serviceName}] Starting process: ${command} ${args.join(' ')} in ${workingDir}`);
+
             const mcpProcess = spawn(command, args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
-                cwd: cwd,
+                cwd: workingDir,
                 env: {
                     ...process.env,
                     ...env
                 }
             });
 
-            // 存储进程
             this.mcpProcesses.set(serviceName, mcpProcess);
-
-            // 初始化为空工具数组
-            if (!this.mcpToolsMap.has(serviceName)) {
-                this.mcpToolsMap.set(serviceName, []);
-            }
-
-            // 标记服务为未就绪状态，直到工具获取完成
+            this.mcpToolsMap.set(serviceName, this.mcpToolsMap.get(serviceName) || []);
             this.serviceReadyMap.set(serviceName, false);
+            this.mcpErrors.delete(serviceName); // Clear previous errors
 
-            // 处理标准输出
             mcpProcess.stdout?.on('data', (data: Buffer) => {
                 this.handleMcpResponse(data, serviceName);
             });
 
-            // 处理标准错误
             mcpProcess.stderr?.on('data', (data: Buffer) => {
                 const errorText = data.toString().trim();
-                console.error(`MCP process error from ${serviceName}: ${errorText}`);
-                this.mcpErrors.set(serviceName, errorText);
+                console.error(`[${serviceName}] STDERR: ${errorText}`);
+                const currentErrors = this.mcpErrors.get(serviceName) || "";
+                this.mcpErrors.set(serviceName, `${currentErrors}\n${errorText}`.trim());
             });
 
-            // 处理进程错误
-            mcpProcess.on('error', (error: Error) => {
-                console.error(`MCP process error for ${serviceName}: ${error.message}`);
-                // close事件会被触发，所以在这里不需要删除
+            mcpProcess.on('error', (err) => {
+                console.error(`[${serviceName}] Spawn Error: ${err.message}`);
+                this.mcpErrors.set(serviceName, `Spawn Error: ${err.message}`);
             });
 
-            mcpProcess.on('close', (code: number) => {
-                console.log(`MCP process for ${serviceName} exited with code: ${code}`);
+            mcpProcess.on('close', (code: number, signal: string) => {
+                console.log(`[${serviceName}] Process exited with code: ${code}, signal: ${signal}`);
+                const errorOutput = this.mcpErrors.get(serviceName);
+                if (code !== 0 && errorOutput) {
+                    console.error(`[${serviceName}] Process exited with an error. Last known error output:\n${errorOutput}`);
+                }
+
                 this.mcpProcesses.delete(serviceName);
                 this.serviceReadyMap.set(serviceName, false);
 
-                // 尝试重启
                 const serviceInfo = this.serviceRegistry.get(serviceName);
-                if (serviceInfo) {
+                if (serviceInfo && code !== 0) { // Only restart on non-zero exit codes
                     const attempts = (this.restartAttempts.get(serviceName) || 0) + 1;
                     this.restartAttempts.set(serviceName, attempts);
 
                     if (attempts > this.MAX_RESTART_ATTEMPTS) {
-                        console.error(`Service ${serviceName} has crashed too many times. Will not restart again.`);
+                        console.error(`[${serviceName}] Service has crashed too many times. Will not restart again.`);
                         return;
                     }
 
-                    // 指数退避策略
                     const restartDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
-                    console.log(`Attempting to restart service ${serviceName} in ${restartDelay / 1000}s (attempt ${attempts})...`);
+                    console.log(`[${serviceName}] Attempting to restart in ${restartDelay / 1000}s (attempt ${attempts})...`);
                     setTimeout(() => {
                         this.startMcpProcess(
                             serviceName,
@@ -362,24 +359,21 @@ class McpBridge {
                         );
                     }, restartDelay);
                 } else {
-                    console.log(`Not restarting service ${serviceName} as it is not in the registry.`);
+                    console.log(`[${serviceName}] Not restarting (exit code 0 or service unregistered).`);
                 }
             });
 
-            // 启动后获取工具列表
             setTimeout(() => this.fetchMcpTools(serviceName), 1000);
 
-            // 如果进程在一分钟后仍在运行，则认为它稳定并重置重启计数器
             setTimeout(() => {
                 if (this.isServiceActive(serviceName)) {
-                    console.log(`Service ${serviceName} appears stable, resetting restart counter.`);
+                    console.log(`[${serviceName}] Service appears stable, resetting restart counter.`);
                     this.restartAttempts.set(serviceName, 0);
                 }
             }, 60000);
         } catch (error) {
-            console.error(`Failed to start MCP process for ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
-            // 标记服务为就绪状态
-            this.serviceReadyMap.set(serviceName, true);
+            console.error(`[${serviceName}] Failed to start process: ${error instanceof Error ? error.message : String(error)}`);
+            this.serviceReadyMap.set(serviceName, true); // Mark as ready to prevent deadlocks
         }
     }
 

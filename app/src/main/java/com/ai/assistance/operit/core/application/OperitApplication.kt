@@ -24,7 +24,6 @@ import com.ai.assistance.operit.data.preferences.initUserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.services.EmbeddingService
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
-import com.ai.assistance.operit.ui.features.chat.webview.computer.ComputerDesktopManager
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.language.LanguageFactory
 import com.ai.assistance.operit.util.GlobalExceptionHandler
 import com.ai.assistance.operit.util.LocaleUtils
@@ -69,9 +68,6 @@ class OperitApplication : Application() {
         super.onCreate()
         instance = this
 
-        // 初始化全局桌面管理器
-        ComputerDesktopManager.initialize(this)
-        
         // Initialize ActivityLifecycleManager to track the current activity
         ActivityLifecycleManager.initialize(this)
 

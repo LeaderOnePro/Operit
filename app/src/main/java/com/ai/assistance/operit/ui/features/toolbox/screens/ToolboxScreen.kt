@@ -39,7 +39,7 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.ffmpegtoolbox.FFmpeg
 import com.ai.assistance.operit.ui.features.toolbox.screens.filemanager.FileManagerScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.logcat.LogcatScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.shellexecutor.ShellExecutorScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.screens.TerminalScreen
+import com.ai.assistance.operit.terminal.view.TerminalScreen as TerminalViewScreen
 // import com.ai.assistance.operit.ui.features.toolbox.screens.terminalconfig.TerminalAutoConfigScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.uidebugger.UIDebuggerScreen
 import kotlinx.coroutines.delay
@@ -47,6 +47,8 @@ import kotlinx.coroutines.launch
 import android.content.Context
 import com.ai.assistance.operit.R
 import androidx.compose.ui.res.stringResource
+import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.terminal.rememberTerminalEnv
 
 // 工具类别
 enum class ToolCategory {
@@ -81,7 +83,6 @@ fun ToolboxScreen(
         onFormatConverterSelected: () -> Unit,
         onFileManagerSelected: () -> Unit,
         onTerminalSelected: () -> Unit,
-        onTerminalAutoConfigSelected: () -> Unit,
         onAppPermissionsSelected: () -> Unit,
         onUIDebuggerSelected: () -> Unit,
         onFFmpegToolboxSelected: () -> Unit,
@@ -165,13 +166,6 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_terminal_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onTerminalSelected
-                        ),
-                        Tool(
-                                name = stringResource(R.string.tool_terminal_auto_config),
-                                icon = Icons.Rounded.Build,
-                                description = stringResource(R.string.tool_terminal_auto_config_desc),
-                                category = ToolCategory.DEVELOPMENT,
-                                onClick = onTerminalAutoConfigSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_ui_debugger),
@@ -475,8 +469,11 @@ fun FileManagerToolScreen(navController: NavController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalToolScreen(navController: NavController) {
+        val context = LocalContext.current
+        val terminalManager = remember { TerminalManager.getInstance(context) }
+        val terminalEnv = rememberTerminalEnv(terminalManager = terminalManager)
         CustomScaffold() { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) { TerminalScreen() }
+                Box(modifier = Modifier.padding(paddingValues)) { TerminalViewScreen(env = terminalEnv) }
         }
 }
 

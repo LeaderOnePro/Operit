@@ -131,14 +131,14 @@ class MCPDeployer(private val context: Context) {
             }
             
             // 获取终端会话
-            val sessionId = terminal.createSession()
+            val sessionId = terminal.createSessionAndWait("mcp-deployer")
             if (sessionId == null) {
-                statusCallback(DeploymentStatus.Error("无法创建终端会话"))
+                statusCallback(DeploymentStatus.Error("无法创建终端会话或会话初始化超时"))
                 return@withContext false
             }
 
-            // 定义插件在应用内部的存储路径
-            val pluginHomeDir = "${context.filesDir.path}/mcp_plugins"
+            // 定义插件在 proot 环境中的主目录路径
+            val pluginHomeDir = "~/mcp_plugins"
             val pluginDir = "$pluginHomeDir/${pluginId.split("/").last()}"
 
             // 首先创建插件目录
@@ -153,7 +153,19 @@ class MCPDeployer(private val context: Context) {
             // 复制插件文件到目标目录
             statusCallback(DeploymentStatus.InProgress("复制插件文件到目标目录..."))
 
-            val copyExecuted = terminal.executeCommand(sessionId, "cp -r $pluginPath/* $pluginDir/")
+            // 将pluginPath转换为终端可访问的路径
+            val terminalPluginPath = if (pluginPath.startsWith("/storage/")) {
+                // 如果是Android storage路径，转换为sdcard路径
+                pluginPath.replace("/storage/emulated/0", "/sdcard")
+            } else if (pluginPath.startsWith("/sdcard")) {
+                // 已经是sdcard路径，直接使用
+                pluginPath
+            } else {
+                // 其他情况，假设是相对路径或需要检查的路径
+                pluginPath
+            }
+
+            val copyExecuted = terminal.executeCommand(sessionId, "cp -r $terminalPluginPath/* $pluginDir/")
             if (copyExecuted == null) {
                 statusCallback(DeploymentStatus.Error("复制文件到目标目录失败"))
                 return@withContext false
@@ -187,10 +199,10 @@ class MCPDeployer(private val context: Context) {
 
                 // 判断是否是非关键命令（如npm配置命令）
                 val isNonCriticalCommand =
-                        cleanCommand.contains("npm config set") ||
+                        cleanCommand.contains("pnpm config set") ||
                                 cleanCommand.contains("|| true") ||
-                                cleanCommand.contains("npm install -g") ||
-                                cleanCommand.startsWith("npm config")
+                                cleanCommand.contains("pnpm install -g") ||
+                                cleanCommand.startsWith("pnpm config")
 
                 statusCallback(
                         DeploymentStatus.InProgress(

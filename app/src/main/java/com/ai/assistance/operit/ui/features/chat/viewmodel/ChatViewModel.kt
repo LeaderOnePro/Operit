@@ -18,7 +18,6 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
-
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.InvitationRepository
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
@@ -251,7 +250,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showWebView = MutableStateFlow(false)
     val showWebView: StateFlow<Boolean> = _showWebView
 
-    // 添加“AI电脑”附加层显示状态
+    // 添加AI电脑显示状态的状态流
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
 
@@ -1076,6 +1075,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // WebView控制方法
     fun toggleWebView() {
+        // 如果要显示WebView，先关闭AI电脑
+        if (!_showWebView.value && _showAiComputer.value) {
+            _showAiComputer.value = false
+            Log.d(TAG, "AI电脑已关闭（由于打开工作区）")
+        }
+        
         // 如果要显示WebView，确保本地Web服务器已启动
         if (!_showWebView.value) {
             // Get the WORKSPACE server instance and ensure it's running
@@ -1119,27 +1124,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         val newShowState = !_showWebView.value
         _showWebView.value = newShowState
 
-        // 如果打开WebView，则关闭AI电脑
-        if (newShowState) {
-            _showAiComputer.value = false
-        }
-        
         // 每次切换时，增加刷新计数器
         if (_showWebView.value) {
             _webViewRefreshCounter.value += 1
         }
     }
 
-    // AI电脑控制方法
-    fun toggleAiComputer() {
-        val newShowState = !_showAiComputer.value
-        _showAiComputer.value = newShowState
 
-        // 如果打开AI电脑，则关闭WebView
-        if (newShowState) {
-            _showWebView.value = false
-        }
-    }
 
     // 初始化本地Web服务器
     private fun initLocalWebServer() {
@@ -1389,6 +1380,35 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun onAiComputerButtonClick() {
         toggleAiComputer()
     }
+
+    // AI电脑控制方法
+    fun toggleAiComputer() {
+        viewModelScope.launch {
+            // 如果要显示AI电脑，先关闭工作区
+            if (!_showAiComputer.value && _showWebView.value) {
+                _showWebView.value = false
+                Log.d(TAG, "工作区已关闭（由于打开AI电脑）")
+            }
+            
+            val newShowState = !_showAiComputer.value
+            _showAiComputer.value = newShowState
+            
+            if (newShowState) {
+                // 初始化AI电脑管理器
+                try {
+                    Log.d(TAG, "AI电脑已启动")
+                } catch (e: Exception) {
+                    Log.e(TAG, "启动AI电脑失败", e)
+                    _showAiComputer.value = false
+                    uiStateDelegate.showErrorMessage("启动AI电脑失败: ${e.message}")
+                }
+            } else {
+                Log.d(TAG, "AI电脑已关闭")
+            }
+        }
+    }
+
+
 
     /** 初始化语音服务 */
     private fun initializeVoiceService() {

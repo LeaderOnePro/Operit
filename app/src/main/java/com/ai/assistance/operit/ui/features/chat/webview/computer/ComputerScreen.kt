@@ -1,19 +1,23 @@
 package com.ai.assistance.operit.ui.features.chat.webview.computer
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
-import com.ai.assistance.operit.data.model.ChatHistory
-import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
-import java.io.File
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.terminal.rememberTerminalEnv
+import com.ai.assistance.operit.terminal.view.TerminalScreen
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun ComputerScreen(
-    actualViewModel: ChatViewModel,
-    currentChat: ChatHistory?,
-) {
-    // For now, we'll just show the ComputerManager directly.
-    // Later we can add setup screens if needed.
-    ComputerManager(
-        actualViewModel = actualViewModel,
-        currentChat = currentChat,
-    )
+fun ComputerScreen() {
+    val context = LocalContext.current
+    
+    // Create a TerminalManager and TerminalEnv instance for the terminal
+    val terminalManager = remember { TerminalManager.getInstance(context) }
+    val terminalEnv = rememberTerminalEnv(terminalManager)
+    
+    // Show the terminal interface instead of the web desktop
+    TerminalScreen(env = terminalEnv)
 } 
