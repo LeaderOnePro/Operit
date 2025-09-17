@@ -318,6 +318,30 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
                 }
             }
 
+    /** Get tool descriptions provided by the service as a list of strings */
+    suspend fun getToolDescriptions(): List<String> = 
+            withContext(Dispatchers.IO) {
+                try {
+                    val tools = getTools()
+                    return@withContext tools.mapNotNull { tool ->
+                        val name = tool.optString("name", "")
+                        val description = tool.optString("description", "")
+                        if (name.isNotEmpty()) {
+                            if (description.isNotEmpty()) {
+                                "$name: $description"
+                            } else {
+                                name
+                            }
+                        } else {
+                            null
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error getting tool descriptions: ${e.message}")
+                    return@withContext emptyList()
+                }
+            }
+
     /** Disconnect from the service */
     fun disconnect() {
         isConnected.set(false)

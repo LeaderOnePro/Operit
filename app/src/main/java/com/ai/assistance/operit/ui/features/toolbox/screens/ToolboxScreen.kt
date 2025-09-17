@@ -88,7 +88,6 @@ fun ToolboxScreen(
         onFFmpegToolboxSelected: () -> Unit,
         onShellExecutorSelected: () -> Unit,
         onLogcatSelected: () -> Unit,
-        onMarkdownDemoSelected: () -> Unit,
         onTextToSpeechSelected: () -> Unit,
         onSpeechToTextSelected: () -> Unit,
         onToolTesterSelected: () -> Unit,
@@ -180,13 +179,6 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_ffmpeg_toolbox_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onFFmpegToolboxSelected
-                        ),
-                        Tool(
-                                name = stringResource(R.string.tool_stream_markdown_demo),
-                                icon = Icons.Default.FormatAlignLeft,
-                                description = stringResource(R.string.tool_stream_markdown_demo_desc),
-                                category = ToolCategory.DEVELOPMENT,
-                                onClick = onMarkdownDemoSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_shell_executor),

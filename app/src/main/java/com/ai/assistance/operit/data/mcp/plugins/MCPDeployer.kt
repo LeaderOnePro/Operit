@@ -26,6 +26,11 @@ class MCPDeployer(private val context: Context) {
         private const val TAG = "MCPDeployer"
     }
 
+    /** Get or create shared session */
+    private suspend fun getOrCreateSharedSession(): String? {
+        return MCPSharedSession.getOrCreateSharedSession(context)
+    }
+
     // 部署状态
     sealed class DeploymentStatus {
         object NotStarted : DeploymentStatus()
@@ -118,24 +123,14 @@ class MCPDeployer(private val context: Context) {
             serverName: String?
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            // 获取终端管理器
-            val terminal = Terminal.getInstance(context)
-            
-            // 确保已连接到终端服务
-            if (!terminal.isConnected()) {
-                val connected = terminal.initialize()
-                if (!connected) {
-                    statusCallback(DeploymentStatus.Error("无法连接到终端服务"))
-                    return@withContext false
-                }
-            }
-            
-            // 获取终端会话
-            val sessionId = terminal.createSessionAndWait("mcp-deployer")
+            // 获取或创建共享终端会话
+            val sessionId = getOrCreateSharedSession()
             if (sessionId == null) {
-                statusCallback(DeploymentStatus.Error("无法创建终端会话或会话初始化超时"))
+                statusCallback(DeploymentStatus.Error("无法获取终端会话"))
                 return@withContext false
             }
+            
+            val terminal = Terminal.getInstance(context)
 
             // 定义插件在 proot 环境中的主目录路径
             val pluginHomeDir = "~/mcp_plugins"

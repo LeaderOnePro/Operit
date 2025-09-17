@@ -150,7 +150,6 @@ class MCPRepository(private val context: Context) {
             _mcpServers.value = servers.sortedBy { it.name }
             _installedPluginIds.value = installedIds
             
-            Log.d(TAG, "从MCPLocalServer加载插件: ${servers.size}个，已安装: ${installedIds.size}个")
         } catch (e: Exception) {
             Log.e(TAG, "从MCPLocalServer加载插件失败", e)
         }

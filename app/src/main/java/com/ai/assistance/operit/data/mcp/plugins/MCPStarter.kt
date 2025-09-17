@@ -33,7 +33,6 @@ class MCPStarter(private val context: Context) {
     private val starterScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val terminal = Terminal.getInstance(context)
     private var pnpmInstalled: Boolean? = null
-    private var sharedSessionId: String? = null
 
     /** Plugin initialization status enum */
     enum class PluginInitStatus {
@@ -54,23 +53,7 @@ class MCPStarter(private val context: Context) {
 
     /** Get or create shared session */
     private suspend fun getOrCreateSharedSession(): String? {
-        if (sharedSessionId != null) {
-            return sharedSessionId
-        }
-
-        if (!terminal.isConnected()) {
-            if (!terminal.initialize()) {
-                Log.e(TAG, "Failed to initialize TerminalManager")
-                return null
-            }
-        }
-
-        // Create a shared session for all MCP operations
-        sharedSessionId = terminal.createSessionAndWait("mcp-operations")
-        if (sharedSessionId == null) {
-            Log.e(TAG, "Failed to create shared terminal session or session initialization timeout")
-        }
-        return sharedSessionId
+        return MCPSharedSession.getOrCreateSharedSession(context)
     }
 
     /** Check if pnpm is installed in terminal */
@@ -431,11 +414,68 @@ class MCPStarter(private val context: Context) {
             try {
                 delay(5000) // Wait for services to initialize
                 val results = verifyAllMcpPlugins()
+                
+                // 自动生成空描述的工具包描述
+                generateMissingDescriptions(results)
+                
                 progressListener.onAllPluginsVerified(results)
             } catch (e: Exception) {
                 Log.e(TAG, "Error verifying plugins", e)
                 progressListener.onAllPluginsVerified(emptyList())
             }
+        }
+    }
+
+    /** 
+     * 为没有描述的工具包自动生成描述
+     */
+    private suspend fun generateMissingDescriptions(results: List<VerificationResult>) {
+        try {
+            val mcpRepository = MCPRepository(context)
+            val mcpLocalServer = MCPLocalServer.getInstance(context)
+            
+            // 筛选出成功响应的插件
+            val respondingPlugins = results.filter { it.isResponding }
+            
+            for (result in respondingPlugins) {
+                try {
+                    // 获取插件信息
+                    val pluginInfo = mcpRepository.getInstalledPluginInfo(result.pluginId)
+                    
+                    // 检查描述是否为空
+                    if (pluginInfo != null && pluginInfo.description.isBlank()) {
+                        Log.d(TAG, "为插件 ${result.pluginId} 生成描述，当前描述为空")
+                        
+                        // 获取工具描述
+                        val client = MCPBridgeClient(context, result.serviceName)
+                        val toolDescriptions = client.getToolDescriptions()
+                        
+                        if (toolDescriptions.isNotEmpty()) {
+                            // 调用EnhancedAIService生成描述
+                            val generatedDescription = com.ai.assistance.operit.api.chat.EnhancedAIService.generatePackageDescription(
+                                context = context,
+                                pluginName = pluginInfo.name,
+                                toolDescriptions = toolDescriptions
+                            )
+                            
+                            // 只有在AI成功生成描述时才保存，失败时保持原有的空描述
+                            if (generatedDescription.isNotBlank()) {
+                                val updatedMetadata = pluginInfo.copy(description = generatedDescription)
+                                mcpLocalServer.addOrUpdatePluginMetadata(updatedMetadata)
+                                Log.i(TAG, "已为插件 ${result.pluginId} 生成描述: $generatedDescription")
+                            } else {
+                                Log.w(TAG, "插件 ${result.pluginId} 的描述生成失败，保持原有空描述")
+                            }
+                        } else {
+                            Log.w(TAG, "插件 ${result.pluginId} 没有可用的工具描述")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "为插件 ${result.pluginId} 生成描述时出错: ${e.message}", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "生成缺失描述时出错", e)
         }
     }
 

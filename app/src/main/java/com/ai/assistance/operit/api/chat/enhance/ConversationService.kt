@@ -746,5 +746,75 @@ $text
             throw e
         }
     }
+
+    /**
+     * 自动生成工具包描述
+     * @param pluginName 工具包名称
+     * @param toolDescriptions 工具描述列表
+     * @param multiServiceManager 多服务管理器
+     * @return 生成的工具包描述
+     */
+    suspend fun generatePackageDescription(
+        pluginName: String,
+        toolDescriptions: List<String>,
+        multiServiceManager: MultiServiceManager
+    ): String {
+        if (toolDescriptions.isEmpty()) {
+            return ""
+        }
+        
+        val toolList = toolDescriptions.joinToString("\n") { "- $it" }
+        
+        val descriptionPrompt = """
+请为名为"$pluginName"的MCP工具包生成一个简洁的描述。这个工具包包含以下工具：
+
+$toolList
+
+要求：
+1. 描述应该简洁明了，不超过100字
+2. 重点说明工具包的主要功能和用途
+3. 使用中文
+4. 不要包含技术细节，要通俗易懂
+5. 只返回描述内容，不要添加任何其他文字
+
+请生成描述：
+        """.trim()
+        
+        val chatHistory = listOf(
+            Pair("system", "你是一个专业的技术文档撰写助手，擅长为软件工具包编写简洁清晰的功能描述。")
+        )
+        
+        val contentBuilder = StringBuilder()
+        
+        try {
+            // 获取总结功能的AIService实例
+            val summaryService = multiServiceManager.getServiceForFunction(FunctionType.SUMMARY)
+            
+            // 获取模型参数
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.SUMMARY)
+            
+            val stream = summaryService.sendMessage(
+                message = descriptionPrompt,
+                chatHistory = chatHistory,
+                modelParameters = modelParameters
+            )
+            
+            stream.collect { content ->
+                contentBuilder.append(content)
+            }
+            
+            val result = contentBuilder.toString().trim()
+            
+            // 如果生成失败或内容为空，返回空字符串表示生成失败
+            return if (result.isBlank()) {
+                ""
+            } else {
+                result
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "生成工具包描述时出错", e)
+            return ""
+        }
+    }
 }
 

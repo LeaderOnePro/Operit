@@ -196,6 +196,21 @@ class EnhancedAIService private constructor(private val context: Context) {
                     instance.multiServiceManager
             )
         }
+
+        /**
+         * 自动生成工具包描述（非实例化方式）
+         * @param context 应用上下文
+         * @param pluginName 工具包名称
+         * @param toolDescriptions 工具描述列表
+         * @return 生成的工具包描述
+         */
+        suspend fun generatePackageDescription(
+            context: Context,
+            pluginName: String,
+            toolDescriptions: List<String>
+        ): String {
+            return getInstance(context).generatePackageDescription(pluginName, toolDescriptions)
+        }
     }
 
     // MultiServiceManager 管理不同功能的 AIService 实例
@@ -1253,6 +1268,19 @@ class EnhancedAIService private constructor(private val context: Context) {
      */
     suspend fun translateText(text: String): String {
         return conversationService.translateText(text, multiServiceManager)
+    }
+
+    /**
+     * 自动生成工具包描述
+     * @param pluginName 工具包名称
+     * @param toolDescriptions 工具描述列表
+     * @return 生成的工具包描述
+     */
+    suspend fun generatePackageDescription(
+        pluginName: String,
+        toolDescriptions: List<String>
+    ): String {
+        return conversationService.generatePackageDescription(pluginName, toolDescriptions, multiServiceManager)
     }
 
 

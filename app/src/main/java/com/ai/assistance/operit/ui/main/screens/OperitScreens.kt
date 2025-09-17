@@ -167,7 +167,6 @@ sealed class Screen(
                     onFFmpegToolboxSelected = { navigateTo(FFmpegToolbox) },
                     onShellExecutorSelected = { navigateTo(ShellExecutor) },
                     onLogcatSelected = { navigateTo(Logcat) },
-                    onMarkdownDemoSelected = { navigateTo(MarkdownDemo) },
                     onTextToSpeechSelected = { navigateTo(TextToSpeech) },
                     onSpeechToTextSelected = { navigateTo(SpeechToText) },
                     onToolTesterSelected = { navigateTo(ToolTester) },

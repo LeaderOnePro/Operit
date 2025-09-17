@@ -48,6 +48,7 @@ import com.ai.assistance.operit.data.mcp.plugins.MCPBridgeClient
 import com.ai.assistance.operit.data.mcp.plugins.ServiceInfo
 import com.google.gson.JsonParser
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.ui.res.stringResource
 import com.ai.assistance.operit.R
 
@@ -99,7 +100,6 @@ fun MCPConfigScreen() {
     val currentInstallingPlugin by viewModel.currentServer.collectAsState()
     val installedPlugins =
             mcpRepository.installedPluginIds.collectAsState(initial = emptySet()).value
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // 计算是否有任何服务器在运行
     val isAnyServerRunning = serverStatus.values.any { it.active }
@@ -167,7 +167,6 @@ fun MCPConfigScreen() {
     var showImportDialog by remember { mutableStateOf(false) }
     var repoUrlInput by remember { mutableStateOf("") }
     var pluginNameInput by remember { mutableStateOf("") }
-    var pluginDescriptionInput by remember { mutableStateOf("") }
     var isImporting by remember { mutableStateOf(false) }
     // 新增：导入方式选择和压缩包路径
     var importTabIndex by remember { mutableStateOf(0) } // 0: 仓库导入, 1: 压缩包导入
@@ -238,14 +237,14 @@ fun MCPConfigScreen() {
                 
                 if (toolsMap.isNotEmpty()) {
                     val totalTools = toolsMap.values.sumOf { it.size }
-                    snackbarHostState.showSnackbar(context.getString(R.string.tools_loaded, totalTools), duration = SnackbarDuration.Short)
+                    Toast.makeText(context, context.getString(R.string.tools_loaded, totalTools), Toast.LENGTH_SHORT).show()
                     Log.i("MCPConfigScreen", "Loaded $totalTools tools from ${toolsMap.size} plugins")
                 } else {
                     Log.i("MCPConfigScreen", "No tools found for any running plugins.")
                 }
             } catch (e: Exception) {
                 Log.e("MCPConfigScreen", "Error fetching tools", e)
-                snackbarHostState.showSnackbar(context.getString(R.string.tools_load_error, e.message))
+                Toast.makeText(context, context.getString(R.string.tools_load_error, e.message), Toast.LENGTH_SHORT).show()
             }
         } else {
             pluginToolsMap = emptyMap() // 清空工具映射
@@ -262,7 +261,7 @@ fun MCPConfigScreen() {
     LaunchedEffect(deploymentStatus) {
         if (deploymentStatus is MCPDeployer.DeploymentStatus.Success) {
             currentDeployingPlugin?.let { pluginId ->
-                snackbarHostState.showSnackbar(context.getString(R.string.plugin_deployed_success, getPluginDisplayName(pluginId, mcpRepository)))
+                Toast.makeText(context, context.getString(R.string.plugin_deployed_success, getPluginDisplayName(pluginId, mcpRepository)), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -284,7 +283,7 @@ fun MCPConfigScreen() {
                     selectedPluginId?.let { pluginId ->
                         scope.launch {
                         mcpLocalServer.savePluginConfig(pluginId, pluginConfigJson)
-                            snackbarHostState.showSnackbar(context.getString(R.string.config_saved))
+                            Toast.makeText(context, context.getString(R.string.config_saved), Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -380,9 +379,7 @@ fun MCPConfigScreen() {
                 viewModel.updateRemoteServer(updatedServer)
                 showRemoteEditDialog = false
                 editingRemoteServer = null
-                scope.launch {
-                    snackbarHostState.showSnackbar(context.getString(R.string.remote_service_updated, updatedServer.name))
-                }
+                Toast.makeText(context, context.getString(R.string.remote_service_updated, updatedServer.name), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -581,15 +578,6 @@ fun MCPConfigScreen() {
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
-                    
-                    OutlinedTextField(
-                        value = pluginDescriptionInput,
-                        onValueChange = { pluginDescriptionInput = it },
-                        label = { Text(stringResource(R.string.plugin_description)) },
-                        placeholder = { Text(stringResource(R.string.this_is_mcp_plugin)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        maxLines = 3
-                    )
                 }
             },
             confirmButton = {
@@ -604,9 +592,7 @@ fun MCPConfigScreen() {
                             // 检查插件ID是否冲突
                             val proposedId = pluginNameInput.replace(" ", "_").lowercase()
                             if (mcpRepository.isPluginInstalled(proposedId)) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.plugin_already_exists, pluginNameInput))
-                                }
+                                Toast.makeText(context, context.getString(R.string.plugin_already_exists, pluginNameInput), Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
 
@@ -614,11 +600,11 @@ fun MCPConfigScreen() {
                             // 生成一个唯一的ID，移除 "import_" 前缀
                             val importId = proposedId
                             
-                            // 创建服务器对象
+                            // 创建服务器对象（描述将由自动生成功能填充）
                             val server = com.ai.assistance.operit.data.mcp.MCPServer(
                                 id = importId,
                                 name = pluginNameInput,
-                                description = pluginDescriptionInput,
+                                description = "", // 将由自动生成功能填充
                                 logoUrl = "",
                                 stars = 0,
                                 category = if(isRemote) context.getString(R.string.remote_service) else context.getString(R.string.import_plugin),
@@ -628,7 +614,7 @@ fun MCPConfigScreen() {
                                 isInstalled = isRemote, // 远程服务视为"已安装"
                                 version = "1.0.0",
                                 updatedAt = "",
-                                longDescription = pluginDescriptionInput,
+                                longDescription = "", // 将由自动生成功能填充
                                 repoUrl = if (importTabIndex == 0) repoUrlInput else "",
                                 type = if(isRemote) "remote" else "local",
                                 endpoint = if(isRemote) remoteEndpointInput else null,
@@ -638,9 +624,7 @@ fun MCPConfigScreen() {
                             if(isRemote){
                                 // 对于远程服务，直接保存到仓库
                                 viewModel.addRemoteServer(server)
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.remote_service_added, server.name))
-                                }
+                                Toast.makeText(context, context.getString(R.string.remote_service_added, server.name), Toast.LENGTH_SHORT).show()
                             } else {
                                 // 本地插件走安装流程
                                 val mcpServer = com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer(
@@ -673,7 +657,6 @@ fun MCPConfigScreen() {
                             // 清空输入并关闭对话框
                             repoUrlInput = ""
                             pluginNameInput = ""
-                            pluginDescriptionInput = ""
                             zipFilePath = ""
                             remoteEndpointInput = ""
                             remoteConnectionType = "httpStream"
@@ -686,9 +669,7 @@ fun MCPConfigScreen() {
                                 1 -> context.getString(R.string.select_zip_and_enter_name)
                                 else -> context.getString(R.string.enter_complete_remote_info)
                             }
-                            scope.launch {
-                                snackbarHostState.showSnackbar(errorMessage)
-                            }
+                            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
                         }
                     },
                     enabled = !isImporting && 
@@ -710,7 +691,6 @@ fun MCPConfigScreen() {
                 TextButton(onClick = { 
                     repoUrlInput = ""
                     pluginNameInput = ""
-                    pluginDescriptionInput = ""
                     zipFilePath = ""
                     remoteEndpointInput = ""
                     remoteConnectionType = "httpStream"
@@ -786,7 +766,6 @@ fun MCPConfigScreen() {
     }
 
     CustomScaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             floatingActionButton = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1349,7 +1328,6 @@ fun RemoteServerEditDialog(
 ) {
     var name by remember { mutableStateOf(server.name) }
     var description by remember { mutableStateOf(server.description) }
-    var author by remember { mutableStateOf(server.author) }
     var endpoint by remember { mutableStateOf(server.endpoint ?: "") }
     var connectionType by remember { mutableStateOf(server.connectionType ?: "httpStream") }
     val connectionTypes = listOf("httpStream", "sse")
@@ -1374,12 +1352,6 @@ fun RemoteServerEditDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(stringResource(R.string.description)) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = author,
-                    onValueChange = { author = it },
-                    label = { Text(stringResource(R.string.author)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 if(isRemote) {
@@ -1430,7 +1402,6 @@ fun RemoteServerEditDialog(
                     val updatedServer = server.copy(
                         name = name,
                         description = description,
-                        author = author,
                         endpoint = if(isRemote) endpoint else server.endpoint,
                         connectionType = if(isRemote) connectionType else server.connectionType
                     )
