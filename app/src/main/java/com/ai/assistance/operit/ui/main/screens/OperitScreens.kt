@@ -187,7 +187,7 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            ShizukuDemoScreen()
+            ShizukuDemoScreen(navigateTo = navigateTo)
         }
     }
 

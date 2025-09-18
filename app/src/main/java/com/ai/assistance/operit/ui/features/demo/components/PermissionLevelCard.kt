@@ -307,10 +307,12 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
-                                            onLocationPermissionClick = onLocationPermissionClick
+                                            onLocationPermissionClick = onLocationPermissionClick,
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -331,12 +333,14 @@ fun PermissionLevelCard(
                                             isAccessibilityProviderInstalled = isAccessibilityProviderInstalled,
                                             hasAccessibilityServiceEnabled =
                                                     hasAccessibilityServiceEnabled,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
                                             onAccessibilityClick = onAccessibilityClick,
-                                            onInstallAccessibilityProviderClick = onInstallAccessibilityProviderClick
+                                            onInstallAccessibilityProviderClick = onInstallAccessibilityProviderClick,
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -354,10 +358,12 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
-                                            onLocationPermissionClick = onLocationPermissionClick
+                                            onLocationPermissionClick = onLocationPermissionClick,
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -565,10 +571,12 @@ private fun StandardPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
-        onLocationPermissionClick: () -> Unit
+        onLocationPermissionClick: () -> Unit,
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -624,6 +632,17 @@ private fun StandardPermissionSection(
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
                 )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
+                )
             }
         }
     }
@@ -637,12 +656,14 @@ private fun AccessibilityPermissionSection(
         hasLocationPermission: Boolean,
         isAccessibilityProviderInstalled: Boolean, // 新增
         hasAccessibilityServiceEnabled: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
         onAccessibilityClick: () -> Unit,
-        onInstallAccessibilityProviderClick: () -> Unit // 新增
+        onInstallAccessibilityProviderClick: () -> Unit, // 新增
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -696,6 +717,17 @@ private fun AccessibilityPermissionSection(
                         title = stringResource(R.string.location_permission),
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
+                )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
                 )
             }
         }
@@ -779,10 +811,12 @@ private fun AdminPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -868,6 +902,17 @@ private fun AdminPermissionSection(
                         title = stringResource(R.string.location_permission),
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
+                )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
                 )
             }
         }
@@ -1379,7 +1424,7 @@ private fun FeatureGrid(level: AndroidPermissionLevel) {
                         "data/data" to isFeatureSupported(level, false, false, false, false, true),
                         context.getString(R.string.feature_screen_auto_click) to isFeatureSupported(level, false, true, true, true, true),
                         context.getString(R.string.feature_system_permission_modification) to isFeatureSupported(level, false, false, false, true, true),
-                        context.getString(R.string.feature_termux_support) to isFeatureSupported(level, false, false, true, true, true),
+                        context.getString(R.string.feature_termux_support) to isFeatureSupported(level, true, true, true, true, true),
                         context.getString(R.string.feature_run_js) to isFeatureSupported(level, true, true, true, true, true),
                         context.getString(R.string.feature_plugin_market_mcp) to isFeatureSupported(level, false, false, false, true, true)
                 )

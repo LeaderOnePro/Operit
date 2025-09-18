@@ -23,6 +23,8 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.system.AndroidPermissionLevel
+import com.ai.assistance.operit.ui.main.screens.Screen
+import com.ai.assistance.operit.ui.main.screens.ScreenNavigationHandler
 import com.ai.assistance.operit.core.tools.system.AccessibilityProviderInstaller
 import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
 import com.ai.assistance.operit.core.tools.system.ShizukuInstaller
@@ -47,7 +49,8 @@ fun ShizukuDemoScreen(
                                         LocalContext.current.applicationContext as
                                                 android.app.Application
                                 )
-                )
+                ),
+        navigateTo: ScreenNavigationHandler? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -245,8 +248,8 @@ fun ShizukuDemoScreen(
                 }
         )
 
-        // 组合向导卡片到一个专门的设置区域
-        val needOperitTerminalSetupGuide = !uiState.isOperitTerminalInstalled.value || viewModel.isOperitTerminalUpdateNeeded.value
+        // 组合向导卡片到一个专门的设置区域 - 现在检查NodeJS和Python环境
+        val needOperitTerminalSetupGuide = !viewModel.isNodejsPythonEnvironmentReady.value
 
         // 检查Shizuku版本状态 - 使用remember缓存结果，避免每次重组时重复调用
         val (installedVersion, bundledVersion, isUpdateNeeded) =
@@ -652,17 +655,25 @@ fun ShizukuDemoScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // OperitTerminal向导卡片
+            // NodeJS和Python环境配置向导卡片
             if (needOperitTerminalSetupGuide) {
                 OperitTerminalWizardCard(
+                    isPnpmInstalled = viewModel.isPnpmInstalled.value,
+                    isPipInstalled = viewModel.isPythonInstalled.value,
+                    isEnvironmentReady = viewModel.isNodejsPythonEnvironmentReady.value,
+                    showWizard = uiState.showOperitTerminalWizard.value,
+                    onToggleWizard = { viewModel.toggleOperitTerminalWizard() },
+                    onOpenTerminalScreen = { 
+                        // 跳转到TerminalScreen
+                        navigateTo?.invoke(Screen.Terminal)
+                    },
+                    // 保留兼容性参数
                     isInstalled = uiState.isOperitTerminalInstalled.value,
                     installedVersion = viewModel.operitTerminalInstalledVersion.value,
                     latestVersion = viewModel.operitTerminalLatestVersion.value,
                     releaseNotes = viewModel.operitTerminalReleaseNotes.value,
                     updateNeeded = viewModel.isOperitTerminalUpdateNeeded.value,
-                    showWizard = uiState.showOperitTerminalWizard.value,
                     downloadUrl = viewModel.operitTerminalDownloadUrl.value,
-                    onToggleWizard = { viewModel.toggleOperitTerminalWizard() },
                     onInstall = { viewModel.installOrUpdateOperitTerminal(context) },
                     onUpdate = { viewModel.installOrUpdateOperitTerminal(context) },
                     onOpen = { viewModel.openOperitTerminal(context) },

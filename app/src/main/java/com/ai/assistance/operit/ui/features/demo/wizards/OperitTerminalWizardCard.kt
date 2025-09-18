@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,25 +27,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.util.GithubReleaseUtil
 
 @Composable
 fun OperitTerminalWizardCard(
-    isInstalled: Boolean,
-    installedVersion: String?,
-    latestVersion: String?,
-    releaseNotes: String?,
-    updateNeeded: Boolean,
+    isPnpmInstalled: Boolean,
+    isPipInstalled: Boolean,
+    isEnvironmentReady: Boolean,
     showWizard: Boolean,
-    downloadUrl: String? = null,
     onToggleWizard: (Boolean) -> Unit,
-    onInstall: () -> Unit,
-    onUpdate: () -> Unit,
-    onOpen: () -> Unit,
+    onOpenTerminalScreen: () -> Unit,
+    // 保留旧参数以保持兼容性
+    isInstalled: Boolean = false,
+    installedVersion: String? = null,
+    latestVersion: String? = null,
+    releaseNotes: String? = null,
+    updateNeeded: Boolean = false,
+    downloadUrl: String? = null,
+    onInstall: () -> Unit = {},
+    onUpdate: () -> Unit = {},
+    onOpen: () -> Unit = {},
     onDownloadFromUrl: (String) -> Unit = {}
 ) {
-    var showDownloadSourceMenu by remember { mutableStateOf(false) }
-    
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -68,7 +71,7 @@ fun OperitTerminalWizardCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        stringResource(R.string.operit_terminal_wizard_title),
+                        "配置终端环境",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -80,8 +83,7 @@ fun OperitTerminalWizardCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        if (showWizard) stringResource(R.string.wizard_collapse)
-                        else stringResource(R.string.wizard_expand),
+                        if (showWizard) "收起" else "展开",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -90,22 +92,23 @@ fun OperitTerminalWizardCard(
 
             Spacer(modifier = Modifier.height(12.dp))
             
-            // 状态信息
+            // 环境状态信息
             val statusText = when {
-                !isInstalled -> stringResource(R.string.operit_terminal_not_installed)
-                updateNeeded -> stringResource(R.string.operit_terminal_update_available)
-                else -> stringResource(R.string.operit_terminal_up_to_date)
+                isEnvironmentReady -> "NodeJS和pip环境已就绪"
+                isPnpmInstalled && !isPipInstalled -> "已安装pnpm，需要配置pip"
+                !isPnpmInstalled && isPipInstalled -> "已安装pip，需要配置pnpm"
+                else -> "需要配置NodeJS和pip环境"
             }
             
             val statusColor = when {
-                 updateNeeded -> MaterialTheme.colorScheme.primary
-                 isInstalled -> MaterialTheme.colorScheme.tertiary
+                isEnvironmentReady -> MaterialTheme.colorScheme.tertiary
+                isPnpmInstalled || isPipInstalled -> MaterialTheme.colorScheme.primary
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (isInstalled && !updateNeeded) Icons.Default.CheckCircle else Icons.Default.Info,
+                    imageVector = if (isEnvironmentReady) Icons.Default.CheckCircle else Icons.Default.Info,
                     contentDescription = null,
                     tint = statusColor,
                     modifier = Modifier.size(16.dp)
@@ -118,198 +121,100 @@ fun OperitTerminalWizardCard(
                 )
             }
             
+            // 详细环境状态显示
+            if (!isEnvironmentReady) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // pnpm状态
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = if (isPnpmInstalled) Icons.Default.CheckCircle else Icons.Default.Info,
+                            contentDescription = null,
+                            tint = if (isPnpmInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "pnpm",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isPnpmInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    // pip状态
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = if (isPipInstalled) Icons.Default.CheckCircle else Icons.Default.Info,
+                            contentDescription = null,
+                            tint = if (isPipInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "pip",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isPipInstalled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             // 详细设置内容，仅在展开时显示
             AnimatedVisibility(visible = showWizard) {
                 Column {
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    when {
-                        // 未安装
-                        !isInstalled -> {
-                            Text(
-                                stringResource(R.string.operit_terminal_install_description),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { 
-                                    if (downloadUrl != null) {
-                                        showDownloadSourceMenu = true
-                                    } else {
-                                        onInstall()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.operit_terminal_install_button), fontSize = 14.sp)
-                            }
-                        }
-
-                        // 需要更新
-                        updateNeeded -> {
-                            Text(
-                                stringResource(R.string.operit_terminal_update_description),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            
-                            if (!releaseNotes.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                // Tip: Omit long text with ellipsis
-                                Text(
-                                    text = stringResource(R.string.operit_terminal_release_notes, releaseNotes),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 3
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { 
-                                    if (downloadUrl != null) {
-                                        showDownloadSourceMenu = true
-                                    } else {
-                                        onUpdate()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.operit_terminal_update_button), fontSize = 14.sp)
-                            }
-                        }
-
-                        // 已是最新
-                        else -> {
-                             Text(
-                                stringResource(R.string.operit_terminal_latest_description),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(
-                                onClick = onOpen,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                Text(stringResource(R.string.operit_terminal_open_button), fontSize = 14.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // 下载源选择对话框
-    if (showDownloadSourceMenu && downloadUrl != null) {
-        val mirroredUrls = remember(downloadUrl) {
-            GithubReleaseUtil.getMirroredUrls(downloadUrl)
-        }
-
-        AlertDialog(
-            onDismissRequest = { showDownloadSourceMenu = false },
-            title = { Text(stringResource(id = R.string.select_download_source)) },
-            text = {
-                Column {
-                    Text(
-                        stringResource(id = R.string.select_download_source_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    // Use a scrollable column in case of many mirrors
-                    val scrollState = rememberScrollState()
-                    Column(Modifier.verticalScroll(scrollState)) {
-                        if (mirroredUrls.isEmpty()) {
-                            Text(
-                                stringResource(id = R.string.no_mirrors_found),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 16.dp)
-                            )
-                        } else {
-                            // Dynamically generate mirror download options
-                            mirroredUrls.forEach { (name, url) ->
-                                DownloadSourceRow(
-                                    title = stringResource(id = R.string.mirror_download, name),
-                                    description = stringResource(id = R.string.china_mirror_desc),
-                                    icon = Icons.Default.Storage,
-                                    onClick = {
-                                        onDownloadFromUrl(url)
-                                        showDownloadSourceMenu = false
-                                    }
-                                )
-                            }
-                        }
-                        
-                        // GitHub original link option
-                        DownloadSourceRow(
-                            title = stringResource(id = R.string.github_source),
-                            description = stringResource(id = R.string.github_source_desc),
-                            icon = Icons.Default.Language,
-                            onClick = {
-                                onDownloadFromUrl(downloadUrl)
-                                showDownloadSourceMenu = false
-                            }
+                    if (!isEnvironmentReady) {
+                        Text(
+                            "需要在终端中配置NodeJS（pnpm）和pip环境以支持MCP插件运行。点击下方按钮进入终端配置界面完成设置。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Button(
+                            onClick = onOpenTerminalScreen,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("前往终端配置", fontSize = 14.sp)
+                        }
+                    } else {
+                        Text(
+                            "NodeJS和pip环境已经配置完成，可以正常使用MCP插件功能。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        OutlinedButton(
+                            onClick = onOpenTerminalScreen,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Terminal, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("打开终端", fontSize = 14.sp)
+                        }
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showDownloadSourceMenu = false }) {
-                    Text(stringResource(id = R.string.cancel))
-                }
             }
-        )
+        }
     }
-}
-
-@Composable
-private fun DownloadSourceRow(
-   title: String,
-   description: String,
-   icon: ImageVector,
-   onClick: () -> Unit
-) {
-   Row(
-       modifier = Modifier
-           .fillMaxWidth()
-           .clickable(onClick = onClick)
-           .padding(vertical = 12.dp),
-       verticalAlignment = Alignment.CenterVertically,
-       horizontalArrangement = Arrangement.spacedBy(16.dp)
-   ) {
-       Icon(
-           imageVector = icon,
-           contentDescription = null,
-           tint = MaterialTheme.colorScheme.primary,
-           modifier = Modifier.size(24.dp)
-       )
-       Column(modifier = Modifier.weight(1f)) {
-           Text(
-               text = title,
-               style = MaterialTheme.typography.bodyLarge,
-               color = MaterialTheme.colorScheme.onSurface
-           )
-           Text(
-               text = description,
-               style = MaterialTheme.typography.bodySmall,
-               color = MaterialTheme.colorScheme.onSurfaceVariant
-           )
-       }
-   }
 } 

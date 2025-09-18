@@ -12,7 +12,6 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import com.ai.assistance.operit.core.tools.system.OperitTerminalManager
 import com.ai.assistance.operit.core.tools.system.RootAuthorizer
-import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
 import com.ai.assistance.operit.data.repository.UIHierarchyManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -21,6 +20,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.content.pm.PackageManager
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.ai.assistance.operit.core.tools.system.AccessibilityProviderInstaller
+import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
+import com.ai.assistance.operit.core.tools.system.Terminal
+import com.ai.assistance.operit.data.mcp.plugins.MCPSharedSession
 
 private const val TAG = "DemoStateManager"
 
@@ -28,7 +35,7 @@ private const val TAG = "DemoStateManager"
  * Consolidated state management for the demo screens. Handles state initialization, updates, and
  * listeners for Shizuku and other features.
  */
-class DemoStateManager(private val context: Context, private val coroutineScope: CoroutineScope) {
+class DemoStateManager(private val context: Context, private val coroutineScope: CoroutineScope) : ViewModel() {
     // Main UI state holder
     private val _uiState = MutableStateFlow(DemoScreenState())
     val uiState: StateFlow<DemoScreenState> = _uiState.asStateFlow()
@@ -40,6 +47,11 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
     var operitTerminalReleaseNotes = mutableStateOf<String?>(null)
     var isOperitTerminalUpdateNeeded = mutableStateOf(false)
 
+    // NodeJS和Python环境状态
+    val isPnpmInstalled = mutableStateOf(false)
+    val isPythonInstalled = mutableStateOf(false)
+    val isNodejsPythonEnvironmentReady = mutableStateOf(false)
+
     // Shizuku state change listeners
     private val shizukuListener: () -> Unit = { refreshStatus() }
 
@@ -50,6 +62,10 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         // Register listeners for Shizuku and Root state changes
         ShizukuAuthorizer.addStateChangeListener(shizukuListener)
         RootAuthorizer.addStateChangeListener(rootListener)
+        // 初始化时刷新所有状态
+        coroutineScope.launch {
+            refreshAllStates()
+        }
     }
 
     /** Initialize state */
@@ -171,6 +187,23 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         RootAuthorizer.removeStateChangeListener(rootListener)
     }
 
+    /**
+     * 刷新所有状态
+     */
+    suspend fun refreshAllStates() {
+        refreshOperitTerminalStatus()
+        refreshNodejsPythonEnvironment()
+    }
+
+    /**
+     * 公开的刷新所有状态方法
+     */
+    fun refreshAllStatesPublic() {
+        coroutineScope.launch {
+            refreshAllStates()
+        }
+    }
+
     private fun registerStateChangeListeners() {
         // Implementation of registerStateChangeListeners method
     }
@@ -231,6 +264,7 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
 
             // Check OperitTerminal status
             refreshOperitTerminalStatus()
+            refreshNodejsPythonEnvironment()
 
             // 延迟300ms以确保UI能够刷新
             delay(300)
@@ -275,6 +309,48 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
             false
         }
     }
+
+    /**
+     * 检查NodeJS和Python环境状态
+     */
+    suspend fun refreshNodejsPythonEnvironment() {
+        try {
+            val sessionId = MCPSharedSession.getOrCreateSharedSession(context)
+            if (sessionId == null) {
+                isPnpmInstalled.value = false
+                isPythonInstalled.value = false
+                isNodejsPythonEnvironmentReady.value = false
+                return
+            }
+
+            val terminal = Terminal.getInstance(context)
+            
+            // 检查pnpm安装状态
+            val pnpmResult = terminal.executeCommand(sessionId, "command -v pnpm")
+            isPnpmInstalled.value = pnpmResult != null && pnpmResult.contains("pnpm")
+            
+            // 检查python安装状态
+            val pythonResult = terminal.executeCommand(sessionId, "command -v python")
+            isPythonInstalled.value = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            
+            // 如果python不存在，检查python3
+            if (!isPythonInstalled.value) {
+                val python3Result = terminal.executeCommand(sessionId, "command -v python3")
+                isPythonInstalled.value = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
+            }
+
+            // 更新环境就绪状态
+            isNodejsPythonEnvironmentReady.value = isPnpmInstalled.value && isPythonInstalled.value
+            
+            Log.d(TAG, "NodeJS环境检查 - pnpm: ${isPnpmInstalled.value}, python: ${isPythonInstalled.value}, ready: ${isNodejsPythonEnvironmentReady.value}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "检查NodeJS和Python环境时出错", e)
+            isPnpmInstalled.value = false
+            isPythonInstalled.value = false
+            isNodejsPythonEnvironmentReady.value = false
+        }
+    }
 }
 
 /** 刷新应用权限和组件状态 */
@@ -309,9 +385,31 @@ suspend fun refreshPermissionsAndStatus(
         }
     updateShizukuPermission(hasShizukuPermission)
 
-    // 检查OperitTerminal是否安装
-    val isOperitTerminalInstalled = OperitTerminalManager.isInstalled(context)
-    updateOperitTerminalInstalled(isOperitTerminalInstalled)
+    // 检查NodeJS和Python环境是否就绪（替代OperitTerminal安装检查）
+    val isNodejsPythonEnvironmentReady = try {
+        val sessionId = MCPSharedSession.getOrCreateSharedSession(context)
+        if (sessionId != null) {
+            val terminal = Terminal.getInstance(context)
+            val pnpmResult = terminal.executeCommand(sessionId, "command -v pnpm")
+            val isPnpmInstalled = pnpmResult != null && pnpmResult.contains("pnpm")
+            
+            val pythonResult = terminal.executeCommand(sessionId, "command -v python")
+            var isPythonInstalled = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            
+            if (!isPythonInstalled) {
+                val python3Result = terminal.executeCommand(sessionId, "command -v python3")
+                isPythonInstalled = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
+            }
+            
+            isPnpmInstalled && isPythonInstalled
+        } else {
+            false
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "检查NodeJS和Python环境时出错", e)
+        false
+    }
+    updateOperitTerminalInstalled(isNodejsPythonEnvironmentReady)
 
     // 检查存储权限
     val hasStoragePermission =

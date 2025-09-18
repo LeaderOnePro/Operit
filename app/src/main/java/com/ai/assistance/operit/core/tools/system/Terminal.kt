@@ -74,33 +74,24 @@ class Terminal private constructor(private val context: Context) {
     }
 
     /**
-     * 创建新的终端会话
+     * 创建新的终端会话 - 同步等待初始化完成
      */
-    fun createSession(title: String? = null): String {
-        Log.d(TAG, "Creating new terminal session")
-        return terminalManager.createNewSession(title).id
+    suspend fun createSession(title: String? = null): String {
+        Log.d(TAG, "Creating new terminal session and waiting for initialization")
+        val newSession = terminalManager.createNewSession(title)
+        Log.d(TAG, "Session ${newSession.id} initialized successfully")
+        return newSession.id
     }
     
     /**
      * 创建新的终端会话并等待初始化完成
+     * @deprecated 使用 createSession 代替，现在所有会话创建都是同步的
      */
     suspend fun createSessionAndWait(title: String? = null): String? {
-        Log.d(TAG, "Creating new terminal session and waiting for initialization")
-        val newSession = terminalManager.createNewSession(title)
-        
-        // 等待会话初始化完成
-        val initialized = withTimeoutOrNull(30000) { // 30秒超时
-            terminalManager.terminalState.first { state ->
-                val session = state.sessions.find { it.id == newSession.id }
-                session?.initState == com.ai.assistance.operit.terminal.data.SessionInitState.READY
-            }
-        }
-        
-        return if (initialized != null) {
-            Log.d(TAG, "Session ${newSession.id} initialized successfully")
-            newSession.id
-        } else {
-            Log.e(TAG, "Session initialization timeout for session: ${newSession.id}")
+        return try {
+            createSession(title)
+        } catch (e: Exception) {
+            Log.e(TAG, "Session creation failed", e)
             null
         }
     }

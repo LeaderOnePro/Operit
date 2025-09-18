@@ -45,6 +45,14 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
     val isOperitTerminalUpdateNeeded
         get() = stateManager.isOperitTerminalUpdateNeeded
 
+    // Expose NodeJS and Python environment properties
+    val isPnpmInstalled
+        get() = stateManager.isPnpmInstalled
+    val isPythonInstalled
+        get() = stateManager.isPythonInstalled
+    val isNodejsPythonEnvironmentReady
+        get() = stateManager.isNodejsPythonEnvironmentReady
+
     /** Initialize the ViewModel with context data */
     fun initialize(context: Context) {
         // 初始化Root授权器
