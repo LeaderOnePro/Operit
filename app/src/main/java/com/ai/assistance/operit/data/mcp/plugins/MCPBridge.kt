@@ -182,16 +182,13 @@ class MCPBridge private constructor(private val context: Context) {
 
                         // 使用传入的sessionId或创建新的会话
                         val actualSessionId = sessionId ?: run {
-                            val newSessionId = terminal.createSessionAndWait("mcp-bridge-start")
+                            val newSessionId = terminal.createSessionAndWait("mcp-bridge-daemon")
                             if (newSessionId == null) {
                                 Log.e(TAG, "无法创建终端会话或会话初始化超时")
                                 return@withContext false
                             }
                             newSessionId
                         }
-
-                        // 清理日志文件
-                        Log.d(TAG, "清理日志文件")
 
                         // 构建启动命令 - 使用后台方式运行
                         val command = StringBuilder("cd $TERMUX_BRIDGE_PATH && node index.js $port")
@@ -201,7 +198,7 @@ class MCPBridge private constructor(private val context: Context) {
                                 command.append(" ${mcpArgs.joinToString(" ")}")
                             }
                         }
-                        command.append(" > bridge.log 2>&1 &")
+                        command.append(" &")
 
                         Log.d(TAG, "发送启动命令: $command")
 
@@ -228,11 +225,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                         // 如果三次尝试后仍然无法ping通，检查日志
                         if (!isRunning) {
-                            Log.e(TAG, "桥接器可能未成功启动，检查日志...")
-
-                            // 异步读取日志而不阻塞
-                            val logCmd = "tail -n 20 $TERMUX_BRIDGE_PATH/bridge.log"
-                            terminal.executeCommand(actualSessionId, logCmd)
+                            Log.e(TAG, "桥接器可能未成功启动。请检查终端会话 'mcp-bridge-daemon' 的输出。")
                         }
 
                         return@withContext isRunning

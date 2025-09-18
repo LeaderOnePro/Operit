@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -420,7 +420,7 @@ fun AIChatScreen(
                     }
             ) {
                 Icon(
-                        imageVector = Icons.Default.Computer,
+                        imageVector = Icons.Default.Terminal,
                         contentDescription = "AI电脑",
                         tint =
                                 if (showAiComputer) MaterialTheme.colorScheme.primaryContainer

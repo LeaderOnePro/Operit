@@ -119,7 +119,7 @@ class MCPStarter(private val context: Context) {
         // Start bridge
         if (!MCPBridge.startBridge(
             context = context,
-            sessionId = sessionId
+            sessionId = null // Use a dedicated session for the bridge server
         )) {
             Log.e(TAG, "Failed to start bridge")
             return false
