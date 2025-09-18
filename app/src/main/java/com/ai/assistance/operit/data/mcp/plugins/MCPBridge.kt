@@ -126,7 +126,7 @@ class MCPBridge private constructor(private val context: Context) {
                         cp -f $sdcardBridgePath/index.js $TERMUX_BRIDGE_PATH/ && 
                         cp -f $sdcardBridgePath/package.json $TERMUX_BRIDGE_PATH/ && 
                         cd $TERMUX_BRIDGE_PATH && 
-                        pnpm install
+                        if [ ! -d "node_modules/mcp-client" ] || [ ! -d "node_modules/uuid" ]; then pnpm install; fi
                     """.trimIndent()
 
                     // 执行命令

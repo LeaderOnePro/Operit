@@ -139,8 +139,8 @@ class Terminal private constructor(private val context: Context) {
 
         collectorReady.await() // 等待收集器准备就绪
         
-        // 现在发送命令，使用预生成的 commandId
-        terminalManager.sendInput(command, isCommand = true, commandId = commandId)
+        // 现在发送命令，使用预生成的 commandId，这样可以触发队列管理
+        terminalManager.sendCommand(command, commandId)
 
         val result = withTimeoutOrNull(300000) { // 5 分钟超时
             deferred.await()

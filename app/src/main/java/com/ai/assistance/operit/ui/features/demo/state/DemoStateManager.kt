@@ -331,18 +331,35 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
             
             // 检查python安装状态
             val pythonResult = terminal.executeCommand(sessionId, "command -v python")
-            isPythonInstalled.value = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            var hasPython = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
             
             // 如果python不存在，检查python3
-            if (!isPythonInstalled.value) {
+            if (!hasPython) {
                 val python3Result = terminal.executeCommand(sessionId, "command -v python3")
-                isPythonInstalled.value = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
+                hasPython = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
             }
 
-            // 更新环境就绪状态
+            // 检查pip安装状态 - 只有python存在时才检查pip
+            var hasPip = false
+            if (hasPython) {
+                // 尝试检查pip
+                val pipResult = terminal.executeCommand(sessionId, "command -v pip")
+                hasPip = pipResult != null && pipResult.contains("pip")
+                
+                // 如果pip不存在，检查pip3
+                if (!hasPip) {
+                    val pip3Result = terminal.executeCommand(sessionId, "command -v pip3")
+                    hasPip = pip3Result != null && pip3Result.contains("pip3")
+                }
+            }
+
+            // 只有python和pip都可用时，python环境才算准备好
+            isPythonInstalled.value = hasPython && hasPip
+
+            // 更新环境就绪状态 - 只有pnpm和python(包含pip)都准备好时才为true
             isNodejsPythonEnvironmentReady.value = isPnpmInstalled.value && isPythonInstalled.value
             
-            Log.d(TAG, "NodeJS环境检查 - pnpm: ${isPnpmInstalled.value}, python: ${isPythonInstalled.value}, ready: ${isNodejsPythonEnvironmentReady.value}")
+            Log.d(TAG, "NodeJS环境检查 - pnpm: ${isPnpmInstalled.value}, python: $hasPython, pip: $hasPip, python环境: ${isPythonInstalled.value}, 整体ready: ${isNodejsPythonEnvironmentReady.value}")
             
         } catch (e: Exception) {
             Log.e(TAG, "检查NodeJS和Python环境时出错", e)
@@ -394,14 +411,29 @@ suspend fun refreshPermissionsAndStatus(
             val isPnpmInstalled = pnpmResult != null && pnpmResult.contains("pnpm")
             
             val pythonResult = terminal.executeCommand(sessionId, "command -v python")
-            var isPythonInstalled = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            var hasPython = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
             
-            if (!isPythonInstalled) {
+            if (!hasPython) {
                 val python3Result = terminal.executeCommand(sessionId, "command -v python3")
-                isPythonInstalled = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
+                hasPython = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
             }
             
-            isPnpmInstalled && isPythonInstalled
+            // 检查pip安装状态 - 只有python存在时才检查pip
+            var hasPip = false
+            if (hasPython) {
+                // 尝试检查pip
+                val pipResult = terminal.executeCommand(sessionId, "command -v pip")
+                hasPip = pipResult != null && pipResult.contains("pip")
+                
+                // 如果pip不存在，检查pip3
+                if (!hasPip) {
+                    val pip3Result = terminal.executeCommand(sessionId, "command -v pip3")
+                    hasPip = pip3Result != null && pip3Result.contains("pip3")
+                }
+            }
+            
+            // 只有pnpm和python(包含pip)都准备好时才为true
+            isPnpmInstalled && hasPython && hasPip
         } else {
             false
         }
