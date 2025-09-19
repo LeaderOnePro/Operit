@@ -664,8 +664,8 @@ fun ShizukuDemoScreen(
                     showWizard = uiState.showOperitTerminalWizard.value,
                     onToggleWizard = { viewModel.toggleOperitTerminalWizard() },
                     onOpenTerminalScreen = { 
-                        // 跳转到TerminalScreen
-                        navigateTo?.invoke(Screen.Terminal)
+                        // 跳转到TerminalSetup，直接显示配置界面
+                        navigateTo?.invoke(Screen.TerminalSetup)
                     }
                 )
             }

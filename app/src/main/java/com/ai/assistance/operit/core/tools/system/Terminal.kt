@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collect
 
 /**
  * 终端管理器
@@ -157,14 +159,18 @@ class Terminal private constructor(private val context: Context) {
      */
     fun executeCommandFlow(sessionId: String, command: String): Flow<CommandExecutionEvent> {
         terminalManager.switchToSession(sessionId)
-        val commandId = terminalManager.sendCommand(command)
-        
-        return commandEvents
-            .filter { it.sessionId == sessionId && it.commandId == commandId }
-            .transformWhile { event ->
-                emit(event)
-                !event.isCompleted
-            }
+        return channelFlow {
+            val commandId = terminalManager.sendCommand(command)
+            commandEvents
+                .filter { it.sessionId == sessionId && it.commandId == commandId }
+                .transformWhile { event ->
+                    emit(event)
+                    !event.isCompleted
+                }
+                .collect { sentEvent ->
+                    send(sentEvent)
+                }
+        }
     }
     
     /**
