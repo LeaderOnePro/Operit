@@ -2,18 +2,13 @@ package com.ai.assistance.operit.ui.features.demo.viewmodel
 
 import android.app.Application
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.AIToolHandler
-import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
-import com.ai.assistance.operit.core.tools.system.OperitTerminalManager
 import com.ai.assistance.operit.core.tools.system.RootAuthorizer
 import com.ai.assistance.operit.ui.features.demo.state.DemoStateManager
 import kotlinx.coroutines.Dispatchers
@@ -180,51 +175,6 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
     /** Command handling */
     fun updateCommandText(text: String) {
         stateManager.updateCommandText(text)
-    }
-
-    /** OperitTerminal Actions */
-    fun openOperitTerminal(context: Context) {
-        viewModelScope.launch {
-            try {
-                val intent = context.packageManager.getLaunchIntentForPackage(OperitTerminalManager.PACKAGE_NAME)
-                if (intent != null) {
-                    context.startActivity(intent)
-                } else {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "无法找到 OperitTerminal 应用", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "无法启动 OperitTerminal 应用", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    fun executeAdbCommand() {
-        viewModelScope.launch {
-            // Update result text to indicate execution in progress
-            stateManager.updateResultText("执行中...")
-
-            try {
-                // Execute the command
-                val commandText = uiState.value.commandText.value
-                val result = AndroidShellExecutor.executeShellCommand(commandText)
-
-                // Update with the result
-                stateManager.updateResultText(
-                        if (result.success) {
-                            "命令执行成功:\n${result.stdout}"
-                        } else {
-                            "命令执行失败 (退出码: ${result.exitCode}):\n${result.stderr}"
-                        }
-                )
-            } catch (e: Exception) {
-                // Handle execution errors
-                stateManager.updateResultText("命令执行出错: ${e.message}")
-            }
-        }
     }
 
     /** Refresh all registered tools */
