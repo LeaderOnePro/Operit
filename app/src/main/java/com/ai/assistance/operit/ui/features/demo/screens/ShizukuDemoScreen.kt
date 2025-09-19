@@ -666,18 +666,7 @@ fun ShizukuDemoScreen(
                     onOpenTerminalScreen = { 
                         // 跳转到TerminalScreen
                         navigateTo?.invoke(Screen.Terminal)
-                    },
-                    // 保留兼容性参数
-                    isInstalled = uiState.isOperitTerminalInstalled.value,
-                    installedVersion = viewModel.operitTerminalInstalledVersion.value,
-                    latestVersion = viewModel.operitTerminalLatestVersion.value,
-                    releaseNotes = viewModel.operitTerminalReleaseNotes.value,
-                    updateNeeded = viewModel.isOperitTerminalUpdateNeeded.value,
-                    downloadUrl = viewModel.operitTerminalDownloadUrl.value,
-                    onInstall = { viewModel.installOrUpdateOperitTerminal(context) },
-                    onUpdate = { viewModel.installOrUpdateOperitTerminal(context) },
-                    onOpen = { viewModel.openOperitTerminal(context) },
-                    onDownloadFromUrl = { url -> viewModel.downloadFromUrl(context, url) }
+                    }
                 )
             }
         }

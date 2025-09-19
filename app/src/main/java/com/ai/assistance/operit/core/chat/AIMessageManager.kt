@@ -36,8 +36,8 @@ import kotlinx.coroutines.withContext
  */
 object AIMessageManager {
     private const val TAG = "AIMessageManager"
-    // 聊天总结的消息数量阈值
-    private const val SUMMARY_CHUNK_SIZE = 4
+    // 聊天总结的消息数量阈值 - 移除硬编码，改用动态设置
+    // private const val SUMMARY_CHUNK_SIZE = 4
 
     // 使用独立的协程作用域，确保AI操作的生命周期独立于任何特定的ViewModel
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -309,8 +309,17 @@ object AIMessageManager {
         messages: List<ChatMessage>,
         currentTokens: Int,
         maxTokens: Int,
-        tokenUsageThreshold: Double
+        tokenUsageThreshold: Double,
+        enableSummary: Boolean,
+        enableSummaryByMessageCount: Boolean,
+        summaryMessageCountThreshold: Int
     ): Boolean {
+        // 首先检查总结功能是否启用
+        if (!enableSummary) {
+            return false
+        }
+
+        // 检查Token阈值
         if (maxTokens > 0) {
             val usageRatio = currentTokens.toDouble() / maxTokens.toDouble()
             if (usageRatio >= tokenUsageThreshold) {
@@ -319,20 +328,23 @@ object AIMessageManager {
             }
         }
 
-        val lastSummaryIndex = messages.indexOfLast { it.sender == "summary" }
-        val relevantMessages = if (lastSummaryIndex != -1) {
-            messages.subList(lastSummaryIndex + 1, messages.size)
-        } else {
-            messages
-        }
-        val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user"}
+        // 检查消息条数阈值（如果启用）
+        if (enableSummaryByMessageCount) {
+            val lastSummaryIndex = messages.indexOfLast { it.sender == "summary" }
+            val relevantMessages = if (lastSummaryIndex != -1) {
+                messages.subList(lastSummaryIndex + 1, messages.size)
+            } else {
+                messages
+            }
+            val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user"}
 
-        if (userAiMessagesSinceLastSummary >= SUMMARY_CHUNK_SIZE) {
-            Log.d(TAG, "自上次总结后新消息数量达到阈值 ($userAiMessagesSinceLastSummary)，生成总结.")
-            return true
+            if (userAiMessagesSinceLastSummary >= summaryMessageCountThreshold) {
+                Log.d(TAG, "自上次总结后新消息数量达到阈值 ($userAiMessagesSinceLastSummary)，生成总结.")
+                return true
+            }
         }
 
-        Log.d(TAG, "未达到生成总结的条件. 新消息数: $userAiMessagesSinceLastSummary, Token使用率: ${if (maxTokens > 0) currentTokens.toDouble() / maxTokens else 0.0}")
+        Log.d(TAG, "未达到生成总结的条件. Token使用率: ${if (maxTokens > 0) currentTokens.toDouble() / maxTokens else 0.0}")
         return false
     }
 

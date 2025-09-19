@@ -354,6 +354,14 @@
     <string name="settings_functional_model_desc">为不同功能（如对话、总结、问题库等）配置专用的模型与API设置</string>
     <string name="settings_configure_function">配置功能</string>
     
+    <string name="settings_section_context_summary">上下文与总结</string>
+    <string name="settings_enable_summary">启用对话总结</string>
+    <string name="settings_enable_summary_desc">当上下文过长时自动生成对话总结，节省Token消耗</string>
+    <string name="settings_enable_summary_by_message_count">按消息条数触发总结</string>
+    <string name="settings_enable_summary_by_message_count_desc">当新消息数量达到阈值时触发总结</string>
+    <string name="settings_summary_message_count_threshold">消息条数阈值</string>
+    <string name="settings_summary_message_count_threshold_subtitle">触发总结的新消息数量(1-20条)</string>
+
     <string name="settings_section_display">显示与行为</string>
 
     <string name="settings_keep_screen_on">屏幕常亮</string>

@@ -40,13 +40,6 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
     private val _uiState = MutableStateFlow(DemoScreenState())
     val uiState: StateFlow<DemoScreenState> = _uiState.asStateFlow()
 
-    // OperitTerminal states
-    var operitTerminalInstalledVersion = mutableStateOf<String?>(null)
-    var operitTerminalLatestVersion = mutableStateOf<String?>(null)
-    var operitTerminalDownloadUrl = mutableStateOf<String?>(null)
-    var operitTerminalReleaseNotes = mutableStateOf<String?>(null)
-    var isOperitTerminalUpdateNeeded = mutableStateOf(false)
-
     // NodeJS和Python环境状态
     val isPnpmInstalled = mutableStateOf(false)
     val isPythonInstalled = mutableStateOf(false)
@@ -191,7 +184,6 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
      * 刷新所有状态
      */
     suspend fun refreshAllStates() {
-        refreshOperitTerminalStatus()
         refreshNodejsPythonEnvironment()
     }
 
@@ -263,7 +255,6 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
             }
 
             // Check OperitTerminal status
-            refreshOperitTerminalStatus()
             refreshNodejsPythonEnvironment()
 
             // 延迟300ms以确保UI能够刷新
@@ -274,39 +265,6 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
             _uiState.update { currentState ->
                 currentState.copy(isRefreshing = mutableStateOf(false))
             }
-        }
-    }
-
-    private suspend fun refreshOperitTerminalStatus() {
-        val isInstalled = OperitTerminalManager.isInstalled(context)
-        _uiState.value.isOperitTerminalInstalled.value = isInstalled
-
-        val installedVersion = if (isInstalled) OperitTerminalManager.getInstalledVersion(context) else null
-        operitTerminalInstalledVersion.value = installedVersion
-
-        val releaseInfo = OperitTerminalManager.fetchLatestReleaseInfo()
-        val latestVersion = releaseInfo?.version
-        operitTerminalLatestVersion.value = latestVersion
-        operitTerminalDownloadUrl.value = releaseInfo?.downloadUrl
-        operitTerminalReleaseNotes.value = releaseInfo?.releaseNotes
-
-        isOperitTerminalUpdateNeeded.value = if (installedVersion != null && latestVersion != null) {
-            try {
-                // "1.10" vs "1.2"
-                val installedParts = installedVersion.split('.').map { it.toInt() }
-                val latestParts = latestVersion.split('.').map { it.toInt() }
-                val installedMajor = installedParts.getOrElse(0) { 0 }
-                val installedMinor = installedParts.getOrElse(1) { 0 }
-                val latestMajor = latestParts.getOrElse(0) { 0 }
-                val latestMinor = latestParts.getOrElse(1) { 0 }
-
-                latestMajor > installedMajor || (latestMajor == installedMajor && latestMinor > installedMinor)
-            } catch (e: NumberFormatException) {
-                Log.w(TAG, "版本号格式错误: installed='$installedVersion', latest='$latestVersion'", e)
-                false // Fallback to no update if versions are weird
-            }
-        } else {
-            false
         }
     }
 

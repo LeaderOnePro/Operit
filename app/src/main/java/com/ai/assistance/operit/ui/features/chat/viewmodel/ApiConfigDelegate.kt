@@ -59,6 +59,15 @@ class ApiConfigDelegate(
             MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_TOKEN_THRESHOLD)
     val summaryTokenThreshold: StateFlow<Float> = _summaryTokenThreshold.asStateFlow()
 
+    private val _enableSummary = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_SUMMARY)
+    val enableSummary: StateFlow<Boolean> = _enableSummary.asStateFlow()
+
+    private val _enableSummaryByMessageCount = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT)
+    val enableSummaryByMessageCount: StateFlow<Boolean> = _enableSummaryByMessageCount.asStateFlow()
+
+    private val _summaryMessageCountThreshold = MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD)
+    val summaryMessageCountThreshold: StateFlow<Int> = _summaryMessageCountThreshold.asStateFlow()
+
     // 为了兼容现有代码，添加API密钥状态流
     private val _apiKey = MutableStateFlow("")
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
@@ -158,6 +167,27 @@ class ApiConfigDelegate(
         viewModelScope.launch {
             apiPreferences.summaryTokenThresholdFlow.collect { threshold ->
                 _summaryTokenThreshold.value = threshold
+            }
+        }
+
+        // Collect enable summary setting
+        viewModelScope.launch {
+            apiPreferences.enableSummaryFlow.collect { enabled ->
+                _enableSummary.value = enabled
+            }
+        }
+
+        // Collect enable summary by message count setting
+        viewModelScope.launch {
+            apiPreferences.enableSummaryByMessageCountFlow.collect { enabled ->
+                _enableSummaryByMessageCount.value = enabled
+            }
+        }
+
+        // Collect summary message count threshold setting
+        viewModelScope.launch {
+            apiPreferences.summaryMessageCountThresholdFlow.collect { threshold ->
+                _summaryMessageCountThreshold.value = threshold
             }
         }
     }
@@ -281,6 +311,32 @@ class ApiConfigDelegate(
         viewModelScope.launch {
             apiPreferences.saveSummaryTokenThreshold(threshold)
             _summaryTokenThreshold.value = threshold
+        }
+    }
+
+    /** 切换启用总结功能 */
+    fun toggleEnableSummary() {
+        viewModelScope.launch {
+            val newValue = !_enableSummary.value
+            apiPreferences.saveEnableSummary(newValue)
+            _enableSummary.value = newValue
+        }
+    }
+
+    /** 切换按消息数量启用总结 */
+    fun toggleEnableSummaryByMessageCount() {
+        viewModelScope.launch {
+            val newValue = !_enableSummaryByMessageCount.value
+            apiPreferences.saveEnableSummaryByMessageCount(newValue)
+            _enableSummaryByMessageCount.value = newValue
+        }
+    }
+
+    /** 更新总结消息数量阈值 */
+    fun updateSummaryMessageCountThreshold(threshold: Int) {
+        viewModelScope.launch {
+            apiPreferences.saveSummaryMessageCountThreshold(threshold)
+            _summaryMessageCountThreshold.value = threshold
         }
     }
 }

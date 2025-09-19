@@ -33,18 +33,6 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
     val uiState: StateFlow<com.ai.assistance.operit.ui.features.demo.state.DemoScreenState> =
             stateManager.uiState
 
-    // Expose properties for OperitTerminal
-    val operitTerminalInstalledVersion
-        get() = stateManager.operitTerminalInstalledVersion
-    val operitTerminalLatestVersion
-        get() = stateManager.operitTerminalLatestVersion
-    val operitTerminalDownloadUrl
-        get() = stateManager.operitTerminalDownloadUrl
-    val operitTerminalReleaseNotes
-        get() = stateManager.operitTerminalReleaseNotes
-    val isOperitTerminalUpdateNeeded
-        get() = stateManager.isOperitTerminalUpdateNeeded
-
     // Expose NodeJS and Python environment properties
     val isPnpmInstalled
         get() = stateManager.isPnpmInstalled
@@ -209,42 +197,6 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "无法启动 OperitTerminal 应用", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    fun installOrUpdateOperitTerminal(context: Context) {
-        viewModelScope.launch {
-            val downloadUrl = operitTerminalDownloadUrl.value
-            if (downloadUrl.isNullOrEmpty()) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "获取下载链接失败，请稍后重试", Toast.LENGTH_SHORT).show()
-                }
-                // 尝试刷新
-                refreshStatus(context)
-                return@launch
-            }
-
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "无法打开下载链接", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    fun downloadFromUrl(context: Context, url: String) {
-        viewModelScope.launch {
-            try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(R.string.toast_download_link_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         }

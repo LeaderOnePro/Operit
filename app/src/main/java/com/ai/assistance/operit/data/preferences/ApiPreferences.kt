@@ -66,6 +66,11 @@ class ApiPreferences private constructor(private val context: Context) {
         val WAIFU_ENABLE_SELFIE = booleanPreferencesKey("waifu_enable_selfie") // 是否启用自拍功能
         val WAIFU_SELFIE_PROMPT = stringPreferencesKey("waifu_selfie_prompt") // 自拍功能的外貌提示词
 
+        // Keys for Summary Settings
+        val ENABLE_SUMMARY = booleanPreferencesKey("enable_summary")
+        val ENABLE_SUMMARY_BY_MESSAGE_COUNT = booleanPreferencesKey("enable_summary_by_message_count")
+        val SUMMARY_MESSAGE_COUNT_THRESHOLD = intPreferencesKey("summary_message_count_threshold")
+
         // Key for Context Length
         val CONTEXT_LENGTH = floatPreferencesKey("context_length")
 
@@ -97,6 +102,11 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_WAIFU_ENABLE_EMOTICONS = false // 默认不启用表情包
         const val DEFAULT_WAIFU_ENABLE_SELFIE = false // 默认不启用自拍功能
         const val DEFAULT_WAIFU_SELFIE_PROMPT = "kipfel (vrchat), long hair, Matcha color hair, purple eyes, sweater vest,  black skirt, black necktie, collared shirt, long sleeves, black headwear, beanie, pleated skirt, hair bun, white shirt, hair ribbon,  hairclip, hair between eyes, black footwear, blush, hair ornament, cat hat,  very long hair,sweater, animal ear headwear, bag, bandaid on leg, socks" // 默认外貌提示词
+
+        // Default values for Summary Settings
+        const val DEFAULT_ENABLE_SUMMARY = true
+        const val DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT = true
+        const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 4
 
         // Default value for Context Length (in K)
         const val DEFAULT_CONTEXT_LENGTH = 48.0f
@@ -218,6 +228,22 @@ class ApiPreferences private constructor(private val context: Context) {
             preferences[WAIFU_SELFIE_PROMPT] ?: DEFAULT_WAIFU_SELFIE_PROMPT
         }
 
+    // Flows for Summary Settings
+    val enableSummaryFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_SUMMARY] ?: DEFAULT_ENABLE_SUMMARY
+        }
+
+    val enableSummaryByMessageCountFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] ?: DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
+        }
+
+    val summaryMessageCountThresholdFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] ?: DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
+        }
+
     // Flow for Context Length
     val contextLengthFlow: Flow<Float> =
         context.apiDataStore.data.map { preferences ->
@@ -324,6 +350,25 @@ class ApiPreferences private constructor(private val context: Context) {
     suspend fun saveWaifuSelfiePrompt(selfiePrompt: String) {
         context.apiDataStore.edit { preferences ->
             preferences[WAIFU_SELFIE_PROMPT] = selfiePrompt
+        }
+    }
+
+    // Save Summary Settings
+    suspend fun saveEnableSummary(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_SUMMARY] = isEnabled
+        }
+    }
+
+    suspend fun saveEnableSummaryByMessageCount(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = isEnabled
+        }
+    }
+
+    suspend fun saveSummaryMessageCountThreshold(threshold: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = threshold
         }
     }
 

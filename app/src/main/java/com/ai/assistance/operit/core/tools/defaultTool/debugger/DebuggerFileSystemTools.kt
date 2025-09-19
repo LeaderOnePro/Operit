@@ -809,7 +809,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         // Don't allow deleting system directories
-        val restrictedPaths = listOf("/system", "/data", "/proc", "/dev")
+        val restrictedPaths = listOf("/system", "/proc", "/dev")
         if (restrictedPaths.any { path.startsWith(it) }) {
             return ToolResult(
                     toolName = tool.name,

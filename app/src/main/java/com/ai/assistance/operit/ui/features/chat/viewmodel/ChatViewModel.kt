@@ -197,6 +197,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val enableMemoryAttachment: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMemoryAttachment }
 
     val summaryTokenThreshold: StateFlow<Float> by lazy { apiConfigDelegate.summaryTokenThreshold }
+    val enableSummary: StateFlow<Boolean> by lazy { apiConfigDelegate.enableSummary }
+    val enableSummaryByMessageCount: StateFlow<Boolean> by lazy { apiConfigDelegate.enableSummaryByMessageCount }
+    val summaryMessageCountThreshold: StateFlow<Int> by lazy { apiConfigDelegate.summaryMessageCountThreshold }
 
     // 上下文长度
     val maxWindowSizeInK: StateFlow<Float> by lazy { apiConfigDelegate.contextLength }
@@ -501,6 +504,18 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         apiConfigDelegate.updateSummaryTokenThreshold(threshold)
     }
 
+    fun toggleEnableSummary() {
+        apiConfigDelegate.toggleEnableSummary()
+    }
+
+    fun toggleEnableSummaryByMessageCount() {
+        apiConfigDelegate.toggleEnableSummaryByMessageCount()
+    }
+
+    fun updateSummaryMessageCountThreshold(threshold: Int) {
+        apiConfigDelegate.updateSummaryMessageCountThreshold(threshold)
+    }
+
     // 聊天历史相关方法
     fun createNewChat() {
         chatHistoryDelegate.createNewChat()
@@ -723,7 +738,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 messages = currentMessages,
                 currentTokens = currentTokens,
                 maxTokens = maxTokens,
-                tokenUsageThreshold = summaryTokenThreshold.value.toDouble()
+                tokenUsageThreshold = summaryTokenThreshold.value.toDouble(),
+                enableSummary = enableSummary.value,
+                enableSummaryByMessageCount = enableSummaryByMessageCount.value,
+                summaryMessageCountThreshold = summaryMessageCountThreshold.value
             )
         
         if (isShouldGenerateSummary) {
@@ -781,8 +799,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 enableMemoryAttachment = enableMemoryAttachment.value, // 传递记忆附着的状态
                 enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
                 maxTokens = maxTokens,
-                //如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
-                tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble(),
+                //如果记忆总结没开，直接调1；如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
+                tokenUsageThreshold = if (!enableSummary.value) 1.0 else if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble(),
                 replyToMessage = replyToMessage.value // 传递回复消息
         )
 
