@@ -34,6 +34,14 @@ class FileBindingService(context: Context) {
             aiGeneratedCode: String,
             multiServiceManager: MultiServiceManager
     ): Pair<String, String> {
+        // Check for the AI merge override flag
+        if (aiGeneratedCode.trim().startsWith("// @FORCE_AI_MERGE")) {
+            Log.d(TAG, "Attempt FORCE: AI-driven merge was forced by the agent.")
+            val codeToProcess = aiGeneratedCode.lines().drop(1).joinToString("\n")
+            // Directly jump to the robust full-content merge
+            return runFullContentMerge(originalContent, codeToProcess, multiServiceManager)
+        }
+        
         // Optimization: If the AI-generated code doesn't contain placeholders like
         // "... existing code ...", it's likely a full file replacement. This avoids a
         // costly and unnecessary patch generation call to the AI.
@@ -158,11 +166,31 @@ Now, generate ONLY the patch in the custom format based on all the rules.
 
         // --- Attempt 4: Robust Full-Content Merge (Fallback) ---
         Log.d(TAG, "Attempt 4 (Fallback): Trying robust full-content merge...")
+        return runFullContentMerge(originalContent, aiGeneratedCode, multiServiceManager)
+    }
+
+    /**
+     * Runs a full-content merge by sending the original and AI-generated code to an AI model.
+     * This is the most robust but also most token-intensive method.
+     *
+     * @param originalContent The original content of the file.
+     * @param aiGeneratedCode The AI-generated code with placeholders, representing the desired changes.
+     * @param multiServiceManager The service manager for AI communication.
+     * @return A Pair containing the final merged content and a diff string.
+     */
+    private suspend fun runFullContentMerge(
+        originalContent: String,
+        aiGeneratedCode: String,
+        multiServiceManager: MultiServiceManager
+    ): Pair<String, String> {
         try {
+            val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
+            val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
+
             val mergeSystemPrompt = FunctionalPrompts.FILE_BINDING_MERGE_PROMPT.trimIndent()
 
             val mergeUserPrompt =
-"""
+                """
 **Original File Content:**
 ```
 $normalizedOriginalContent
@@ -175,49 +203,49 @@ Now, generate ONLY the complete and final merged file content.
 """.trimIndent()
 
             val modelParameters =
-                    multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
+                multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
             val fileBindingService =
-                    multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
+                multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
 
             val contentBuilder = StringBuilder()
             fileBindingService.sendMessage(
-                            mergeUserPrompt,
-                            listOf(Pair("system", mergeSystemPrompt)),
-                            modelParameters
-                    )
-                    .collect { content -> contentBuilder.append(content) }
+                mergeUserPrompt,
+                listOf(Pair("system", mergeSystemPrompt)),
+                modelParameters
+            )
+                .collect { content -> contentBuilder.append(content) }
 
             val mergedContentFromAI =
-                    ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
+                ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
 
             if (mergedContentFromAI.isBlank()) {
-                Log.w(TAG, "Attempt 4: Full merge returned empty content. Returning original.")
+                Log.w(TAG, "Full merge returned empty content. Returning original.")
                 return Pair(originalContent, "")
             }
 
             val diffString =
-                    UnifiedDiffUtils.generateUnifiedDiff(
-                                    "a/file",
-                                    "b/file",
-                                    normalizedOriginalContent.lines(),
-                                    DiffUtils.diff(
-                                            normalizedOriginalContent.lines(),
-                                            mergedContentFromAI.lines()
-                                    ),
-                                    3
-                            )
-                            .joinToString("\n")
+                UnifiedDiffUtils.generateUnifiedDiff(
+                    "a/file",
+                    "b/file",
+                    normalizedOriginalContent.lines(),
+                    DiffUtils.diff(
+                        normalizedOriginalContent.lines(),
+                        mergedContentFromAI.lines()
+                    ),
+                    3
+                )
+                    .joinToString("\n")
 
-            Log.d(TAG, "Attempt 4: Robust full-content merge successful.")
+            Log.d(TAG, "Robust full-content merge successful.")
             apiPreferences.updateTokensForFunction(
-                    FunctionType.FILE_BINDING,
-                    fileBindingService.inputTokenCount,
-                    fileBindingService.outputTokenCount
+                FunctionType.FILE_BINDING,
+                fileBindingService.inputTokenCount,
+                fileBindingService.outputTokenCount
             )
             return Pair(mergedContentFromAI, diffString)
         } catch (e: Exception) {
-            Log.e(TAG, "Attempt 4: Error during robust full-merge fallback.", e)
-            return Pair(originalContent, "Error during fallback file binding: ${e.message}")
+            Log.e(TAG, "Error during robust full-merge.", e)
+            return Pair(originalContent, "Error during robust file binding: ${e.message}")
         }
     }
 

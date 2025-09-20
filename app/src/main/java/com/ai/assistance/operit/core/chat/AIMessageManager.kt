@@ -103,7 +103,7 @@ object AIMessageManager {
         } else ""
 
         // 3. 根据开关决定是否生成工作区附着
-        val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank()) {
+        val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank() && !messageText.contains("<workspace_attachment>", ignoreCase = true)) {
             try {
                 val workspaceContent = WorkspaceAttachmentProcessor.generateWorkspaceAttachment(
                     context = context,

@@ -1943,7 +1943,7 @@
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
     <string name="ai_planning_desc">Can generate a series of plans for execution (mediocre effectiveness, not recommended, will be replaced in the future).</string>
     <string name="thinking_mode">Thinking Mode</string>
-    <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3 and Claude, enabling built-in thinking.</string>
+    <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3, Claude and SiliconFlow, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>
     <string name="thinking_guidance_desc">Can force models that can\'t think to perform thinking. This option is not recommended for thinking models.</string>
     <string name="details">Details</string>

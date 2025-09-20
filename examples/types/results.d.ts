@@ -435,6 +435,30 @@ export interface TerminalCommandResultData {
     toString(): string;
 }
 
+/**
+ * Terminal session creation result data
+ */
+export interface TerminalSessionCreationResultData {
+    /** ID of the created or retrieved session */
+    sessionId: string;
+    /** Name of the session */
+    sessionName: string;
+    /** Whether a new session was created */
+    isNewSession: boolean;
+}
+
+/**
+ * Terminal session close result data
+ */
+export interface TerminalSessionCloseResultData {
+    /** ID of the closed session */
+    sessionId: string;
+    /** Whether the session was closed successfully */
+    success: boolean;
+    /** A message describing the result */
+    message: string;
+}
+
 // ============================================================================
 // FFmpeg Types
 // ============================================================================
@@ -579,6 +603,14 @@ export interface IntentResult extends BaseResult {
 
 export interface TerminalCommandResult extends BaseResult {
     data: TerminalCommandResultData;
+}
+
+export interface TerminalSessionCreationResult extends BaseResult {
+    data: TerminalSessionCreationResultData;
+}
+
+export interface TerminalSessionCloseResult extends BaseResult {
+    data: TerminalSessionCloseResultData;
 }
 
 export interface DeviceInfoResult extends BaseResult {

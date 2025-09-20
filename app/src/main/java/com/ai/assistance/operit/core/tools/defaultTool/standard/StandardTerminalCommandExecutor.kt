@@ -7,73 +7,115 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.core.tools.system.Terminal
 import kotlinx.coroutines.*
+import java.util.concurrent.ConcurrentHashMap
 
 /** 终端命令执行工具 - 非流式输出版本 执行终端命令并一次性收集全部输出后返回 */
 class StandardTerminalCommandExecutor(private val context: Context) {
 
     private val TAG = "TerminalCommandExecutor"
 
-    /** 执行指定的AI工具 */
-    fun invoke(tool: AITool): ToolResult {
+    // 用于将会话名称映射到会话ID
+    private val sessionNameToIdMap = ConcurrentHashMap<String, String>()
+
+    /** 创建或获取一个终端会话 */
+    fun createOrGetSession(tool: AITool): ToolResult {
+        return runBlocking {
+            try {
+                val sessionName = tool.parameters.find { it.name == "session_name" }?.value
+                if (sessionName.isNullOrBlank()) {
+                    return@runBlocking ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "缺少参数: session_name"
+                    )
+                }
+
+                val terminal = Terminal.getInstance(context)
+
+                // 检查是否已有同名会话，并且该会话仍然存活
+                val existingSessionId = sessionNameToIdMap[sessionName]
+                if (existingSessionId != null && terminal.terminalState.value.sessions.any { it.id == existingSessionId }) {
+                    return@runBlocking ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result = TerminalSessionCreationResultData(
+                            sessionId = existingSessionId,
+                            sessionName = sessionName,
+                            isNewSession = false
+                        )
+                    )
+                }
+
+                // 创建新会话
+                val newSessionId = terminal.createSession(sessionName)
+                sessionNameToIdMap[sessionName] = newSessionId
+
+                ToolResult(
+                    toolName = tool.name,
+                    success = true,
+                    result = TerminalSessionCreationResultData(
+                        sessionId = newSessionId,
+                        sessionName = sessionName,
+                        isNewSession = true
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "创建或获取终端会话时出错", e)
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "创建或获取终端会话时出错: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /** 在指定的终端会话中执行命令 */
+    fun executeCommandInSession(tool: AITool): ToolResult {
         return runBlocking {
             try {
                 val command = tool.parameters.find { param -> param.name == "command" }?.value ?: ""
+                val sessionId = tool.parameters.find { param -> param.name == "session_id" }?.value
+
+                if (sessionId.isNullOrBlank()) {
+                    return@runBlocking ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "缺少参数: session_id"
+                    )
+                }
+
                 val timeout =
                         tool.parameters
                                 .find { param -> param.name == "timeout_ms" }
                                 ?.value
                                 ?.toLongOrNull()
                                 ?: 30000L
-                val withSessionId =
-                        tool.parameters.find { param -> param.name == "session_id" }?.value
 
-                // 获取终端管理器
-                Log.d(TAG, "Getting TerminalManager instance")
                 val terminal = Terminal.getInstance(context)
-                
-                // 确保已连接到终端服务
-                Log.d(TAG, "Checking if terminal service is connected")
-                if (!terminal.isConnected()) {
-                    Log.d(TAG, "Terminal service not connected, initializing...")
-                    val connected = terminal.initialize()
-                    if (!connected) {
-                        Log.e(TAG, "Failed to connect to terminal service")
-                        return@runBlocking ToolResult(
-                                toolName = tool.name,
-                                success = false,
-                                result = StringResultData(""),
-                                error = "无法连接到终端服务"
-                        )
-                    }
-                }
 
-                // 获取或创建会话
-                val sessionId = if (!withSessionId.isNullOrEmpty()) {
-                    withSessionId
-                        } else {
-                    // 创建新会话
-                    terminal.createSession()
-                        }
-
-                if (sessionId == null) {
+                // 检查会话是否存在
+                if (terminal.terminalState.value.sessions.none { it.id == sessionId }) {
+                    // 如果会话不存在，也从我们的映射中移除
+                    sessionNameToIdMap.entries.removeIf { it.value == sessionId }
                     return@runBlocking ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result = StringResultData(""),
-                            error = "无法找到或创建终端会话"
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "终端会话 '$sessionId' 不存在或已关闭"
                     )
                 }
 
-                // 执行命令并收集Flow输出
                 val outputFlow = terminal.executeCommandFlow(sessionId, command)
-                
+
                 if (outputFlow != null) {
-                    // 收集所有输出事件
                     val events = mutableListOf<String>()
                     var exitCode = 0
                     var hasCompleted = false
-                    
-                    // 使用withTimeout防止无限等待
+
                     try {
                         withTimeout(timeout) {
                             outputFlow.collect { event ->
@@ -91,11 +133,10 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                         hasCompleted = true
                         exitCode = -1
                     }
-                    
+
                     val fullOutput = events.joinToString("")
                     Log.d(TAG, "Command output collected: '$fullOutput', exitCode: $exitCode")
-                    
-                    // 成功执行
+
                     ToolResult(
                             toolName = tool.name,
                             success = hasCompleted && exitCode == 0,
@@ -107,7 +148,6 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                             )
                     )
                 } else {
-                    // 命令执行失败
                     ToolResult(
                         toolName = tool.name,
                         success = false,
@@ -122,6 +162,47 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                         success = false,
                         result = StringResultData(""),
                         error = "执行终端命令时出错: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /** 关闭一个终端会话 */
+    fun closeSession(tool: AITool): ToolResult {
+        return runBlocking {
+            val sessionId = tool.parameters.find { it.name == "session_id" }?.value
+            try {
+                if (sessionId.isNullOrBlank()) {
+                    return@runBlocking ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "缺少参数: session_id"
+                    )
+                }
+
+                val terminal = Terminal.getInstance(context)
+                terminal.closeSession(sessionId)
+
+                // 从名称映射中移除
+                sessionNameToIdMap.entries.removeIf { it.value == sessionId }
+
+                ToolResult(
+                    toolName = tool.name,
+                    success = true,
+                    result = TerminalSessionCloseResultData(
+                        sessionId = sessionId,
+                        success = true,
+                        message = "终端会话 '$sessionId' 已成功关闭。"
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "关闭终端会话时出错", e)
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "关闭终端会话 '$sessionId' 时出错: ${e.message}"
                 )
             }
         }

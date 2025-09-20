@@ -6,7 +6,7 @@ METADATA
     "tools": [
         {
             "name": "terminal",
-            "description": "通过Termux终端执行命令并收集输出结果，会自动保留目录上下文",
+            "description": "通过Ubuntu终端执行命令并收集输出结果，会自动保留目录上下文",
             "parameters": [
                 {
                     "name": "command",
@@ -57,18 +57,23 @@ const superAdmin = (function () {
                 throw new Error("命令不能为空");
             }
             const command = params.command;
-            const sessionId = params.sessionId;
+            let sessionId = params.sessionId;
             const timeoutMs = params.timeoutMs;
             console.log(`执行终端命令: ${command}`);
             // 将超时时间转换为数字类型
             const timeout = timeoutMs ? parseInt(timeoutMs, 10) : undefined;
+            // 如果没有提供会话ID，则创建或获取一个默认会话
+            if (!sessionId) {
+                const session = await Tools.System.terminal.create("super_admin_default_session");
+                sessionId = session.sessionId;
+            }
             // 调用系统工具执行终端命令
-            const result = await Tools.System.terminal(command, sessionId, timeout);
+            const result = await Tools.System.terminal.exec(sessionId, command, timeout);
             return {
                 command: command,
                 output: result.output,
                 exitCode: result.exitCode,
-                sessionId: result.sessionId || sessionId,
+                sessionId: result.sessionId,
                 context_preserved: true // 标记此命令保留了目录上下文
             };
         }

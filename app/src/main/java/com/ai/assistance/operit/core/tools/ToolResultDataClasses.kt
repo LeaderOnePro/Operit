@@ -1067,3 +1067,29 @@ data class AutomationFunctionListResult(
         return sb.toString()
     }
 }
+
+/** 终端会话创建结果数据 */
+@Serializable
+data class TerminalSessionCreationResultData(
+    val sessionId: String,
+    val sessionName: String,
+    val isNewSession: Boolean
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (isNewSession) {
+            "成功创建新的终端会话。会话名称: '$sessionName', 会话ID: $sessionId"
+        } else {
+            "成功获取现有的终端会话。会话名称: '$sessionName', 会话ID: $sessionId"
+        }
+    }
+}
+
+/** 终端会话关闭结果数据 */
+@Serializable
+data class TerminalSessionCloseResultData(
+    val sessionId: String,
+    val success: Boolean,
+    val message: String
+) : ToolResultData() {
+    override fun toString(): String = message
+}

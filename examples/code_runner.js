@@ -134,6 +134,12 @@
 }
 */
 const codeRunner = (function () {
+    // Helper function to execute a terminal command using the new session-based API
+    async function executeTerminalCommand(command, timeoutMs) {
+        // Use a consistent session name to allow for session reuse
+        const session = await Tools.System.terminal.create("code_runner_session");
+        return await Tools.System.terminal.exec(session.sessionId, command, timeoutMs);
+    }
     async function main() {
         const results = {
             javascript: await testJavaScript(),
@@ -169,7 +175,7 @@ const codeRunner = (function () {
     async function testPython() {
         try {
             // 检查Python是否可用
-            const pythonCheckResult = await Tools.System.terminal("python3 --version", undefined, 10000);
+            const pythonCheckResult = await executeTerminalCommand("python3 --version", 10000);
             if (pythonCheckResult.exitCode !== 0) {
                 return { success: false, message: "Python不可用，请确保已安装Python" };
             }
@@ -186,7 +192,7 @@ const codeRunner = (function () {
     async function testRuby() {
         try {
             // 检查Ruby是否可用
-            const rubyCheckResult = await Tools.System.terminal("ruby --version", undefined, 10000);
+            const rubyCheckResult = await executeTerminalCommand("ruby --version", 10000);
             if (rubyCheckResult.exitCode !== 0) {
                 return { success: false, message: "Ruby不可用，请确保已安装Ruby" };
             }
@@ -203,7 +209,7 @@ const codeRunner = (function () {
     async function testGo() {
         try {
             // 检查Go是否可用
-            const goCheckResult = await Tools.System.terminal("go version", undefined, 10000);
+            const goCheckResult = await executeTerminalCommand("go version", 10000);
             if (goCheckResult.exitCode !== 0) {
                 return { success: false, message: "Go不可用，请确保已安装Go" };
             }
@@ -227,7 +233,7 @@ func main() {
     async function testRust() {
         try {
             // 检查Rust是否可用
-            const rustCheckResult = await Tools.System.terminal("rustc --version", undefined, 10000);
+            const rustCheckResult = await executeTerminalCommand("rustc --version", 10000);
             if (rustCheckResult.exitCode !== 0) {
                 return { success: false, message: "Rust不可用，请确保已安装Rust" };
             }
@@ -271,7 +277,7 @@ fn main() {
         const tempFilePath = "/sdcard/Download/Operit/temp_script.py";
         try {
             await Tools.Files.write(tempFilePath, script);
-            const result = await Tools.System.terminal(`python3 ${tempFilePath}`, undefined, 30000);
+            const result = await executeTerminalCommand(`python3 ${tempFilePath}`, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -292,7 +298,7 @@ fn main() {
         if (!fileExists || !fileExists.exists) {
             throw new Error(`Python 文件不存在: ${filePath}`);
         }
-        const result = await Tools.System.terminal(`python3 ${filePath}`, undefined, 30000);
+        const result = await executeTerminalCommand(`python3 ${filePath}`, 30000);
         if (result.exitCode === 0) {
             return result.output.trim();
         }
@@ -308,7 +314,7 @@ fn main() {
         const tempFilePath = "/sdcard/Download/Operit/temp_script.rb";
         try {
             await Tools.Files.write(tempFilePath, script);
-            const result = await Tools.System.terminal(`ruby ${tempFilePath}`, undefined, 30000);
+            const result = await executeTerminalCommand(`ruby ${tempFilePath}`, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -329,7 +335,7 @@ fn main() {
         if (!fileExists || !fileExists.exists) {
             throw new Error(`Ruby 文件不存在: ${filePath}`);
         }
-        const result = await Tools.System.terminal(`ruby ${filePath}`, undefined, 30000);
+        const result = await executeTerminalCommand(`ruby ${filePath}`, 30000);
         if (result.exitCode === 0) {
             return result.output.trim();
         }
@@ -346,15 +352,15 @@ fn main() {
         const tempFilePath = `${tempDirPath}/main.go`;
         const homeTempBin = "/data/data/com.termux/files/home/temp_go_bin";
         try {
-            await Tools.System.terminal(`mkdir -p ${tempDirPath}`, undefined, 10000);
+            await executeTerminalCommand(`mkdir -p ${tempDirPath}`, 10000);
             await Tools.Files.write(tempFilePath, script);
-            const compileResult = await Tools.System.terminal(`cd ${tempDirPath} && go build -o main main.go`, undefined, 30000);
+            const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && go build -o main main.go`, 30000);
             if (compileResult.exitCode !== 0) {
                 throw new Error(`Go 代码编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
             }
-            await Tools.System.terminal(`cp ${tempDirPath}/main ${homeTempBin}`, undefined, 10000);
-            await Tools.System.terminal(`chmod +x ${homeTempBin}`, undefined, 10000);
-            const result = await Tools.System.terminal(homeTempBin, undefined, 30000);
+            await executeTerminalCommand(`cp ${tempDirPath}/main ${homeTempBin}`, 10000);
+            await executeTerminalCommand(`chmod +x ${homeTempBin}`, 10000);
+            const result = await executeTerminalCommand(homeTempBin, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -363,8 +369,8 @@ fn main() {
             }
         }
         finally {
-            await Tools.System.terminal(`rm -f ${homeTempBin}`, undefined, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
-            await Tools.System.terminal(`rm -rf ${tempDirPath}`, undefined, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
+            await executeTerminalCommand(`rm -f ${homeTempBin}`, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+            await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
         }
     }
     async function run_go_file(params) {
@@ -379,13 +385,13 @@ fn main() {
         const tempExecPath = "/sdcard/Download/Operit/temp_exec";
         const homeTempBin = "/data/data/com.termux/files/home/temp_go_bin";
         try {
-            const compileResult = await Tools.System.terminal(`go build -o ${tempExecPath} ${filePath}`, undefined, 30000);
+            const compileResult = await executeTerminalCommand(`go build -o ${tempExecPath} ${filePath}`, 30000);
             if (compileResult.exitCode !== 0) {
                 throw new Error(`Go 文件编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
             }
-            await Tools.System.terminal(`cp ${tempExecPath} ${homeTempBin}`, undefined, 10000);
-            await Tools.System.terminal(`chmod +x ${homeTempBin}`, undefined, 10000);
-            const result = await Tools.System.terminal(homeTempBin, undefined, 30000);
+            await executeTerminalCommand(`cp ${tempExecPath} ${homeTempBin}`, 10000);
+            await executeTerminalCommand(`chmod +x ${homeTempBin}`, 10000);
+            const result = await executeTerminalCommand(homeTempBin, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -394,7 +400,7 @@ fn main() {
             }
         }
         finally {
-            await Tools.System.terminal(`rm -f ${homeTempBin}`, undefined, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+            await executeTerminalCommand(`rm -f ${homeTempBin}`, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
             await Tools.Files.deleteFile(tempExecPath).catch(err => console.error(`删除临时文件失败: ${err.message}`));
         }
     }
@@ -413,16 +419,16 @@ edition = "2021"
 
 [dependencies]
       `;
-            await Tools.System.terminal(`mkdir -p ${tempDirPath}/src`, undefined, 10000);
-            await Tools.System.terminal(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, undefined, 10000);
-            await Tools.System.terminal(`echo '${script.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, undefined, 10000);
-            const compileResult = await Tools.System.terminal(`cd ${tempDirPath} && cargo build --release`, undefined, 60000);
+            await executeTerminalCommand(`mkdir -p ${tempDirPath}/src`, 10000);
+            await executeTerminalCommand(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, 10000);
+            await executeTerminalCommand(`echo '${script.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, 10000);
+            const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && cargo build --release`, 60000);
             if (compileResult.exitCode !== 0) {
                 throw new Error(`Rust 代码编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
             }
             const execPath = `${tempDirPath}/target/release/temp_rust_script`;
-            await Tools.System.terminal(`chmod +x ${execPath}`, undefined, 10000);
-            const result = await Tools.System.terminal(execPath, undefined, 30000);
+            await executeTerminalCommand(`chmod +x ${execPath}`, 10000);
+            const result = await executeTerminalCommand(execPath, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -431,7 +437,7 @@ edition = "2021"
             }
         }
         finally {
-            await Tools.System.terminal(`rm -rf ${tempDirPath}`, undefined, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
+            await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
         }
     }
     async function run_rust_file(params) {
@@ -453,20 +459,20 @@ edition = "2021"
 
 [dependencies]
       `;
-            await Tools.System.terminal(`mkdir -p ${tempDirPath}/src`, undefined, 10000);
-            await Tools.System.terminal(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, undefined, 10000);
+            await executeTerminalCommand(`mkdir -p ${tempDirPath}/src`, 10000);
+            await executeTerminalCommand(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, 10000);
             const fileContent = await Tools.Files.read(filePath);
             if (!fileContent || !fileContent.content) {
                 throw new Error(`无法读取文件: ${filePath}`);
             }
-            await Tools.System.terminal(`echo '${fileContent.content.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, undefined, 10000);
-            const compileResult = await Tools.System.terminal(`cd ${tempDirPath} && cargo build --release`, undefined, 60000);
+            await executeTerminalCommand(`echo '${fileContent.content.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, 10000);
+            const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && cargo build --release`, 60000);
             if (compileResult.exitCode !== 0) {
                 throw new Error(`Rust 文件编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
             }
             const execPath = `${tempDirPath}/target/release/temp_rust_script`;
-            await Tools.System.terminal(`chmod +x ${execPath}`, undefined, 10000);
-            const result = await Tools.System.terminal(execPath, undefined, 30000);
+            await executeTerminalCommand(`chmod +x ${execPath}`, 10000);
+            const result = await executeTerminalCommand(execPath, 30000);
             if (result.exitCode === 0) {
                 return result.output.trim();
             }
@@ -475,7 +481,7 @@ edition = "2021"
             }
         }
         finally {
-            await Tools.System.terminal(`rm -rf ${tempDirPath}`, undefined, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
+            await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
         }
     }
     function wrap(func) {

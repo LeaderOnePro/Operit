@@ -68,6 +68,48 @@ data class UpdateInfo(
 
 val updates = listOf(
     UpdateInfo(
+        version = "v1.5.0",
+        date = "2025-09-19",
+        title = "原生Ubuntu虚拟机与AI深度搜索",
+        description = "本次更新移除了Termux兼容，通过内置Ubuntu 24虚拟机大幅增强了MCP的稳定性和兼容性。AI计划模式升级为深度搜索，并新增了消息回复、角色卡增强、内置文档中心等多项功能，同时修复了大量Bug，提升了整体体验。",
+        highlights = listOf(
+            "🚀 内置Ubuntu虚拟机：移除Termux依赖，原生运行Ubuntu24，大幅提升MCP稳定性和兼容性。",
+            "🧠 AI能力升级：计划模式升级为深度搜索，AI可自主规划并生成详细报告。",
+            "💬 交互体验优化：新增消息回复、角色头像绑定、消息自动朗读等功能。",
+            "🎭 角色卡增强：支持开场白、世界书导入标签，体验更沉浸。",
+            "🐛 重要修复与完善：修复链接点击闪退、记忆显示异常等多个关键Bug，并内置文档中心。"
+        ),
+        allChanges = listOf(
+            "移除Termux兼容，内置Ubuntu24虚拟机以增强MCP兼容性与稳定性。",
+            "简化权限配置，所有执行命令可在内置终端查看。",
+            "MCP不再需要手动填写描述。",
+            "计划模式升级为深度搜索，AI可自主规划并生成报告。",
+            "增加消息回复功能（长按回复）。",
+            "角色消息绑定角色卡头像。",
+            "帮助中心升级为内置文档中心。",
+            "增加对话消息自动朗读功能。",
+            "朗读功能优化，不再读出Markdown标志和思考内容。",
+            "支持硅基流动TTS自定义音色。",
+            "增加角色卡开场白和自动翻译功能。",
+            "增加消息总结等待提示。",
+            "修复链接点击闪退BUG，改为弹窗显示内容。",
+            "修复标签修改与保存问题。",
+            "支持将角色卡世界书导入为同名标签。",
+            "修复模型Endpoint补全不触发问题。",
+            "修复Super Admin工具包Shell命令错误。",
+            "修复聊天记忆更新后显示异常的bug。",
+            "增加海外模型提供商使用提醒。",
+            "修复网页工作区页面切换预览不更新的bug。",
+            "增加侧边栏上边距。",
+            "修复悬浮窗初始高度过大的问题。",
+            "增加主题颜色记忆选取功能。",
+            "增加记忆总结功能细节调节开关。"
+        ),
+        isLatest = true,
+        downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.0",
+        releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.0"
+    ),
+    UpdateInfo(
         version = "v1.4.0",
         date = "2025-09-01",
         title = "角色卡系统与自动化能力扩展",
@@ -108,7 +150,7 @@ val updates = listOf(
             "现在在token超限后依旧可以强制发送内容了",
             "修复了一次请求报错后第二次请求需要重进软件的问题"
         ),
-        isLatest = true,
+        isLatest = false,
         downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.4.0",
         releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.4.0"
     ),

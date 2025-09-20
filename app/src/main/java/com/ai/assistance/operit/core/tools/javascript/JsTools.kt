@@ -119,11 +119,14 @@ fun getJsToolsDefinition(): String {
                     toolCall("get_device_location", { high_accuracy: !!highAccuracy, timeout: parseInt(timeout) }),
                 shell: (command) => toolCall("execute_shell", { command }),
                 // 执行终端命令 - 一次性收集输出
-                terminal: (command, sessionId, timeoutMs) => {
-                    const params = { command };
-                    if (sessionId) params.session_id = sessionId;
-                    if (timeoutMs) params.timeout_ms = timeoutMs;
-                    return toolCall("execute_terminal", params);
+                terminal: {
+                    create: (sessionName) => toolCall("create_terminal_session", { session_name: sessionName }),
+                    exec: (sessionId, command, timeoutMs) => {
+                        const params = { session_id: sessionId, command };
+                        if (timeoutMs) params.timeout_ms = timeoutMs;
+                        return toolCall("execute_in_terminal_session", params);
+                    },
+                    close: (sessionId) => toolCall("close_terminal_session", { session_id: sessionId })
                 },
                 // 执行Intent
                 intent: (options = {}) => {

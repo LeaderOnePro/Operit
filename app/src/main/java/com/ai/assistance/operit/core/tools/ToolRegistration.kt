@@ -43,21 +43,45 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
 
     // 终端命令执行工具 - 一次性收集输出
     handler.registerTool(
-            name = "execute_terminal",
+            name = "create_terminal_session",
+            category = ToolCategory.SYSTEM_OPERATION,
+            dangerCheck = { false },
+            descriptionGenerator = { tool ->
+                val sessionName = tool.parameters.find { it.name == "session_name" }?.value
+                "创建或获取终端会话: ${sessionName ?: "未命名"}"
+            },
+            executor = { tool ->
+                val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
+                terminalTool.createOrGetSession(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "execute_in_terminal_session",
             category = ToolCategory.SYSTEM_OPERATION,
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val command = tool.parameters.find { it.name == "command" }?.value ?: ""
                 val sessionId = tool.parameters.find { it.name == "session_id" }?.value
-                if (sessionId != null) {
-                    "执行终端命令 (会话: $sessionId): $command"
-                } else {
-                    "执行终端命令: $command"
-                }
+                "在终端会话 '$sessionId' 中执行: $command"
             },
             executor = { tool ->
                 val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
-                terminalTool.invoke(tool)
+                terminalTool.executeCommandInSession(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "close_terminal_session",
+            category = ToolCategory.SYSTEM_OPERATION,
+            dangerCheck = { false },
+            descriptionGenerator = { tool ->
+                val sessionId = tool.parameters.find { it.name == "session_id" }?.value
+                "关闭终端会话: $sessionId"
+            },
+            executor = { tool ->
+                val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
+                terminalTool.closeSession(tool)
             }
     )
 

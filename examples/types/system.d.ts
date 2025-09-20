@@ -5,7 +5,8 @@
 import {
     SleepResultData, SystemSettingData, AppOperationData, AppListData,
     DeviceInfoResultData, NotificationData, LocationData,
-    ADBResultData, IntentResultData, TerminalCommandResultData
+    ADBResultData, IntentResultData, TerminalCommandResultData,
+    TerminalSessionCreationResultData, TerminalSessionCloseResultData
 } from './results';
 
 /**
@@ -94,11 +95,30 @@ export namespace System {
     }): Promise<IntentResultData>;
 
     /**
-     * Execute a terminal command and collect the output
-     * @param command The command to execute
-     * @param sessionId Optional session ID to use a specific terminal session
-     * @param timeoutMs Optional timeout in milliseconds
-     * @returns Promise resolving to the result of the terminal command execution
+     * Terminal operations.
      */
-    function terminal(command: string, sessionId?: string, timeoutMs?: number): Promise<TerminalCommandResultData>;
+    namespace terminal {
+        /**
+         * Create or get a terminal session.
+         * @param sessionName The name for the session.
+         * @returns Promise resolving to the session creation result.
+         */
+        function create(sessionName: string): Promise<TerminalSessionCreationResultData>;
+
+        /**
+         * Execute a command in a terminal session.
+         * @param sessionId The ID of the session.
+         * @param command The command to execute.
+         * @param timeoutMs Optional timeout in milliseconds.
+         * @returns Promise resolving to the command execution result.
+         */
+        function exec(sessionId: string, command: string, timeoutMs?: number): Promise<TerminalCommandResultData>;
+
+        /**
+         * Close a terminal session.
+         * @param sessionId The ID of the session to close.
+         * @returns Promise resolving to the session close result.
+         */
+        function close(sessionId: string): Promise<TerminalSessionCloseResultData>;
+    }
 }

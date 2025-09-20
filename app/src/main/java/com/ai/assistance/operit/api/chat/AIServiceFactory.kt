@@ -98,7 +98,7 @@ object AIServiceFactory {
 
             // 默认使用OpenAI格式（大多数服务商兼容）
             ApiProviderType.DEEPSEEK -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.SILICONFLOW -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.SILICONFLOW -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
             ApiProviderType.OPENROUTER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
             ApiProviderType.INFINIAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
             ApiProviderType.OTHER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
