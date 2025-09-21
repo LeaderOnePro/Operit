@@ -20,43 +20,47 @@
 
 <div align="center">
   <div style="padding: 10px 0; text-align: center;">
-    <img src="docs/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit预览图1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit预览图2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit预览图3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit预览图4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/9f85b39450c8616909039b66d15a475a.jpg" width="22%" alt="Operit预览图1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/88a7b7520e4628682a849cc00716c8de.jpg" width="22%" alt="Operit预览图2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/9036f349c25888d357de5ce34580176d.jpg" width="22%" alt="Operit预览图3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/d12038f26df3f814b4e3ce967537f039.jpg" width="22%" alt="Operit预览图4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
   <p><b>🚀 我们非常需要各位去推广这个软件来获取更高的关注度 🚀</b></p>
 </div>
 
 ## 🌟 项目简介
 
-**Operit AI** 是移动端首个功能完备的 AI 智能助手应用，它**完全独立运行**（除了外部api调用）于您的 Android 设备上，拥有强大的**工具调用能力**。它不仅仅是一个聊天界面，更是一个和安卓权限和各种工具深度融合的**全能助手**。
+**Operit AI** 是移动端首个功能完备的 AI 智能助手应用，它**完全独立运行**（除了外部api调用）于您的 Android 设备上，拥有强大的**工具调用能力**、**深度搜索**、**记忆库**，并支持**用户性格**与**角色卡**等高度自定义功能。它不仅仅是一个聊天界面，更是一个和安卓权限和各种工具深度融合的**全能助手**，现在还内置了**Ubuntu 24虚拟机**，提供前所未有的强大功能。
 
 ## 🛠️ 丰富的内置工具
 
 Operit内置超过40种强大工具，支持AI助手与您的设备深度交互：
 
+- **内置Ubuntu 24虚拟机**：稳定运行各类Linux工具与MCP（Method, Coder, and Plan），实现复杂的自动化任务。
 - **文件系统工具**：读写文件、搜索文件、解压缩、文件转换等
 - **HTTP工具**：网络请求、网页访问、文件上传下载等
 - **系统操作工具**：管理系统设置、安装应用、控制应用运行等
-- **UI自动化工具**：屏幕点击、滑动、元素查找、表单填写等
 - **媒体处理工具**：视频转换、编解码、帧提取等
 
 这些内置工具结合丰富的插件，让Operit可以完成从简单到复杂的各类任务，真正实现手机智能助手的全能体验。
 
 ## 🚀 核心功能展示
 
-### 🗣️ 语音驱动的UI自动化
+### 🗣️ 全新语音交互体验
 
-Operit AI 现已支持**本地语音对话**与**UI自动化**的无缝结合。您可以一边与AI对话，一边看着它为您自动执行屏幕操作。这不仅仅是语音指令，而是真正意义上的“说到做到”，让复杂任务在谈笑间完成。
+Operit AI 带来了革命性的语音交互功能。现在，它不仅仅是简单的语音指令，而是能够进行**自然连续对话**的智能伙伴。结合强大的本地与云端语音技术，您可以与AI进行流畅的交流，实现从闲聊、查询到执行复杂任务的全方位语音控制。
 
-<div align="center">
-  <div style="margin: 20px 0;">
-    <!-- GIF placeholder -->
-    <p style="text-align: center; color: #888;">[此处应有语音驱动UI操作的演示GIF]</p>
-  </div>
-  <p>👆 动动嘴，就能完成屏幕点击、应用跳转等复杂操作，彻底解放双手</p>
-</div>
+### 🖥️ 内置Ubuntu 24虚拟机
+
+Operit AI 内置了一个完整的 Ubuntu 24 虚拟机环境，这意味着您可以在手机上拥有一个强大的桌面级 Linux 系统。这为**MCP（Method, Coder, and Plan）的稳定运行**提供了前所未有的支持，让您可以安全、高效地执行复杂的代码任务和自动化流程，而无需担心兼容性或环境问题。
+
+### 🎨 强大的主题与个性化定制
+
+打造专属于你的AI助手！Operit AI 提供了强大的主题自定义功能，您可以调整界面的几乎每一个角落，从颜色、字体到布局，创造出独一无二的视觉风格。不仅如此，您还可以通过**用户性格**和**角色卡**功能，塑造AI的个性和说话方式，让它成为您最贴心的伙伴。
+
+### 🧠 深度搜索与记忆库
+
+忘记信息过载的烦恼。Operit AI 拥有强大的**深度搜索**功能，可以快速在您的设备和历史对话中找到所需信息。而独特的**记忆库**功能，则能让AI记住您的偏好、重要信息和常用习惯，提供更具个性化和上下文感知能力的智能服务。
 
 ### 🌐 Web开发功能
 
@@ -92,8 +96,8 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 
 <div align="center">
   <div style="margin: 20px 0;">
-    <img src="docs/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
-    <img src="docs/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
+    <img src="docs/assets/84ea63a7437eae374f53c5b64f52c24d.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
+    <img src="docs/assets/73a602a713cff3f840efaba543465b03.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
   </div>
   <p>👆 丰富的插件生态系统和内置工具，各种功能一触即发</p>
 </div>
