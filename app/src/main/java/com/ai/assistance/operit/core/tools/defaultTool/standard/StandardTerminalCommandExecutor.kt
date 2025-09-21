@@ -14,8 +14,11 @@ class StandardTerminalCommandExecutor(private val context: Context) {
 
     private val TAG = "TerminalCommandExecutor"
 
-    // 用于将会话名称映射到会话ID
-    private val sessionNameToIdMap = ConcurrentHashMap<String, String>()
+    companion object {
+        // 用于将会话名称映射到会话ID
+        private val sessionNameToIdMap = ConcurrentHashMap<String, String>()
+    }
+
 
     /** 创建或获取一个终端会话 */
     fun createOrGetSession(tool: AITool): ToolResult {
@@ -33,21 +36,23 @@ class StandardTerminalCommandExecutor(private val context: Context) {
 
                 val terminal = Terminal.getInstance(context)
 
-                // 检查是否已有同名会话，并且该会话仍然存活
-                val existingSessionId = sessionNameToIdMap[sessionName]
-                if (existingSessionId != null && terminal.terminalState.value.sessions.any { it.id == existingSessionId }) {
+                // 修正：直接检查 Terminal 单例中是否已存在同名会话，而不是依赖本地缓存
+                val existingSession = terminal.terminalState.value.sessions.find { it.title == sessionName }
+                if (existingSession != null) {
+                    // 如果存在，更新本地缓存并返回该会话
+                    sessionNameToIdMap[sessionName] = existingSession.id
                     return@runBlocking ToolResult(
                         toolName = tool.name,
                         success = true,
                         result = TerminalSessionCreationResultData(
-                            sessionId = existingSessionId,
+                            sessionId = existingSession.id,
                             sessionName = sessionName,
                             isNewSession = false
                         )
                     )
                 }
 
-                // 创建新会话
+                // 如果 Terminal 中不存在，则创建新会话
                 val newSessionId = terminal.createSession(sessionName)
                 sessionNameToIdMap[sessionName] = newSessionId
 

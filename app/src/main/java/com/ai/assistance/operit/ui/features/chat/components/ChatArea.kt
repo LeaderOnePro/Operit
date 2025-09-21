@@ -184,7 +184,6 @@ fun ChatArea(
                         onDeleteMessage = onDeleteMessage,
                         onDeleteMessagesFrom = onDeleteMessagesFrom,
                         onSpeakMessage = onSpeakMessage, // 传递朗读回调
-                        onAutoReadMessage = onAutoReadMessage, // 传递自动朗读回调
                         onReplyToMessage = onReplyToMessage, // 传递回复回调
                         chatStyle = chatStyle, // 传递风格
                         isHidden = shouldHide // 新增参数控制隐藏
@@ -247,7 +246,6 @@ private fun MessageItem(
     onDeleteMessage: ((Int) -> Unit)?,
     onDeleteMessagesFrom: ((Int) -> Unit)?,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
-    onAutoReadMessage: ((String) -> Unit)? = null, // 添加自动朗读回调
     onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调
     chatStyle: ChatStyle, // 新增参数
     isHidden: Boolean = false // 新增参数控制隐藏
@@ -362,30 +360,6 @@ private fun MessageItem(
                     Icon(
                         imageVector = Icons.Default.VolumeUp,
                         contentDescription = stringResource(R.string.read_message),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                },
-                modifier = Modifier.height(36.dp)
-            )
-
-            // 自动朗读选项
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.auto_read_message),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
-                    )
-                },
-                onClick = {
-                    onAutoReadMessage?.invoke(WaifuMessageProcessor.cleanContentForWaifu(message.content))
-                    showContextMenu = false
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.AutoFixHigh,
-                        contentDescription = stringResource(R.string.auto_read_message),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )

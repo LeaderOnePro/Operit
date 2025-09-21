@@ -52,6 +52,10 @@ class ApiConfigDelegate(
             MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_MEMORY_ATTACHMENT)
     val enableMemoryAttachment: StateFlow<Boolean> = _enableMemoryAttachment.asStateFlow()
 
+    private val _enableAutoRead =
+            MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_AUTO_READ)
+    val enableAutoRead: StateFlow<Boolean> = _enableAutoRead.asStateFlow()
+
     private val _contextLength = MutableStateFlow(ApiPreferences.DEFAULT_CONTEXT_LENGTH)
     val contextLength: StateFlow<Float> = _contextLength.asStateFlow()
 
@@ -146,6 +150,13 @@ class ApiConfigDelegate(
         viewModelScope.launch {
             apiPreferences.enableMemoryAttachmentFlow.collect { enabled ->
                 _enableMemoryAttachment.value = enabled
+            }
+        }
+
+        // Collect auto read setting
+        viewModelScope.launch {
+            apiPreferences.enableAutoReadFlow.collect { enabled ->
+                _enableAutoRead.value = enabled
             }
         }
 
@@ -296,6 +307,15 @@ class ApiConfigDelegate(
             val newValue = !_enableMemoryAttachment.value
             apiPreferences.saveEnableMemoryAttachment(newValue)
             _enableMemoryAttachment.value = newValue
+        }
+    }
+
+    /** 切换自动朗读 */
+    fun toggleAutoRead() {
+        viewModelScope.launch {
+            val newValue = !_enableAutoRead.value
+            apiPreferences.saveEnableAutoRead(newValue)
+            _enableAutoRead.value = newValue
         }
     }
 

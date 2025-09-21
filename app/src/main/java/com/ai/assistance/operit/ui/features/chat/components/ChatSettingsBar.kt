@@ -24,6 +24,8 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.TipsAndUpdates
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,7 +82,9 @@ fun ChatSettingsBar(
         onSummaryTokenThresholdChange: (Float) -> Unit,
         onNavigateToUserPreferences: () -> Unit,
         onNavigateToModelConfig: () -> Unit,
-        onNavigateToModelPrompts: () -> Unit
+        onNavigateToModelPrompts: () -> Unit,
+    isAutoReadEnabled: Boolean,
+    onToggleAutoRead: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val iconScale by
@@ -178,6 +182,14 @@ fun ChatSettingsBar(
                     Icon(
                         imageVector = Icons.Rounded.Security,
                         contentDescription = stringResource(R.string.auto_approve_active),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                AnimatedVisibility(visible = isAutoReadEnabled) {
+                    Icon(
+                        imageVector = Icons.Rounded.VolumeUp,
+                        contentDescription = stringResource(R.string.auto_read_active),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -329,6 +341,38 @@ fun ChatSettingsBar(
                                                     alpha = 0.2f
                                             )
                             )
+
+                            // 自动朗读
+                            SettingItem(
+                                title = stringResource(R.string.auto_read_message),
+                                    icon =
+                                            if (isAutoReadEnabled) Icons.Rounded.VolumeUp
+                                            else Icons.Outlined.VolumeOff,
+                                    iconTint =
+                                            if (isAutoReadEnabled)
+                                                    MaterialTheme.colorScheme.primary
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    ),
+                                isChecked = isAutoReadEnabled,
+                                onToggle = onToggleAutoRead,
+                                onInfoClick = {
+                                        infoPopupContent =
+                                                context.getString(R.string.auto_read_message) to context.getString(R.string.auto_read_desc)
+                                    showMenu = false
+                                }
+                            )
+                            
+                            Divider(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                thickness = 0.5.dp,
+                                    color =
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                    alpha = 0.2f
+                                            )
+                            )
+
                             // AI计划模式
                             SettingItem(
                                 title = stringResource(R.string.ai_planning_mode),

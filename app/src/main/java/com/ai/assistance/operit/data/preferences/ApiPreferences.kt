@@ -57,6 +57,9 @@ class ApiPreferences private constructor(private val context: Context) {
         // Key for Memory Attachment
         val ENABLE_MEMORY_ATTACHMENT = booleanPreferencesKey("enable_memory_attachment")
 
+        // Key for Auto Read
+        val ENABLE_AUTO_READ = booleanPreferencesKey("enable_auto_read")
+
         // Key for Waifu Mode
         val ENABLE_WAIFU_MODE = booleanPreferencesKey("enable_waifu_mode")
         val WAIFU_CHAR_DELAY = intPreferencesKey("waifu_char_delay") // 每字符延迟（毫秒）
@@ -93,6 +96,9 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Default value for Memory Attachment
         const val DEFAULT_ENABLE_MEMORY_ATTACHMENT = true
+
+        // Default value for Auto Read
+        const val DEFAULT_ENABLE_AUTO_READ = false
 
         // Default value for Waifu Mode
         const val DEFAULT_ENABLE_WAIFU_MODE = false
@@ -190,6 +196,12 @@ class ApiPreferences private constructor(private val context: Context) {
     val enableMemoryAttachmentFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
             preferences[ENABLE_MEMORY_ATTACHMENT] ?: DEFAULT_ENABLE_MEMORY_ATTACHMENT
+        }
+
+    // Flow for Auto Read
+    val enableAutoReadFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_AUTO_READ] ?: DEFAULT_ENABLE_AUTO_READ
         }
 
     // Flow for Waifu Mode
@@ -307,6 +319,13 @@ class ApiPreferences private constructor(private val context: Context) {
     suspend fun saveEnableMemoryAttachment(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences ->
             preferences[ENABLE_MEMORY_ATTACHMENT] = isEnabled
+        }
+    }
+
+    // Save Auto Read setting
+    suspend fun saveEnableAutoRead(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_AUTO_READ] = isEnabled
         }
     }
 

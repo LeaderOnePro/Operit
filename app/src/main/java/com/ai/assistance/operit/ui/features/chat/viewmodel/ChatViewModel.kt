@@ -40,6 +40,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.util.WaifuMessageProcessor
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -71,9 +72,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    // 添加自动朗读状态
-    private val _isAutoReadEnabled = MutableStateFlow(false)
-    val isAutoReadEnabled: StateFlow<Boolean> = _isAutoReadEnabled.asStateFlow()
+    // 添加自动朗读状态 - Now managed by ApiConfigDelegate
+    val isAutoReadEnabled: StateFlow<Boolean> by lazy { apiConfigDelegate.enableAutoRead }
 
     // 添加回复相关状态
     private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
@@ -1457,14 +1457,16 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     // 等待初始化完成
                     delay(500)
                 }
-                
+
+                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(message)
+
                 val success = voiceService?.speak(
-                    text = message,
+                    text = cleanMessage,
                     interrupt = true, // 中断当前播放
                     rate = 1.0f,
                     pitch = 1.0f
                 ) ?: false
-                
+
                 if (!success) {
                     uiStateDelegate.showToast("朗读失败")
                 }
@@ -1487,25 +1489,30 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     fun toggleAutoRead() {
-        _isAutoReadEnabled.value = !_isAutoReadEnabled.value
-        // 如果关闭，则也停止当前语音
-        if (!_isAutoReadEnabled.value) {
-            stopSpeaking()
+        apiConfigDelegate.toggleAutoRead()
+        // Stop speaking if auto-read is being turned off.
+        // We check the new value directly from the delegate's state flow.
+        viewModelScope.launch {
+            // A small delay to allow the state flow to update, although it's often fast.
+            delay(50)
+            if (!isAutoReadEnabled.value) {
+                stopSpeaking()
+            }
         }
     }
 
     fun disableAutoRead() {
-        if (_isAutoReadEnabled.value) {
-            _isAutoReadEnabled.value = false
+        if (isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to false
             stopSpeaking()
         }
     }
 
     fun enableAutoReadAndSpeak(content: String) {
-        if (!_isAutoReadEnabled.value) {
-            _isAutoReadEnabled.value = true
-            speakMessage(content)
+        if (!isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to true
         }
+        speakMessage(content)
     }
 
     /** 设置回复目标消息 */
