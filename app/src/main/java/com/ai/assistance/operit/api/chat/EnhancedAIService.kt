@@ -407,7 +407,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     chatHistory = preparedHistory,
                                     modelParameters = modelParameters,
                                     enableThinking = enableThinking,
-                                    onTokensUpdated = { input, output ->
+                                    onTokensUpdated = { input, cachedInput, output ->
                                         _perRequestTokenCounts.value = Pair(input, output)
                                     },
                                     onNonFatalError = onNonFatalError
@@ -462,10 +462,11 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // Update accumulated token counts and persist them
                     val inputTokens = serviceForFunction.inputTokenCount
+                    val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                     val outputTokens = serviceForFunction.outputTokenCount
                     accumulatedInputTokenCount += inputTokens
                     accumulatedOutputTokenCount += outputTokens
-                    apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens)
+                    apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                     Log.d(
                             TAG,
@@ -1015,7 +1016,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                 chatHistory = currentChatHistory,
                                 modelParameters = modelParameters,
                                 enableThinking = enableThinking,
-                                onTokensUpdated = { input, output ->
+                                onTokensUpdated = { input, cachedInput, output ->
                                     _perRequestTokenCounts.value = Pair(input, output)
                                 },
                                 onNonFatalError = onNonFatalError
@@ -1057,10 +1058,11 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 // Update accumulated token counts and persist them
                 val inputTokens = serviceForFunction.inputTokenCount
+                val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                 val outputTokens = serviceForFunction.outputTokenCount
                 accumulatedInputTokenCount += inputTokens
                 accumulatedOutputTokenCount += outputTokens
-                apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens)
+                apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                 Log.d(
                         TAG,

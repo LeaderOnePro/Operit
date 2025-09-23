@@ -19,6 +19,11 @@ import kotlinx.coroutines.launch
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.components.CustomScaffold
+import com.ai.assistance.operit.util.TokenCacheManager
+
+private const val DEFAULT_INPUT_PRICE = 4.0
+private const val DEFAULT_OUTPUT_PRICE = 12.0
+private const val DEFAULT_CACHED_INPUT_PRICE = 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,9 +35,9 @@ fun TokenUsageStatisticsScreen(
     val apiPreferences = remember { ApiPreferences.getInstance(context) }
     
     // State to hold token data for all provider models
-    val providerModelTokenUsage = remember { mutableStateMapOf<String, Pair<Int, Int>>() }
-    // State to hold custom pricing for each model
-    val modelPricing = remember { mutableStateMapOf<String, Pair<Double, Double>>() }
+    val providerModelTokenUsage = remember { mutableStateMapOf<String, Triple<Int, Int, Int>>() }
+    // State to hold custom pricing for each model (input, output, cached input)
+    val modelPricing = remember { mutableStateMapOf<String, Triple<Double, Double, Double>>() }
     var showPricingDialog by remember { mutableStateOf(false) }
     var selectedModel by remember { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -47,8 +52,8 @@ fun TokenUsageStatisticsScreen(
                 // Initialize pricing for new models with default values
                 tokensMap.keys.forEach { model ->
                     if (!modelPricing.containsKey(model)) {
-                        // Default pricing in RMB (Claude-3.5-Sonnet pricing as default)
-                        modelPricing[model] = Pair(21.6, 108.0) // ¥21.6/1M input, ¥108/1M output
+                        // Default pricing in RMB
+                        modelPricing[model] = Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE) // ¥4/1M input, ¥12/1M output, ¥0.5/1M cached input
                     }
                 }
             }
@@ -61,8 +66,9 @@ fun TokenUsageStatisticsScreen(
             providerModelTokenUsage.keys.forEach { model ->
                 val inputPrice = apiPreferences.getModelInputPrice(model)
                 val outputPrice = apiPreferences.getModelOutputPrice(model)
-                if (inputPrice > 0.0 || outputPrice > 0.0) {
-                    modelPricing[model] = Pair(inputPrice, outputPrice)
+                val cachedInputPrice = apiPreferences.getModelCachedInputPrice(model)
+                if (inputPrice > 0.0 || outputPrice > 0.0 || cachedInputPrice > 0.0) {
+                    modelPricing[model] = Triple(inputPrice, outputPrice, cachedInputPrice)
                 }
             }
         }
@@ -70,16 +76,19 @@ fun TokenUsageStatisticsScreen(
 
     // Calculate costs for each provider model using custom pricing
     val providerModelCosts = providerModelTokenUsage.mapValues { (model, tokens) ->
-        val pricing = modelPricing[model] ?: Pair(21.6, 108.0)
-        val inputCost = tokens.first.toDouble() * pricing.first / 1_000_000
-        val outputCost = tokens.second.toDouble() * pricing.second / 1_000_000
-        inputCost + outputCost
+        val pricing = modelPricing[model] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
+        // tokens.first = total input, tokens.second = output, tokens.third = cached input
+        val nonCachedInput = tokens.first - tokens.third
+        (nonCachedInput / 1_000_000.0 * pricing.first) + (tokens.second / 1_000_000.0 * pricing.second) + (tokens.third / 1_000_000.0 * pricing.third)
     }
 
     val totalInputTokens = providerModelTokenUsage.values.sumOf { it.first }
     val totalOutputTokens = providerModelTokenUsage.values.sumOf { it.second }
-    val totalCost = providerModelCosts.values.sum()
+    val totalCachedInputTokens = providerModelTokenUsage.values.sumOf { it.third }
     val totalTokens = totalInputTokens + totalOutputTokens
+
+    // Calculate total cost across all models
+    val totalCost = providerModelCosts.values.sum()
 
     CustomScaffold(
         floatingActionButton = {
@@ -151,6 +160,64 @@ fun TokenUsageStatisticsScreen(
                                 )
                             }
                         }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Token breakdown by type
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.settings_input_tokens),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "$totalInputTokens",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.settings_output_tokens),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "$totalOutputTokens",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            if (totalCachedInputTokens > 0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.settings_cached_tokens_label),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    Text(
+                                        text = "$totalCachedInputTokens",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -206,13 +273,14 @@ fun TokenUsageStatisticsScreen(
                 }
             } else {
                 items(sortedProviderModels) { (providerModel, tokens) ->
-                    val (input, output) = tokens
+                    val (input, output, cached) = tokens
                     val cost = providerModelCosts[providerModel] ?: 0.0
-                    val pricing = modelPricing[providerModel] ?: Pair(21.6, 108.0)
+                    val pricing = modelPricing[providerModel] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
                     
                     TokenUsageModelCard(
                         modelName = providerModel,
                         inputTokens = input,
+                        cachedInputTokens = cached,
                         outputTokens = output,
                         cost = cost,
                         inputPrice = pricing.first,
@@ -229,9 +297,10 @@ fun TokenUsageStatisticsScreen(
 
     // Pricing Dialog
     if (showPricingDialog && selectedModel.isNotEmpty()) {
-        val currentPricing = modelPricing[selectedModel] ?: Pair(21.6, 108.0)
+        val currentPricing = modelPricing[selectedModel] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
         var inputPrice by remember { mutableStateOf(currentPricing.first.toString()) }
         var outputPrice by remember { mutableStateOf(currentPricing.second.toString()) }
+        var cachedInputPrice by remember { mutableStateOf(currentPricing.third.toString()) }
         
         AlertDialog(
             onDismissRequest = { showPricingDialog = false },
@@ -255,6 +324,14 @@ fun TokenUsageStatisticsScreen(
                     )
                     
                     OutlinedTextField(
+                        value = cachedInputPrice,
+                        onValueChange = { cachedInputPrice = it },
+                        label = { Text(stringResource(id = R.string.settings_cached_input_price_per_million)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    OutlinedTextField(
                         value = outputPrice,
                         onValueChange = { outputPrice = it },
                         label = { Text(stringResource(id = R.string.settings_output_price_per_million)) },
@@ -266,14 +343,16 @@ fun TokenUsageStatisticsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val inputPriceDouble = inputPrice.toDoubleOrNull() ?: 21.6
-                        val outputPriceDouble = outputPrice.toDoubleOrNull() ?: 108.0
+                        val inputPriceDouble = inputPrice.toDoubleOrNull() ?: DEFAULT_INPUT_PRICE
+                        val outputPriceDouble = outputPrice.toDoubleOrNull() ?: DEFAULT_OUTPUT_PRICE
+                        val cachedInputPriceDouble = cachedInputPrice.toDoubleOrNull() ?: DEFAULT_CACHED_INPUT_PRICE
                         
-                        modelPricing[selectedModel] = Pair(inputPriceDouble, outputPriceDouble)
+                        modelPricing[selectedModel] = Triple(inputPriceDouble, outputPriceDouble, cachedInputPriceDouble)
                         
                         scope.launch {
                             apiPreferences.setModelInputPrice(selectedModel, inputPriceDouble)
                             apiPreferences.setModelOutputPrice(selectedModel, outputPriceDouble)
+                            apiPreferences.setModelCachedInputPrice(selectedModel, cachedInputPriceDouble)
                         }
                         
                         showPricingDialog = false
@@ -332,6 +411,7 @@ fun TokenUsageStatisticsScreen(
 private fun TokenUsageModelCard(
     modelName: String,
     inputTokens: Int,
+    cachedInputTokens: Int,
     outputTokens: Int,
     cost: Double,
     inputPrice: Double,
@@ -382,6 +462,13 @@ private fun TokenUsageModelCard(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
+                    if (cachedInputTokens > 0) {
+                        Text(
+                            text = stringResource(R.string.settings_cached_tokens, cachedInputTokens),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
                     Text(
                         text = stringResource(id = R.string.settings_price_format, inputPrice),
                         style = MaterialTheme.typography.bodySmall,

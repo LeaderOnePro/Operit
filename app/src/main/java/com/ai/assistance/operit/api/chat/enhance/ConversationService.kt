@@ -121,12 +121,13 @@ class ConversationService(private val context: Context) {
 
             // 获取本次总结生成的token统计
             val inputTokens = summaryService.inputTokenCount
+            val cachedInputTokens = summaryService.cachedInputTokenCount
             val outputTokens = summaryService.outputTokenCount
 
             // 将总结token计数添加到用户偏好分析的token统计中
             try {
-                Log.d(TAG, "总结生成使用了输入token: $inputTokens, 输出token: $outputTokens")
-                apiPreferences.updateTokensForProviderModel(summaryService.providerModel, inputTokens, outputTokens)
+                Log.d(TAG, "总结生成使用了输入token: $inputTokens, 缓存token: $cachedInputTokens, 输出token: $outputTokens")
+                apiPreferences.updateTokensForProviderModel(summaryService.providerModel, inputTokens, outputTokens, cachedInputTokens)
                 Log.d(TAG, "已将总结token统计添加到用户偏好分析token计数中")
             } catch (e: Exception) {
                 Log.e(TAG, "更新token统计失败", e)

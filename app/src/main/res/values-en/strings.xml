@@ -389,6 +389,8 @@
     
     <string name="settings_section_usage">Usage Statistics</string>
     <string name="settings_token_statistics">Token Statistics</string>
+    <string name="settings_total_tokens_breakdown">Input: %1$d (Cached: %2$d) / Output: %3$d</string>
+    <string name="settings_cached_tokens">(Cached: %1$d)</string>
     <string name="settings_reset_analysis_count">Reset Preference Analysis Counter</string>
     <string name="settings_why_token_stats">Why Should I Care About Token Statistics?</string>
     <string name="settings_token_stats_explanation">Because it\'s like a restaurant bill, except the \'food\' is AI thinking and the \'money\' is calculated in RMB! Preference analysis is the AI observing your tastes to customize your next \'menu\'. Don\'t worry, even if you chat until your fingers cramp, these costs might not be enough to buy a bubble tea~</string>
@@ -2029,6 +2031,7 @@
     <string name="settings_pricing_description">Set RMB price per million tokens</string>
     <string name="settings_input_price_per_million">Input Price (per million tokens)</string>
     <string name="settings_output_price_per_million">Output Price (per million tokens)</string>
+    <string name="settings_cached_input_price_per_million">Cached Input Price (per million tokens)</string>
     <string name="settings_save">Save</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_reset_confirmation">Reset Confirmation</string>
@@ -2037,6 +2040,7 @@
     <string name="settings_edit_pricing">Edit Pricing</string>
     <string name="settings_input_tokens">Input Tokens</string>
     <string name="settings_output_tokens">Output Tokens</string>
+    <string name="settings_cached_tokens_label">Cached Tokens</string>
     <string name="settings_price_format">$%.2f/1M</string>
     <string name="settings_cost">Cost</string>
     

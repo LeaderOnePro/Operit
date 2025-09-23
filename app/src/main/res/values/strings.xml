@@ -380,6 +380,8 @@
     
     <string name="settings_section_usage">使用统计</string>
     <string name="settings_token_statistics">Token统计</string>
+    <string name="settings_total_tokens_breakdown">输入: %1$d (缓存: %2$d) / 输出: %3$d</string>
+    <string name="settings_cached_tokens">(缓存: %1$d)</string>
     <string name="settings_reset_analysis_count">重置偏好分析计数</string>
     <string name="settings_why_token_stats">为什么我要关心Token统计？</string>
     <string name="settings_token_stats_explanation">因为它就像一个饭店账单，只不过这里的\'饭\'是AI的思考，而\'钱\'是以人民币计算的！偏好分析是AI暗中观察你的口味，为你定制下次的\'菜单\'。别担心，即使你聊到手指抽筋，这些费用可能还不够买一杯奶茶～</string>
@@ -2036,6 +2038,7 @@
     <string name="settings_pricing_description">设置每百万Token的人民币价格</string>
     <string name="settings_input_price_per_million">输入价格（每百万Token）</string>
     <string name="settings_output_price_per_million">输出价格（每百万Token）</string>
+    <string name="settings_cached_input_price_per_million">缓存输入价格（每百万Token）</string>
     <string name="settings_save">保存</string>
     <string name="settings_cancel">取消</string>
     <string name="settings_reset_confirmation">重置确认</string>
@@ -2044,6 +2047,7 @@
     <string name="settings_edit_pricing">编辑定价</string>
     <string name="settings_input_tokens">输入Token</string>
     <string name="settings_output_tokens">输出Token</string>
+    <string name="settings_cached_tokens_label">缓存Token</string>
     <string name="settings_price_format">¥%.2f/1M</string>
     <string name="settings_cost">费用</string>
     

@@ -345,7 +345,8 @@ object ProblemLibrary {
             apiPreferences?.updateTokensForProviderModel(
                     aiService.providerModel,
                     aiService.inputTokenCount,
-                    aiService.outputTokenCount
+                    aiService.outputTokenCount,
+                    aiService.cachedInputTokenCount
             )
 
             return parseAnalysisResult(ChatUtils.removeThinkingContent(result.toString()))

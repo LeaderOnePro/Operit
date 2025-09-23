@@ -137,7 +137,8 @@ Now, generate ONLY the patch in the custom format based on all the rules.
                 apiPreferences.updateTokensForProviderModel(
                         fileBindingService.providerModel,
                         fileBindingService.inputTokenCount,
-                        fileBindingService.outputTokenCount
+                        fileBindingService.outputTokenCount,
+                        fileBindingService.cachedInputTokenCount
                 )
 
                 val finalDiff =
@@ -240,7 +241,8 @@ Now, generate ONLY the complete and final merged file content.
             apiPreferences.updateTokensForProviderModel(
                 fileBindingService.providerModel,
                 fileBindingService.inputTokenCount,
-                fileBindingService.outputTokenCount
+                fileBindingService.outputTokenCount,
+                fileBindingService.cachedInputTokenCount
             )
             return Pair(mergedContentFromAI, diffString)
         } catch (e: Exception) {
