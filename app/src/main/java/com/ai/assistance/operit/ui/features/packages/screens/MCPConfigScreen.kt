@@ -186,9 +186,6 @@ fun MCPConfigScreen(
     var showRemoteEditDialog by remember { mutableStateOf(false) }
     var editingRemoteServer by remember { mutableStateOf<MCPLocalServer.PluginMetadata?>(null) }
 
-    // 新增：MCP社区链接对话框状态
-    var showMCPCommunityDialog by remember { mutableStateOf(false) }
-
 
 
 
@@ -502,7 +499,10 @@ fun MCPConfigScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 TextButton(
-                                    onClick = { showMCPCommunityDialog = true }
+                                    onClick = {
+                                        showImportDialog = false
+                                        onNavigateToMCPMarket()
+                                    }
                                 ) {
                                     Text(stringResource(R.string.get_mcp))
                                 }
@@ -775,108 +775,6 @@ fun MCPConfigScreen(
         )
     }
     
-    // MCP社区链接对话框
-    if (showMCPCommunityDialog) {
-        AlertDialog(
-            onDismissRequest = { showMCPCommunityDialog = false },
-            title = { Text(stringResource(R.string.mcp_community_resources)) },
-            text = {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    item {
-                        Text(
-                            stringResource(R.string.choose_mcp_community_to_get_plugins),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    
-                    // 官方资源
-                    item {
-                        MCPCommunityItem(
-                            title = stringResource(R.string.mcp_official_repo),
-                            description = stringResource(R.string.anthropic_official_mcp_servers),
-                            url = "https://github.com/modelcontextprotocol",
-                            onCopyUrl = { url ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("MCP URL", url)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                    
-                    // 社区目录
-                    item {
-                        MCPCommunityItem(
-                            title = stringResource(R.string.mcp_server_directory),
-                            description = stringResource(R.string.complete_mcp_server_list_177),
-                            url = "https://mcplist.ai",
-                            onCopyUrl = { url ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("MCP URL", url)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                    
-                    // Claude MCP社区
-                    item {
-                        MCPCommunityItem(
-                            title = stringResource(R.string.claude_mcp_community),
-                            description = stringResource(R.string.claude_mcp_community_website),
-                            url = "https://claudemcp.com",
-                            onCopyUrl = { url ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("MCP URL", url)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                    
-                    // 魔搭社区
-                    item {
-                        MCPCommunityItem(
-                            title = stringResource(R.string.modelscope_community),
-                            description = stringResource(R.string.modelscope_ai_community_mcp_resources),
-                            url = "https://modelscope.cn",
-                            onCopyUrl = { url ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("MCP URL", url)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                    
-                    // GitHub Awesome MCP
-                    item {
-                        MCPCommunityItem(
-                            title = stringResource(R.string.awesome_mcp),
-                            description = stringResource(R.string.github_awesome_mcp_resources),
-                            url = "https://github.com/search?q=awesome+mcp&type=repositories",
-                            onCopyUrl = { url ->
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("MCP URL", url)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showMCPCommunityDialog = false }) {
-                    Text(stringResource(R.string.close))
-                }
-            }
-        )
-    }
-
     CustomScaffold(
             floatingActionButton = {
                 Column(
@@ -1500,68 +1398,4 @@ fun RemoteServerEditDialog(
             }
         }
     )
-}
-
-@Composable
-private fun MCPCommunityItem(
-    title: String,
-    description: String,
-    url: String,
-    onCopyUrl: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            
-            IconButton(
-                onClick = { onCopyUrl(url) },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = stringResource(R.string.copy_link),
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
-        
-        Text(
-            text = url,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-            ),
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(start = 4.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        
-        HorizontalDivider(
-            modifier = Modifier.padding(top = 8.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-        )
-    }
 }
