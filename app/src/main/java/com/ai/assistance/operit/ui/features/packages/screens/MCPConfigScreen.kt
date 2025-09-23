@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -67,7 +68,9 @@ import com.ai.assistance.operit.data.mcp.plugins.MCPStarter
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MCPConfigScreen() {
+fun MCPConfigScreen(
+    onNavigateToMCPMarket: () -> Unit = {}
+) {
     val context = LocalContext.current
     val mcpLocalServer = remember { MCPLocalServer.getInstance(context) }
     val mcpRepository = remember { MCPRepository(context) }
@@ -154,7 +157,7 @@ fun MCPConfigScreen() {
     var selectedPluginId by remember { mutableStateOf<String?>(null) }
     var pluginConfigJson by remember { mutableStateOf("") }
     var selectedPluginForDetails by remember {
-        mutableStateOf<com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer?>(
+        mutableStateOf<MCPLocalServer.PluginMetadata?>(
                 null
         )
     }
@@ -181,10 +184,12 @@ fun MCPConfigScreen() {
 
     // 新增：远程服务编辑对话框状态
     var showRemoteEditDialog by remember { mutableStateOf(false) }
-    var editingRemoteServer by remember { mutableStateOf<com.ai.assistance.operit.data.mcp.MCPServer?>(null) }
+    var editingRemoteServer by remember { mutableStateOf<MCPLocalServer.PluginMetadata?>(null) }
 
     // 新增：MCP社区链接对话框状态
     var showMCPCommunityDialog by remember { mutableStateOf(false) }
+
+
 
 
     // Effect to fetch and display tools when MCP servers start
@@ -499,7 +504,7 @@ fun MCPConfigScreen() {
                                 TextButton(
                                     onClick = { showMCPCommunityDialog = true }
                                 ) {
-                                    Text("获取MCP", style = MaterialTheme.typography.labelSmall)
+                                    Text(stringResource(R.string.get_mcp))
                                 }
                             }
                             
@@ -591,11 +596,21 @@ fun MCPConfigScreen() {
                     
                     OutlinedTextField(
                         value = pluginNameInput,
-                        onValueChange = { pluginNameInput = it },
+                        onValueChange = { newValue ->
+                            // 只允许英文字母、数字和下划线
+                            val filtered = newValue.filter { it.isLetterOrDigit() || it == '_' }
+                            pluginNameInput = filtered
+                        },
                         label = { Text(stringResource(R.string.plugin_name)) },
                         placeholder = { Text(stringResource(R.string.my_mcp_plugin)) },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        supportingText = { 
+                            Text(
+                                stringResource(R.string.plugin_name_description),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     )
                 }
             },
@@ -620,16 +635,12 @@ fun MCPConfigScreen() {
                             val importId = proposedId
                             
                             // 创建服务器对象（描述将由自动生成功能填充）
-                            val server = com.ai.assistance.operit.data.mcp.MCPServer(
+                            val server = MCPLocalServer.PluginMetadata(
                                 id = importId,
                                 name = pluginNameInput,
                                 description = "", // 将由自动生成功能填充
                                 logoUrl = "",
-                                stars = 0,
-                                category = if(isRemote) context.getString(R.string.remote_service) else context.getString(R.string.import_plugin),
-                                requiresApiKey = false,
                                 author = "",
-                                isVerified = false,
                                 isInstalled = isRemote, // 远程服务视为"已安装"
                                 version = "1.0.0",
                                 updatedAt = "",
@@ -646,30 +657,10 @@ fun MCPConfigScreen() {
                                 Toast.makeText(context, context.getString(R.string.remote_service_added, server.name), Toast.LENGTH_SHORT).show()
                             } else {
                                 // 本地插件走安装流程
-                                val mcpServer = com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer(
-                                id = server.id,
-                                name = server.name,
-                                description = server.description,
-                                logoUrl = server.logoUrl,
-                                stars = server.stars,
-                                category = server.category,
-                                requiresApiKey = server.requiresApiKey,
-                                author = server.author,
-                                isVerified = server.isVerified,
-                                isInstalled = server.isInstalled,
-                                version = server.version,
-                                updatedAt = server.updatedAt,
-                                longDescription = server.longDescription,
-                                    repoUrl = server.repoUrl,
-                                    type = server.type,
-                                    endpoint = server.endpoint,
-                                    connectionType = server.connectionType
-                            )
-                            
                             if (importTabIndex == 0) {
-                                viewModel.installServerWithObject(mcpServer)
+                                viewModel.installServerWithObject(server)
                             } else {
-                                viewModel.installServerFromZip(mcpServer, zipFilePath)
+                                viewModel.installServerFromZip(server, zipFilePath)
                                 }
                             }
                             
@@ -788,7 +779,7 @@ fun MCPConfigScreen() {
     if (showMCPCommunityDialog) {
         AlertDialog(
             onDismissRequest = { showMCPCommunityDialog = false },
-            title = { Text("MCP 社区资源") },
+            title = { Text(stringResource(R.string.mcp_community_resources)) },
             text = {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
@@ -796,7 +787,7 @@ fun MCPConfigScreen() {
                 ) {
                     item {
                         Text(
-                            "选择以下优质MCP社区获取插件：",
+                            stringResource(R.string.choose_mcp_community_to_get_plugins),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -805,14 +796,14 @@ fun MCPConfigScreen() {
                     // 官方资源
                     item {
                         MCPCommunityItem(
-                            title = "MCP 官方仓库",
-                            description = "Anthropic官方维护的MCP服务器集合",
+                            title = stringResource(R.string.mcp_official_repo),
+                            description = stringResource(R.string.anthropic_official_mcp_servers),
                             url = "https://github.com/modelcontextprotocol",
                             onCopyUrl = { url ->
                                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val clip = android.content.ClipData.newPlainText("MCP URL", url)
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -820,14 +811,14 @@ fun MCPConfigScreen() {
                     // 社区目录
                     item {
                         MCPCommunityItem(
-                            title = "MCP 服务器目录",
-                            description = "完整的MCP服务器列表，包含177+个服务器",
+                            title = stringResource(R.string.mcp_server_directory),
+                            description = stringResource(R.string.complete_mcp_server_list_177),
                             url = "https://mcplist.ai",
                             onCopyUrl = { url ->
                                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val clip = android.content.ClipData.newPlainText("MCP URL", url)
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -835,14 +826,14 @@ fun MCPConfigScreen() {
                     // Claude MCP社区
                     item {
                         MCPCommunityItem(
-                            title = "Claude MCP 社区",
-                            description = "专注于Claude MCP的社区网站",
+                            title = stringResource(R.string.claude_mcp_community),
+                            description = stringResource(R.string.claude_mcp_community_website),
                             url = "https://claudemcp.com",
                             onCopyUrl = { url ->
                                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val clip = android.content.ClipData.newPlainText("MCP URL", url)
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -850,14 +841,14 @@ fun MCPConfigScreen() {
                     // 魔搭社区
                     item {
                         MCPCommunityItem(
-                            title = "魔搭社区",
-                            description = "ModelScope AI模型社区，包含MCP相关资源",
+                            title = stringResource(R.string.modelscope_community),
+                            description = stringResource(R.string.modelscope_ai_community_mcp_resources),
                             url = "https://modelscope.cn",
                             onCopyUrl = { url ->
                                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val clip = android.content.ClipData.newPlainText("MCP URL", url)
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -865,14 +856,14 @@ fun MCPConfigScreen() {
                     // GitHub Awesome MCP
                     item {
                         MCPCommunityItem(
-                            title = "Awesome MCP",
-                            description = "GitHub上精选的MCP资源和工具集合",
+                            title = stringResource(R.string.awesome_mcp),
+                            description = stringResource(R.string.github_awesome_mcp_resources),
                             url = "https://github.com/search?q=awesome+mcp&type=repositories",
                             onCopyUrl = { url ->
                                 val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val clip = android.content.ClipData.newPlainText("MCP URL", url)
                                 clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "链接已复制", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -880,7 +871,7 @@ fun MCPConfigScreen() {
             },
             confirmButton = {
                 TextButton(onClick = { showMCPCommunityDialog = false }) {
-                    Text("关闭")
+                    Text(stringResource(R.string.close))
                 }
             }
         )
@@ -903,6 +894,16 @@ fun MCPConfigScreen() {
                         modifier = Modifier.size(56.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.start_plugin))
+                    }
+                    
+                    // 市场按钮
+                    FloatingActionButton(
+                        onClick = onNavigateToMCPMarket,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(Icons.Default.Store, contentDescription = stringResource(R.string.mcp_market))
                     }
                     
                     // 导入按钮
@@ -1038,25 +1039,7 @@ fun MCPConfigScreen() {
                                     // 设置要编辑的服务器并显示对话框
                                     val serverToEdit = getPluginAsServer(pluginId, mcpRepository,context)
                                     if(serverToEdit != null){
-                                        editingRemoteServer = com.ai.assistance.operit.data.mcp.MCPServer(
-                                            id = serverToEdit.id,
-                                            name = serverToEdit.name,
-                                            description = serverToEdit.description,
-                                            logoUrl = serverToEdit.logoUrl,
-                                            stars = serverToEdit.stars,
-                                            category = serverToEdit.category,
-                                            requiresApiKey = serverToEdit.requiresApiKey,
-                                            author = serverToEdit.author,
-                                            isVerified = serverToEdit.isVerified,
-                                            isInstalled = serverToEdit.isInstalled,
-                                            version = serverToEdit.version,
-                                            updatedAt = serverToEdit.updatedAt,
-                                            longDescription = serverToEdit.longDescription,
-                                            repoUrl = serverToEdit.repoUrl,
-                                            type = serverToEdit.type,
-                                            endpoint = serverToEdit.endpoint,
-                                            connectionType = serverToEdit.connectionType
-                                        )
+                                        editingRemoteServer = serverToEdit
                                         showRemoteEditDialog = true
                                     }
                                 },
@@ -1139,47 +1122,25 @@ private fun getPluginAsServer(
     pluginId: String,
     mcpRepository: MCPRepository,
     context: Context
-): com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer? {
+): MCPLocalServer.PluginMetadata? {
     val pluginInfo = mcpRepository.getInstalledPluginInfo(pluginId)
 
     // 尝试从内存中的服务器列表查找
     val existingServer = mcpRepository.mcpServers.value.find { it.id == pluginId }
 
-    // 如果在列表中找到，并且类型是远程，直接使用
-    if (existingServer != null && existingServer.type == "remote") {
-        return com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer(
-            id = existingServer.id,
-            name = existingServer.name,
-            description = existingServer.description,
-            logoUrl = existingServer.logoUrl,
-            stars = existingServer.stars,
-            category = existingServer.category,
-            requiresApiKey = existingServer.requiresApiKey,
-            author = existingServer.author,
-            isVerified = existingServer.isVerified,
-            isInstalled = true,
-            version = existingServer.version,
-            updatedAt = existingServer.updatedAt,
-            longDescription = existingServer.longDescription,
-            repoUrl = existingServer.repoUrl,
-            type = existingServer.type,
-            endpoint = existingServer.endpoint,
-            connectionType = existingServer.connectionType
-        )
+    // 如果在列表中找到，直接使用
+    if (existingServer != null) {
+        return existingServer.copy(isInstalled = true)
     }
 
     val displayName = getPluginDisplayName(pluginId, mcpRepository)
 
-    return com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer(
+    return MCPLocalServer.PluginMetadata(
         id = pluginId,
         name = displayName,
         description = pluginInfo?.description ?: context.getString(R.string.local_installed_plugin),
         logoUrl = "",
-        stars = 0,
-        category = context.getString(R.string.installed_plugins),
-        requiresApiKey = false,
         author = pluginInfo?.author ?: context.getString(R.string.local_installation),
-        isVerified = false,
         isInstalled = true,
         version = pluginInfo?.version ?: context.getString(R.string.local_version),
         updatedAt = "",
@@ -1385,7 +1346,7 @@ private fun PluginListItem(
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
                             ) {
                                 Text(
-                                    text = "+${toolNames.size - 5}",
+                                    text = stringResource(R.string.more) + "${toolNames.size - 5}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -1443,9 +1404,9 @@ private fun PluginListItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RemoteServerEditDialog(
-    server: com.ai.assistance.operit.data.mcp.MCPServer,
+    server: MCPLocalServer.PluginMetadata,
     onDismiss: () -> Unit,
-    onSave: (com.ai.assistance.operit.data.mcp.MCPServer) -> Unit
+    onSave: (MCPLocalServer.PluginMetadata) -> Unit
 ) {
     var name by remember { mutableStateOf(server.name) }
     var description by remember { mutableStateOf(server.description) }
@@ -1580,7 +1541,7 @@ private fun MCPCommunityItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "复制链接",
+                    contentDescription = stringResource(R.string.copy_link),
                     tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(18.dp)
                 )

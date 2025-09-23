@@ -131,6 +131,10 @@
     <string name="about_contact">联系我们: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
     <string name="about_copyright">© 2023-2024 Operit. 保留所有权利。</string>
+    <string name="star_on_github">在 GitHub 点个 Star</string>
+    <string name="update_log">更新日志</string>
+    <string name="app_logo_description">应用图标</string>
+    <string name="github_star_description">GitHub Star</string>
     
     <!-- AI Chat Screen -->
     <string name="configure_ai">配置 AI 接口</string>
@@ -1236,6 +1240,7 @@
     <string name="interface_text">界面文本</string>
 
     <!-- MCP and Plugin Related -->
+    <string name="repo">仓库</string>
     <string name="uninstall">卸载</string>
     <string name="install">安装</string>
     <string name="import_from_repo">仓库</string>
@@ -2394,6 +2399,9 @@
     <string name="screen_title_tool_tester">工具测试中心</string>
     <string name="screen_title_text_to_speech">文本转语音</string>
     <string name="screen_title_speech_to_text">语音识别</string>
+    <string name="screen_title_mcp_market">MCP 市场</string>
+    <string name="screen_title_mcp_publish">发布 MCP 插件</string>
+    <string name="screen_title_mcp_manage">管理我的插件</string>
     
     <!-- Model Prompts Settings Screen -->
     <string name="unknown_error">未知错误</string>
@@ -2514,4 +2522,137 @@
     <string name="delete_tag">删除标签</string>
     <string name="delete_tag_confirm">确定要删除标签「%1$s」吗？此操作不可撤销。</string>
 
+    <!-- Token Config WebView & URL Config Dialog -->
+    <string name="custom_url_config">自定义URL配置</string>
+    <string name="config_name_label">配置名称</string>
+    <string name="signin_url">登录页面URL</string>
+    <string name="tab_config">Tab配置</string>
+    <string name="tab_number">Tab %1$d</string>
+    <string name="title_label">标题</string>
+    <string name="url_label">URL</string>
+    <string name="settings_config">设置</string>
+    
+    <!-- Terminal Environment Wizard -->
+    <string name="configure_terminal_environment">配置终端环境</string>
+    <string name="nodejs_pip_environment_ready">NodeJS和pip环境已就绪</string>
+    <string name="pnpm_installed_need_pip">已安装pnpm，需要配置pip</string>
+    <string name="pip_installed_need_pnpm">已安装pip，需要配置pnpm</string>
+    <string name="need_configure_nodejs_pip">需要配置NodeJS和pip环境</string>
+    <string name="terminal_environment_setup_description">需要在终端中配置NodeJS（pnpm）和pip环境以支持MCP插件运行。点击下方按钮进入终端配置界面完成设置。</string>
+    <string name="go_to_terminal_config">前往终端配置</string>
+    <string name="nodejs_pip_environment_configured">NodeJS和pip环境已经配置完成，可以正常使用MCP插件功能。</string>
+    <string name="open_terminal">打开终端</string>
+    
+    <!-- MCP市场界面 -->
+    <string name="login_github_to_manage_mcp_plugins">登录 GitHub 以发布和管理您的 MCP 插件</string>
+    <string name="browse">浏览</string>
+    <string name="my_tab">我的</string>
+    <string name="user_avatar">用户头像</string>
+    <string name="clear_search">清空搜索</string>
+    <string name="available_mcp_plugins">可用的 MCP 插件</string>
+    <string name="no_matching_plugins_found">未找到匹配的插件</string>
+    <string name="no_available_mcp_plugins">暂无可用的 MCP 插件</string>
+    <string name="refresh_or_try_later">刷新或稍后再试</string>
+    <string name="recommended_feature">推荐功能</string>
+    <string name="premium_mcp_plugins_coming_soon">即将推出精选的优质 MCP 插件</string>
+    <string name="please_login_github_first">请先登录 GitHub</string>
+    <string name="login_to_view_manage_mcp_plugins">登录后可以查看和管理您发布的 MCP 插件</string>
+    <string name="publish_new_plugin">发布新插件</string>
+    <string name="manage_my_plugins">管理我的插件</string>
+    <string name="logout">退出登录</string>
+    <string name="author_avatar">作者头像</string>
+    <string name="sharer_avatar">分享者头像</string>
+    <string name="available">可用</string>
+    <string name="closed">已关闭</string>
+
+    <string name="github_account">GitHub 账户</string>
+    <string name="login_github">登录 GitHub</string>
+    <string name="publish_mcp_plugins_to_market">• 发布您的 MCP 插件到市场</string>
+    <string name="manage_published_plugins">• 管理您已发布的插件</string>
+    <string name="better_installation_experience">• 获得更好的安装体验</string>
+    
+    <!-- MCP发布界面 -->
+    <string name="edit_description">编辑说明</string>
+    <string name="publish_description">发布说明</string>
+    <string name="only_alphanumeric_underscore_plugin_id">只允许英文字母、数字和下划线，此名称将作为插件ID使用</string>
+    <string name="install_command">安装命令</string>
+    <string name="please_fill_all_required_fields">请填写所有必填字段</string>
+    <string name="update_plugin">更新插件</string>
+    <string name="publish_to_market">发布到市场</string>
+    <string name="confirm_update">确认更新</string>
+    <string name="confirm_publish">确认发布</string>
+    <string name="confirm_mcp_git_import_deployment">我已确认mcp可以通过软件git导入得方式，并正常部署和运行</string>
+    <string name="update_failed_check_network">更新失败，请检查网络连接</string>
+    <string name="publish_failed_check_network_repo">发布失败，请检查网络连接和仓库地址</string>
+    <string name="update_success">更新成功</string>
+    <string name="publish_success">发布成功</string>
+    
+    <!-- MCP配置界面 -->
+    <string name="mcp_community_resources">MCP 社区资源</string>
+    <string name="mcp_official_repo">MCP 官方仓库</string>
+    <string name="anthropic_official_mcp_servers">Anthropic官方维护的MCP服务器集合</string>
+    <string name="link_copied">链接已复制</string>
+    <string name="mcp_server_directory">MCP 服务器目录</string>
+    <string name="complete_mcp_server_list_177">完整的MCP服务器列表，包含177+个服务器</string>
+    <string name="claude_mcp_community">Claude MCP 社区</string>
+    <string name="claude_mcp_community_website">专注于Claude MCP的社区网站</string>
+    <string name="modelscope_community">魔搭社区</string>
+    <string name="modelscope_ai_community_mcp_resources">ModelScope AI模型社区，包含MCP相关资源</string>
+    <string name="github_awesome_mcp_resources">GitHub上精选的MCP资源和工具集合</string>
+    <string name="mcp_market">MCP市场</string>
+    <string name="more">更多</string>
+    <string name="copy_link">复制链接</string>
+    
+    <!-- MCP管理界面 -->
+    <string name="need_login_github_manage_plugins">需要登录 GitHub 才能管理您发布的插件</string>
+    <string name="no_published_plugins_yet">还没有发布任何插件</string>
+    <string name="click_button_publish_first_mcp_plugin">点击上方按钮发布您的第一个 MCP 插件</string>
+    <string name="confirm_delete_action">确定删除</string>
+    <string name="published">已发布</string>
+    <string name="removed">已移除</string>
+    <string name="remove">移除</string>
+    <string name="republish">重新发布</string>
+    
+    <!-- 附加字符串 -->
+    <string name="author_colon">作者:</string>
+    <string name="share_colon">分享:</string>
+    <string name="downloading_progress">下载中 %1$s</string>
+    <string name="extracting_progress">解压中...</string>
+    <string name="installing_progress">安装中...</string>
+    <string name="after_logging_in_you_can">登录 GitHub 账户后，您可以：</string>
+    <string name="publish_your_mcp_plugin_to_the_market">发布您的 MCP 插件到市场</string>
+    <string name="manage_your_published_plugins">管理您已发布的插件</string>
+    <string name="no_mcp_plugins_available">暂无可用的 MCP 插件</string>
+    <string name="try_changing_keywords">尝试更换关键词</string>
+    <string name="refresh_or_try_again_later">刷新或稍后再试</string>
+    <string name="recommended_features">推荐功能</string>
+    <string name="coming_soon_for_mcp_plugins">即将推出精选的优质 MCP 插件</string>
+    <string name="after_logging_in_you_can_view_and_manage_your_mcp_plugins">登录后可以查看和管理您发布的 MCP 插件</string>
+    <string name="get_mcp">获取MCP</string>
+    <string name="plugin_name_description">只允许英文字母、数字和下划线，此名称将作为插件ID使用</string>
+    <string name="choose_mcp_community_to_get_plugins">选择以下优质MCP社区获取插件：</string>
+    <string name="awesome_mcp">Awesome MCP</string>
+    <string name="loading_your_plugins">正在加载您的插件...</string>
+    <string name="confirm_remove_plugin_from_market">确定要从市场移除插件「%1$s」吗？此操作会关闭对应的 Issue，但不会删除您的代码仓库。</string>
+    
+    <!-- MCPPublishScreen 额外字符串 -->
+    <string name="edit_plugin_info_description">您正在编辑已发布的插件信息。修改后的信息将更新到市场仓库的对应 Issue 中。</string>
+    <string name="publish_plugin_info_description">您的插件信息将作为 GitHub Issue 发布到市场仓库。请确保提供的信息准确完整。表单内容会自动保存为草稿，直到成功发布后才会清空。</string>
+    <string name="plugin_name_required">插件名称 *</string>
+    <string name="plugin_description_required">插件描述 *</string>
+    <string name="github_repo_address_required">GitHub 仓库地址 *</string>
+    <string name="install_command_example">例如：pnpm install xxx@xxxx</string>
+    <string name="install_command_optional_description">如果无填写则使用软件自动识别项目结构。建议为空。</string>
+    <string name="updating_progress">更新中...</string>
+    <string name="publishing_progress">发布中...</string>
+    <string name="please_check_submitted_info">请检查您提交的信息：</string>
+    <string name="name_colon">名称: %1$s</string>
+    <string name="description_colon">描述: %1$s</string>
+    <string name="repository_colon">仓库: %1$s</string>
+    <string name="install_command_colon">安装命令: %1$s</string>
+    <string name="update_failed_with_error">更新失败：%1$s</string>
+    <string name="publish_failed_with_error">发布失败：%1$s</string>
+    <string name="mcp_plugin_update_success_message">您的 MCP 插件信息已成功更新。</string>
+    <string name="mcp_plugin_publish_success_message">您的 MCP 插件已成功发布到市场，等待审核通过后即可被其他用户发现和使用。</string>
+    
 </resources>

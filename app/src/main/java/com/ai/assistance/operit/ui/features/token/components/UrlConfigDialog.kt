@@ -21,7 +21,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.token.model.TabConfig
 import com.ai.assistance.operit.ui.features.token.model.UrlConfig
 
@@ -45,7 +47,7 @@ fun UrlConfigDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("自定义URL配置")
+            Text(stringResource(R.string.custom_url_config))
         },
         text = {
             Column(
@@ -57,79 +59,79 @@ fun UrlConfigDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("配置名称") },
+                    label = { Text(stringResource(R.string.config_name_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = signInUrl,
                     onValueChange = { signInUrl = it },
-                    label = { Text("登录页面URL") },
+                    label = { Text(stringResource(R.string.signin_url)) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Text(
-                    text = "Tab配置",
+                    text = stringResource(R.string.tab_config),
                     style = MaterialTheme.typography.titleMedium
                 )
 
                 // Tab 1
-                Text("Tab 1", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tab_number, 1), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(
                     value = tab1Title,
                     onValueChange = { tab1Title = it },
-                    label = { Text("标题") },
+                    label = { Text(stringResource(R.string.title_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = tab1Url,
                     onValueChange = { tab1Url = it },
-                    label = { Text("URL") },
+                    label = { Text(stringResource(R.string.url_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Tab 2
-                Text("Tab 2", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tab_number, 2), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(
                     value = tab2Title,
                     onValueChange = { tab2Title = it },
-                    label = { Text("标题") },
+                    label = { Text(stringResource(R.string.title_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = tab2Url,
                     onValueChange = { tab2Url = it },
-                    label = { Text("URL") },
+                    label = { Text(stringResource(R.string.url_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Tab 3
-                Text("Tab 3", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tab_number, 3), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(
                     value = tab3Title,
                     onValueChange = { tab3Title = it },
-                    label = { Text("标题") },
+                    label = { Text(stringResource(R.string.title_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = tab3Url,
                     onValueChange = { tab3Url = it },
-                    label = { Text("URL") },
+                    label = { Text(stringResource(R.string.url_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 // Tab 4
-                Text("Tab 4", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.tab_number, 4), style = MaterialTheme.typography.labelMedium)
                 OutlinedTextField(
                     value = tab4Title,
                     onValueChange = { tab4Title = it },
-                    label = { Text("标题") },
+                    label = { Text(stringResource(R.string.title_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = tab4Url,
                     onValueChange = { tab4Url = it },
-                    label = { Text("URL") },
+                    label = { Text(stringResource(R.string.url_label)) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -150,12 +152,12 @@ fun UrlConfigDialog(
                     onSave(newConfig)
                 }
             ) {
-                Text("保存")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

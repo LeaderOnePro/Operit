@@ -8,7 +8,7 @@
   <a href="https://github.com/AAswordman/Operit/releases/latest"><img src="https://img.shields.io/github/v/release/AAswordman/Operit" alt="Latest Release"></a>
   <br>
   <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
-  <a href="https://operit.dev.tc"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
+  <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
   <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
 </div>
 
@@ -113,7 +113,7 @@ Operit AI offers a rich plugin ecosystem. Combined with built-in tools, it can h
 
 ## 🚀 Quick Start
 
-> **For a detailed installation guide and rich usage examples, please check out our 👉 [User Guide](https://operit.dev.tc)**
+> **For a detailed installation guide and rich usage examples, please check out our 👉 [User Guide](https://aaswordman.github.io/OperitWeb)**
 
 - **System Requirements**: Android 8.0+ (API 26+), 4GB+ RAM recommended, 200MB+ storage space.
 - **Installation Steps**:

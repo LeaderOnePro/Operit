@@ -33,7 +33,7 @@ def main():
     files = {
         '中文': 'app/src/main/res/values/strings.xml',
         '英文': 'app/src/main/res/values-en/strings.xml', 
-        '西班牙语': 'app/src/main/res/values-es/strings.xml'
+        # '西班牙语': 'app/src/main/res/values-es/strings.xml'
     }
     
     # 检查是否使用简化模式

@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
@@ -62,7 +63,10 @@ fun OperitTerminalWizardCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Default.Terminal,
                         contentDescription = null,
@@ -71,9 +75,12 @@ fun OperitTerminalWizardCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "配置终端环境",
+                        stringResource(R.string.configure_terminal_environment),
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
@@ -83,7 +90,7 @@ fun OperitTerminalWizardCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        if (showWizard) "收起" else "展开",
+                        stringResource(if (showWizard) R.string.wizard_collapse else R.string.wizard_expand),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -94,10 +101,10 @@ fun OperitTerminalWizardCard(
             
             // 环境状态信息
             val statusText = when {
-                isEnvironmentReady -> "NodeJS和pip环境已就绪"
-                isPnpmInstalled && !isPipInstalled -> "已安装pnpm，需要配置pip"
-                !isPnpmInstalled && isPipInstalled -> "已安装pip，需要配置pnpm"
-                else -> "需要配置NodeJS和pip环境"
+                isEnvironmentReady -> stringResource(R.string.nodejs_pip_environment_ready)
+                isPnpmInstalled && !isPipInstalled -> stringResource(R.string.pnpm_installed_need_pip)
+                !isPnpmInstalled && isPipInstalled -> stringResource(R.string.pip_installed_need_pnpm)
+                else -> stringResource(R.string.need_configure_nodejs_pip)
             }
             
             val statusColor = when {
@@ -176,7 +183,7 @@ fun OperitTerminalWizardCard(
 
                     if (!isEnvironmentReady) {
                         Text(
-                            "需要在终端中配置NodeJS（pnpm）和pip环境以支持MCP插件运行。点击下方按钮进入终端配置界面完成设置。",
+                            stringResource(R.string.terminal_environment_setup_description),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -191,11 +198,11 @@ fun OperitTerminalWizardCard(
                         ) {
                             Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("前往终端配置", fontSize = 14.sp)
+                            Text(stringResource(R.string.go_to_terminal_config), fontSize = 14.sp)
                         }
                     } else {
                         Text(
-                            "NodeJS和pip环境已经配置完成，可以正常使用MCP插件功能。",
+                            stringResource(R.string.nodejs_pip_environment_configured),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -210,7 +217,7 @@ fun OperitTerminalWizardCard(
                         ) {
                             Icon(Icons.Default.Terminal, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("打开终端", fontSize = 14.sp)
+                            Text(stringResource(R.string.open_terminal), fontSize = 14.sp)
                         }
                     }
                 }

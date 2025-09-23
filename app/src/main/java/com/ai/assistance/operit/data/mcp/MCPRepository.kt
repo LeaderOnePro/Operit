@@ -11,8 +11,9 @@ import com.ai.assistance.operit.core.tools.mcp.MCPToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.ui.permissions.ToolCategory
-import com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer as UIMCPServer
+
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -61,8 +62,8 @@ class MCPRepository(private val context: Context) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _mcpServers = MutableStateFlow<List<UIMCPServer>>(emptyList())
-    val mcpServers: StateFlow<List<UIMCPServer>> = _mcpServers.asStateFlow()
+    private val _mcpServers = MutableStateFlow<List<MCPLocalServer.PluginMetadata>>(emptyList())
+    val mcpServers: StateFlow<List<MCPLocalServer.PluginMetadata>> = _mcpServers.asStateFlow()
 
     // 已安装插件ID管理
     private val _installedPluginIds = MutableStateFlow<Set<String>>(emptySet())
@@ -112,7 +113,7 @@ class MCPRepository(private val context: Context) {
             val mcpServers = mcpLocalServer.getAllMCPServers()
             
             // 构建插件列表
-            val servers = mutableListOf<UIMCPServer>()
+            val servers = mutableListOf<MCPLocalServer.PluginMetadata>()
             val installedIds = mutableSetOf<String>()
             
             pluginMetadata.values.forEach { metadata ->
@@ -126,25 +127,12 @@ class MCPRepository(private val context: Context) {
                     installedIds.add(metadata.id)
                 }
                 
-                servers.add(UIMCPServer(
-                    id = metadata.id,
-                    name = metadata.name,
-                    description = metadata.description,
-                    logoUrl = metadata.logoUrl,
-                    stars = 0,
-                    category = metadata.category,
-                    requiresApiKey = metadata.requiresApiKey,
-                    author = metadata.author,
-                    isVerified = metadata.isVerified,
-                    isInstalled = isPhysicallyInstalled || metadata.type == "remote",
-                    version = metadata.version,
-                    updatedAt = "",
-                    longDescription = metadata.longDescription,
-                    repoUrl = metadata.repoUrl,
-                    type = metadata.type,
-                    endpoint = metadata.endpoint,
-                    connectionType = metadata.connectionType
-                ))
+                // 创建更新的metadata，确保isInstalled字段正确
+                val updatedMetadata = metadata.copy(
+                    isInstalled = isPhysicallyInstalled || metadata.type == "remote"
+                )
+                
+                servers.add(updatedMetadata)
             }
             
             _mcpServers.value = servers.sortedBy { it.name }
@@ -225,17 +213,17 @@ class MCPRepository(private val context: Context) {
         progressCallback: (InstallProgress) -> Unit = {}
     ): InstallResult {
         return withContext(Dispatchers.IO) {
-            val server = _mcpServers.value.find { it.id == pluginId }
-            if (server == null) {
+            val metadata = _mcpServers.value.find { it.id == pluginId }
+            if (metadata == null) {
                 Log.e(TAG, "找不到服务器信息: $pluginId")
                 return@withContext InstallResult.Error("找不到对应的服务器信息")
             }
 
-            val result = installPluginInternal(server, progressCallback)
+            val result = installPluginInternal(metadata, progressCallback)
             
             if (result is InstallResult.Success) {
                 // 保存插件元数据到MCPLocalServer
-                savePluginMetadata(server, result.pluginPath)
+                savePluginMetadata(metadata, result.pluginPath)
                 // 重新加载插件状态
                 loadPluginsFromMCPLocalServer()
             }
@@ -248,7 +236,7 @@ class MCPRepository(private val context: Context) {
      * 安装MCP插件 - 使用服务器对象
      */
     suspend fun installMCPServerWithObject(
-        server: UIMCPServer,
+        server: MCPLocalServer.PluginMetadata,
         progressCallback: (InstallProgress) -> Unit = {}
     ): InstallResult {
         return withContext(Dispatchers.IO) {
@@ -285,21 +273,18 @@ class MCPRepository(private val context: Context) {
             try {
                 Log.d(TAG, "从本地ZIP安装插件, ID: $serverId, Name: $name")
 
-                val server = UIMCPServer(
+                val server = MCPLocalServer.PluginMetadata(
                                 id = serverId,
                                 name = name,
                                 description = description,
                                 logoUrl = "",
-                                stars = 0,
-                                category = "导入插件",
-                                requiresApiKey = false,
                                 author = author,
-                                isVerified = false,
                                 isInstalled = false,
                                 version = "1.0.0",
                                 updatedAt = "",
                                 longDescription = description,
-                                repoUrl = ""
+                                repoUrl = "",
+                                type = "local"
                         )
 
                 val result = installPluginFromZipInternal(server, zipUri, progressCallback)
@@ -357,7 +342,7 @@ class MCPRepository(private val context: Context) {
      * 内部安装插件实现
      */
     private suspend fun installPluginInternal(
-        server: UIMCPServer,
+        server: MCPLocalServer.PluginMetadata,
         progressCallback: (InstallProgress) -> Unit
     ): InstallResult {
         progressCallback(InstallProgress.Preparing)
@@ -418,7 +403,7 @@ class MCPRepository(private val context: Context) {
      * 从ZIP文件安装插件的内部实现
      */
     private suspend fun installPluginFromZipInternal(
-        server: UIMCPServer,
+        server: MCPLocalServer.PluginMetadata,
         zipUri: Uri,
         progressCallback: (InstallProgress) -> Unit
     ): InstallResult {
@@ -485,20 +470,60 @@ class MCPRepository(private val context: Context) {
         serverId: String,
         progressCallback: (InstallProgress) -> Unit
     ): File? = withContext(Dispatchers.IO) {
-        val branches = listOf("main", "master", "develop", "dev")
+        val defaultBranch = getGithubDefaultBranch(owner, repoName)
+
+        if (defaultBranch == null) {
+            Log.e(TAG, "无法确定 $owner/$repoName 的默认分支，下载失败")
+            return@withContext null
+        }
         
-        for (branch in branches) {
-            val zipUrl = "https://github.com/$owner/$repoName/archive/refs/heads/$branch.zip"
-            Log.d(TAG, "尝试下载分支 $branch: $zipUrl")
+        val zipUrl = "https://github.com/$owner/$repoName/archive/refs/heads/$defaultBranch.zip"
+        Log.d(TAG, "从确定的默认分支 '$defaultBranch' 下载: $zipUrl")
             
             val file = downloadFromUrl(zipUrl, serverId, progressCallback)
             if (file != null && file.exists() && file.length() > 0) {
-                Log.d(TAG, "分支 $branch 下载成功")
+            Log.d(TAG, "从默认分支 '$defaultBranch' 下载成功")
                 return@withContext file
             }
-        }
         
-        Log.e(TAG, "所有分支下载都失败")
+        Log.e(TAG, "从默认分支 '$defaultBranch' 下载失败")
+        null
+    }
+
+    /**
+     * 使用 GitHub API 获取仓库的默认分支
+     */
+    private suspend fun getGithubDefaultBranch(owner: String, repoName: String): String? = withContext(Dispatchers.IO) {
+        val apiUrl = "https://api.github.com/repos/$owner/$repoName"
+        Log.d(TAG, "从 GitHub API 获取仓库信息: $apiUrl")
+        try {
+            val url = URL(apiUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            connection.connectTimeout = CONNECT_TIMEOUT
+            connection.readTimeout = READ_TIMEOUT
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val reader = connection.inputStream.bufferedReader()
+                val response = reader.readText()
+                reader.close()
+
+                val jsonObject = JsonParser.parseString(response).asJsonObject
+                val defaultBranch = jsonObject.get("default_branch")?.asString
+
+                if (!defaultBranch.isNullOrBlank()) {
+                    Log.d(TAG, "找到 $owner/$repoName 的默认分支: $defaultBranch")
+                    return@withContext defaultBranch
+                } else {
+                    Log.e(TAG, "在 $owner/$repoName 的 API 响应中找不到 'default_branch'")
+                }
+            } else {
+                Log.e(TAG, "GitHub API 请求失败，响应码: ${connection.responseCode}，URL: $apiUrl")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取 $owner/$repoName 的默认分支时出错", e)
+        }
         null
     }
 
@@ -539,6 +564,7 @@ class MCPRepository(private val context: Context) {
             val buffer = ByteArray(BUFFER_SIZE)
             var bytesRead: Int
             var totalBytesRead: Long = 0
+            var lastReportedProgress = -1
             
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 outputStream.write(buffer, 0, bytesRead)
@@ -548,8 +574,9 @@ class MCPRepository(private val context: Context) {
                     (totalBytesRead * 100 / contentLength).toInt()
                 } else -1
                 
-                if (progress % 10 == 0 || progress == 100) {
+                if (progress != lastReportedProgress) {
                     progressCallback(InstallProgress.Downloading(progress))
+                    lastReportedProgress = progress
                 }
             }
             
@@ -586,6 +613,7 @@ class MCPRepository(private val context: Context) {
                 var entry = zipInputStream.nextEntry
                 val totalEntries = countZipEntries(zipFile)
                 var extractedCount = 0
+                var lastReportedProgress = -1
                 
                 while (entry != null) {
                     val entryName = entry.name
@@ -622,8 +650,9 @@ class MCPRepository(private val context: Context) {
                         (extractedCount * 100 / totalEntries).toInt()
                     } else -1
                     
-                    if (progress % 10 == 0 || progress == 100) {
+                    if (progress != lastReportedProgress) {
                         progressCallback(InstallProgress.Extracting(progress))
+                        lastReportedProgress = progress
                     }
                 }
                 
@@ -668,13 +697,19 @@ class MCPRepository(private val context: Context) {
      * 从GitHub仓库URL中提取所有者和仓库名
      */
     private fun extractOwnerAndRepo(repoUrl: String): Pair<String, String>? {
-        val regex = "https?://(?:www\\.)?github\\.com/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)".toRegex()
-        val matchResult = regex.find(repoUrl) ?: return null
+        val regex = "(?:https?://)?(?:www\\.)?github\\.com/([\\w.-]+)/([\\w.-]+)(?:\\.git)?/?.*".toRegex()
+        val matchResult = regex.find(repoUrl)
         
+        if (matchResult != null && matchResult.groupValues.size >= 3) {
         val owner = matchResult.groupValues[1]
         val repo = matchResult.groupValues[2]
         
-        return if (owner.isBlank() || repo.isBlank()) null else owner to repo
+            if (owner.isNotBlank() && repo.isNotBlank()) {
+                return owner to repo
+            }
+        }
+        
+        return null
     }
 
     /**
@@ -718,19 +753,8 @@ class MCPRepository(private val context: Context) {
     /**
      * 保存插件元数据到MCPLocalServer
      */
-    private suspend fun savePluginMetadata(server: UIMCPServer, pluginPath: String) {
-        val metadata = MCPLocalServer.PluginMetadata(
-            id = server.id,
-            name = server.name,
-            description = server.description,
-            version = server.version,
-            author = server.author,
-            category = server.category,
-            requiresApiKey = server.requiresApiKey,
-            isVerified = server.isVerified,
-            logoUrl = server.logoUrl,
-            repoUrl = server.repoUrl,
-            longDescription = server.longDescription,
+    private suspend fun savePluginMetadata(server: MCPLocalServer.PluginMetadata, pluginPath: String) {
+        val metadata = server.copy(
             type = "local",
             installedPath = pluginPath,
             installedTime = System.currentTimeMillis()
@@ -743,7 +767,7 @@ class MCPRepository(private val context: Context) {
     /**
      * 添加远程服务器
      */
-    suspend fun addRemoteServer(server: MCPServer) {
+    suspend fun addRemoteServer(server: MCPLocalServer.PluginMetadata) {
         withContext(Dispatchers.IO) {
             if (server.type != "remote" || server.endpoint == null) {
                 Log.e(TAG, "addRemoteServer调用了无效的远程服务器: ${server.id}")
@@ -754,21 +778,8 @@ class MCPRepository(private val context: Context) {
             // We just store the metadata. The bridge will handle the connection.
 
             // 保存远程服务器元数据
-            val metadata = MCPLocalServer.PluginMetadata(
-                id = server.id,
-                name = server.name,
-                description = server.description,
-                version = server.version,
-                author = server.author,
-                category = server.category,
-                requiresApiKey = server.requiresApiKey,
-                isVerified = server.isVerified,
-                logoUrl = server.logoUrl,
-                repoUrl = server.repoUrl,
-                longDescription = server.longDescription,
+            val metadata = server.copy(
                 type = "remote",
-                endpoint = server.endpoint,
-                connectionType = server.connectionType,
                 installedTime = System.currentTimeMillis()
             )
             
@@ -789,7 +800,7 @@ class MCPRepository(private val context: Context) {
     /**
      * 更新远程服务器
      */
-    suspend fun updateRemoteServer(server: MCPServer) {
+    suspend fun updateRemoteServer(server: MCPLocalServer.PluginMetadata) {
         withContext(Dispatchers.IO) {
             val metadata = mcpLocalServer.getPluginMetadata(server.id)
             if (metadata == null) {

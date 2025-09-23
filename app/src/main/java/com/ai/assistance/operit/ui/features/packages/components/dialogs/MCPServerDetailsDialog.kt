@@ -29,7 +29,7 @@ import com.ai.assistance.operit.ui.features.packages.components.dialogs.content.
 import com.ai.assistance.operit.ui.features.packages.components.dialogs.content.MCPServerDetailsContent
 import com.ai.assistance.operit.ui.features.packages.components.dialogs.header.MCPServerDetailsHeader
 import com.ai.assistance.operit.ui.features.packages.components.dialogs.tabs.MCPServerDetailsTabs
-import com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer
+import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,10 +49,10 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun MCPServerDetailsDialog(
-        server: MCPServer,
+        server: MCPLocalServer.PluginMetadata,
         onDismiss: () -> Unit,
-        onInstall: (MCPServer) -> Unit,
-        onUninstall: (MCPServer) -> Unit,
+        onInstall: (MCPLocalServer.PluginMetadata) -> Unit,
+        onUninstall: (MCPLocalServer.PluginMetadata) -> Unit,
         installedPath: String? = null,
         pluginConfig: String = "",
         onSaveConfig: () -> Unit = {},
@@ -61,7 +61,9 @@ fun MCPServerDetailsDialog(
 ) {
     // Local state for loaded README content
     var readmeContent by remember { mutableStateOf<String?>(null) }
-    val isInstalled = server.isInstalled && installedPath != null
+    val isInstalled =
+            if (server.type == "remote") server.isInstalled
+            else server.isInstalled && installedPath != null
     val coroutineScope = rememberCoroutineScope()
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp

@@ -1,0 +1,582 @@
+package com.ai.assistance.operit.data.api
+
+import android.content.Context
+import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
+import com.ai.assistance.operit.data.preferences.GitHubUser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+@Serializable
+data class GitHubAccessTokenResponse(
+    val access_token: String,
+    val token_type: String,
+    val scope: String
+)
+
+@Serializable
+data class GitHubRepository(
+    val id: Long,
+    val name: String,
+    val full_name: String,
+    val description: String?,
+    val html_url: String,
+    val clone_url: String,
+    val stargazers_count: Int,
+    val forks_count: Int,
+    val language: String?,
+    val topics: List<String> = emptyList(),
+    val created_at: String,
+    val updated_at: String,
+    val owner: GitHubUser
+)
+
+@Serializable
+data class GitHubIssue(
+    val id: Long,
+    val number: Int,
+    val title: String,
+    val body: String?,
+    val html_url: String,
+    val state: String,
+    val labels: List<GitHubLabel> = emptyList(),
+    val user: GitHubUser,
+    val created_at: String,
+    val updated_at: String
+)
+
+@Serializable
+data class GitHubLabel(
+    val id: Long,
+    val name: String,
+    val color: String,
+    val description: String?
+)
+
+@Serializable
+data class CreateIssueRequest(
+    val title: String,
+    val body: String,
+    val labels: List<String> = emptyList()
+)
+
+@Serializable
+data class UpdateIssueRequest(
+    val title: String? = null,
+    val body: String? = null,
+    val state: String? = null,
+    val labels: List<String>? = null
+)
+
+@Serializable
+data class GitHubComment(
+    val id: Long,
+    val body: String,
+    val user: GitHubUser,
+    val created_at: String,
+    val updated_at: String,
+    val html_url: String
+)
+
+@Serializable
+data class CreateCommentRequest(
+    val body: String
+)
+
+/**
+ * GitHub API服务类
+ * 提供GitHub OAuth认证、用户信息、仓库操作等功能
+ */
+class GitHubApiService(private val context: Context) {
+    
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request()
+            val newRequest = request.newBuilder()
+                .addHeader("Accept", "application/vnd.github.v3+json")
+                .addHeader("User-Agent", "Operit-MCP-Client")
+                .build()
+            chain.proceed(newRequest)
+        }
+        .build()
+    
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+    
+    private val authPreferences = GitHubAuthPreferences.getInstance(context)
+    
+    companion object {
+        private const val GITHUB_API_BASE = "https://api.github.com"
+        private const val GITHUB_OAUTH_BASE = "https://github.com/login/oauth"
+    }
+    
+    /**
+     * 通过授权码获取访问令牌
+     */
+    suspend fun getAccessToken(code: String): Result<GitHubAccessTokenResponse> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = """
+                {
+                    "client_id": "${GitHubAuthPreferences.GITHUB_CLIENT_ID}",
+                    "client_secret": "${GitHubAuthPreferences.GITHUB_CLIENT_SECRET}",
+                    "code": "$code"
+                }
+            """.trimIndent()
+            
+            val request = Request.Builder()
+                .url("$GITHUB_OAUTH_BASE/access_token")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .addHeader("Accept", "application/json")
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val tokenResponse = json.decodeFromString<GitHubAccessTokenResponse>(responseBody)
+                    Result.success(tokenResponse)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取当前用户信息
+     */
+    suspend fun getCurrentUser(): Result<GitHubUser> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+            
+            val request = Request.Builder()
+                .url("$GITHUB_API_BASE/user")
+                .addHeader("Authorization", authHeader)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val user = json.decodeFromString<GitHubUser>(responseBody)
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 根据用户名获取GitHub用户信息
+     */
+    suspend fun getUser(username: String): Result<GitHubUser> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$GITHUB_API_BASE/users/$username")
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val user = json.decodeFromString<GitHubUser>(responseBody)
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 搜索仓库
+     */
+    suspend fun searchRepositories(
+        query: String,
+        sort: String = "stars",
+        order: String = "desc",
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<List<GitHubRepository>> = withContext(Dispatchers.IO) {
+        try {
+            val url = HttpUrl.Builder()
+                .scheme("https")
+                .host("api.github.com")
+                .addPathSegment("search")
+                .addPathSegment("repositories")
+                .addQueryParameter("q", query)
+                .addQueryParameter("sort", sort)
+                .addQueryParameter("order", order)
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("per_page", perPage.toString())
+                .build()
+            
+            val request = Request.Builder()
+                .url(url)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val searchResult = json.parseToJsonElement(responseBody).jsonObject
+                    val itemsArray = searchResult["items"]?.jsonArray
+                    val repositories = itemsArray?.map { item ->
+                        json.decodeFromJsonElement(GitHubRepository.serializer(), item)
+                    } ?: emptyList()
+                    Result.success(repositories)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取仓库的Issues
+     */
+    suspend fun getRepositoryIssues(
+        owner: String,
+        repo: String,
+        state: String = "open",
+        labels: String? = null,
+        creator: String? = null,
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<List<GitHubIssue>> = withContext(Dispatchers.IO) {
+        try {
+            val url = HttpUrl.Builder()
+                .scheme("https")
+                .host("api.github.com")
+                .addPathSegment("repos")
+                .addPathSegment(owner)
+                .addPathSegment(repo)
+                .addPathSegment("issues")
+                .addQueryParameter("state", state)
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("per_page", perPage.toString())
+                .apply {
+                    labels?.let { addQueryParameter("labels", it) }
+                    creator?.let { addQueryParameter("creator", it) }
+                }
+                .build()
+            
+            val request = Request.Builder()
+                .url(url)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val issues = json.decodeFromString<List<GitHubIssue>>(responseBody)
+                    Result.success(issues)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 创建Issue
+     */
+    suspend fun createIssue(
+        owner: String,
+        repo: String,
+        title: String,
+        body: String,
+        labels: List<String> = emptyList()
+    ): Result<GitHubIssue> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+            
+            val createRequest = CreateIssueRequest(title, body, labels)
+            val requestBody = json.encodeToString(CreateIssueRequest.serializer(), createRequest)
+            
+            val request = Request.Builder()
+                .url("$GITHUB_API_BASE/repos/$owner/$repo/issues")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", authHeader)
+                .addHeader("Accept", "application/vnd.github.v3+json")
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val issue = json.decodeFromString<GitHubIssue>(responseBody)
+                    Result.success(issue)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                val errorBody = response.body?.string()
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}\n$errorBody"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 更新Issue
+     */
+    suspend fun updateIssue(
+        owner: String,
+        repo: String,
+        issueNumber: Int,
+        updateRequest: UpdateIssueRequest
+    ): Result<GitHubIssue> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+            
+            val requestBody = json.encodeToString(UpdateIssueRequest.serializer(), updateRequest)
+            
+            val request = Request.Builder()
+                .url("$GITHUB_API_BASE/repos/$owner/$repo/issues/$issueNumber")
+                .patch(requestBody.toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", authHeader)
+                .addHeader("Accept", "application/vnd.github.v3+json")
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val issue = json.decodeFromString<GitHubIssue>(responseBody)
+                    Result.success(issue)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                val errorBody = response.body?.string()
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}\n$errorBody"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 更新Issue（便利方法 - 更新标题和内容）
+     */
+    suspend fun updateIssue(
+        owner: String,
+        repo: String,
+        issueNumber: Int,
+        title: String? = null,
+        body: String? = null
+    ): Result<GitHubIssue> {
+        val updateRequest = UpdateIssueRequest(title = title, body = body)
+        return updateIssue(owner, repo, issueNumber, updateRequest)
+    }
+    
+    /**
+     * 更新Issue状态（便利方法）
+     */
+    suspend fun updateIssue(
+        owner: String,
+        repo: String,
+        issueNumber: Int,
+        state: String
+    ): Result<GitHubIssue> {
+        val updateRequest = UpdateIssueRequest(state = state)
+        return updateIssue(owner, repo, issueNumber, updateRequest)
+    }
+    
+    /**
+     * 获取用户的仓库列表
+     */
+    suspend fun getUserRepositories(
+        username: String? = null,
+        type: String = "all",
+        sort: String = "updated",
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<List<GitHubRepository>> = withContext(Dispatchers.IO) {
+        try {
+            val url = if (username != null) {
+                "$GITHUB_API_BASE/users/$username/repos"
+            } else {
+                "$GITHUB_API_BASE/user/repos"
+            }
+            
+            val httpUrl = HttpUrl.Builder()
+                .scheme("https")
+                .host("api.github.com")
+                .apply {
+                    if (username != null) {
+                        addPathSegment("users")
+                        addPathSegment(username)
+                        addPathSegment("repos")
+                    } else {
+                        addPathSegment("user")
+                        addPathSegment("repos")
+                    }
+                }
+                .addQueryParameter("type", type)
+                .addQueryParameter("sort", sort)
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("per_page", perPage.toString())
+                .build()
+            
+            val requestBuilder = Request.Builder().url(httpUrl)
+            
+            // 如果是获取当前用户的仓库，需要认证
+            if (username == null) {
+                val authHeader = authPreferences.getAuthorizationHeader()
+                    ?: return@withContext Result.failure(Exception("No access token available"))
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val repositories = json.decodeFromString<List<GitHubRepository>>(responseBody)
+                    Result.success(repositories)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 获取Issue的评论
+     */
+    suspend fun getIssueComments(
+        owner: String,
+        repo: String,
+        issueNumber: Int,
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<List<GitHubComment>> = withContext(Dispatchers.IO) {
+        try {
+            val url = HttpUrl.Builder()
+                .scheme("https")
+                .host("api.github.com")
+                .addPathSegment("repos")
+                .addPathSegment(owner)
+                .addPathSegment(repo)
+                .addPathSegment("issues")
+                .addPathSegment(issueNumber.toString())
+                .addPathSegment("comments")
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("per_page", perPage.toString())
+                .build()
+            
+            val request = Request.Builder()
+                .url(url)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val comments = json.decodeFromString<List<GitHubComment>>(responseBody)
+                    Result.success(comments)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 为Issue创建评论
+     */
+    suspend fun createIssueComment(
+        owner: String,
+        repo: String,
+        issueNumber: Int,
+        body: String
+    ): Result<GitHubComment> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+            
+            val createRequest = CreateCommentRequest(body)
+            val requestBody = json.encodeToString(CreateCommentRequest.serializer(), createRequest)
+            
+            val request = Request.Builder()
+                .url("$GITHUB_API_BASE/repos/$owner/$repo/issues/$issueNumber/comments")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", authHeader)
+                .addHeader("Accept", "application/vnd.github.v3+json")
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val comment = json.decodeFromString<GitHubComment>(responseBody)
+                    Result.success(comment)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                val errorBody = response.body?.string()
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}\n$errorBody"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+} 

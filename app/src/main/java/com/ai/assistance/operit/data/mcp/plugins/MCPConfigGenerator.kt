@@ -58,7 +58,7 @@ class MCPConfigGenerator {
         }
 
         // 确定要使用的服务器名称
-        val serverName = existingServerName ?: pluginId.split("/").last().lowercase()
+        val serverName = pluginId
         Log.d(TAG, "使用服务器名称: $serverName")
 
         // 如果没有从示例提取到配置，或者是TypeScript项目需要进行特殊处理

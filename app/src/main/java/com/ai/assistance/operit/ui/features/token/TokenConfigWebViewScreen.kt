@@ -43,10 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.token.components.UrlConfigDialog
 import com.ai.assistance.operit.ui.features.token.model.NavDestination
 import com.ai.assistance.operit.ui.features.token.model.getIconForIndex
@@ -166,7 +168,7 @@ fun TokenConfigWebViewScreen(onNavigateBack: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "设置",
+                    contentDescription = stringResource(R.string.settings_config),
                     tint = appBarContentColor
                 )
             }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.ui.components.CustomScaffold
@@ -59,7 +60,10 @@ import com.ai.assistance.operit.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun PackageManagerScreen() {
+fun PackageManagerScreen(
+    onNavigateToMCPMarket: () -> Unit = {},
+    onNavigateToMCPDetail: ((com.ai.assistance.operit.data.api.GitHubIssue) -> Unit)? = null
+) {
     val context = LocalContext.current
     val packageManager = remember {
         PackageManager.getInstance(context, AIToolHandler.getInstance(context))
@@ -96,7 +100,7 @@ fun PackageManagerScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Tab selection state
-    var selectedTab by remember { mutableStateOf(PackageTab.PACKAGES) }
+    var selectedTab by rememberSaveable { mutableStateOf(PackageTab.PACKAGES) }
 
     // File picker launcher for importing external packages
     val packageFilePicker =
@@ -496,10 +500,9 @@ fun PackageManagerScreen() {
                     }
                     */
                     PackageTab.MCP -> {
-                        MCPConfigScreen()
-                                
-                            
-                        
+                        MCPConfigScreen(
+                            onNavigateToMCPMarket = onNavigateToMCPMarket
+                        )
                     }
                 }
             }
