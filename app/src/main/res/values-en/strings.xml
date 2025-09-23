@@ -831,11 +831,11 @@
     <string name="input_tokens">Input: %1$s</string>
     <string name="output_tokens">Output: %1$s</string>
     <string name="context_window">Context: %1$s</string>
-    <string name="auto_approve">Auto-approve:</string>
+    <string name="auto_approve">Auto-approve</string>
     <string name="auto_approve_desc">Safe tools will be executed automatically without prompting. For specific group approvals, please go to Settings - Tool Permission Management.</string>
     <string name="enabled">Enabled</string>
     <string name="ask">Ask</string>
-    <string name="ai_planning_mode">AI Planning:</string>
+    <string name="ai_planning_mode">Deep Search</string>
     <string name="disabled">Disabled</string>
     
     <!-- Termux Related -->
@@ -1959,7 +1959,7 @@
     <string name="memory_desc">Memory selection includes user preferences and memory base under that preference. To create a new memory base, go to settings to create a new user preference and select it here</string>
     <string name="memory_attachment">Memory Attachment</string>
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
-    <string name="ai_planning_desc">Can generate a series of plans for execution (mediocre effectiveness, not recommended, will be replaced in the future).</string>
+    <string name="ai_planning_desc">Will perform task decomposition and trigger multiple sub-agents to collect information, then summarize. Sub-agents have the same tool-calling capabilities as the chat agent.</string>
     <string name="thinking_mode">Thinking Mode</string>
     <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3, Claude and SiliconFlow, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>

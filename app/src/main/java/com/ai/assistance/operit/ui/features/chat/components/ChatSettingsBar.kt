@@ -19,7 +19,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Portrait
 import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Security
@@ -172,7 +172,7 @@ fun ChatSettingsBar(
                 }
                 AnimatedVisibility(visible = enableAiPlanning) {
                     Icon(
-                        imageVector = Icons.Rounded.AutoAwesome,
+                        imageVector = Icons.Outlined.Hub,
                         contentDescription = stringResource(R.string.ai_planning_active),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
@@ -377,8 +377,8 @@ fun ChatSettingsBar(
                             SettingItem(
                                 title = stringResource(R.string.ai_planning_mode),
                                     icon =
-                                            if (enableAiPlanning) Icons.Rounded.AutoAwesome
-                                            else Icons.Outlined.AutoAwesome,
+                                            if (enableAiPlanning) Icons.Outlined.Hub
+                                            else Icons.Outlined.Hub,
                                     iconTint =
                                             if (enableAiPlanning) MaterialTheme.colorScheme.primary
                                             else
