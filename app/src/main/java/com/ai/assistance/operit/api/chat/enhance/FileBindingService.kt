@@ -134,8 +134,8 @@ Now, generate ONLY the patch in the custom format based on all the rules.
 
             if (success) {
                 Log.d(TAG, "Attempt 3: Custom Loose Text Patch succeeded.")
-                apiPreferences.updateTokensForFunction(
-                        FunctionType.FILE_BINDING,
+                apiPreferences.updateTokensForProviderModel(
+                        fileBindingService.providerModel,
                         fileBindingService.inputTokenCount,
                         fileBindingService.outputTokenCount
                 )
@@ -237,8 +237,8 @@ Now, generate ONLY the complete and final merged file content.
                     .joinToString("\n")
 
             Log.d(TAG, "Robust full-content merge successful.")
-            apiPreferences.updateTokensForFunction(
-                FunctionType.FILE_BINDING,
+            apiPreferences.updateTokensForProviderModel(
+                fileBindingService.providerModel,
                 fileBindingService.inputTokenCount,
                 fileBindingService.outputTokenCount
             )

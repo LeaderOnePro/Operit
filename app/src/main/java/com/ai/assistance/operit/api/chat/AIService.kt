@@ -13,6 +13,9 @@ interface AIService {
     /** 输出token计数 */
     val outputTokenCount: Int
 
+    /** 获取供应商:模型标识符，格式如"DEEPSEEK:deepseek-chat" */
+    val providerModel: String
+
     /** 重置token计数器 */
     fun resetTokenCounts()
 

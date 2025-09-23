@@ -342,8 +342,8 @@ object ProblemLibrary {
                 stream.collect { content -> result.append(content) }
             }
 
-            apiPreferences?.updateTokensForFunction(
-                    FunctionType.PROBLEM_LIBRARY,
+            apiPreferences?.updateTokensForProviderModel(
+                    aiService.providerModel,
                     aiService.inputTokenCount,
                     aiService.outputTokenCount
             )

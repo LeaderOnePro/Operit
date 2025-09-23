@@ -338,6 +338,11 @@ private fun MCPBrowseTab(
                             onNavigateToDetail = onNavigateToDetail,
                             viewModel = viewModel
                         )
+                        
+                        // 加载reactions数据
+                        LaunchedEffect(issue.number) {
+                            viewModel.loadIssueReactions(issue.number)
+                        }
                     }
 
                     if (issues.isEmpty() && !isLoading) {
@@ -654,6 +659,58 @@ private fun MCPIssueCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Reactions显示
+            val reactionsMap by viewModel.issueReactions.collectAsState()
+            val reactions = reactionsMap[issue.number] ?: emptyList()
+            val thumbsUpCount = reactions.count { it.content == "+1" }
+            val heartCount = reactions.count { it.content == "heart" }
+            
+            if (thumbsUpCount > 0 || heartCount > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (thumbsUpCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ThumbUp,
+                                contentDescription = "点赞",
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = thumbsUpCount.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    if (heartCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = "喜欢",
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFE91E63)
+                            )
+                            Text(
+                                text = heartCount.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFE91E63)
+                            )
+                        }
+                    }
+                }
             }
 
 

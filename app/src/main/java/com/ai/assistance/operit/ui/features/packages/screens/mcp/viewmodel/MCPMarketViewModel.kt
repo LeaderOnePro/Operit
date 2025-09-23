@@ -51,7 +51,7 @@ class MCPMarketViewModel(
     )
 
     private val githubApiService = GitHubApiService(context)
-    private val githubAuth = GitHubAuthPreferences.getInstance(context)
+    val githubAuth = GitHubAuthPreferences.getInstance(context)
 
     // UI状态
     private val _isLoading = MutableStateFlow(false)
@@ -114,6 +114,20 @@ class MCPMarketViewModel(
     // 用户头像缓存
     private val _userAvatarCache = MutableStateFlow<Map<String, String>>(emptyMap())
     val userAvatarCache: StateFlow<Map<String, String>> = _userAvatarCache.asStateFlow()
+
+    // Reactions相关状态
+    private val _issueReactions = MutableStateFlow<Map<Int, List<com.ai.assistance.operit.data.api.GitHubReaction>>>(emptyMap())
+    val issueReactions: StateFlow<Map<Int, List<com.ai.assistance.operit.data.api.GitHubReaction>>> = _issueReactions.asStateFlow()
+
+    private val _isLoadingReactions = MutableStateFlow<Set<Int>>(emptySet())
+    val isLoadingReactions: StateFlow<Set<Int>> = _isLoadingReactions.asStateFlow()
+
+    private val _isReacting = MutableStateFlow<Set<Int>>(emptySet())
+    val isReacting: StateFlow<Set<Int>> = _isReacting.asStateFlow()
+
+    // 仓库信息缓存（包含星数）
+    private val _repositoryCache = MutableStateFlow<Map<String, com.ai.assistance.operit.data.api.GitHubRepository>>(emptyMap())
+    val repositoryCache: StateFlow<Map<String, com.ai.assistance.operit.data.api.GitHubRepository>> = _repositoryCache.asStateFlow()
 
     // 草稿保存
     private val sharedPrefs: SharedPreferences = context.getSharedPreferences("mcp_publish_draft", Context.MODE_PRIVATE)
@@ -1076,6 +1090,175 @@ class MCPMarketViewModel(
             } catch (e: Exception) {
                 Log.w(TAG, "Exception while fetching avatar for user $username", e)
             }
+        }
+    }
+
+    /**
+     * 获取Issue的reactions
+     */
+    fun loadIssueReactions(issueNumber: Int) {
+        if (issueNumber in _isLoadingReactions.value) {
+            return // 正在加载中，避免重复请求
+        }
+
+        viewModelScope.launch {
+            try {
+                _isLoadingReactions.value = _isLoadingReactions.value + issueNumber
+                
+                val result = githubApiService.getIssueReactions(
+                    owner = MARKET_REPO_OWNER,
+                    repo = MARKET_REPO_NAME,
+                    issueNumber = issueNumber
+                )
+
+                result.fold(
+                    onSuccess = { reactions ->
+                        val currentReactions = _issueReactions.value.toMutableMap()
+                        currentReactions[issueNumber] = reactions
+                        _issueReactions.value = currentReactions
+                        Log.d(TAG, "Successfully loaded reactions for issue #$issueNumber")
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Failed to load reactions for issue #$issueNumber", error)
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception while loading reactions for issue #$issueNumber", e)
+            } finally {
+                _isLoadingReactions.value = _isLoadingReactions.value - issueNumber
+            }
+        }
+    }
+
+    /**
+     * 为Issue添加reaction
+     */
+    fun addReactionToIssue(issueNumber: Int, reactionType: String) {
+        if (issueNumber in _isReacting.value) {
+            return // 正在操作中，避免重复请求
+        }
+
+        viewModelScope.launch {
+            try {
+                _isReacting.value = _isReacting.value + issueNumber
+                
+                val result = githubApiService.createIssueReaction(
+                    owner = MARKET_REPO_OWNER,
+                    repo = MARKET_REPO_NAME,
+                    issueNumber = issueNumber,
+                    content = reactionType
+                )
+
+                result.fold(
+                    onSuccess = { newReaction ->
+                        // 将新reaction添加到现有列表
+                        val currentReactions = _issueReactions.value.toMutableMap()
+                        val existingReactions = currentReactions[issueNumber] ?: emptyList()
+                        currentReactions[issueNumber] = existingReactions + newReaction
+                        _issueReactions.value = currentReactions
+                        
+                        Toast.makeText(
+                            context,
+                            "点赞成功！",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        Log.d(TAG, "Successfully added reaction to issue #$issueNumber")
+                    },
+                    onFailure = { error ->
+                        _errorMessage.value = "点赞失败: ${error.message}"
+                        Log.e(TAG, "Failed to add reaction to issue #$issueNumber", error)
+                    }
+                )
+            } catch (e: Exception) {
+                _errorMessage.value = "点赞时发生错误: ${e.message}"
+                Log.e(TAG, "Exception while adding reaction to issue #$issueNumber", e)
+            } finally {
+                _isReacting.value = _isReacting.value - issueNumber
+            }
+        }
+    }
+
+    /**
+     * 获取仓库信息（包含星数）
+     */
+    fun fetchRepositoryInfo(repositoryUrl: String) {
+        if (repositoryUrl.isBlank() || _repositoryCache.value.containsKey(repositoryUrl)) {
+            return // 已经缓存或URL为空
+        }
+
+        // 从URL中提取owner和repo名称
+        val repoPath = repositoryUrl.removePrefix("https://github.com/")
+        val parts = repoPath.split("/")
+        if (parts.size < 2) {
+            Log.w(TAG, "Invalid repository URL: $repositoryUrl")
+            return
+        }
+
+        val owner = parts[0]
+        val repo = parts[1]
+
+        viewModelScope.launch {
+            try {
+                val result = githubApiService.getRepository(owner, repo)
+                result.fold(
+                    onSuccess = { repository ->
+                        val currentCache = _repositoryCache.value.toMutableMap()
+                        currentCache[repositoryUrl] = repository
+                        _repositoryCache.value = currentCache
+                        Log.d(TAG, "Successfully fetched repository info for $repositoryUrl")
+                    },
+                    onFailure = { error ->
+                        Log.w(TAG, "Failed to fetch repository info for $repositoryUrl: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Exception while fetching repository info for $repositoryUrl", e)
+            }
+        }
+    }
+
+    /**
+     * 获取Issue的reactions列表
+     */
+    fun getReactionsForIssue(issueNumber: Int): List<com.ai.assistance.operit.data.api.GitHubReaction> {
+        return _issueReactions.value[issueNumber] ?: emptyList()
+    }
+
+    /**
+     * 检查是否正在加载reactions
+     */
+    fun isLoadingReactionsForIssue(issueNumber: Int): Boolean {
+        return issueNumber in _isLoadingReactions.value
+    }
+
+    /**
+     * 检查是否正在添加reaction
+     */
+    fun isReactingToIssue(issueNumber: Int): Boolean {
+        return issueNumber in _isReacting.value
+    }
+
+    /**
+     * 获取仓库信息
+     */
+    fun getRepositoryInfo(repositoryUrl: String): com.ai.assistance.operit.data.api.GitHubRepository? {
+        return _repositoryCache.value[repositoryUrl]
+    }
+
+    /**
+     * 统计特定类型的reaction数量
+     */
+    fun getReactionCount(issueNumber: Int, reactionType: String): Int {
+        return getReactionsForIssue(issueNumber).count { it.content == reactionType }
+    }
+
+    /**
+     * 检查当前用户是否已经对issue添加了特定类型的reaction
+     */
+    suspend fun hasUserReacted(issueNumber: Int, reactionType: String): Boolean {
+        val currentUser = githubAuth.getCurrentUserInfo() ?: return false
+        return getReactionsForIssue(issueNumber).any { 
+            it.content == reactionType && it.user.login == currentUser.login 
         }
     }
 } 

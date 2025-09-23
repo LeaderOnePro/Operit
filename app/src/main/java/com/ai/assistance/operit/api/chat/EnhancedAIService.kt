@@ -465,7 +465,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     val outputTokens = serviceForFunction.outputTokenCount
                     accumulatedInputTokenCount += inputTokens
                     accumulatedOutputTokenCount += outputTokens
-                    apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                    apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens)
 
                     Log.d(
                             TAG,
@@ -1060,7 +1060,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 val outputTokens = serviceForFunction.outputTokenCount
                 accumulatedInputTokenCount += inputTokens
                 accumulatedOutputTokenCount += outputTokens
-                apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens)
 
                 Log.d(
                         TAG,

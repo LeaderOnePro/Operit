@@ -28,7 +28,8 @@ class GeminiProvider(
         private val apiKey: String,
         private val modelName: String,
         private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap()
+        private val customHeaders: Map<String, String> = emptyMap(),
+        private val providerType: ApiProviderType = ApiProviderType.GOOGLE
 ) : AIService {
     companion object {
         private const val TAG = "GeminiProvider"
@@ -60,6 +61,10 @@ class GeminiProvider(
         get() = _inputTokenCount
     override val outputTokenCount: Int
         get() = _outputTokenCount
+
+    // 供应商:模型标识符
+    override val providerModel: String
+        get() = "${providerType.name}:$modelName"
 
     // 取消当前流式传输
     override fun cancelStreaming() {

@@ -396,7 +396,7 @@
     <string name="device_model">设备型号: %1$s %2$s</string>
     <string name="shizuku_status">Shizuku 状态</string>
     <string name="refresh">刷新</string>
-    <string name="installed">已安装: %1$s</string>
+    <string name="installed">已安装</string>
     <string name="service_running">服务运行: %1$s</string>
     <string name="permission_status">权限状态: %1$s</string>
     <string name="yes">是</string>
@@ -2023,11 +2023,29 @@
     <string name="settings_data_backup_subtitle">聊天记录备份管理</string>
     <string name="settings_token_usage_stats">Token使用统计</string>
     <string name="settings_function_label">功能</string>
+    <string name="settings_model_label">模型</string>
     <string name="settings_no_token_records">暂无功能模块的Token使用记录。</string>
     <string name="settings_reset_all_counts">重置所有计数</string>
-    <string name="settings_input_tokens">输入</string>
-    <string name="settings_output_tokens">输出</string>
-        <string name="settings_cost">费用</string>
+    <string name="settings_token_usage_subtitle">查看详细的Token使用统计和自定义定价</string>
+    <string name="settings_usage_summary">使用统计</string>
+    <string name="settings_total_tokens">总Token数</string>
+    <string name="settings_total_cost">总费用</string>
+    <string name="settings_model_details">模型详情</string>
+    <string name="settings_click_to_edit_pricing">点击编辑定价</string>
+    <string name="settings_edit_model_pricing">编辑模型定价 - %1$s</string>
+    <string name="settings_pricing_description">设置每百万Token的人民币价格</string>
+    <string name="settings_input_price_per_million">输入价格（每百万Token）</string>
+    <string name="settings_output_price_per_million">输出价格（每百万Token）</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_reset_confirmation">重置确认</string>
+    <string name="settings_reset_warning">这将清除所有Token使用记录，此操作不可恢复。</string>
+    <string name="settings_reset">重置</string>
+    <string name="settings_edit_pricing">编辑定价</string>
+    <string name="settings_input_tokens">输入Token</string>
+    <string name="settings_output_tokens">输出Token</string>
+    <string name="settings_price_format">¥%.2f/1M</string>
+    <string name="settings_cost">费用</string>
     
     <!-- User Preferences Guide Screen -->
     <string name="user_male">男</string>
@@ -2654,5 +2672,31 @@
     <string name="publish_failed_with_error">发布失败：%1$s</string>
     <string name="mcp_plugin_update_success_message">您的 MCP 插件信息已成功更新。</string>
     <string name="mcp_plugin_publish_success_message">您的 MCP 插件已成功发布到市场，等待审核通过后即可被其他用户发现和使用。</string>
+    
+    <!-- MCP Plugin Detail Screen -->
+    <string name="mcp_plugin_detail_title">插件详情</string>
+    <string name="mcp_plugin_author">作者: %1$s</string>
+    <string name="mcp_plugin_shared_by">分享者: %1$s</string>
+    <string name="mcp_plugin_repository">查看仓库</string>
+    <string name="mcp_plugin_install">安装插件</string>
+    <string name="mcp_plugin_installed">已安装</string>
+    <string name="mcp_plugin_description_title">插件描述</string>
+    <string name="mcp_plugin_metadata">插件信息</string>
+    <string name="mcp_plugin_status_available">可用</string>
+    <string name="mcp_plugin_status_closed">已关闭</string>
+    <string name="mcp_plugin_stars">%1$d Stars</string>
+    <string name="mcp_plugin_created_at">创建于: %1$s</string>
+    <string name="mcp_plugin_updated_at">更新于: %1$s</string>
+    <string name="mcp_plugin_community_feedback">社区反馈</string>
+    <string name="mcp_plugin_login_required">请先登录GitHub账号以参与点赞</string>
+    <string name="mcp_plugin_comments">评论 (%1$d)</string>
+    <string name="mcp_plugin_no_comments">暂无评论</string>
+    <string name="mcp_plugin_be_first_comment">成为第一个评论的人吧！</string>
+    <string name="mcp_plugin_add_comment">添加评论</string>
+    <string name="mcp_plugin_comment_hint">分享您的想法或提出问题...</string>
+    <string name="mcp_plugin_post_comment">发布</string>
+    <string name="mcp_plugin_cancel">取消</string>
+    <string name="mcp_plugin_refresh_comments">刷新评论</string>
+    <string name="mcp_plugin_unknown_author">未知</string>
     
 </resources>

@@ -55,7 +55,8 @@ fun SettingsScreen(
         navigateToSpeechServicesSettings: () -> Unit,
         navigateToCustomHeadersSettings: () -> Unit,
         navigateToPersonaCardGeneration: () -> Unit,
-        navigateToWaifuModeSettings: () -> Unit
+        navigateToWaifuModeSettings: () -> Unit,
+        navigateToTokenUsageStatistics: () -> Unit
 ) {
         val context = LocalContext.current
         val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -380,11 +381,13 @@ fun SettingsScreen(
                                 icon = Icons.Default.History,
                                 onClick = navigateToChatHistorySettings
                         )
-                }
-
-                // ======= Token使用统计 =======
-                TokenUsageCompactCard(context, apiPreferences, scope, cardContainerColor) {
-                        showSaveSuccessMessage = true
+                        
+                        CompactSettingsItem(
+                                title = stringResource(id = R.string.settings_token_usage_stats),
+                                subtitle = stringResource(id = R.string.settings_token_usage_subtitle),
+                                icon = Icons.Default.Analytics,
+                                onClick = navigateToTokenUsageStatistics
+                        )
                 }
 
                 // 底部间距
@@ -619,197 +622,4 @@ private fun CompactSlider(
         }
 }
 
-@Composable
-private fun TokenUsageCompactCard(
-        context: android.content.Context,
-        apiPreferences: ApiPreferences,
-        scope: kotlinx.coroutines.CoroutineScope,
-        containerColor: Color,
-        onSuccess: () -> Unit
-) {
-    // State to hold token data for all function types
-    val functionTokenUsage = remember { mutableStateMapOf<FunctionType, Pair<Int, Int>>() }
-    var expanded by remember { mutableStateOf(false) }
 
-    // Collect tokens for EACH function type from ApiPreferences
-    LaunchedEffect(Unit) {
-        for (functionType in FunctionType.values()) {
-            scope.launch {
-                apiPreferences.getTokensForFunctionFlow(functionType).collect { tokens ->
-                    if (tokens.first > 0 || tokens.second > 0) {
-                        functionTokenUsage[functionType] = tokens
-                    } else {
-                        // This is important to remove if it becomes 0 after reset
-                        functionTokenUsage.remove(functionType)
-                    }
-                }
-            }
-        }
-    }
-
-    val usdToRmbRate = 7.2
-
-    // Calculate costs for each function
-    val functionCosts = functionTokenUsage.mapValues { (_, tokens) ->
-        val inputCost = tokens.first * 0.27 / 1_000_000 * usdToRmbRate
-        val outputCost = tokens.second * 1.10 / 1_000_000 * usdToRmbRate
-        inputCost + outputCost
-    }
-
-    val totalInputTokens = functionTokenUsage.values.sumOf { it.first }
-    val totalOutputTokens = functionTokenUsage.values.sumOf { it.second }
-    val totalCost = functionCosts.values.sum()
-    val totalTokens = totalInputTokens + totalOutputTokens
-
-    SettingsSection(
-            title = stringResource(id = R.string.settings_section_usage),
-            icon = Icons.Default.Analytics,
-            containerColor = containerColor
-    ) {
-        Column(modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .clickable { expanded = !expanded }) {
-            Row(
-                    modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                            text = stringResource(id = R.string.settings_token_usage_stats),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                            text = "$totalTokens tokens · ¥${String.format("%.2f", totalCost)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                    )
-                }
-                Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = "Expand",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            androidx.compose.animation.AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    // Header Row
-                    TokenStatRow(
-                            label = stringResource(id = R.string.settings_function_label),
-                            inputTokens = -1, // Use negative as a flag for header
-                            outputTokens = -1,
-                            cost = -1.0,
-                            isHighlighted = true
-                    )
-                    Divider(modifier = Modifier.padding(vertical = 2.dp))
-
-                    val sortedFunctions = functionTokenUsage.entries.sortedBy { it.key.name }
-
-                    if (sortedFunctions.isEmpty()) {
-                        Text(
-                                text = stringResource(id = R.string.settings_no_token_records),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(vertical = 8.dp).align(Alignment.CenterHorizontally)
-                        )
-                    } else {
-                        for ((functionType, tokens) in sortedFunctions) {
-                            val (input, output) = tokens
-                            val cost = functionCosts[functionType] ?: 0.0
-                            TokenStatRow(
-                                    label = functionType.name.replace("_", " ").lowercase()
-                                            .replaceFirstChar { it.uppercase() },
-                                    inputTokens = input,
-                                    outputTokens = output,
-                                    cost = cost
-                            )
-                        }
-                    }
-
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
-                    TokenStatRow(
-                            label = stringResource(id = R.string.settings_total),
-                            inputTokens = totalInputTokens,
-                            outputTokens = totalOutputTokens,
-                            cost = totalCost,
-                            isHighlighted = true
-                    )
-
-                    Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(
-                                onClick = {
-                                    scope.launch {
-                                        apiPreferences.resetAllFunctionTokenCounts()
-                                        onSuccess()
-                                    }
-                                }
-                        ) {
-                            Text(stringResource(id = R.string.settings_reset_all_counts), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TokenStatRow(
-        label: String,
-        inputTokens: Int,
-        outputTokens: Int,
-        cost: Double,
-        isHighlighted: Boolean = false
-) {
-    val textStyle = if (isHighlighted)
-        MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-    else
-        MaterialTheme.typography.bodySmall
-
-    Row(
-            modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-                text = label,
-                style = textStyle,
-                modifier = Modifier.weight(0.3f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-        )
-        if (inputTokens >= 0) { // Check for header flag
-            Text(
-                    text = inputTokens.toString(),
-                    style = textStyle,
-                    modifier = Modifier.weight(0.25f),
-                    textAlign = TextAlign.End
-            )
-            Text(
-                    text = outputTokens.toString(),
-                    style = textStyle,
-                    modifier = Modifier.weight(0.25f),
-                    textAlign = TextAlign.End
-            )
-            Text(
-                    text = "¥${String.format(if (cost > 0 && cost < 0.01) "%.3f" else "%.2f", cost)}",
-                    style = textStyle,
-                    modifier = Modifier.weight(0.2f),
-                    textAlign = TextAlign.End
-            )
-        } else { // Header text
-            Text(text = stringResource(id = R.string.settings_input_tokens), style = textStyle, modifier = Modifier.weight(0.25f), textAlign = TextAlign.End)
-            Text(text = stringResource(id = R.string.settings_output_tokens), style = textStyle, modifier = Modifier.weight(0.25f), textAlign = TextAlign.End)
-            Text(text = stringResource(id = R.string.settings_cost), style = textStyle, modifier = Modifier.weight(0.2f), textAlign = TextAlign.End)
-        }
-    }
-}

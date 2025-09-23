@@ -74,34 +74,34 @@ object AIServiceFactory {
 
         return when (apiProviderType) {
             // OpenAI格式，支持原生和兼容OpenAI API的服务
-            ApiProviderType.OPENAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.OPENAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // Claude格式，支持Anthropic Claude系列
-            ApiProviderType.ANTHROPIC -> ClaudeProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.ANTHROPIC -> ClaudeProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // Gemini格式，支持Google Gemini系列
-            ApiProviderType.GOOGLE -> GeminiProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.GOOGLE -> GeminiProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // LM Studio使用OpenAI兼容格式
-            ApiProviderType.LMSTUDIO -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.LMSTUDIO -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // 阿里云（通义千问）使用专用的QwenProvider
-            ApiProviderType.ALIYUN -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.ALIYUN -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // 其他中文服务商，当前使用OpenAI Provider (大多数兼容OpenAI格式)
             // 后续可根据需要实现专用Provider
-            ApiProviderType.BAIDU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.XUNFEI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.ZHIPU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.BAICHUAN -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.MOONSHOT -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.BAIDU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.XUNFEI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.ZHIPU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.BAICHUAN -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.MOONSHOT -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
 
             // 默认使用OpenAI格式（大多数服务商兼容）
-            ApiProviderType.DEEPSEEK -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.SILICONFLOW -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.OPENROUTER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.INFINIAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.OTHER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.DEEPSEEK -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.SILICONFLOW -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.OPENROUTER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.INFINIAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
+            ApiProviderType.OTHER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders, apiProviderType)
         }
     }
 }

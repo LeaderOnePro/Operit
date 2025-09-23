@@ -38,6 +38,7 @@ import com.ai.assistance.operit.ui.features.settings.screens.ToolPermissionSetti
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesGuideScreen
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.CustomHeadersSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.TokenUsageStatisticsScreen
 import com.ai.assistance.operit.ui.features.token.TokenConfigWebViewScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.AppPermissionsToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.FileManagerToolScreen
@@ -301,7 +302,8 @@ sealed class Screen(
                     navigateToSpeechServicesSettings = { navigateTo(SpeechServicesSettings) },
                     navigateToCustomHeadersSettings = { navigateTo(CustomHeadersSettings) },
                     navigateToPersonaCardGeneration = { navigateTo(PersonaCardGeneration) },
-                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) }
+                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
+                    navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) }
             )
         }
     }
@@ -679,6 +681,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             LanguageSettingsScreen(onBackPressed = onGoBack)
+        }
+    }
+
+    data object TokenUsageStatistics :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.settings_token_usage_stats) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            TokenUsageStatisticsScreen(onBackPressed = onGoBack)
         }
     }
 

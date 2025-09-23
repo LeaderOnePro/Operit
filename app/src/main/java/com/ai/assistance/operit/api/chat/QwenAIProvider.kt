@@ -18,8 +18,9 @@ class QwenAIProvider(
     apiKey: String,
     modelName: String,
     client: OkHttpClient,
-    customHeaders: Map<String, String> = emptyMap()
-) : OpenAIProvider(apiEndpoint, apiKey, modelName, client, customHeaders) {
+    customHeaders: Map<String, String> = emptyMap(),
+    providerType: com.ai.assistance.operit.data.model.ApiProviderType = com.ai.assistance.operit.data.model.ApiProviderType.ALIYUN
+) : OpenAIProvider(apiEndpoint, apiKey, modelName, client, customHeaders, providerType) {
 
     /**
      * 重写创建请求体的方法，以支持Qwen的`enable_thinking`参数。

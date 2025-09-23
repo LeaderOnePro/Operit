@@ -405,7 +405,7 @@
     <string name="device_model">Device Model: %1$s %2$s</string>
     <string name="shizuku_status">Shizuku Status</string>
     <string name="refresh">Refresh</string>
-    <string name="installed">Installed: %1$s</string>
+    <string name="installed">Installed</string>
     <string name="service_running">Service Running: %1$s</string>
     <string name="permission_status">Permission Status: %1$s</string>
     <string name="yes">Yes</string>
@@ -2016,10 +2016,28 @@
     <string name="settings_data_backup_subtitle">Chat history backup management</string>
     <string name="settings_token_usage_stats">Token Usage Statistics</string>
     <string name="settings_function_label">Function</string>
+    <string name="settings_model_label">Model</string>
     <string name="settings_no_token_records">No token usage records for functional modules yet.</string>
     <string name="settings_reset_all_counts">Reset All Counts</string>
-    <string name="settings_input_tokens">Input</string>
-    <string name="settings_output_tokens">Output</string>
+    <string name="settings_token_usage_subtitle">View detailed token usage statistics and custom pricing</string>
+    <string name="settings_usage_summary">Usage Summary</string>
+    <string name="settings_total_tokens">Total Tokens</string>
+    <string name="settings_total_cost">Total Cost</string>
+    <string name="settings_model_details">Model Details</string>
+    <string name="settings_click_to_edit_pricing">Click to edit pricing</string>
+    <string name="settings_edit_model_pricing">Edit Model Pricing - %1$s</string>
+    <string name="settings_pricing_description">Set RMB price per million tokens</string>
+    <string name="settings_input_price_per_million">Input Price (per million tokens)</string>
+    <string name="settings_output_price_per_million">Output Price (per million tokens)</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_reset_confirmation">Reset Confirmation</string>
+    <string name="settings_reset_warning">This will clear all token usage records. This action cannot be undone.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_edit_pricing">Edit Pricing</string>
+    <string name="settings_input_tokens">Input Tokens</string>
+    <string name="settings_output_tokens">Output Tokens</string>
+    <string name="settings_price_format">$%.2f/1M</string>
     <string name="settings_cost">Cost</string>
     
     <!-- User Preferences Guide Screen -->
@@ -2659,5 +2677,31 @@
     <string name="publish_failed_with_error">Publish failed: %1$s</string>
     <string name="mcp_plugin_update_success_message">Your MCP plugin information has been successfully updated.</string>
     <string name="mcp_plugin_publish_success_message">Your MCP plugin has been successfully published to the market and is awaiting approval before being discoverable by other users.</string>
+    
+    <!-- MCP Plugin Detail Screen -->
+    <string name="mcp_plugin_detail_title">Plugin Details</string>
+    <string name="mcp_plugin_author">Author: %1$s</string>
+    <string name="mcp_plugin_shared_by">Shared by: %1$s</string>
+    <string name="mcp_plugin_repository">View Repository</string>
+    <string name="mcp_plugin_install">Install Plugin</string>
+    <string name="mcp_plugin_installed">Installed</string>
+    <string name="mcp_plugin_description_title">Plugin Description</string>
+    <string name="mcp_plugin_metadata">Plugin Information</string>
+    <string name="mcp_plugin_status_available">Available</string>
+    <string name="mcp_plugin_status_closed">Closed</string>
+    <string name="mcp_plugin_stars">%1$d Stars</string>
+    <string name="mcp_plugin_created_at">Created: %1$s</string>
+    <string name="mcp_plugin_updated_at">Updated: %1$s</string>
+    <string name="mcp_plugin_community_feedback">Community Feedback</string>
+    <string name="mcp_plugin_login_required">Please login to GitHub to participate</string>
+    <string name="mcp_plugin_comments">Comments (%1$d)</string>
+    <string name="mcp_plugin_no_comments">No comments yet</string>
+    <string name="mcp_plugin_be_first_comment">Be the first to comment!</string>
+    <string name="mcp_plugin_add_comment">Add Comment</string>
+    <string name="mcp_plugin_comment_hint">Share your thoughts or ask questions...</string>
+    <string name="mcp_plugin_post_comment">Post</string>
+    <string name="mcp_plugin_cancel">Cancel</string>
+    <string name="mcp_plugin_refresh_comments">Refresh Comments</string>
+    <string name="mcp_plugin_unknown_author">Unknown</string>
     
 </resources>

@@ -27,7 +27,8 @@ open class OpenAIProvider(
         private val apiKey: String,
         private val modelName: String,
         private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap()
+        private val customHeaders: Map<String, String> = emptyMap(),
+        private val providerType: ApiProviderType = ApiProviderType.OPENAI
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -51,6 +52,10 @@ open class OpenAIProvider(
         get() = _inputTokenCount
     override val outputTokenCount: Int
         get() = _outputTokenCount
+
+    // 供应商:模型标识符
+    override val providerModel: String
+        get() = "${providerType.name}:$modelName"
 
     // 重置token计数
     override fun resetTokenCounts() {
