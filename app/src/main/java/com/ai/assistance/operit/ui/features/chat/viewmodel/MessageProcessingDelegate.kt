@@ -15,6 +15,7 @@ import com.ai.assistance.operit.util.stream.share
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -132,11 +133,25 @@ class MessageProcessingDelegate(
                 replyToMessage
             )
 
-            addMessageToChat(ChatMessage(
+            val userMessage = ChatMessage(
                 sender = "user", 
                 content = finalMessageContent,
                 roleName = "用户" // 用户消息的角色名固定为"用户"
-            ))
+            )
+
+            // 在发送消息前，同步工作区状态
+            if (!workspacePath.isNullOrBlank()) {
+                try {
+                    Log.d(TAG, "Syncing workspace state for timestamp ${userMessage.timestamp}")
+                    WorkspaceBackupManager.getInstance(context).syncState(workspacePath, userMessage.timestamp)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Workspace sync failed", e)
+                    // 报告一个非致命错误，不会中断消息流程
+                    _nonFatalErrorEvent.emit("工作区状态同步失败: ${e.message}")
+                }
+            }
+
+            addMessageToChat(userMessage)
 
             lateinit var aiMessage: ChatMessage
             try {

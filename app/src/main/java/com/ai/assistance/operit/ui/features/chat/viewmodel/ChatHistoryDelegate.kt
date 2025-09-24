@@ -203,17 +203,15 @@ class ChatHistoryDelegate(
     }
 
     /** 从指定索引删除后续所有消息 */
-    fun deleteMessagesFrom(index: Int) {
-        viewModelScope.launch {
-            historyUpdateMutex.withLock {
-                val currentMessages = _chatHistory.value
-                if (index >= 0 && index < currentMessages.size) {
-                    val messageToStartDeletingFrom = currentMessages[index]
-                    val newHistory = currentMessages.subList(0, index)
+    suspend fun deleteMessagesFrom(index: Int) {
+        historyUpdateMutex.withLock {
+            val currentMessages = _chatHistory.value
+            if (index >= 0 && index < currentMessages.size) {
+                val messageToStartDeletingFrom = currentMessages[index]
+                val newHistory = currentMessages.subList(0, index)
 
-                    // 这个方法会处理数据库和内存的更新
-                    truncateChatHistory(newHistory, messageToStartDeletingFrom.timestamp)
-                }
+                // 这个方法会处理数据库和内存的更新
+                truncateChatHistory(newHistory, messageToStartDeletingFrom.timestamp)
             }
         }
     }
@@ -356,25 +354,23 @@ class ChatHistoryDelegate(
      * @param newHistory 截断后保留的消息列表。
      * @param timestampOfFirstDeletedMessage 用于删除数据库记录的起始时间戳。如果为null，则清空所有消息。
      */
-    fun truncateChatHistory(newHistory: List<ChatMessage>, timestampOfFirstDeletedMessage: Long?) {
-        viewModelScope.launch {
-            historyUpdateMutex.withLock {
-                _currentChatId.value?.let { chatId ->
-                    if (timestampOfFirstDeletedMessage != null) {
-                        // 从数据库中删除指定时间戳之后的消息
-                        chatHistoryManager.deleteMessagesFrom(
-                                chatId,
-                                timestampOfFirstDeletedMessage
-                        )
-                    } else {
-                        // 如果时间戳为空，则清除该聊天的所有消息
-                        chatHistoryManager.clearChatMessages(chatId)
-                    }
-
-                    // 更新内存中的聊天记录
-                    _chatHistory.value = newHistory
-                    onChatHistoryLoaded(newHistory)
+    suspend fun truncateChatHistory(newHistory: List<ChatMessage>, timestampOfFirstDeletedMessage: Long?) {
+        historyUpdateMutex.withLock {
+            _currentChatId.value?.let { chatId ->
+                if (timestampOfFirstDeletedMessage != null) {
+                    // 从数据库中删除指定时间戳之后的消息
+                    chatHistoryManager.deleteMessagesFrom(
+                            chatId,
+                            timestampOfFirstDeletedMessage
+                    )
+                } else {
+                    // 如果时间戳为空，则清除该聊天的所有消息
+                    chatHistoryManager.clearChatMessages(chatId)
                 }
+
+                // 更新内存中的聊天记录
+                _chatHistory.value = newHistory
+                onChatHistoryLoaded(newHistory)
             }
         }
     }

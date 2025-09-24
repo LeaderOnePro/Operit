@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 import com.ai.assistance.operit.util.WaifuMessageProcessor
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -551,7 +552,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     /** 从指定索引删除后续所有消息 */
     fun deleteMessagesFrom(index: Int) {
+        viewModelScope.launch {
         chatHistoryDelegate.deleteMessagesFrom(index)
+        }
     }
 
     fun saveCurrentChat() {
@@ -622,40 +625,50 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 获取目标消息
                 val targetMessage = currentHistory[index]
 
-                // 检查目标消息是否是用户消息，如果不是，选择前一条用户消息
-                val finalIndex: Int
-                val finalMessage: ChatMessage
-
-                if (targetMessage.sender == "user") {
-                    finalIndex = index
-                    finalMessage = targetMessage.copy(content = editedContent)
-                } else {
-                    // 查找该消息前最近的用户消息
-                    var userMessageIndex = index - 1
-                    while (userMessageIndex >= 0 &&
-                            currentHistory[userMessageIndex].sender != "user") {
-                        userMessageIndex--
-                    }
-
-                    if (userMessageIndex < 0) {
-                        uiStateDelegate.showErrorMessage("找不到有效的用户消息进行回档")
+                // 检查目标消息是否是用户消息
+                if (targetMessage.sender != "user") {
+                    uiStateDelegate.showErrorMessage("只能对用户消息执行此操作")
                         return@launch
                     }
 
-                    finalIndex = userMessageIndex
-                    finalMessage = currentHistory[userMessageIndex].copy(content = editedContent)
+                // **核心修复**: 确定回滚的时间戳。
+                // 我们需要恢复到目标消息 *之前* 的状态,
+                // 所以我们使用前一条消息的时间戳。
+                // 如果目标是第一条消息，则回滚到初始状态 (时间戳 0)。
+                val rewindTimestamp = if (index > 0) {
+                    currentHistory[index - 1].timestamp
+                } else {
+                    0L
+                }
+
+                // 获取当前工作区路径
+                val chatId = currentChatId.value
+                val currentChat = chatHistories.value.find { it.id == chatId }
+                val workspacePath = currentChat?.workspace
+
+                Log.d(TAG, "[Rewind] Target message timestamp: ${targetMessage.timestamp}")
+                if (index > 0) {
+                    Log.d(TAG, "[Rewind] Previous message timestamp: ${currentHistory[index - 1].timestamp}")
+                } else {
+                    Log.d(TAG, "[Rewind] No previous message, target is the first message.")
+                }
+                Log.d(TAG, "[Rewind] Timestamp passed to syncState: $rewindTimestamp")
+
+                // 如果绑定了工作区，则执行回滚
+                if (!workspacePath.isNullOrBlank()) {
+                    Log.d(TAG, "Rewinding workspace to timestamp: $rewindTimestamp")
+                    withContext(Dispatchers.IO) {
+                        WorkspaceBackupManager.getInstance(context)
+                            .syncState(workspacePath, rewindTimestamp)
+                    }
+                    Log.d(TAG, "Workspace rewind complete.")
                 }
 
                 // 截取到指定消息的历史记录（不包含该消息本身）
-                val rewindHistory = currentHistory.subList(0, finalIndex)
+                val rewindHistory = currentHistory.subList(0, index)
+                
                 // 获取要删除的第一条消息的时间戳
-                val timestampOfFirstDeletedMessage =
-                        if (finalIndex < currentHistory.size) {
-                            currentHistory[finalIndex].timestamp
-                        } else {
-                            // 如果finalIndex是列表末尾，则没有消息需要删除
-                            null
-                        }
+                val timestampOfFirstDeletedMessage = currentHistory[index].timestamp
 
                 // **核心修复**：调用新的委托方法，原子性地更新数据库和内存
                 chatHistoryDelegate.truncateChatHistory(
@@ -667,9 +680,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 uiStateDelegate.showToast("正在准备重新发送消息")
 
                 // 使用修改后的消息内容来发送
-                chatHistoryDelegate.updateChatHistory(rewindHistory)
-
-                messageProcessingDelegate.updateUserMessage(finalMessage.content)
+                messageProcessingDelegate.updateUserMessage(editedContent)
                 sendUserMessage()
             } catch (e: Exception) {
                 Log.e(TAG, "回档并重新发送消息失败", e)

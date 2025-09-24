@@ -54,6 +54,16 @@ open class StandardFileSystemTools(protected val context: Context) {
                 protected const val PART_SIZE = 200
         }
 
+        /** Adds line numbers to a string of content. */
+        private fun addLineNumbers(content: String): String {
+                val lines = content.lines()
+                if (lines.isEmpty()) return ""
+                val maxDigits = lines.size.toString().length
+                return lines.mapIndexed { index, line ->
+                        "${(index + 1).toString().padStart(maxDigits, ' ')}| $line"
+                }.joinToString("\n")
+        }
+
         /** List files in a directory */
         open suspend fun listFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
@@ -531,10 +541,14 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                                 val contentData = fullResult.result as FileContentData
                                 var content = contentData.content
-                                if (content.length > MAX_FILE_SIZE_BYTES) {
-                                        content =
-                                                content.substring(0, MAX_FILE_SIZE_BYTES) +
-                                                        "\n\n... (file content truncated) ..."
+                                val isTruncated = content.length > MAX_FILE_SIZE_BYTES
+                                if (isTruncated) {
+                                        content = content.substring(0, MAX_FILE_SIZE_BYTES)
+                                }
+
+                                var contentWithLineNumbers = addLineNumbers(content)
+                                if (isTruncated) {
+                                        contentWithLineNumbers += "\n\n... (file content truncated) ..."
                                 }
                                 return ToolResult(
                                         toolName = tool.name,
@@ -542,8 +556,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                         result =
                                                 FileContentData(
                                                         path = path,
-                                                        content = content,
-                                                        size = content.length.toLong()
+                                                        content = contentWithLineNumbers,
+                                                        size = contentWithLineNumbers.length.toLong()
                                                 ),
                                         error = ""
                                 )
@@ -568,7 +582,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
 
                         val truncated = file.length() > MAX_FILE_SIZE_BYTES
-                        var finalContent = content
+                        var finalContent = addLineNumbers(content)
                         if (truncated) {
                                 finalContent += "\n\n... (file content truncated) ..."
                         }
@@ -2204,7 +2218,7 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                 // 2. 读取原始文件内容
                 val readResult =
-                        readFile(AITool(name = "read_file_full", parameters = listOf(ToolParameter("path", path))))
+                        readFileFull(AITool(name = "read_file_full", parameters = listOf(ToolParameter("path", path))))
 
                 if (!readResult.success) {
                         emit(
