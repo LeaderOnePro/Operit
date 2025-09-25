@@ -392,8 +392,9 @@ private fun parseMessageContent(content: String): MessageParseResult {
         // Enhanced regex pattern to find attachments with optional content attribute
         // 注意：由于content属性可能包含json数据，我们用非贪婪匹配确保正确解析
         val attachmentPattern =
-            "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>"
-                .toRegex(RegexOption.DOT_MATCHES_ALL)
+            "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
+                RegexOption.DOT_MATCHES_ALL
+            )
 
         // Get all matches
         val matches = attachmentPattern.findAll(cleanedContent).toList()
@@ -408,8 +409,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
             if (contentAfterLast.isBlank()) {
                 trailingAttachmentIndices.add(matches.size - 1)
                 for (i in matches.size - 2 downTo 0) {
-                    val textBetween =
-                        cleanedContent.substring(matches[i].range.last + 1, matches[i + 1].range.first)
+                    val textBetween = cleanedContent.substring(matches[i].range.last + 1, matches[i + 1].range.first)
                     if (textBetween.isBlank()) {
                         trailingAttachmentIndices.add(i)
                     } else {
@@ -445,7 +445,8 @@ private fun parseMessageContent(content: String): MessageParseResult {
             val isTrailingAttachment = trailingAttachmentIndices.contains(index)
 
             // 特殊处理屏幕内容附件，始终将其作为trailing attachment
-            val isScreenContent = (type == "text/json" && filename == "screen_content.json")
+            val isScreenContent =
+                (type == "text/json" && filename == "screen_content.json")
 
             val shouldBeTrailing = isTrailingAttachment || isScreenContent
 
@@ -453,10 +454,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
                 val textBefore = cleanedContent.substring(lastIndex, startIndex)
                 // Only append text if it's before an inline attachment,
                 // or if it's before the very first trailing attachment.
-                if (!shouldBeTrailing ||
-                    (trailingAttachmentIndices.isNotEmpty() &&
-                        index == trailingAttachmentIndices.minOrNull())
-                ) {
+                if (!shouldBeTrailing || (trailingAttachmentIndices.isNotEmpty() && index == trailingAttachmentIndices.minOrNull())) {
                     messageText.append(textBefore)
                 }
             }
