@@ -2708,4 +2708,14 @@
     <string name="mcp_plugin_refresh_comments">Refresh Comments</string>
     <string name="mcp_plugin_unknown_author">Unknown</string>
     
+    <!-- Advanced Settings Section -->
+    <string name="advanced_settings">Advanced Settings</string>
+    <string name="use_api_key_pool">Use API Key Pool</string>
+    <string name="api_key_pool_desc">Enable to manage multiple API keys with automatic rotation</string>
+    <string name="api_key_pool_empty">API key pool is empty, click the button below to add keys</string>
+    <string name="add_api_key">Add API Key</string>
+    <string name="edit_api_key">Edit API Key</string>
+    <string name="delete_api_key">Delete API Key</string>
+    <string name="advanced_settings_saved">Advanced settings saved</string>
+    
 </resources>

@@ -215,8 +215,6 @@ class ConversationService(private val context: Context) {
                     finalSystemPrompt,
                     activeCard.name
                 )
-
-                Log.d(TAG, "最终系统提示词: $finalSystemPromptWithReplacements")
                 preparedHistory.add(0, Pair("system", finalSystemPromptWithReplacements))
             }
 

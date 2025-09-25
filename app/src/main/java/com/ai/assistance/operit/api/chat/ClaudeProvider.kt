@@ -23,7 +23,7 @@ import org.json.JSONObject
 /** Anthropic Claude API的实现，处理Claude特有的API格式 */
 class ClaudeProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
         private val customHeaders: Map<String, String> = emptyMap(),
@@ -243,12 +243,13 @@ class ClaudeProvider(
     }
 
     // 创建请求
-    private fun createRequest(requestBody: RequestBody): Request {
+    private suspend fun createRequest(requestBody: RequestBody): Request {
+        val currentApiKey = apiKeyProvider.getApiKey()
         val builder =
                 Request.Builder()
                         .url(apiEndpoint)
                         .post(requestBody)
-                        .addHeader("x-api-key", apiKey)
+                        .addHeader("x-api-key", currentApiKey)
                         .addHeader("anthropic-version", ANTHROPIC_VERSION)
                         .addHeader("Content-Type", "application/json")
 
@@ -475,7 +476,7 @@ class ClaudeProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.ANTHROPIC
         )

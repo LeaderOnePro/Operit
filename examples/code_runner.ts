@@ -8,7 +8,7 @@
   tools: [
     {
       name: run_javascript_es5
-      description: 运行自定义 JavaScript 脚本
+      description: 运行自定义 JavaScript (ES5) 脚本。会捕获 console.log 的输出以及最终的返回值。
       // This tool takes parameters
       parameters: [
         {
@@ -21,7 +21,7 @@
     },
     {
       name: run_javascript_file
-      description: 运行 JavaScript 文件
+      description: 运行 JavaScript (ES5) 文件。会捕获 console.log 的输出以及最终的返回值。
       parameters: [
         {
           name: file_path
@@ -33,7 +33,7 @@
     },
     {
       name: run_python
-      description: 运行自定义 Python 脚本
+      description: 运行自定义 Python 脚本。脚本的输出应使用 'print' 函数，以便能够被捕获。
       parameters: [
         {
           name: script
@@ -45,7 +45,7 @@
     },
     {
       name: run_python_file
-      description: 运行 Python 文件
+      description: 运行 Python 文件。脚本的输出应使用 'print' 函数，以便能够被捕获。
       parameters: [
         {
           name: file_path
@@ -150,6 +150,93 @@ const codeRunner = (function () {
     return str.replace(/'/g, "'\\''");
   }
 
+  // Helper function to execute JavaScript code and capture logs/return value
+  async function executeJavaScript(script: string): Promise<string> {
+    const logs: string[] = [];
+
+    // Create a proxy for the console object
+    const consoleProxy = {
+      log: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(formattedArgs.join(' '));
+      },
+      warn: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(`WARN: ${formattedArgs.join(' ')}`);
+      },
+      error: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(`ERROR: ${formattedArgs.join(' ')}`);
+      },
+    };
+
+    try {
+      // Use the Function constructor to create a new function in the global scope.
+      // Pass the console proxy to it. This is safer than eval.
+      const func = new Function('console', `
+        // Wrap in an IIFE to handle return statements properly and avoid variable leakage.
+        return (function(){
+          "use strict";
+          ${script}
+        })();
+      `);
+
+      const returnValue = func(consoleProxy);
+
+      let output = logs.join('\n');
+
+      if (returnValue !== undefined) {
+        if (output) {
+          output += '\n';
+        }
+        let formattedReturnValue;
+        if (returnValue === null) {
+          formattedReturnValue = 'null';
+        } else if (typeof returnValue === 'object') {
+          try {
+            formattedReturnValue = JSON.stringify(returnValue, null, 2);
+          } catch (e) {
+            formattedReturnValue = returnValue.toString();
+          }
+        } else {
+          formattedReturnValue = returnValue.toString();
+        }
+        output += `Return value: ${formattedReturnValue}`;
+      }
+
+      return output || "(No output from console.log or return value)";
+
+    } catch (e: any) {
+      const errorOutput = logs.join('\n');
+      if (errorOutput) {
+        throw new Error(`Script execution failed: ${e.message}\n\nLogs before error:\n${errorOutput}`);
+      } else {
+        throw new Error(`Script execution failed: ${e.message}`);
+      }
+    }
+  }
+
   // Helper function to check for errors in command output when exit code is unreliable
   function hasError(output: string): boolean {
     const errorPatterns = [
@@ -191,11 +278,12 @@ const codeRunner = (function () {
   async function testJavaScript() {
     try {
       // 测试简单的JS代码
-      const script = "const testVar = 42; return 'JavaScript运行正常，测试值: ' + testVar;";
-      const result = await run_javascript_es5({ script });
-      const expected = 'JavaScript运行正常，测试值: 42';
-      if (result !== expected) {
-        return { success: false, message: `JavaScript执行器测试失败: 期望 "${expected}", 实际 "${result}"` };
+      const script = "console.log('JavaScript 运行正常'); const testVar = 42; return '测试值: ' + testVar;";
+      const result = await executeJavaScript(script);
+      const expectedOutput = `JavaScript 运行正常\nReturn value: "测试值: 42"`;
+
+      if (result !== expectedOutput) {
+        return { success: false, message: `JavaScript执行器测试失败: 期望 "${expectedOutput}", 实际 "${result}"` };
       }
       return { success: true, message: "JavaScript执行器测试成功" };
     } catch (error) {
@@ -373,8 +461,7 @@ edition = "2021"
     if (!script || script.trim() === "") {
       throw new Error("请提供要执行的脚本内容");
     }
-    // Wrap in a function to allow return statements
-    return eval(`(function(){${script}})()`);
+    return executeJavaScript(script);
   }
 
   async function run_javascript_file(params: { file_path: string }) {
@@ -390,8 +477,7 @@ edition = "2021"
       throw new Error(`无法读取文件: ${filePath}`);
     }
 
-    // Wrap in a function to allow return statements
-    return eval(`(function(){${fileResult.content}})()`);
+    return executeJavaScript(fileResult.content);
   }
 
   async function run_python(params: { script: string }) {

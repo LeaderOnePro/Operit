@@ -29,6 +29,7 @@ import com.ai.assistance.operit.api.chat.AIServiceFactory
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
+import com.ai.assistance.operit.ui.features.settings.sections.AdvancedSettingsSection
 import com.ai.assistance.operit.ui.features.settings.sections.ModelApiSettingsSection
 import com.ai.assistance.operit.ui.features.settings.sections.ModelParametersSection
 import kotlinx.coroutines.flow.first
@@ -243,11 +244,9 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                                                 val customHeadersJson = apiPreferences.getCustomHeaders()
                                                 val service =
                                                         AIServiceFactory.createService(
-                                                                apiProviderType = config.apiProviderType,
-                                                                apiEndpoint = config.apiEndpoint,
-                                                                apiKey = config.apiKey,
-                                                                modelName = config.modelName,
-                                                                customHeadersJson = customHeadersJson
+                                                                config = config,
+                                                                customHeadersJson = customHeadersJson,
+                                                                modelConfigManager = configManager
                                                         )
                                                 testResult = service.testConnection()
                                             } ?: run {
@@ -418,6 +417,15 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                         config = config,
                         configManager = configManager,
                         showNotification = { message -> showNotification(message) }
+                )
+            }
+
+            // 高级设置区域（API密钥池配置）
+            selectedConfig.value?.let { config ->
+                AdvancedSettingsSection(
+                    config = config,
+                    configManager = configManager,
+                    showNotification = { message -> showNotification(message) }
                 )
             }
 

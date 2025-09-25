@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.data.mcp
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
@@ -696,6 +697,7 @@ class MCPRepository(private val context: Context) {
     /**
      * 从GitHub仓库URL中提取所有者和仓库名
      */
+    @SuppressLint("SuspiciousIndentation")
     private fun extractOwnerAndRepo(repoUrl: String): Pair<String, String>? {
         val regex = "(?:https?://)?(?:www\\.)?github\\.com/([\\w.-]+)/([\\w.-]+)(?:\\.git)?/?.*".toRegex()
         val matchResult = regex.find(repoUrl)

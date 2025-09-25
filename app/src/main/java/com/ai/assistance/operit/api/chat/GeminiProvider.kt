@@ -26,7 +26,7 @@ import org.json.JSONObject
 /** Google Gemini API的实现 支持标准Gemini接口流式传输 */
 class GeminiProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
         private val customHeaders: Map<String, String> = emptyMap(),
@@ -406,7 +406,7 @@ class GeminiProvider(
     }
 
     /** 创建HTTP请求 */
-    private fun createRequest(
+    private suspend fun createRequest(
             requestBody: RequestBody,
             isStreaming: Boolean,
             requestId: String
@@ -427,11 +427,12 @@ class GeminiProvider(
         }
 
         // 添加API密钥
+        val currentApiKey = apiKeyProvider.getApiKey()
         val finalUrl =
                 if (requestUrl.contains("?")) {
-                    "$requestUrl&key=$apiKey"
+                    "$requestUrl&key=$currentApiKey"
                 } else {
-                    "$requestUrl?key=$apiKey"
+                    "$requestUrl?key=$currentApiKey"
                 }
 
         val request = builder.url(finalUrl)
@@ -779,7 +780,7 @@ class GeminiProvider(
     /** 获取模型列表 */
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.GOOGLE
         )

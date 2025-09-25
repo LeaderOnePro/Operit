@@ -2703,4 +2703,14 @@
     <string name="mcp_plugin_refresh_comments">刷新评论</string>
     <string name="mcp_plugin_unknown_author">未知</string>
     
+    <!-- Advanced Settings Section -->
+    <string name="advanced_settings">高级设置</string>
+    <string name="use_api_key_pool">使用API密钥池</string>
+    <string name="api_key_pool_desc">启用后可管理多个API密钥，系统将自动轮换使用</string>
+    <string name="api_key_pool_empty">API密钥池为空，点击下方按钮添加密钥</string>
+    <string name="add_api_key">添加API密钥</string>
+    <string name="edit_api_key">编辑API密钥</string>
+    <string name="delete_api_key">删除API密钥</string>
+    <string name="advanced_settings_saved">高级设置已保存</string>
+    
 </resources>

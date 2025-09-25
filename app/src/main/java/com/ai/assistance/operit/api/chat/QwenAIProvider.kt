@@ -15,12 +15,12 @@ import okhttp3.OkHttpClient
  */
 class QwenAIProvider(
     apiEndpoint: String,
-    apiKey: String,
+    apiKeyProvider: ApiKeyProvider,
     modelName: String,
     client: OkHttpClient,
     customHeaders: Map<String, String> = emptyMap(),
     providerType: com.ai.assistance.operit.data.model.ApiProviderType = com.ai.assistance.operit.data.model.ApiProviderType.ALIYUN
-) : OpenAIProvider(apiEndpoint, apiKey, modelName, client, customHeaders, providerType) {
+) : OpenAIProvider(apiEndpoint, apiKeyProvider, modelName, client, customHeaders, providerType) {
 
     /**
      * 重写创建请求体的方法，以支持Qwen的`enable_thinking`参数。

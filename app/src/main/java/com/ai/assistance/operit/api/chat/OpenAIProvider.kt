@@ -25,7 +25,7 @@ import org.json.JSONObject
 /** OpenAI API格式的实现，支持标准OpenAI接口和兼容此格式的其他提供商 */
 open class OpenAIProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
         private val customHeaders: Map<String, String> = emptyMap(),
@@ -107,7 +107,7 @@ open class OpenAIProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.OPENAI // 默认为OpenAI类型
         )
@@ -253,10 +253,11 @@ open class OpenAIProvider(
     }
 
     // 创建请求
-    private fun createRequest(requestBody: RequestBody): Request {
+    private suspend fun createRequest(requestBody: RequestBody): Request {
+        val currentApiKey = apiKeyProvider.getApiKey()
         val builder = Request.Builder()
                 .url(EndpointCompleter.completeEndpoint(apiEndpoint))
-                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Authorization", "Bearer $currentApiKey")
                 .addHeader("Content-Type", "application/json")
 
         // 添加自定义请求头
