@@ -2722,4 +2722,8 @@
     <string name="invalid_file_format">无效的文件格式，请选择文本文件</string>
     <string name="no_valid_keys_found">未找到有效的密钥</string>
     
+    <!-- 手动更新记忆 -->
+    <string name="manual_memory_update">手动更新记忆</string>
+    <string name="manual_memory_update_desc">当AI在任务完成后忘记总结时，手动触发记忆保存，将本次对话的有价值内容存入长期记忆库。</string>
+    
 </resources>

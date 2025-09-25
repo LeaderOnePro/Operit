@@ -205,13 +205,17 @@ class ChatHistoryDelegate(
     /** 从指定索引删除后续所有消息 */
     suspend fun deleteMessagesFrom(index: Int) {
         historyUpdateMutex.withLock {
-            val currentMessages = _chatHistory.value
-            if (index >= 0 && index < currentMessages.size) {
-                val messageToStartDeletingFrom = currentMessages[index]
-                val newHistory = currentMessages.subList(0, index)
+            _currentChatId.value?.let { chatId ->
+                val currentMessages = _chatHistory.value
+                if (index >= 0 && index < currentMessages.size) {
+                    val messageToStartDeletingFrom = currentMessages[index]
+                    val newHistory = currentMessages.subList(0, index)
 
-                // 这个方法会处理数据库和内存的更新
-                truncateChatHistory(newHistory, messageToStartDeletingFrom.timestamp)
+                    // 直接在这里处理数据库和内存更新，避免重复加锁
+                    chatHistoryManager.deleteMessagesFrom(chatId, messageToStartDeletingFrom.timestamp)
+                    _chatHistory.value = newHistory
+                    onChatHistoryLoaded(newHistory)
+                }
             }
         }
     }

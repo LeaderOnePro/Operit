@@ -652,7 +652,8 @@ fun AIChatScreen(
                                 onNavigateToModelConfig = onNavigateToModelConfig,
                                 onNavigateToModelPrompts = onNavigateToModelPrompts,
                                 isAutoReadEnabled = isAutoReadEnabled,
-                                onToggleAutoRead = { actualViewModel.toggleAutoRead() }
+                                onToggleAutoRead = { actualViewModel.toggleAutoRead() },
+                                onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() }
                         )
                     }
                 }

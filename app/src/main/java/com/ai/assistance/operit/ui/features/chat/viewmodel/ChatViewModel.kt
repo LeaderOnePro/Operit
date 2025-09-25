@@ -546,13 +546,15 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     /** 删除单条消息 */
     fun deleteMessage(index: Int) {
+        Log.d(TAG, "准备删除消息，索引: $index")
         chatHistoryDelegate.deleteMessage(index)
     }
 
     /** 从指定索引删除后续所有消息 */
     fun deleteMessagesFrom(index: Int) {
         viewModelScope.launch {
-        chatHistoryDelegate.deleteMessagesFrom(index)
+            Log.d(TAG, "准备从索引 $index 开始删除后续消息")
+            chatHistoryDelegate.deleteMessagesFrom(index)
         }
     }
 
@@ -1514,6 +1516,35 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     /** 清除回复状态 */
     fun clearReplyToMessage() {
         _replyToMessage.value = null
+    }
+
+    fun manuallyUpdateMemory() {
+        viewModelScope.launch {
+            if (enhancedAiService == null) {
+                uiStateDelegate.showToast("AI服务不可用，无法更新记忆")
+                return@launch
+            }
+            if (chatHistory.value.isEmpty()) {
+                uiStateDelegate.showToast("聊天历史为空，无需更新记忆")
+                return@launch
+            }
+
+            try {
+                // Convert ChatMessage list to List<Pair<String, String>>
+                val history = chatHistory.value.map { it.sender to it.content }
+                // Get the last message content
+                val lastMessageContent = chatHistory.value.lastOrNull()?.content ?: ""
+
+                enhancedAiService?.saveConversationToMemory(
+                    history,
+                    lastMessageContent
+                )
+                uiStateDelegate.showToast("记忆已手动更新")
+            } catch (e: Exception) {
+                Log.e(TAG, "手动更新记忆失败", e)
+                uiStateDelegate.showErrorMessage("手动更新记忆失败: ${e.message}")
+            }
+        }
     }
 
 }

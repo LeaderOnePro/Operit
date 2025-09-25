@@ -299,9 +299,9 @@ class ChatHistoryManager private constructor(private val context: Context) {
     suspend fun deleteMessage(chatId: String, timestamp: Long) {
         mutex.withLock {
             try {
-                // This assumes a method in MessageDao to delete by timestamp, which is a reasonable
-                // assumption to fix the current compilation error.
+                Log.d(TAG, "正在从数据库删除消息. ChatId: $chatId, Timestamp: $timestamp")
                 messageDao.deleteMessageByTimestamp(chatId, timestamp)
+                Log.d(TAG, "消息从数据库删除成功.")
 
                 // Update chat metadata
                 chatDao.getChatById(chatId)?.let { chat ->
@@ -366,7 +366,9 @@ class ChatHistoryManager private constructor(private val context: Context) {
     suspend fun deleteMessagesFrom(chatId: String, timestamp: Long) {
         mutex.withLock {
             try {
+                Log.d(TAG, "正在从数据库删除消息. ChatId: $chatId, Timestamp >=: $timestamp")
                 messageDao.deleteMessagesFrom(chatId, timestamp)
+                Log.d(TAG, "后续消息从数据库删除成功.")
                 // 更新聊天元数据时间戳
                 chatDao.getChatById(chatId)?.let { chat ->
                     chatDao.updateChatMetadata(

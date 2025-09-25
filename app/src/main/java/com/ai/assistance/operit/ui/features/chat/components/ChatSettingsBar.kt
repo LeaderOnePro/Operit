@@ -3,6 +3,7 @@ package com.ai.assistance.operit.ui.features.chat.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Portrait
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.rounded.Link
@@ -84,7 +86,8 @@ fun ChatSettingsBar(
         onNavigateToModelConfig: () -> Unit,
         onNavigateToModelPrompts: () -> Unit,
     isAutoReadEnabled: Boolean,
-    onToggleAutoRead: () -> Unit
+    onToggleAutoRead: () -> Unit,
+    onManualMemoryUpdate: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val iconScale by
@@ -486,6 +489,22 @@ fun ChatSettingsBar(
                                     showMenu = false
                                 }
                             )
+
+                            // 手动更新记忆
+                            ActionSettingItem(
+                                title = stringResource(R.string.manual_memory_update),
+                                icon = Icons.Outlined.Save,
+                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                onClick = {
+                                    onManualMemoryUpdate()
+                                    showMenu = false
+                                },
+                                onInfoClick = {
+                                    infoPopupContent =
+                                        context.getString(R.string.manual_memory_update) to context.getString(R.string.manual_memory_update_desc)
+                                    showMenu = false
+                                }
+                            )
                         }
                     }
                 }
@@ -758,7 +777,7 @@ private fun MemorySelectorItem(
             IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
-                    contentDescription = "详情",
+                    contentDescription = stringResource(R.string.details),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -886,7 +905,7 @@ private fun ModelSelectorItem(
             IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
-                    contentDescription = "详情",
+                    contentDescription = stringResource(R.string.details),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -1024,7 +1043,7 @@ private fun PromptSelectorItem(
             IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
-                    contentDescription = "详情",
+                    contentDescription = stringResource(R.string.details),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
@@ -1116,5 +1135,51 @@ private fun PromptSelectorItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ActionSettingItem(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    onClick: () -> Unit,
+    onInfoClick: () -> Unit
+) {
+    Row(
+        modifier =
+                Modifier.fillMaxWidth()
+                        .height(36.dp)
+                        .padding(vertical = 2.dp)
+                        .padding(horizontal = 3.dp)
+                        .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                RoundedCornerShape(8.dp)
+                        )
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onClick)
+                        .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 图标
+        Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+        // 详情按钮（左侧）
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = stringResource(R.string.details),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        // 文本
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+        )
     }
 }
