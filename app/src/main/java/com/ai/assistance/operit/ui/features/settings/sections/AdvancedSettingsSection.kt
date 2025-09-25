@@ -1,11 +1,13 @@
 package com.ai.assistance.operit.ui.features.settings.sections
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,7 +42,7 @@ fun AdvancedSettingsSection(
 
     var showAddKeyDialog by remember { mutableStateOf(false) }
     var editingKey by remember { mutableStateOf<ApiKeyInfo?>(null) }
-
+    
     // Save changes to the config
     fun saveChanges() {
         scope.launch {
@@ -50,6 +52,44 @@ fun AdvancedSettingsSection(
             )
             configManager.saveModelConfig(updatedConfig)
             showNotification(context.getString(R.string.advanced_settings_saved))
+        }
+    }
+    
+    // 文件选择器
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        result.data?.data?.let { uri ->
+            scope.launch {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val content = inputStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    
+                    val keys = content.lines()
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() && it.startsWith("sk-") }
+                    
+                    if (keys.isEmpty()) {
+                        showNotification(context.getString(R.string.no_valid_keys_found))
+                        return@launch
+                    }
+                    
+                    val newKeys = keys.mapIndexed { index, key ->
+                        ApiKeyInfo(
+                            id = UUID.randomUUID().toString(),
+                            name = "导入密钥 ${key.takeLast(4)}",
+                            key = key,
+                            isEnabled = true
+                        )
+                    }
+                    
+                    apiKeyPool = apiKeyPool + newKeys
+                    saveChanges()
+                    showNotification(context.getString(R.string.imported_keys_count, keys.size))
+                } catch (e: Exception) {
+                    showNotification(context.getString(R.string.batch_import_failed) + ": ${e.message}")
+                }
+            }
         }
     }
 
@@ -152,6 +192,30 @@ fun AdvancedSettingsSection(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.add_api_key))
                     }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                type = "text/*"
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                            }
+                            filePickerLauncher.launch(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.batch_import_keys))
+                    }
+                    
+                    Text(
+                        text = stringResource(R.string.import_format_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, start = 8.dp, end = 8.dp)
+                    )
                 }
             }
         }

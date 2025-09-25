@@ -2712,5 +2712,14 @@
     <string name="edit_api_key">编辑API密钥</string>
     <string name="delete_api_key">删除API密钥</string>
     <string name="advanced_settings_saved">高级设置已保存</string>
+    <string name="batch_import_keys">批量导入密钥</string>
+    <string name="batch_import_keys_desc">从文本文件批量导入密钥，一行一个密钥</string>
+    <string name="select_txt_file">选择文本文件</string>
+    <string name="batch_import_success">批量导入成功</string>
+    <string name="batch_import_failed">批量导入失败</string>
+    <string name="import_format_desc">请选择包含API密钥的文本文件，每行一个密钥</string>
+    <string name="imported_keys_count">成功导入 %1$d 个密钥</string>
+    <string name="invalid_file_format">无效的文件格式，请选择文本文件</string>
+    <string name="no_valid_keys_found">未找到有效的密钥</string>
     
 </resources>

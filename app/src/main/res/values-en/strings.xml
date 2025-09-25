@@ -2717,5 +2717,14 @@
     <string name="edit_api_key">Edit API Key</string>
     <string name="delete_api_key">Delete API Key</string>
     <string name="advanced_settings_saved">Advanced settings saved</string>
+    <string name="batch_import_keys">Batch Import Keys</string>
+    <string name="batch_import_keys_desc">Import keys from text file, one key per line</string>
+    <string name="select_txt_file">Select Text File</string>
+    <string name="batch_import_success">Batch Import Successful</string>
+    <string name="batch_import_failed">Batch Import Failed</string>
+    <string name="import_format_desc">Please select a text file containing API keys, one key per line</string>
+    <string name="imported_keys_count">Successfully imported %1$d keys</string>
+    <string name="invalid_file_format">Invalid file format, please select a text file</string>
+    <string name="no_valid_keys_found">No valid keys found</string>
     
 </resources>
