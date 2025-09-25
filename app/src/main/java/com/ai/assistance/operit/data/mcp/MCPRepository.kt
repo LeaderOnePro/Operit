@@ -965,46 +965,63 @@ class MCPRepository(private val context: Context) {
             try {
                 Log.d(TAG, "正在为插件 $pluginId 注册工具...")
 
-                // 1. 从MCPLocalServer获取服务器配置
-                val localServerConfig = mcpLocalServer.getMCPServer(pluginId)
-                if (localServerConfig == null) {
-                    Log.w(TAG, "在MCPLocalServer中找不到插件 $pluginId 的配置")
+                // 1. 获取插件元数据以确定类型
+                val pluginMetadata = mcpLocalServer.getPluginMetadata(pluginId)
+                if (pluginMetadata == null) {
+                    Log.w(TAG, "在MCPLocalServer中找不到插件 $pluginId 的元数据")
                     return@forEach
                 }
-                
-                // 2. 将MCPLocalServer配置转换为核心MCP服务器配置
-                val coreServerConfig = com.ai.assistance.operit.core.tools.mcp.MCPServerConfig(
-                    name = pluginId,
-                    // 注意: endpoint, description等信息需要从其他地方获取，例如PluginMetadata
-                    endpoint = "", // 暂时为空，因为本地启动的服务没有固定endpoint
-                    description = mcpLocalServer.getPluginMetadata(pluginId)?.description ?: "",
-                    capabilities = listOf("tools"),
-                    extraData = mapOf(
-                        "command" to localServerConfig.command,
-                        "args" to localServerConfig.args.joinToString(" ")
+
+                val mcpPackage: MCPPackage?
+
+                if (pluginMetadata.type == "remote") {
+                    // --- 远程插件处理逻辑 ---
+                    Log.d(TAG, "插件 $pluginId 是远程插件，使用端点 ${pluginMetadata.endpoint} 进行连接")
+                    val remoteServerConfig = com.ai.assistance.operit.core.tools.mcp.MCPServerConfig(
+                        name = pluginId,
+                        endpoint = pluginMetadata.endpoint ?: "",
+                        description = pluginMetadata.description,
+                        capabilities = listOf("tools"),
+                        extraData = emptyMap() // 远程服务器不需要本地执行参数
                     )
-                )
+                    mcpManager.registerServer(pluginId, remoteServerConfig)
+                    mcpPackage = MCPPackage.fromServer(context, remoteServerConfig)
 
-                // 3. 在MCPManager中注册服务器
-                mcpManager.registerServer(pluginId, coreServerConfig)
-                Log.d(TAG, "已在MCPManager中注册服务器: $pluginId")
+                } else {
+                    // --- 本地插件处理逻辑 (保持不变) ---
+                    val localServerConfig = mcpLocalServer.getMCPServer(pluginId)
+                    if (localServerConfig == null) {
+                        Log.w(TAG, "在MCPLocalServer中找不到本地插件 $pluginId 的配置")
+                        return@forEach
+                    }
+                    
+                    val coreServerConfig = com.ai.assistance.operit.core.tools.mcp.MCPServerConfig(
+                        name = pluginId,
+                        endpoint = "", // 本地服务无固定端点
+                        description = pluginMetadata.description,
+                        capabilities = listOf("tools"),
+                        extraData = mapOf(
+                            "command" to localServerConfig.command,
+                            "args" to localServerConfig.args.joinToString(" ")
+                        )
+                    )
 
-                // 4. 从服务器获取工具包
-                // 注意：fromServer会尝试连接，确保服务已启动
-                val mcpPackage = MCPPackage.fromServer(context, coreServerConfig)
+                    mcpManager.registerServer(pluginId, coreServerConfig)
+                    Log.d(TAG, "已在MCPManager中注册本地服务器: $pluginId")
+                    mcpPackage = MCPPackage.fromServer(context, coreServerConfig)
+                }
+
                 if (mcpPackage == null) {
                     Log.w(TAG, "无法从服务器 $pluginId 获取MCP包，可能连接失败或服务未就绪")
                     return@forEach
                 }
 
-                // 5. 将MCP包转换为标准ToolPackage以注册工具
+                // --- 通用工具注册逻辑 (保持不变) ---
                 val toolPackage = mcpPackage.toToolPackage()
 
-                // 6. 注册工具
                 toolPackage.tools.forEach { packageTool ->
                     val prefixedToolName = "$pluginId:${packageTool.name}"
                     
-                    // 检查工具是否已注册
                     if (toolHandler.getToolExecutor(prefixedToolName) != null) {
                         Log.d(TAG, "工具 $prefixedToolName 已注册，跳过")
                         return@forEach
@@ -1013,7 +1030,7 @@ class MCPRepository(private val context: Context) {
                     runBlocking {
                         toolHandler.registerTool(
                             name = prefixedToolName,
-                            category = ToolCategory.FILE_READ, // 使用MCPPackage中定义的默认类别
+                            category = ToolCategory.FILE_READ,
                             executor = mcpToolExecutor,
                             descriptionGenerator = { tool ->
                                 val baseDescription = packageTool.description

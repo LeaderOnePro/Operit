@@ -469,8 +469,7 @@ class PluginLoadingState {
     // 跳过加载事件回调
     private var onSkipCallback: (() -> Unit)? = null
 
-    // 插件加载完成事件回调
-    private var onPluginsLoadedCallback: ((List<String>) -> Unit)? = null
+
 
     // 设置应用上下文
     fun setAppContext(context: Context) {
@@ -573,10 +572,7 @@ class PluginLoadingState {
         onSkipCallback = callback
     }
 
-    // 设置插件加载完成回调
-    fun setOnPluginsLoadedCallback(callback: (List<String>) -> Unit) {
-        onPluginsLoadedCallback = callback
-    }
+
 
     // 触发跳过操作
     fun skip() {
@@ -657,12 +653,7 @@ class PluginLoadingState {
                     // 获取MCPRepository实例
                     val mcpRepository = MCPRepository(context)
 
-                    // 设置回调，以便在插件成功加载后注册其工具
-                    setOnPluginsLoadedCallback { successfulPluginIds ->
-                        Log.d("PluginLoadingState", "所有插件加载完成，开始注册 ${successfulPluginIds.size} 个插件的工具...")
-                        mcpRepository.registerToolsForLoadedPlugins(successfulPluginIds)
-                        Log.d("PluginLoadingState", "工具注册流程已触发")
-                    }
+                    // 注意：工具注册现在在MCPStarter的验证阶段进行，确保插件真正就绪后才注册工具
 
                     // 获取已安装的插件列表 (这是一个Set<String>)
                     updateMessage(context.getString(R.string.plugin_loading_list))
@@ -811,13 +802,7 @@ class PluginLoadingState {
                                     0 // 当没有部署的插件时，成功率为0
                                 }
 
-                        // 触发插件加载完成的回调
-                        if (status == MCPStarter.PluginInitStatus.SUCCESS && successCount > 0) {
-                            val successfulPlugins = _plugins.value
-                                .filter { it.status == PluginStatus.SUCCESS }
-                                .map { it.id }
-                            onPluginsLoadedCallback?.invoke(successfulPlugins)
-                        }
+                        // 工具注册将在验证阶段自动进行，无需在此处触发
 
                         // 如果有插件加载失败，则特别提示可以跳过
                         if (successCount < totalCount && totalCount > 0) {

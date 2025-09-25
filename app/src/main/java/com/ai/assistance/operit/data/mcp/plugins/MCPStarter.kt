@@ -418,11 +418,37 @@ class MCPStarter(private val context: Context) {
                 // 自动生成空描述的工具包描述
                 generateMissingDescriptions(results)
                 
+                // 注册验证成功的插件的工具
+                registerToolsForVerifiedPlugins(results)
+                
                 progressListener.onAllPluginsVerified(results)
             } catch (e: Exception) {
                 Log.e(TAG, "Error verifying plugins", e)
                 progressListener.onAllPluginsVerified(emptyList())
             }
+        }
+    }
+
+    /**
+     * 为验证成功的插件注册工具
+     * 这确保只有真正就绪并响应的插件才会注册其工具
+     */
+    private suspend fun registerToolsForVerifiedPlugins(results: List<VerificationResult>) {
+        try {
+            val mcpRepository = MCPRepository(context)
+            val successfulPluginIds = results
+                .filter { it.isResponding }
+                .map { it.pluginId }
+            
+            if (successfulPluginIds.isNotEmpty()) {
+                Log.d(TAG, "开始为 ${successfulPluginIds.size} 个验证成功的插件注册工具: $successfulPluginIds")
+                mcpRepository.registerToolsForLoadedPlugins(successfulPluginIds)
+                Log.d(TAG, "工具注册流程已完成")
+            } else {
+                Log.d(TAG, "没有验证成功的插件，跳过工具注册")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "注册验证成功插件的工具时出错", e)
         }
     }
 

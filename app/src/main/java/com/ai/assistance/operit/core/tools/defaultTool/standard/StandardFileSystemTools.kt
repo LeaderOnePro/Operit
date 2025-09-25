@@ -64,6 +64,16 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }.joinToString("\n")
         }
 
+        /** Adds line numbers to a string of content, starting from a specific line number. */
+        private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
+                val lines = content.lines()
+                if (lines.isEmpty()) return ""
+                val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
+                return lines.mapIndexed { index, line ->
+                        "${(startLine + index + 1).toString().padStart(maxDigits, ' ')}| $line"
+                }.joinToString("\n")
+        }
+
         /** List files in a directory */
         open suspend fun listFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
@@ -671,13 +681,15 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
                         }
 
+                        val contentWithLineNumbers = addLineNumbers(partContent.toString(), startLine, totalLines)
+
                         ToolResult(
                                 toolName = tool.name,
                                 success = true,
                                 result =
                                         FilePartContentData(
                                                 path = path,
-                                                content = partContent.toString(),
+                                                content = contentWithLineNumbers,
                                                 partIndex = validPartIndex,
                                                 totalParts = totalParts,
                                                 startLine = startLine,

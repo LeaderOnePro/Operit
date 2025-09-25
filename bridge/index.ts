@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
-import type { MCPClient } from 'mcp-client';
 import * as os from 'os';
 
 // Configuration
@@ -91,7 +90,7 @@ class McpBridge {
 
     // 服务进程/连接映射
     private mcpProcesses: Map<string, ChildProcessWithoutNullStreams> = new Map();
-    private remoteServiceClients: Map<string, MCPClient> = new Map();
+    private remoteServiceClients: Map<string, import('mcp-client').MCPClient> = new Map();
     private mcpToolsMap: Map<string, any[]> = new Map();
     private serviceReadyMap: Map<string, boolean> = new Map();
 

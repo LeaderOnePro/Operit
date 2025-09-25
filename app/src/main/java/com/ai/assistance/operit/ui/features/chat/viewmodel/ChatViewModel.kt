@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
@@ -1160,25 +1159,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
 
-
-    // 初始化本地Web服务器
-    private fun initLocalWebServer() {
-        try {
-            // 使用单例模式获取LocalWebServer实例
-            val webServer = LocalWebServer.getInstance(context, LocalWebServer.ServerType.WORKSPACE)
-            // 只有当服务器未运行时才启动
-            if (!webServer.isRunning()) {
-                webServer.start()
-                Log.d(TAG, "本地Web服务器已启动")
-            } else {
-                Log.d(TAG, "本地Web服务器已经在运行中")
-            }
-        } catch (e: IOException) {
-            Log.e(TAG, "初始化本地Web服务器失败", e)
-            uiStateDelegate.showErrorMessage("无法启动Web服务器: ${e.message}")
-        }
-    }
-
     // 更新当前聊天ID的Web服务器工作空间
     fun updateWebServerForCurrentChat(chatId: String) {
         try {
@@ -1536,18 +1516,4 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         _replyToMessage.value = null
     }
 
-    /** 生成回复消息的摘要 */
-    private fun generateReplyPreview(message: ChatMessage): String {
-        val content = message.content
-        val cleanContent = content
-            .replace(Regex("<[^>]*>"), "") // 移除XML标签
-            .trim()
-        
-        // 限制长度为50个字符
-        return if (cleanContent.length > 50) {
-            cleanContent.take(50) + "..."
-        } else {
-            cleanContent
-        }
-    }
 }

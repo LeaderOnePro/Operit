@@ -119,7 +119,7 @@ You will be given:
 - **Your output MUST start directly with `// [MAPPING]` or `// [MAPPING-FAILED]`. No other text, explanation, or preamble is allowed.**
 - The `[CONTEXT]` block is your ground truth for finding the location. Ignore the line numbers in the original `[START-...]` tag; they are likely wrong.
 - For `INSERT:after_line`, the context is the line you need to insert after. Your corrected mapping should also point to the line number to insert after.
-- For `REPLACE` and `DELETE`, find the full context block. Your corrected mapping should be `REPLACE:new_start-new_end` or `DELETE:new_start-new_end`.
+- For `REPLACE` and `DELETE`, find the full context block. Your corrected mapping should be `REPLACE:new_start-new_end` or `DELETE:new_start-new_end`. The line range must be inclusive, covering the first and last lines of the matched context block.
 - If you find the context successfully, output the mapping in the specified format.
 - If you **cannot** find the exact context for **ANY** of the blocks in the `Source Code`, discard everything and output ONLY the failure marker: `// [MAPPING-FAILED]`
 

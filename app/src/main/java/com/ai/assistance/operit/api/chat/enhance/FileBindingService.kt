@@ -58,13 +58,6 @@ class FileBindingService(context: Context) {
             aiGeneratedCode: String,
             multiServiceManager: MultiServiceManager
     ): Pair<String, String> {
-        // Tier 3: Highest priority override for complex, AI-driven merges
-        if (aiGeneratedCode.trim().startsWith("// @FORCE_AI_MERGE")) {
-            Log.d(TAG, "AI-driven merge was forced by the agent.")
-            val codeToProcess = aiGeneratedCode.lines().drop(1).joinToString("\n")
-            return runFullContentMerge(originalContent, codeToProcess, multiServiceManager)
-        }
-        
         // Tier 1: Attempt precise, line-number-based patching
         if (aiGeneratedCode.contains("// [START-")) {
             Log.d(TAG, "Structured edit blocks detected. Attempting line-based patch.")
@@ -347,87 +340,6 @@ class FileBindingService(context: Context) {
 
         Log.d(TAG, "Successfully constructed corrected patch from mapping.")
         return correctedPatch
-    }
-
-    /**
-     * Runs a full-content merge by sending the original and AI-generated code to an AI model.
-     * This is the most robust but also most token-intensive method.
-     *
-     * @param originalContent The original content of the file.
-     * @param aiGeneratedCode The AI-generated code with placeholders, representing the desired changes.
-     * @param multiServiceManager The service manager for AI communication.
-     * @return A Pair containing the final merged content and a diff string.
-     */
-    private suspend fun runFullContentMerge(
-        originalContent: String,
-        aiGeneratedCode: String,
-        multiServiceManager: MultiServiceManager
-    ): Pair<String, String> {
-        try {
-            val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
-            val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
-
-            val mergeSystemPrompt = FunctionalPrompts.FILE_BINDING_MERGE_PROMPT.trimIndent()
-
-            val mergeUserPrompt =
-                """
-**Original File Content:**
-```
-$normalizedOriginalContent
-```
-**AI-Generated Code (with placeholders):**
-```
-$normalizedAiGeneratedCode
-```
-Now, generate ONLY the complete and final merged file content.
-""".trimIndent()
-
-            val modelParameters =
-                multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
-            val fileBindingService =
-                multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
-
-            val contentBuilder = StringBuilder()
-            fileBindingService.sendMessage(
-                mergeUserPrompt,
-                listOf(Pair("system", mergeSystemPrompt)),
-                modelParameters
-            )
-                .collect { content -> contentBuilder.append(content) }
-
-            val mergedContentFromAI =
-                ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
-
-            if (mergedContentFromAI.isBlank()) {
-                Log.w(TAG, "Full merge returned empty content. Returning original.")
-                return Pair(originalContent, "")
-            }
-
-            val diffString =
-                UnifiedDiffUtils.generateUnifiedDiff(
-                    "a/file",
-                    "b/file",
-                    normalizedOriginalContent.lines(),
-                    DiffUtils.diff(
-                        normalizedOriginalContent.lines(),
-                        mergedContentFromAI.lines()
-                    ),
-                    3
-                )
-                    .joinToString("\n")
-
-            Log.d(TAG, "Robust full-content merge successful.")
-            apiPreferences.updateTokensForProviderModel(
-                fileBindingService.providerModel,
-                fileBindingService.inputTokenCount,
-                fileBindingService.outputTokenCount,
-                fileBindingService.cachedInputTokenCount
-            )
-            return Pair(mergedContentFromAI, diffString)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error during robust full-merge.", e)
-            return Pair(originalContent, "Error during robust file binding: ${e.message}")
-        }
     }
 
     private data class EditRange(val start: Int, val end: Int)

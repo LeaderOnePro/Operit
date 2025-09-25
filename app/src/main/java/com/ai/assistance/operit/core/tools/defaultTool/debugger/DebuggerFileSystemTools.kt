@@ -48,6 +48,16 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }.joinToString("\n")
     }
 
+    /** Adds line numbers to a string of content, starting from a specific line number. */
+    private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
+        val lines = content.lines()
+        if (lines.isEmpty()) return ""
+        val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
+        return lines.mapIndexed { index, line ->
+            "${(startLine + index).toString().padStart(maxDigits, ' ')}| $line"
+        }.joinToString("\n")
+    }
+
     /** List files in a directory */
     override suspend fun listFiles(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
@@ -615,6 +625,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             val content = partResult.stdout
+            val contentWithLineNumbers = addLineNumbers(content, startLine, totalLines)
 
             ToolResult(
                     toolName = tool.name,
@@ -622,7 +633,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result =
                             FilePartContentData(
                                     path = path,
-                                    content = content.trimEnd(),
+                                    content = contentWithLineNumbers.trimEnd(),
                                     partIndex = validPartIndex,
                                     totalParts = totalParts,
                                     startLine = startLine - 1, // To 0-indexed for response
