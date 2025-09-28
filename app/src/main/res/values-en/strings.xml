@@ -131,6 +131,10 @@
     <string name="about_contact">Contact Us: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
     <string name="about_copyright">© 2023-2024 Operit. All Rights Reserved.</string>
+    <string name="star_on_github">Star on GitHub</string>
+    <string name="update_log">Update Log</string>
+    <string name="app_logo_description">App Logo</string>
+    <string name="github_star_description">GitHub Star</string>
     
     <!-- AI Chat Screen -->
     <string name="configure_ai">Configure AI API</string>
@@ -240,6 +244,8 @@
     <string name="copy_message">Copy Message</string>
     <string name="read_message">Read Message</string>
     <string name="auto_read_message">Auto Read</string>
+    <string name="auto_read_desc">When enabled, AI responses will be automatically read aloud</string>
+    <string name="auto_read_active">Auto read enabled</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
     <string name="reply_message">Reply</string>
@@ -361,6 +367,14 @@
     <string name="settings_functional_model_desc">Configure specialized models and API settings for different functions (such as chat, summarization, problem library, etc.)</string>
     <string name="settings_configure_function">Configure Function</string>
     
+    <string name="settings_section_context_summary">Context and Summary</string>
+    <string name="settings_enable_summary">Enable Conversation Summary</string>
+    <string name="settings_enable_summary_desc">Automatically generate conversation summaries when context is too long to save Token consumption</string>
+    <string name="settings_enable_summary_by_message_count">Trigger summary by message count</string>
+    <string name="settings_enable_summary_by_message_count_desc">Trigger summary when new message count reaches threshold</string>
+    <string name="settings_summary_message_count_threshold">Message Count Threshold</string>
+    <string name="settings_summary_message_count_threshold_subtitle">Number of new messages to trigger summary (1-20)</string>
+    
     <string name="settings_section_display">Display and Behavior</string>
 
     <string name="settings_keep_screen_on">Keep Screen On</string>
@@ -375,6 +389,8 @@
     
     <string name="settings_section_usage">Usage Statistics</string>
     <string name="settings_token_statistics">Token Statistics</string>
+    <string name="settings_total_tokens_breakdown">Input: %1$d (Cached: %2$d) / Output: %3$d</string>
+    <string name="settings_cached_tokens">(Cached: %1$d)</string>
     <string name="settings_reset_analysis_count">Reset Preference Analysis Counter</string>
     <string name="settings_why_token_stats">Why Should I Care About Token Statistics?</string>
     <string name="settings_token_stats_explanation">Because it\'s like a restaurant bill, except the \'food\' is AI thinking and the \'money\' is calculated in RMB! Preference analysis is the AI observing your tastes to customize your next \'menu\'. Don\'t worry, even if you chat until your fingers cramp, these costs might not be enough to buy a bubble tea~</string>
@@ -391,7 +407,7 @@
     <string name="device_model">Device Model: %1$s %2$s</string>
     <string name="shizuku_status">Shizuku Status</string>
     <string name="refresh">Refresh</string>
-    <string name="installed">Installed: %1$s</string>
+    <string name="installed">Installed</string>
     <string name="service_running">Service Running: %1$s</string>
     <string name="permission_status">Permission Status: %1$s</string>
     <string name="yes">Yes</string>
@@ -815,11 +831,11 @@
     <string name="input_tokens">Input: %1$s</string>
     <string name="output_tokens">Output: %1$s</string>
     <string name="context_window">Context: %1$s</string>
-    <string name="auto_approve">Auto-approve:</string>
+    <string name="auto_approve">Auto-approve</string>
     <string name="auto_approve_desc">Safe tools will be executed automatically without prompting. For specific group approvals, please go to Settings - Tool Permission Management.</string>
     <string name="enabled">Enabled</string>
     <string name="ask">Ask</string>
-    <string name="ai_planning_mode">AI Planning:</string>
+    <string name="ai_planning_mode">Deep Search</string>
     <string name="disabled">Disabled</string>
     
     <!-- Termux Related -->
@@ -931,6 +947,7 @@
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="license_format">License: %1$s</string>
     <string name="visit_project">Visit Project</string>
+    <string name="no_mirrors_found">No available mirror sources found</string>
 
     <!-- Accessibility Wizard -->
     <string name="accessibility_wizard_title">Accessibility Service Setup</string>
@@ -1167,6 +1184,13 @@
     <string name="update_history">Update History</string>
     <string name="nav_memory_base">Memory Base</string>
     
+    <!-- Manual Memory Update -->
+    <string name="manual_memory_update">Manual Memory Update</string>
+    <string name="manual_memory_update_desc">When AI forgets to summarize after task completion, manually trigger memory saving to store valuable content from this conversation into long-term memory.</string>
+    
+    <!-- Details -->
+    <string name="details">Details</string>
+    
     <!-- MCP and Plugin Related -->
     <string name="uninstall">Uninstall</string>
     <string name="install">Install</string>
@@ -1226,6 +1250,7 @@
     <string name="service_metadata">Service Metadata</string>
     <string name="plugin_name">Plugin Name</string>
     <string name="my_mcp_plugin">My MCP Plugin</string>
+    <string name="repo">Repository</string>
     <string name="plugin_description">Plugin Description</string>
     <string name="this_is_mcp_plugin">This is an MCP plugin</string>
     <string name="plugin_already_exists">Plugin \'%1$s\' already exists, please use a different name.</string>
@@ -1941,12 +1966,11 @@
     <string name="memory_desc">Memory selection includes user preferences and memory base under that preference. To create a new memory base, go to settings to create a new user preference and select it here</string>
     <string name="memory_attachment">Memory Attachment</string>
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
-    <string name="ai_planning_desc">Can generate a series of plans for execution (mediocre effectiveness, not recommended, will be replaced in the future).</string>
+    <string name="ai_planning_desc">Will perform task decomposition and trigger multiple sub-agents to collect information, then summarize. Sub-agents have the same tool-calling capabilities as the chat agent.</string>
     <string name="thinking_mode">Thinking Mode</string>
     <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3, Claude and SiliconFlow, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>
     <string name="thinking_guidance_desc">Can force models that can\'t think to perform thinking. This option is not recommended for thinking models.</string>
-    <string name="details">Details</string>
     <string name="model_selection">Model Selection</string>
     <string name="prompt_selection">Prompt Selection</string>
     <string name="memory_selection">Memory Selection</string>
@@ -2000,10 +2024,30 @@
     <string name="settings_data_backup_subtitle">Chat history backup management</string>
     <string name="settings_token_usage_stats">Token Usage Statistics</string>
     <string name="settings_function_label">Function</string>
+    <string name="settings_model_label">Model</string>
     <string name="settings_no_token_records">No token usage records for functional modules yet.</string>
     <string name="settings_reset_all_counts">Reset All Counts</string>
-    <string name="settings_input_tokens">Input</string>
-    <string name="settings_output_tokens">Output</string>
+    <string name="settings_token_usage_subtitle">View detailed token usage statistics and custom pricing</string>
+    <string name="settings_usage_summary">Usage Summary</string>
+    <string name="settings_total_tokens">Total Tokens</string>
+    <string name="settings_total_cost">Total Cost</string>
+    <string name="settings_model_details">Model Details</string>
+    <string name="settings_click_to_edit_pricing">Click to edit pricing</string>
+    <string name="settings_edit_model_pricing">Edit Model Pricing - %1$s</string>
+    <string name="settings_pricing_description">Set RMB price per million tokens</string>
+    <string name="settings_input_price_per_million">Input Price (per million tokens)</string>
+    <string name="settings_output_price_per_million">Output Price (per million tokens)</string>
+    <string name="settings_cached_input_price_per_million">Cached Input Price (per million tokens)</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_reset_confirmation">Reset Confirmation</string>
+    <string name="settings_reset_warning">This will clear all token usage records. This action cannot be undone.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_edit_pricing">Edit Pricing</string>
+    <string name="settings_input_tokens">Input Tokens</string>
+    <string name="settings_output_tokens">Output Tokens</string>
+    <string name="settings_cached_tokens_label">Cached Tokens</string>
+    <string name="settings_price_format">$%.2f/1M</string>
     <string name="settings_cost">Cost</string>
     
     <!-- User Preferences Guide Screen -->
@@ -2366,6 +2410,9 @@
     <string name="screen_title_tool_tester">Tool Testing Center</string>
     <string name="screen_title_text_to_speech">Text to Speech</string>
     <string name="screen_title_speech_to_text">Speech Recognition</string>
+    <string name="screen_title_mcp_market">MCP Market</string>
+    <string name="screen_title_mcp_publish">Publish MCP Plugin</string>
+    <string name="screen_title_mcp_manage">Manage My Plugins</string>
     
     <!-- Model Prompts Settings Screen -->
     <string name="unknown_error">Unknown error</string>
@@ -2507,4 +2554,183 @@
     <!-- Model Configuration -->
     <string name="overseas_provider_warning">Detected that you are in mainland China but selected an overseas service provider. Please confirm whether you have enabled proxy tools</string>
 
-</resources> 
+        <!-- Token Config WebView & URL Config Dialog -->
+    <string name="custom_url_config">Custom URL Configuration</string>
+    <string name="config_name_label">Configuration Name</string>
+    <string name="signin_url">Sign-in URL</string>
+    <string name="tab_config">Tab Configuration</string>
+    <string name="tab_number">Tab %1$d</string>
+    <string name="title_label">Title</string>
+    <string name="url_label">URL</string>
+    <string name="settings_config">Settings</string>
+    
+    <!-- Terminal Environment Wizard -->
+    <string name="configure_terminal_environment">Configure Terminal Environment</string>
+    <string name="nodejs_pip_environment_ready">NodeJS and pip environment ready</string>
+    <string name="pnpm_installed_need_pip">pnpm installed, need to configure pip</string>
+    <string name="pip_installed_need_pnpm">pip installed, need to configure pnpm</string>
+    <string name="need_configure_nodejs_pip">Need to configure NodeJS and pip environment</string>
+    <string name="terminal_environment_setup_description">Need to configure NodeJS (pnpm) and pip environment in terminal to support MCP plugins. Click the button below to enter terminal configuration interface.</string>
+    <string name="go_to_terminal_config">Go to Terminal Configuration</string>
+    <string name="nodejs_pip_environment_configured">NodeJS and pip environment are configured and ready to use MCP plugins.</string>
+    <string name="open_terminal">Open Terminal</string>
+    
+    <!-- MCP Market Screen -->
+    <string name="login_github_to_manage_mcp_plugins">Login to GitHub to publish and manage your MCP plugins</string>
+    <string name="browse">Browse</string>
+    <string name="my_tab">My</string>
+    <string name="user_avatar">User Avatar</string>
+    <string name="clear_search">Clear Search</string>
+    <string name="available_mcp_plugins">Available MCP Plugins</string>
+    <string name="no_matching_plugins_found">No matching plugins found</string>
+    <string name="no_available_mcp_plugins">No available MCP plugins</string>
+    <string name="refresh_or_try_later">Refresh or try again later</string>
+    <string name="recommended_feature">Recommended</string>
+    <string name="premium_mcp_plugins_coming_soon">Premium quality MCP plugins coming soon</string>
+    <string name="please_login_github_first">Please login to GitHub first</string>
+    <string name="login_to_view_manage_mcp_plugins">Login to view and manage your published MCP plugins</string>
+    <string name="publish_new_plugin">Publish New Plugin</string>
+    <string name="manage_my_plugins">Manage My Plugins</string>
+    <string name="logout">Logout</string>
+    <string name="author_avatar">Author Avatar</string>
+    <string name="sharer_avatar">Sharer Avatar</string>
+    <string name="available">Available</string>
+    <string name="closed">Closed</string>
+
+    <string name="github_account">GitHub Account</string>
+    <string name="login_github">Login to GitHub</string>
+    <string name="publish_mcp_plugins_to_market">• Publish your MCP plugins to the market</string>
+    <string name="manage_published_plugins">• Manage your published plugins</string>
+    <string name="better_installation_experience">• Get better installation experience</string>
+    
+    <!-- MCP Publish Screen -->
+    <string name="edit_description">Edit Description</string>
+    <string name="publish_description">Publish Description</string>
+    <string name="only_alphanumeric_underscore_plugin_id">Only alphanumeric characters and underscores allowed, this name will be used as plugin ID</string>
+    <string name="install_command">Install Command</string>
+    <string name="please_fill_all_required_fields">Please fill in all required fields</string>
+    <string name="update_plugin">Update Plugin</string>
+    <string name="publish_to_market">Publish to Market</string>
+    <string name="confirm_update">Confirm Update</string>
+    <string name="confirm_publish">Confirm Publish</string>
+    <string name="confirm_mcp_git_import_deployment">I confirm that this MCP can be imported via git and deployed and run normally</string>
+    <string name="update_failed_check_network">Update failed, please check network connection</string>
+    <string name="publish_failed_check_network_repo">Publish failed, please check network connection and repository address</string>
+    <string name="update_success">Update Successful</string>
+    <string name="publish_success">Publish Successful</string>
+
+    
+    <!-- MCP Config Screen -->
+    <string name="mcp_community_resources">MCP Community Resources</string>
+    <string name="mcp_official_repo">MCP Official Repository</string>
+    <string name="anthropic_official_mcp_servers">Official MCP server collection maintained by Anthropic</string>
+    <string name="link_copied">Link copied</string>
+    <string name="mcp_server_directory">MCP Server Directory</string>
+    <string name="complete_mcp_server_list_177">Complete MCP server list with 177+ servers</string>
+    <string name="claude_mcp_community">Claude MCP Community</string>
+    <string name="claude_mcp_community_website">Community website focused on Claude MCP</string>
+    <string name="modelscope_community">ModelScope Community</string>
+    <string name="modelscope_ai_community_mcp_resources">ModelScope AI community with MCP related resources</string>
+    <string name="github_awesome_mcp_resources">Curated MCP resources and tools on GitHub</string>
+    <string name="mcp_market">MCP Market</string>
+    <string name="more">More</string>
+    <string name="copy_link">Copy Link</string>
+    
+    <!-- MCP Manage Screen -->
+    <string name="need_login_github_manage_plugins">Need to login to GitHub to manage your published plugins</string>
+    <string name="no_published_plugins_yet">No published plugins yet</string>
+    <string name="click_button_publish_first_mcp_plugin">Click the button above to publish your first MCP plugin</string>
+    <string name="confirm_delete_action">Confirm Delete</string>
+    <string name="published">Published</string>
+    <string name="removed">Removed</string>
+    <string name="remove">Remove</string>
+    <string name="republish">Republish</string>
+    
+    <!-- Additional strings -->
+    <string name="author_colon">Author:</string>
+    <string name="share_colon">Share:</string>
+    <string name="downloading_progress">Downloading %1$s</string>
+    <string name="extracting_progress">Extracting...</string>
+    <string name="installing_progress">Installing...</string>
+    <string name="after_logging_in_you_can">After logging in to GitHub, you can:</string>
+    <string name="publish_your_mcp_plugin_to_the_market">Publish your MCP plugins to the market</string>
+    <string name="manage_your_published_plugins">Manage your published plugins</string>
+    <string name="no_mcp_plugins_available">No available MCP plugins</string>
+    <string name="try_changing_keywords">Try changing keywords</string>
+    <string name="refresh_or_try_again_later">Refresh or try again later</string>
+    <string name="recommended_features">Recommended</string>
+    <string name="coming_soon_for_mcp_plugins">Premium quality MCP plugins coming soon</string>
+    <string name="after_logging_in_you_can_view_and_manage_your_mcp_plugins">Login to view and manage your published MCP plugins</string>
+    <string name="get_mcp">Get MCP</string>
+    <string name="plugin_name_description">Only alphanumeric characters and underscores allowed, this name will be used as plugin ID</string>
+    <string name="choose_mcp_community_to_get_plugins">Choose the following quality MCP communities to get plugins:</string>
+    <string name="awesome_mcp">Awesome MCP</string>
+    <string name="loading_your_plugins">Loading your plugins...</string>
+    <string name="confirm_remove_plugin_from_market">Are you sure you want to remove plugin "%1$s" from the market? This will close the corresponding Issue but will not delete your code repository.</string>
+    
+    <!-- MCPPublishScreen additional strings -->
+    <string name="edit_plugin_info_description">You are editing published plugin information. Modified information will be updated to the corresponding Issue in the market repository.</string>
+    <string name="publish_plugin_info_description">Your plugin information will be published as a GitHub Issue to the market repository. Please ensure the information is accurate and complete. Form content will be automatically saved as a draft until successfully published.</string>
+    <string name="plugin_name_required">Plugin Name *</string>
+    <string name="plugin_description_required">Plugin Description *</string>
+    <string name="github_repo_address_required">GitHub Repository Address *</string>
+    <string name="install_command_example">e.g.: pnpm install xxx@xxxx</string>
+    <string name="install_command_optional_description">If not filled, the software will automatically identify the project structure. Recommended to leave empty.</string>
+    <string name="updating_progress">Updating...</string>
+    <string name="publishing_progress">Publishing...</string>
+    <string name="please_check_submitted_info">Please check the information you submitted:</string>
+    <string name="name_colon">Name: %1$s</string>
+    <string name="description_colon">Description: %1$s</string>
+    <string name="repository_colon">Repository: %1$s</string>
+    <string name="install_command_colon">Install Command: %1$s</string>
+    <string name="update_failed_with_error">Update failed: %1$s</string>
+    <string name="publish_failed_with_error">Publish failed: %1$s</string>
+    <string name="mcp_plugin_update_success_message">Your MCP plugin information has been successfully updated.</string>
+    <string name="mcp_plugin_publish_success_message">Your MCP plugin has been successfully published to the market and is awaiting approval before being discoverable by other users.</string>
+    
+    <!-- MCP Plugin Detail Screen -->
+    <string name="mcp_plugin_detail_title">Plugin Details</string>
+    <string name="mcp_plugin_author">Author: %1$s</string>
+    <string name="mcp_plugin_shared_by">Shared by: %1$s</string>
+    <string name="mcp_plugin_repository">View Repository</string>
+    <string name="mcp_plugin_install">Install Plugin</string>
+    <string name="mcp_plugin_installed">Installed</string>
+    <string name="mcp_plugin_description_title">Plugin Description</string>
+    <string name="mcp_plugin_metadata">Plugin Information</string>
+    <string name="mcp_plugin_status_available">Available</string>
+    <string name="mcp_plugin_status_closed">Closed</string>
+    <string name="mcp_plugin_stars">%1$d Stars</string>
+    <string name="mcp_plugin_created_at">Created: %1$s</string>
+    <string name="mcp_plugin_updated_at">Updated: %1$s</string>
+    <string name="mcp_plugin_community_feedback">Community Feedback</string>
+    <string name="mcp_plugin_login_required">Please login to GitHub to participate</string>
+    <string name="mcp_plugin_comments">Comments (%1$d)</string>
+    <string name="mcp_plugin_no_comments">No comments yet</string>
+    <string name="mcp_plugin_be_first_comment">Be the first to comment!</string>
+    <string name="mcp_plugin_add_comment">Add Comment</string>
+    <string name="mcp_plugin_comment_hint">Share your thoughts or ask questions...</string>
+    <string name="mcp_plugin_post_comment">Post</string>
+    <string name="mcp_plugin_cancel">Cancel</string>
+    <string name="mcp_plugin_refresh_comments">Refresh Comments</string>
+    <string name="mcp_plugin_unknown_author">Unknown</string>
+    
+    <!-- Advanced Settings Section -->
+    <string name="advanced_settings">Advanced Settings</string>
+    <string name="use_api_key_pool">Use API Key Pool</string>
+    <string name="api_key_pool_desc">Enable to manage multiple API keys with automatic rotation</string>
+    <string name="api_key_pool_empty">API key pool is empty, click the button below to add keys</string>
+    <string name="add_api_key">Add API Key</string>
+    <string name="edit_api_key">Edit API Key</string>
+    <string name="delete_api_key">Delete API Key</string>
+    <string name="advanced_settings_saved">Advanced settings saved</string>
+    <string name="batch_import_keys">Batch Import Keys</string>
+    <string name="batch_import_keys_desc">Import keys from text file, one key per line</string>
+    <string name="select_txt_file">Select Text File</string>
+    <string name="batch_import_success">Batch Import Successful</string>
+    <string name="batch_import_failed">Batch Import Failed</string>
+    <string name="import_format_desc">Please select a text file containing API keys, one key per line</string>
+    <string name="imported_keys_count">Successfully imported %1$d keys</string>
+    <string name="invalid_file_format">Invalid file format, please select a text file</string>
+    <string name="no_valid_keys_found">No valid keys found</string>
+    
+</resources>

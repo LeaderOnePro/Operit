@@ -5,6 +5,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.util.ChatUtils
+import com.ai.assistance.operit.util.TokenCacheManager
 import com.ai.assistance.operit.util.exceptions.UserCancellationException
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
@@ -22,10 +23,11 @@ import org.json.JSONObject
 /** Anthropic Claude API的实现，处理Claude特有的API格式 */
 class ClaudeProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap()
+        private val customHeaders: Map<String, String> = emptyMap(),
+        private val providerType: ApiProviderType = ApiProviderType.ANTHROPIC
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -42,19 +44,23 @@ class ClaudeProvider(
     class NonRetriableException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
     // 添加token计数器
-    private var _inputTokenCount = 0
-    private var _outputTokenCount = 0
+    private val tokenCacheManager = TokenCacheManager()
 
     // 公开token计数
     override val inputTokenCount: Int
-        get() = _inputTokenCount
+        get() = tokenCacheManager.totalInputTokenCount
+    override val cachedInputTokenCount: Int
+        get() = tokenCacheManager.cachedInputTokenCount
     override val outputTokenCount: Int
-        get() = _outputTokenCount
+        get() = tokenCacheManager.outputTokenCount
+
+    // 供应商:模型标识符
+    override val providerModel: String
+        get() = "${providerType.name}:$modelName"
 
     // 重置token计数
     override fun resetTokenCounts() {
-        _inputTokenCount = 0
-        _outputTokenCount = 0
+        tokenCacheManager.resetTokenCounts()
     }
 
     // 取消当前流式传输
@@ -146,8 +152,8 @@ class ClaudeProvider(
             message: String,
             chatHistory: List<Pair<String, String>>
     ): Int {
-        val (_, _, tokenCount) = buildMessagesAndCountTokens(message, chatHistory)
-        return tokenCount
+        // 使用缓存管理器进行快速估算
+        return tokenCacheManager.calculateInputTokens(message, chatHistory)
     }
 
     // 创建Claude API请求体
@@ -164,8 +170,9 @@ class ClaudeProvider(
         // 添加已启用的模型参数
         addParameters(jsonObject, modelParameters)
 
-        val (messagesArray, systemPrompt, tokenCount) = buildMessagesAndCountTokens(message, chatHistory)
-        _inputTokenCount = tokenCount
+        // 使用TokenCacheManager计算输入token，并继续使用原有逻辑构建消息体
+        tokenCacheManager.calculateInputTokens(message, chatHistory)
+        val (messagesArray, systemPrompt, _) = buildMessagesAndCountTokens(message, chatHistory)
 
         jsonObject.put("messages", messagesArray)
 
@@ -236,12 +243,13 @@ class ClaudeProvider(
     }
 
     // 创建请求
-    private fun createRequest(requestBody: RequestBody): Request {
+    private suspend fun createRequest(requestBody: RequestBody): Request {
+        val currentApiKey = apiKeyProvider.getApiKey()
         val builder =
                 Request.Builder()
                         .url(apiEndpoint)
                         .post(requestBody)
-                        .addHeader("x-api-key", apiKey)
+                        .addHeader("x-api-key", currentApiKey)
                         .addHeader("anthropic-version", ANTHROPIC_VERSION)
                         .addHeader("Content-Type", "application/json")
 
@@ -260,13 +268,12 @@ class ClaudeProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
-            onTokensUpdated: suspend (input: Int, output: Int) -> Unit,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
         isManuallyCancelled = false
         // 重置token计数
-        _inputTokenCount = 0
-        _outputTokenCount = 0
+        resetTokenCounts()
 
         val maxRetries = 3
         var retryCount = 0
@@ -295,7 +302,11 @@ class ClaudeProvider(
                 }
 
                 val requestBody = createRequestBody(currentMessage, currentHistory, modelParameters, enableThinking)
-                onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                onTokensUpdated(
+                        tokenCacheManager.totalInputTokenCount,
+                        tokenCacheManager.cachedInputTokenCount,
+                        tokenCacheManager.outputTokenCount
+                )
                 val request = createRequest(requestBody)
 
                 // 创建Call对象并保存到activeCall中，以便可以取消
@@ -348,8 +359,12 @@ class ClaudeProvider(
                                                 if (delta != null) {
                                                     val content = delta.optString("text", "")
                                                     if (content.isNotEmpty()) {
-                                                        _outputTokenCount += ChatUtils.estimateTokenCount(content)
-                                                        onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                                                        tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(content))
+                                                        onTokensUpdated(
+                                                                tokenCacheManager.totalInputTokenCount,
+                                                                tokenCacheManager.cachedInputTokenCount,
+                                                                tokenCacheManager.outputTokenCount
+                                                        )
                                                         emit(content)
                                                         receivedContent.append(content)
                                                     }
@@ -461,7 +476,7 @@ class ClaudeProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.ANTHROPIC
         )
@@ -473,7 +488,7 @@ class ClaudeProvider(
             // 这比getModelsList更可靠，因为它直接命中了聊天API。
             // 提供一个通用的系统提示，以防止某些需要它的模型出现错误。
             val testHistory = listOf("system" to "You are a helpful assistant.")
-            val stream = sendMessage("Hi", testHistory, emptyList(), false, onTokensUpdated = { _, _ -> }, onNonFatalError = {})
+            val stream = sendMessage("Hi", testHistory, emptyList(), false, onTokensUpdated = { _, _, _ -> }, onNonFatalError = {})
 
             // 消耗流以确保连接有效。
             // 对 "Hi" 的响应应该很短，所以这会很快完成。

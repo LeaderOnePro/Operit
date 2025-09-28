@@ -99,11 +99,9 @@ class MultiServiceManager(private val context: Context) {
         val customHeadersJson = apiPreferences.getCustomHeaders()
 
         return AIServiceFactory.createService(
-                apiProviderType = config.apiProviderType,
-                apiEndpoint = config.apiEndpoint,
-                apiKey = config.apiKey,
-                modelName = config.modelName,
-                customHeadersJson = customHeadersJson
+            config = config,
+            customHeadersJson = customHeadersJson,
+            modelConfigManager = modelConfigManager
         )
     }
 

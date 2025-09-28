@@ -68,6 +68,38 @@ data class UpdateInfo(
 
 val updates = listOf(
     UpdateInfo(
+        version = "v1.5.1",
+        date = "2025-09-25",
+        title = "MCP市场与关键功能修复",
+        description = "本次更新主要修复了一些关键BUG，新增了MCP市场功能，支持分享和一键使用MCP。同时强化了Apply file工具，优化了Token统计方式，并修复了多项终端、朗读等功能问题，提升了整体稳定性。",
+        highlights = listOf(
+            "🔧 MCP功能增强：修复远程MCP启动问题，新增MCP市场支持分享和一键使用。",
+            "🧠 记忆与工作流：记忆库手动刷新，对话重发增加工作区回档功能。",
+            "🛠️ 工具强化：Apply file工具大幅优化，Token统计升级为供应商模型统计。",
+            "🔑 API管理：新增API key池和轮询功能，支持缓存命中统计。",
+            "🐛 Bug修复：修复多项终端、朗读、文档等关键问题，提升稳定性。"
+        ),
+        allChanges = listOf(
+            "修复了远程MCP无法启动和使用的bug",
+            "增加了mcp市场，可以分享上传mcp或者一键使用市场中的mcp",
+            "增加了记忆库的手动触发刷新",
+            "为对话重发增加了工作区回档功能",
+            "大幅度强化apply file工具，能够准确更改文件(消耗更多了)",
+            "更改token统计方式，以供应商:模型统计，支持缓存命中统计",
+            "增加了api key池，支持key轮询",
+            "修复了code runner包的提示词和es5的执行无返回值问题",
+            "修复了terminal执行的提示词，使其避免交互命令",
+            "修复自动朗读，并更改了其位置",
+            "修复了终端配置时遇到的uv和pnpm无法安装的问题",
+            "修复在部分机型终端的登录失败问题",
+            "更改深度搜索的图标和描述",
+            "修复内嵌文档"
+        ),
+        isLatest = true,
+        downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.1",
+        releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.1"
+    ),
+    UpdateInfo(
         version = "v1.5.0",
         date = "2025-09-19",
         title = "原生Ubuntu虚拟机与AI深度搜索",
@@ -105,7 +137,7 @@ val updates = listOf(
             "增加主题颜色记忆选取功能。",
             "增加记忆总结功能细节调节开关。"
         ),
-        isLatest = true,
+        isLatest = false,
         downloadUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.0",
         releaseUrl = "https://github.com/AAswordman/Operit/releases/tag/v1.5.0"
     ),

@@ -57,7 +57,7 @@ import kotlinx.coroutines.flow.sample
 import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import kotlinx.coroutines.launch
-
+import kotlinx.coroutines.delay
 
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -154,6 +154,7 @@ fun AIChatScreen(
             actualViewModel.enableThinkingGuidance.collectAsState() // 收集思考引导状态
     val enableMemoryAttachment by actualViewModel.enableMemoryAttachment.collectAsState()
     val summaryTokenThreshold by actualViewModel.summaryTokenThreshold.collectAsState()
+    val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
     val showChatHistorySelector by actualViewModel.showChatHistorySelector.collectAsState()
     val chatHistories by actualViewModel.chatHistories.collectAsState()
     val currentChatId by actualViewModel.currentChatId.collectAsState()
@@ -445,8 +446,7 @@ fun AIChatScreen(
         }
 
         onDispose {
-            // 当此Composable离开组合时，清空TopAppBar的actions
-            setTopBarActions {}
+            // 当此Composable离开组合时，不再清空TopAppBar的actions，以避免竞争条件
         }
     }
 
@@ -650,7 +650,10 @@ fun AIChatScreen(
                                 },
                                 onNavigateToUserPreferences = onNavigateToUserPreferences,
                                 onNavigateToModelConfig = onNavigateToModelConfig,
-                                onNavigateToModelPrompts = onNavigateToModelPrompts
+                                onNavigateToModelPrompts = onNavigateToModelPrompts,
+                                isAutoReadEnabled = isAutoReadEnabled,
+                                onToggleAutoRead = { actualViewModel.toggleAutoRead() },
+                                onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() }
                         )
                     }
                 }

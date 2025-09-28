@@ -34,6 +34,12 @@ data class ModelConfigData(
         val modelName: String = "",
         val apiProviderType: ApiProviderType = ApiProviderType.DEEPSEEK,
 
+        // 多API Key支持
+        val useMultipleApiKeys: Boolean = false, // 是否启用多API Key模式
+        val apiKeyPool: List<ApiKeyInfo> = emptyList(), // API Key池
+        val currentKeyIndex: Int = 0, // 当前使用的Key索引
+        val keyRotationMode: String = "ROUND_ROBIN", // 轮询模式: ROUND_ROBIN / RANDOM
+
         // 是否包含自定义参数
         val hasCustomParameters: Boolean = false,
 

@@ -147,7 +147,7 @@ fun FileBrowser(
         coroutineScope.launch {
             isLoading = true
             try {
-                val tool = AITool("read_file", listOf(ToolParameter("path", filePath)))
+                val tool = AITool("read_file_full", listOf(ToolParameter("path", filePath)))
                 val result = toolHandler.executeTool(tool)
                 if (result.success && result.result is FileContentData) {
                     val fileContentData = result.result as FileContentData

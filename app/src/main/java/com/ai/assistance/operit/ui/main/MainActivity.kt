@@ -49,6 +49,8 @@ import kotlinx.coroutines.launch
 import android.content.ClipboardManager
 import android.content.ClipData
 import com.ai.assistance.operit.data.mcp.MCPRepository
+import com.ai.assistance.operit.data.preferences.GitHubAuthBus
+import android.content.Intent
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -118,6 +120,9 @@ class MainActivity : ComponentActivity() {
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
 
+        // Handle the intent that started the activity
+        handleIntent(intent)
+
         // 语言设置已在Application中初始化，这里无需重复
 
         initializeComponents()
@@ -152,6 +157,38 @@ class MainActivity : ComponentActivity() {
 
         // 设置双击返回退出
         setupBackPressHandler()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Log.d(TAG, "onNewIntent: Received intent")
+        intent?.data?.let { uri ->
+            if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
+                val code = uri.getQueryParameter("code")
+                if (code != null) {
+                    Log.d(TAG, "GitHub OAuth code received: $code")
+                    GitHubAuthBus.postAuthCode(code)
+                } else {
+                    val error = uri.getQueryParameter("error")
+                    Log.e(TAG, "GitHub OAuth error: $error")
+                }
+            }
+        }
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
+                val code = uri.getQueryParameter("code")
+                if (code != null) {
+                    Log.d(TAG, "GitHub OAuth code received from onCreate: $code")
+                    GitHubAuthBus.postAuthCode(code)
+                } else {
+                    val error = uri.getQueryParameter("error")
+                    Log.e(TAG, "GitHub OAuth error from onCreate: $error")
+                }
+            }
+        }
     }
 
     // ======== 设置初始占位内容 ========

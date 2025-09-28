@@ -407,7 +407,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     chatHistory = preparedHistory,
                                     modelParameters = modelParameters,
                                     enableThinking = enableThinking,
-                                    onTokensUpdated = { input, output ->
+                                    onTokensUpdated = { input, cachedInput, output ->
                                         _perRequestTokenCounts.value = Pair(input, output)
                                     },
                                     onNonFatalError = onNonFatalError
@@ -462,10 +462,11 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // Update accumulated token counts and persist them
                     val inputTokens = serviceForFunction.inputTokenCount
+                    val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                     val outputTokens = serviceForFunction.outputTokenCount
                     accumulatedInputTokenCount += inputTokens
                     accumulatedOutputTokenCount += outputTokens
-                    apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                    apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                     Log.d(
                             TAG,
@@ -1021,7 +1022,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                 chatHistory = currentChatHistory,
                                 modelParameters = modelParameters,
                                 enableThinking = enableThinking,
-                                onTokensUpdated = { input, output ->
+                                onTokensUpdated = { input, cachedInput, output ->
                                     _perRequestTokenCounts.value = Pair(input, output)
                                 },
                                 onNonFatalError = onNonFatalError
@@ -1063,10 +1064,11 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 // Update accumulated token counts and persist them
                 val inputTokens = serviceForFunction.inputTokenCount
+                val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                 val outputTokens = serviceForFunction.outputTokenCount
                 accumulatedInputTokenCount += inputTokens
                 accumulatedOutputTokenCount += outputTokens
-                apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                 Log.d(
                         TAG,
@@ -1289,6 +1291,33 @@ class EnhancedAIService private constructor(private val context: Context) {
         return conversationService.generatePackageDescription(pluginName, toolDescriptions, multiServiceManager)
     }
 
+
+    /**
+     * Manually saves the current conversation to the problem library.
+     * @param conversationHistory The history of the conversation to save.
+     * @param lastContent The content of the last message in the conversation.
+     */
+    suspend fun saveConversationToMemory(
+        conversationHistory: List<Pair<String, String>>,
+        lastContent: String
+    ) {
+            Log.d(TAG, "手动触发记忆更新...")
+            withContext(Dispatchers.IO) { // Use withContext to wait for completion
+                try {
+                    com.ai.assistance.operit.api.chat.library.ProblemLibrary.saveProblemAsync(
+                        context,
+                        toolHandler,
+                        conversationHistory,
+                        lastContent,
+                        multiServiceManager.getServiceForFunction(FunctionType.PROBLEM_LIBRARY)
+                    )
+                    Log.d(TAG, "手动记忆更新成功")
+                } catch (e: Exception) {
+                    Log.e(TAG, "手动记忆更新失败", e)
+                    throw e
+                }
+        }
+    }
 
 
 

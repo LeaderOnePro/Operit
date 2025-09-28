@@ -21,6 +21,10 @@ import com.ai.assistance.operit.ui.features.demo.screens.ShizukuDemoScreen
 import com.ai.assistance.operit.ui.features.help.screens.HelpScreen
 import com.ai.assistance.operit.ui.features.memory.screens.MemoryScreen
 import com.ai.assistance.operit.ui.features.packages.screens.PackageManagerScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPMarketScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPManageScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPPublishScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPPluginDetailScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ChatHistorySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.FunctionalConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.LanguageSettingsScreen
@@ -34,6 +38,7 @@ import com.ai.assistance.operit.ui.features.settings.screens.ToolPermissionSetti
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesGuideScreen
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.CustomHeadersSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.TokenUsageStatisticsScreen
 import com.ai.assistance.operit.ui.features.token.TokenConfigWebViewScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.AppPermissionsToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.FileManagerToolScreen
@@ -142,7 +147,89 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            PackageManagerScreen()
+            PackageManagerScreen(
+                onNavigateToMCPMarket = { navigateTo(MCPMarket) }
+            )
+        }
+    }
+
+    data object MCPMarket : Screen(parentScreen = Packages, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_market) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPMarketScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToPublish = { navigateTo(MCPPublish) },
+                onNavigateToManage = { navigateTo(MCPManage) },
+                onNavigateToDetail = { issue ->
+                    navigateTo(MCPPluginDetail(issue))
+                }
+            )
+        }
+    }
+
+    data object MCPPublish : Screen(parentScreen = MCPMarket, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_publish) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPublishScreen(onNavigateBack = onGoBack)
+        }
+    }
+
+    data object MCPManage : Screen(parentScreen = MCPMarket, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_manage) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPManageScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToEdit = { issue ->
+                    navigateTo(MCPEditPlugin(issue))
+                },
+                onNavigateToPublish = { navigateTo(MCPPublish) }
+            )
+        }
+    }
+
+    data class MCPEditPlugin(val editingIssue: com.ai.assistance.operit.data.api.GitHubIssue) : Screen(parentScreen = MCPManage, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_publish) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPublishScreen(
+                onNavigateBack = onGoBack,
+                editingIssue = editingIssue
+            )
         }
     }
 
@@ -232,7 +319,8 @@ sealed class Screen(
                     navigateToSpeechServicesSettings = { navigateTo(SpeechServicesSettings) },
                     navigateToCustomHeadersSettings = { navigateTo(CustomHeadersSettings) },
                     navigateToPersonaCardGeneration = { navigateTo(PersonaCardGeneration) },
-                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) }
+                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
+                    navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) }
             )
         }
     }
@@ -613,6 +701,23 @@ sealed class Screen(
         }
     }
 
+    data object TokenUsageStatistics :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.settings_token_usage_stats) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            TokenUsageStatisticsScreen(onBackPressed = onGoBack)
+        }
+    }
+
     // Toolbox secondary screens
     data object FormatConverter :
             Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_format_converter) {
@@ -854,6 +959,27 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             SpeechToTextToolScreen(navController = navController)
+        }
+    }
+
+    // MCP 插件详情页面
+    data class MCPPluginDetail(val issue: com.ai.assistance.operit.data.api.GitHubIssue) :
+            Screen(parentScreen = Packages, navItem = NavItem.Packages) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPluginDetailScreen(
+                issue = issue,
+                onNavigateBack = onGoBack
+            )
         }
     }
 

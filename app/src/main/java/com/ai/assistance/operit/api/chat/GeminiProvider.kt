@@ -5,6 +5,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.util.ChatUtils
+import com.ai.assistance.operit.util.TokenCacheManager
 import com.ai.assistance.operit.util.exceptions.UserCancellationException
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.StreamCollector
@@ -25,10 +26,11 @@ import org.json.JSONObject
 /** Google Gemini API的实现 支持标准Gemini接口流式传输 */
 class GeminiProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap()
+        private val customHeaders: Map<String, String> = emptyMap(),
+        private val providerType: ApiProviderType = ApiProviderType.GOOGLE
 ) : AIService {
     companion object {
         private const val TAG = "GeminiProvider"
@@ -50,16 +52,21 @@ class GeminiProvider(
     class NonRetriableException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
     // Token计数
-    private var _inputTokenCount = 0
-    private var _outputTokenCount = 0
+    private val tokenCacheManager = TokenCacheManager()
     
     // 思考状态跟踪
     private var isInThinkingMode = false
 
     override val inputTokenCount: Int
-        get() = _inputTokenCount
+        get() = tokenCacheManager.totalInputTokenCount
+    override val cachedInputTokenCount: Int
+        get() = tokenCacheManager.cachedInputTokenCount
     override val outputTokenCount: Int
-        get() = _outputTokenCount
+        get() = tokenCacheManager.outputTokenCount
+
+    // 供应商:模型标识符
+    override val providerModel: String
+        get() = "${providerType.name}:$modelName"
 
     // 取消当前流式传输
     override fun cancelStreaming() {
@@ -75,8 +82,7 @@ class GeminiProvider(
 
     // 重置Token计数
     override fun resetTokenCounts() {
-        _inputTokenCount = 0
-        _outputTokenCount = 0
+        tokenCacheManager.resetTokenCounts()
         isInThinkingMode = false
     }
 
@@ -84,8 +90,7 @@ class GeminiProvider(
             message: String,
             chatHistory: List<Pair<String, String>>
     ): Int {
-        val (_, tokenCount) = buildContentsAndCountTokens(message, chatHistory)
-        return tokenCount
+        return tokenCacheManager.calculateInputTokens(message, chatHistory)
     }
 
     private fun buildContentsAndCountTokens(
@@ -190,14 +195,18 @@ class GeminiProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
-            onTokensUpdated: suspend (input: Int, output: Int) -> Unit,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
         isManuallyCancelled = false
         val requestId = System.currentTimeMillis().toString()
         // 重置token计数和思考状态
         resetTokenCounts()
-        onTokensUpdated(_inputTokenCount, _outputTokenCount)
+        onTokensUpdated(
+                tokenCacheManager.totalInputTokenCount,
+                tokenCacheManager.cachedInputTokenCount,
+                tokenCacheManager.outputTokenCount
+        )
 
         Log.d(TAG, "发送消息到Gemini API, 模型: $modelName")
 
@@ -237,7 +246,11 @@ class GeminiProvider(
                 }
 
                 val requestBody = createRequestBody(currentMessage, currentHistory, modelParameters, enableThinking)
-                onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                onTokensUpdated(
+                        tokenCacheManager.totalInputTokenCount,
+                        tokenCacheManager.cachedInputTokenCount,
+                        tokenCacheManager.outputTokenCount
+                )
                 val request = createRequest(requestBody, true, requestId) // 使用流式请求
 
                 val call = client.newCall(request)
@@ -341,9 +354,9 @@ class GeminiProvider(
     ): RequestBody {
         val json = JSONObject()
 
-        val (contentsResult, tokenCount) = buildContentsAndCountTokens(message, chatHistory)
+        tokenCacheManager.calculateInputTokens(message, chatHistory)
+        val (contentsResult, _) = buildContentsAndCountTokens(message, chatHistory)
         val (contentsArray, systemInstruction) = contentsResult
-        _inputTokenCount = tokenCount
 
         if (systemInstruction != null) {
             json.put("systemInstruction", systemInstruction)
@@ -393,7 +406,7 @@ class GeminiProvider(
     }
 
     /** 创建HTTP请求 */
-    private fun createRequest(
+    private suspend fun createRequest(
             requestBody: RequestBody,
             isStreaming: Boolean,
             requestId: String
@@ -414,11 +427,12 @@ class GeminiProvider(
         }
 
         // 添加API密钥
+        val currentApiKey = apiKeyProvider.getApiKey()
         val finalUrl =
                 if (requestUrl.contains("?")) {
-                    "$requestUrl&key=$apiKey"
+                    "$requestUrl&key=$currentApiKey"
                 } else {
-                    "$requestUrl?key=$apiKey"
+                    "$requestUrl?key=$currentApiKey"
                 }
 
         val request = builder.url(finalUrl)
@@ -444,9 +458,9 @@ class GeminiProvider(
     /** 处理API流式响应 */
     private suspend fun processStreamingResponse(
             response: Response,
-            streamBuilder: StreamCollector<String>,
+            streamCollector: StreamCollector<String>,
             requestId: String,
-            onTokensUpdated: suspend (input: Int, output: Int) -> Unit,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             receivedContent: StringBuilder
     ) {
         Log.d(TAG, "开始处理响应流")
@@ -497,7 +511,7 @@ class GeminiProvider(
                                 receivedContent.append(content)
 
                                 // 只发送新增的内容
-                                streamBuilder.emit(content)
+                                streamCollector.emit(content)
                             }
                         } catch (e: Exception) {
                             logError("解析SSE响应数据失败: ${e.message}", e)
@@ -562,7 +576,7 @@ class GeminiProvider(
                                                         receivedContent.append(content)
 
                                                         // 只发送这个单独对象产生的内容
-                                                        streamBuilder.emit(content)
+                                                        streamCollector.emit(content)
                                                     }
                                                 }
                                             }
@@ -578,7 +592,7 @@ class GeminiProvider(
                                                 receivedContent.append(content)
 
                                                 // 只发送新提取的内容
-                                                streamBuilder.emit(content)
+                                                streamCollector.emit(content)
                                             }
                                         }
                                     }
@@ -629,7 +643,7 @@ class GeminiProvider(
                                     contentCount++
                                     logDebug("从最终JSON数组[$i]提取内容，长度: ${content.length}")
                                     receivedContent.append(content)
-                                    streamBuilder.emit(content)
+                                    streamCollector.emit(content)
                                 }
                             }
                         }
@@ -640,7 +654,7 @@ class GeminiProvider(
                                 contentCount++
                                 logDebug("从最终JSON对象提取内容，长度: ${content.length}")
                                 receivedContent.append(content)
-                                streamBuilder.emit(content)
+                                streamCollector.emit(content)
                             }
                         }
                     }
@@ -652,14 +666,14 @@ class GeminiProvider(
             // 确保思考模式正确结束
             if (isInThinkingMode) {
                 logDebug("流结束时仍在思考模式，添加结束标签")
-                streamBuilder.emit("</think>")
+                streamCollector.emit("</think>")
                 isInThinkingMode = false
             }
             
             // 确保至少发送一次内容
             if (contentCount == 0) {
                 logDebug("未检测到内容，发送空格")
-                streamBuilder.emit(" ")
+                streamCollector.emit(" ")
             }
         } catch (e: Exception) {
             logError("处理响应时发生异常: ${e.message}", e)
@@ -673,7 +687,7 @@ class GeminiProvider(
     private suspend fun extractContentFromJson(
         json: JSONObject,
         requestId: String,
-        onTokensUpdated: suspend (input: Int, output: Int) -> Unit
+        onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit
     ): String {
         val contentBuilder = StringBuilder()
 
@@ -747,8 +761,12 @@ class GeminiProvider(
 
                     // 估算token
                     val tokens = ChatUtils.estimateTokenCount(text)
-                    _outputTokenCount += tokens
-                    onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                    tokenCacheManager.addOutputTokens(tokens)
+                    onTokensUpdated(
+                            tokenCacheManager.totalInputTokenCount,
+                            tokenCacheManager.cachedInputTokenCount,
+                            tokenCacheManager.outputTokenCount
+                    )
                 }
             }
 
@@ -762,7 +780,7 @@ class GeminiProvider(
     /** 获取模型列表 */
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.GOOGLE
         )
@@ -774,7 +792,7 @@ class GeminiProvider(
             // 这比getModelsList更可靠，因为它直接命中了聊天API。
             // 提供一个通用的系统提示，以防止某些需要它的模型出现错误。
             val testHistory = listOf("system" to "You are a helpful assistant.")
-            val stream = sendMessage("Hi", testHistory, emptyList(), false, onTokensUpdated = { _, _ -> }, onNonFatalError = {})
+            val stream = sendMessage("Hi", testHistory, emptyList(), false, onTokensUpdated = { _, _, _ -> }, onNonFatalError = {})
 
             // 消耗流以确保连接有效。
             // 对 "Hi" 的响应应该很短，所以这会很快完成。

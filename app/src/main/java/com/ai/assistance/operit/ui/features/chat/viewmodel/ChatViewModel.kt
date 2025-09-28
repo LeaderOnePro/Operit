@@ -36,10 +36,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.util.WaifuMessageProcessor
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -71,9 +72,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    // 添加自动朗读状态
-    private val _isAutoReadEnabled = MutableStateFlow(false)
-    val isAutoReadEnabled: StateFlow<Boolean> = _isAutoReadEnabled.asStateFlow()
+    // 添加自动朗读状态 - Now managed by ApiConfigDelegate
+    val isAutoReadEnabled: StateFlow<Boolean> by lazy { apiConfigDelegate.enableAutoRead }
 
     // 添加回复相关状态
     private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
@@ -546,12 +546,16 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     /** 删除单条消息 */
     fun deleteMessage(index: Int) {
+        Log.d(TAG, "准备删除消息，索引: $index")
         chatHistoryDelegate.deleteMessage(index)
     }
 
     /** 从指定索引删除后续所有消息 */
     fun deleteMessagesFrom(index: Int) {
-        chatHistoryDelegate.deleteMessagesFrom(index)
+        viewModelScope.launch {
+            Log.d(TAG, "准备从索引 $index 开始删除后续消息")
+            chatHistoryDelegate.deleteMessagesFrom(index)
+        }
     }
 
     fun saveCurrentChat() {
@@ -622,40 +626,50 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 获取目标消息
                 val targetMessage = currentHistory[index]
 
-                // 检查目标消息是否是用户消息，如果不是，选择前一条用户消息
-                val finalIndex: Int
-                val finalMessage: ChatMessage
-
-                if (targetMessage.sender == "user") {
-                    finalIndex = index
-                    finalMessage = targetMessage.copy(content = editedContent)
-                } else {
-                    // 查找该消息前最近的用户消息
-                    var userMessageIndex = index - 1
-                    while (userMessageIndex >= 0 &&
-                            currentHistory[userMessageIndex].sender != "user") {
-                        userMessageIndex--
-                    }
-
-                    if (userMessageIndex < 0) {
-                        uiStateDelegate.showErrorMessage("找不到有效的用户消息进行回档")
+                // 检查目标消息是否是用户消息
+                if (targetMessage.sender != "user") {
+                    uiStateDelegate.showErrorMessage("只能对用户消息执行此操作")
                         return@launch
                     }
 
-                    finalIndex = userMessageIndex
-                    finalMessage = currentHistory[userMessageIndex].copy(content = editedContent)
+                // **核心修复**: 确定回滚的时间戳。
+                // 我们需要恢复到目标消息 *之前* 的状态,
+                // 所以我们使用前一条消息的时间戳。
+                // 如果目标是第一条消息，则回滚到初始状态 (时间戳 0)。
+                val rewindTimestamp = if (index > 0) {
+                    currentHistory[index - 1].timestamp
+                } else {
+                    0L
+                }
+
+                // 获取当前工作区路径
+                val chatId = currentChatId.value
+                val currentChat = chatHistories.value.find { it.id == chatId }
+                val workspacePath = currentChat?.workspace
+
+                Log.d(TAG, "[Rewind] Target message timestamp: ${targetMessage.timestamp}")
+                if (index > 0) {
+                    Log.d(TAG, "[Rewind] Previous message timestamp: ${currentHistory[index - 1].timestamp}")
+                } else {
+                    Log.d(TAG, "[Rewind] No previous message, target is the first message.")
+                }
+                Log.d(TAG, "[Rewind] Timestamp passed to syncState: $rewindTimestamp")
+
+                // 如果绑定了工作区，则执行回滚
+                if (!workspacePath.isNullOrBlank()) {
+                    Log.d(TAG, "Rewinding workspace to timestamp: $rewindTimestamp")
+                    withContext(Dispatchers.IO) {
+                        WorkspaceBackupManager.getInstance(context)
+                            .syncState(workspacePath, rewindTimestamp)
+                    }
+                    Log.d(TAG, "Workspace rewind complete.")
                 }
 
                 // 截取到指定消息的历史记录（不包含该消息本身）
-                val rewindHistory = currentHistory.subList(0, finalIndex)
+                val rewindHistory = currentHistory.subList(0, index)
+                
                 // 获取要删除的第一条消息的时间戳
-                val timestampOfFirstDeletedMessage =
-                        if (finalIndex < currentHistory.size) {
-                            currentHistory[finalIndex].timestamp
-                        } else {
-                            // 如果finalIndex是列表末尾，则没有消息需要删除
-                            null
-                        }
+                val timestampOfFirstDeletedMessage = currentHistory[index].timestamp
 
                 // **核心修复**：调用新的委托方法，原子性地更新数据库和内存
                 chatHistoryDelegate.truncateChatHistory(
@@ -667,9 +681,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 uiStateDelegate.showToast("正在准备重新发送消息")
 
                 // 使用修改后的消息内容来发送
-                chatHistoryDelegate.updateChatHistory(rewindHistory)
-
-                messageProcessingDelegate.updateUserMessage(finalMessage.content)
+                messageProcessingDelegate.updateUserMessage(editedContent)
                 sendUserMessage()
             } catch (e: Exception) {
                 Log.e(TAG, "回档并重新发送消息失败", e)
@@ -1149,25 +1161,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
 
-
-    // 初始化本地Web服务器
-    private fun initLocalWebServer() {
-        try {
-            // 使用单例模式获取LocalWebServer实例
-            val webServer = LocalWebServer.getInstance(context, LocalWebServer.ServerType.WORKSPACE)
-            // 只有当服务器未运行时才启动
-            if (!webServer.isRunning()) {
-                webServer.start()
-                Log.d(TAG, "本地Web服务器已启动")
-            } else {
-                Log.d(TAG, "本地Web服务器已经在运行中")
-            }
-        } catch (e: IOException) {
-            Log.e(TAG, "初始化本地Web服务器失败", e)
-            uiStateDelegate.showErrorMessage("无法启动Web服务器: ${e.message}")
-        }
-    }
-
     // 更新当前聊天ID的Web服务器工作空间
     fun updateWebServerForCurrentChat(chatId: String) {
         try {
@@ -1457,14 +1450,16 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     // 等待初始化完成
                     delay(500)
                 }
-                
+
+                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(message)
+
                 val success = voiceService?.speak(
-                    text = message,
+                    text = cleanMessage,
                     interrupt = true, // 中断当前播放
                     rate = 1.0f,
                     pitch = 1.0f
                 ) ?: false
-                
+
                 if (!success) {
                     uiStateDelegate.showToast("朗读失败")
                 }
@@ -1487,25 +1482,30 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     fun toggleAutoRead() {
-        _isAutoReadEnabled.value = !_isAutoReadEnabled.value
-        // 如果关闭，则也停止当前语音
-        if (!_isAutoReadEnabled.value) {
-            stopSpeaking()
+        apiConfigDelegate.toggleAutoRead()
+        // Stop speaking if auto-read is being turned off.
+        // We check the new value directly from the delegate's state flow.
+        viewModelScope.launch {
+            // A small delay to allow the state flow to update, although it's often fast.
+            delay(50)
+            if (!isAutoReadEnabled.value) {
+                stopSpeaking()
+            }
         }
     }
 
     fun disableAutoRead() {
-        if (_isAutoReadEnabled.value) {
-            _isAutoReadEnabled.value = false
+        if (isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to false
             stopSpeaking()
         }
     }
 
     fun enableAutoReadAndSpeak(content: String) {
-        if (!_isAutoReadEnabled.value) {
-            _isAutoReadEnabled.value = true
-            speakMessage(content)
+        if (!isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to true
         }
+        speakMessage(content)
     }
 
     /** 设置回复目标消息 */
@@ -1518,18 +1518,33 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         _replyToMessage.value = null
     }
 
-    /** 生成回复消息的摘要 */
-    private fun generateReplyPreview(message: ChatMessage): String {
-        val content = message.content
-        val cleanContent = content
-            .replace(Regex("<[^>]*>"), "") // 移除XML标签
-            .trim()
-        
-        // 限制长度为50个字符
-        return if (cleanContent.length > 50) {
-            cleanContent.take(50) + "..."
-        } else {
-            cleanContent
+    fun manuallyUpdateMemory() {
+        viewModelScope.launch {
+            if (enhancedAiService == null) {
+                uiStateDelegate.showToast("AI服务不可用，无法更新记忆")
+                return@launch
+            }
+            if (chatHistory.value.isEmpty()) {
+                uiStateDelegate.showToast("聊天历史为空，无需更新记忆")
+                return@launch
+            }
+
+            try {
+                // Convert ChatMessage list to List<Pair<String, String>>
+                val history = chatHistory.value.map { it.sender to it.content }
+                // Get the last message content
+                val lastMessageContent = chatHistory.value.lastOrNull()?.content ?: ""
+
+                enhancedAiService?.saveConversationToMemory(
+                    history,
+                    lastMessageContent
+                )
+                uiStateDelegate.showToast("记忆已手动更新")
+            } catch (e: Exception) {
+                Log.e(TAG, "手动更新记忆失败", e)
+                uiStateDelegate.showErrorMessage("手动更新记忆失败: ${e.message}")
+            }
         }
     }
+
 }

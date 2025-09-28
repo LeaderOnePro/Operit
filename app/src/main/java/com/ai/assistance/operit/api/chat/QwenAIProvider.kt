@@ -15,11 +15,12 @@ import okhttp3.OkHttpClient
  */
 class QwenAIProvider(
     apiEndpoint: String,
-    apiKey: String,
+    apiKeyProvider: ApiKeyProvider,
     modelName: String,
     client: OkHttpClient,
-    customHeaders: Map<String, String> = emptyMap()
-) : OpenAIProvider(apiEndpoint, apiKey, modelName, client, customHeaders) {
+    customHeaders: Map<String, String> = emptyMap(),
+    providerType: com.ai.assistance.operit.data.model.ApiProviderType = com.ai.assistance.operit.data.model.ApiProviderType.ALIYUN
+) : OpenAIProvider(apiEndpoint, apiKeyProvider, modelName, client, customHeaders, providerType) {
 
     /**
      * 重写创建请求体的方法，以支持Qwen的`enable_thinking`参数。
@@ -52,7 +53,7 @@ class QwenAIProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
-            onTokensUpdated: suspend (input: Int, output: Int) -> Unit,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> {
         // 直接调用父类的sendMessage实现，它已经包含了续写逻辑

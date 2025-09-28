@@ -170,6 +170,20 @@ class ModelConfigManager(private val context: Context) {
         }
     }
 
+    // 获取指定ID的配置的非Flow版本
+    suspend fun getModelConfig(configId: String): ModelConfigData? {
+        return loadConfigFromDataStore(configId)
+    }
+
+    // 更新API Key池的当前索引
+    suspend fun updateConfigKeyIndex(configId: String, newIndex: Int) {
+        val config = getModelConfig(configId)
+        if (config != null) {
+            val updatedConfig = config.copy(currentKeyIndex = newIndex)
+            saveConfigToDataStore(updatedConfig)
+        }
+    }
+
     // 获取所有配置的摘要信息
     suspend fun getAllConfigSummaries(): List<ModelConfigSummary> {
         val configIds = configListFlow.first()

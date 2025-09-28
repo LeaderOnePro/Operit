@@ -132,7 +132,7 @@
     <string name="device_model">Modelo de dispositivo: %1$s %2$s</string>
     <string name="shizuku_status">Estado de Shizuku</string>
     <string name="refresh">Actualizar</string>
-    <string name="installed">Instalado: %1$s</string>
+    <string name="installed">Instalado</string>
     <string name="service_running">Servicio en ejecución: %1$s</string>
     <string name="permission_status">Estado del permiso: %1$s</string>
     <string name="yes">Sí</string>
@@ -953,6 +953,7 @@
     <string name="settings_data_backup_subtitle">Gestión de respaldo del historial de chat</string>
     <string name="settings_token_usage_stats">Estadísticas de Uso de Tokens</string>
     <string name="settings_function_label">Función</string>
+    <string name="settings_model_label">Modelo</string>
     <string name="settings_no_token_records">Aún no hay registros de uso de tokens para módulos funcionales.</string>
     <string name="settings_reset_all_counts">Restablecer Todos los Conteos</string>
     <string name="settings_input_tokens">Entrada</string>

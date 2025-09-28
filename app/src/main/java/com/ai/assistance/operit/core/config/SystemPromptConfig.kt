@@ -78,7 +78,28 @@ object SystemPromptConfig {
         - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
         - read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)
         - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
-        - apply_file: Applies intelligent edits to a file. For the 'content' parameter, prioritize a diff-like format with '+' for additions and '-' for deletions to maximize efficiency. For larger changes, use partial code with "// ... existing code ..." placeholders. Natural language instructions in comments (e.g., "// delete this function") are also supported. A specialized service intelligently applies these changes. To bypass programmatic patching and force a more robust AI-based merge for complex changes, begin the 'content' parameter with `// @FORCE_AI_MERGE` on its own line. Parameters: path (file path), content (the code or instructions to apply)
+        - apply_file: Applies precise, line-number-based edits. You will read files with line numbers (e.g., "123| code"). To apply edits, you MUST use the following structured format. The code inside your blocks should NOT have line numbers.
+          - **CRITICAL: For each block (REPLACE, INSERT, DELETE), you MUST provide a `[CONTEXT]` block containing the original code lines you are targeting.** This allows the system to find the code even if line numbers have changed.
+          - **Replace**: `// [START-REPLACE:start-end]` (The line range is inclusive. `REPLACE:10-12` removes lines 10, 11, and 12, then inserts new code at line 10's original position).
+`// [CONTEXT]`
+... original code ...
+`// [/CONTEXT]`
+... new code ...
+`// [END-REPLACE]`
+          - **Insert**: `// [START-INSERT:after_line]`
+`// [CONTEXT]`
+... the line you are inserting after ...
+`// [/CONTEXT]`
+... new code ...
+`// [END-INSERT]`
+          - **Delete**: `// [START-DELETE:start-end]` (The line range is inclusive. `DELETE:10-12` removes lines 10, 11, and 12).
+`// [CONTEXT]`
+... original code to be deleted ...
+`// [/CONTEXT]`
+`// [END-DELETE]`
+          - **Full Content**: For full replacement, provide the full file content without any special blocks.
+          - **Note**: Provide multiple edit blocks in one call. The system handles line number conflicts.
+          - Parameters: path (file path), content (edit blocks or full file content)
         - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
         - file_exists: Check if a file or directory exists. Parameters: path (target path)
         - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
@@ -132,7 +153,22 @@ object SystemPromptConfig {
         - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
         - read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，会自动使用OCR提取文本。参数：path（文件路径）
         - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
-        - apply_file: 智能地修改文件。为最大化效率，'content'参数应优先使用带'+'（增）和'-'（删）的差异（diff）格式。对于较大改动，可使用带 "// ... existing code ..." 占位符的部分代码。也支持注释中的自然语言指令（如 "// 删除此函数"）。一个专门的服务会智能地应用这些修改。对于复杂变更，若希望跳过程序化补丁，强制使用更可靠的AI进行合并，请在'content'参数的开头新起一行，使用 `// @FORCE_AI_MERGE` 标记。参数：path（文件路径），content（要应用的代码或指令）
+        - apply_file: 进行精确的、基于行号的编辑。你读取的文件会带行号（如 "123| code"）。修改文件时，**必须**使用以下结构化格式。代码块内部的代码**不**应包含行号。
+          - **关键: 每个编辑块 (REPLACE, INSERT, DELETE) 都必须提供一个 `[CONTEXT]` 块，其中包含你目标修改的原始代码行。** 这能帮助系统在行号变化后依然能定位代码。
+          - **替换**: `// [START-REPLACE:起始-结束]` (行号范围是包含性的。例如 `REPLACE:10-12` 会删除第10, 11, 12行，然后在新代码插入到原第10行的位置)。
+        `// [CONTEXT]`
+        ... 原始代码 ...
+        `// [/CONTEXT]`
+        ... 新代码 ...
+        `// [END-INSERT]`
+          - **删除**: `// [START-DELETE:起始-结束]` (行号范围是包含性的。例如 `DELETE:10-12` 会删除第10, 11, 12行)。
+        `// [CONTEXT]`
+        ... 要删除的原始代码 ...
+        `// [/CONTEXT]`
+        `// [END-DELETE]`
+          - **完整内容**: 若要完整替换，直接提供完整文件内容，不要使用特殊块。
+          - **注意**: 你可以在单次调用中提供多个编辑块。系统会自动处理行号冲突。
+          - 参数: path (文件路径), content (编辑块或完整文件内容)
         - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
         - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
         - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）

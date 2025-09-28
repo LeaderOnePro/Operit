@@ -38,6 +38,26 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         protected const val MAX_FILE_SIZE_BYTES = 32 * 1024 // 32k
     }
 
+    /** Adds line numbers to a string of content. */
+    private fun addLineNumbers(content: String): String {
+        val lines = content.lines()
+        if (lines.isEmpty()) return ""
+        val maxDigits = lines.size.toString().length
+        return lines.mapIndexed { index, line ->
+            "${(index + 1).toString().padStart(maxDigits, ' ')}| $line"
+        }.joinToString("\n")
+    }
+
+    /** Adds line numbers to a string of content, starting from a specific line number. */
+    private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
+        val lines = content.lines()
+        if (lines.isEmpty()) return ""
+        val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
+        return lines.mapIndexed { index, line ->
+            "${(startLine + index).toString().padStart(maxDigits, ' ')}| $line"
+        }.joinToString("\n")
+    }
+
     /** List files in a directory */
     override suspend fun listFiles(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
@@ -450,13 +470,20 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
                 val contentData = fullResult.result as FileContentData
                 var content = contentData.content
-                if (content.length > MAX_FILE_SIZE_BYTES) {
-                    content = content.substring(0, MAX_FILE_SIZE_BYTES) + "\n\n... (file content truncated) ..."
+                val isTruncated = content.length > MAX_FILE_SIZE_BYTES
+                if (isTruncated) {
+                    content = content.substring(0, MAX_FILE_SIZE_BYTES)
                 }
+
+                var contentWithLineNumbers = addLineNumbers(content)
+                if (isTruncated) {
+                    contentWithLineNumbers += "\n\n... (file content truncated) ..."
+                }
+
                 return ToolResult(
                     toolName = tool.name,
                     success = true,
-                    result = FileContentData(path = path, content = content, size = content.length.toLong()),
+                    result = FileContentData(path = path, content = contentWithLineNumbers, size = contentWithLineNumbers.length.toLong()),
                     error = ""
                 )
             }
@@ -489,8 +516,9 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             var content = readResult.stdout
+            var contentWithLineNumbers = addLineNumbers(content)
             if (truncated) {
-                content += "\n\n... (file content truncated) ..."
+                contentWithLineNumbers += "\n\n... (file content truncated) ..."
             }
 
             return ToolResult(
@@ -499,8 +527,8 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result =
                             FileContentData(
                                     path = path,
-                                    content = content,
-                                    size = content.length.toLong()
+                                    content = contentWithLineNumbers,
+                                    size = contentWithLineNumbers.length.toLong()
                             ),
                     error = ""
             )
@@ -597,6 +625,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             val content = partResult.stdout
+            val contentWithLineNumbers = addLineNumbers(content, startLine, totalLines)
 
             ToolResult(
                     toolName = tool.name,
@@ -604,7 +633,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result =
                             FilePartContentData(
                                     path = path,
-                                    content = content.trimEnd(),
+                                    content = contentWithLineNumbers.trimEnd(),
                                     partIndex = validPartIndex,
                                     totalParts = totalParts,
                                     startLine = startLine - 1, // To 0-indexed for response

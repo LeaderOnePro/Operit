@@ -299,11 +299,7 @@ class MCPDeployer(private val context: Context) {
                     args = args,
                     env = env,
                     disabled = disabled,
-                    autoApprove = autoApprove,
-                    metadata = mapOf(
-                        "serverName" to serverName,
-                        "deployedTime" to System.currentTimeMillis().toString()
-                    )
+                    autoApprove = autoApprove
                 )
                 
                 true

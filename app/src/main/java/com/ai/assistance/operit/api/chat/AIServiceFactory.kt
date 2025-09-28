@@ -2,6 +2,8 @@ package com.ai.assistance.operit.api.chat
 
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
+import com.ai.assistance.operit.data.model.ModelConfigData
+import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import java.util.concurrent.TimeUnit
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
@@ -55,53 +57,56 @@ object AIServiceFactory {
     /**
      * 创建AI服务实例
      *
-     * @param apiProviderType API提供商类型
-     * @param apiEndpoint API端点
-     * @param apiKey API密钥
-     * @param modelName 模型名称
+     * @param config 模型配置数据
      * @param customHeadersJson 自定义请求头的JSON字符串
+     * @param modelConfigManager 模型配置管理器，用于多API Key模式
      * @return 对应的AIService实现
      */
     fun createService(
-            apiProviderType: ApiProviderType,
-            apiEndpoint: String,
-            apiKey: String,
-            modelName: String,
-            customHeadersJson: String
+        config: ModelConfigData,
+        customHeadersJson: String,
+        modelConfigManager: ModelConfigManager
     ): AIService {
         val httpClient = SharedHttpClient.instance
         val customHeaders = parseCustomHeaders(customHeadersJson)
 
-        return when (apiProviderType) {
+        // 根据配置决定使用单个API Key还是多API Key轮询
+        val apiKeyProvider = if (config.useMultipleApiKeys) {
+            MultiApiKeyProvider(config.id, modelConfigManager)
+        } else {
+            SingleApiKeyProvider(config.apiKey)
+        }
+
+        return when (config.apiProviderType) {
             // OpenAI格式，支持原生和兼容OpenAI API的服务
-            ApiProviderType.OPENAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.OPENAI -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // Claude格式，支持Anthropic Claude系列
-            ApiProviderType.ANTHROPIC -> ClaudeProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.ANTHROPIC -> ClaudeProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // Gemini格式，支持Google Gemini系列
-            ApiProviderType.GOOGLE -> GeminiProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.GOOGLE -> GeminiProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // LM Studio使用OpenAI兼容格式
-            ApiProviderType.LMSTUDIO -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.LMSTUDIO -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // 阿里云（通义千问）使用专用的QwenProvider
-            ApiProviderType.ALIYUN -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.ALIYUN -> QwenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // 其他中文服务商，当前使用OpenAI Provider (大多数兼容OpenAI格式)
             // 后续可根据需要实现专用Provider
-            ApiProviderType.BAIDU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.XUNFEI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.ZHIPU -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.BAICHUAN -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.MOONSHOT -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.BAIDU -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.XUNFEI -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.ZHIPU -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.BAICHUAN -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.MOONSHOT -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
 
             // 默认使用OpenAI格式（大多数服务商兼容）
-            ApiProviderType.DEEPSEEK -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.SILICONFLOW -> QwenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.OPENROUTER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.INFINIAI -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
-            ApiProviderType.OTHER -> OpenAIProvider(apiEndpoint, apiKey, modelName, httpClient, customHeaders)
+            ApiProviderType.DEEPSEEK -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.SILICONFLOW -> QwenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.OPENROUTER -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.INFINIAI -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
+            ApiProviderType.OTHER -> OpenAIProvider(config.apiEndpoint, apiKeyProvider, config.modelName, httpClient, customHeaders, config.apiProviderType)
         }
     }
 }

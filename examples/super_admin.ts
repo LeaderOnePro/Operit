@@ -6,7 +6,7 @@ METADATA
     "tools": [
         {
             "name": "terminal",
-            "description": "通过Ubuntu终端执行命令并收集输出结果，会自动保留目录上下文",
+            "description": "通过Ubuntu终端执行命令并收集输出结果，会自动保留目录上下文。注意：当前环境不支持交互式命令，执行需要交互的命令（如apt install）时，请使用管道或添加-y等参数以避免阻塞。",
             "parameters": [
                 {
                     "name": "command",

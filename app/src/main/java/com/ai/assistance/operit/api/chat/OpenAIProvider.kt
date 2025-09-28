@@ -5,6 +5,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.util.ChatUtils
+import com.ai.assistance.operit.util.TokenCacheManager
 import com.ai.assistance.operit.util.exceptions.UserCancellationException
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
@@ -24,10 +25,11 @@ import org.json.JSONObject
 /** OpenAI API格式的实现，支持标准OpenAI接口和兼容此格式的其他提供商 */
 open class OpenAIProvider(
         private val apiEndpoint: String,
-        private val apiKey: String,
+        private val apiKeyProvider: ApiKeyProvider,
         private val modelName: String,
         private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap()
+        private val customHeaders: Map<String, String> = emptyMap(),
+        private val providerType: ApiProviderType = ApiProviderType.OPENAI
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -42,20 +44,24 @@ open class OpenAIProvider(
      */
     class NonRetriableException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
-    // 添加token计数器
-    private var _inputTokenCount = 0
-    private var _outputTokenCount = 0
+    // Token缓存管理器
+    private val tokenCacheManager = TokenCacheManager()
 
     // 公开token计数
     override val inputTokenCount: Int
-        get() = _inputTokenCount
+        get() = tokenCacheManager.totalInputTokenCount
     override val outputTokenCount: Int
-        get() = _outputTokenCount
+        get() = tokenCacheManager.outputTokenCount
+    override val cachedInputTokenCount: Int
+        get() = tokenCacheManager.cachedInputTokenCount
+
+    // 供应商:模型标识符
+    override val providerModel: String
+        get() = "${providerType.name}:$modelName"
 
     // 重置token计数
     override fun resetTokenCounts() {
-        _inputTokenCount = 0
-        _outputTokenCount = 0
+        tokenCacheManager.resetTokenCounts()
     }
 
     // 工具函数：分块打印大型文本日志
@@ -101,7 +107,7 @@ open class OpenAIProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKey,
+                apiKey = apiKeyProvider.getApiKey(),
                 apiEndpoint = apiEndpoint,
                 apiProviderType = ApiProviderType.OPENAI // 默认为OpenAI类型
         )
@@ -113,7 +119,7 @@ open class OpenAIProvider(
             // 这比getModelsList更可靠，因为它直接命中了聊天API。
             // 提供一个通用的系统提示，以防止某些需要它的模型出现错误。
             val testHistory = listOf("system" to "You are a helpful assistant.")
-            val stream = sendMessage("Hi", testHistory, emptyList(), enableThinking = false, onTokensUpdated = { _, _ -> }, onNonFatalError = {})
+            val stream = sendMessage("Hi", testHistory, emptyList(), enableThinking = false, onTokensUpdated = { _, _, _ -> }, onNonFatalError = {})
 
             // 消耗流以确保连接有效。
             // 对 "Hi" 的响应应该很短，所以这会很快完成。
@@ -173,7 +179,6 @@ open class OpenAIProvider(
         
         // 使用新的核心逻辑构建消息并获取token计数
         val (messagesArray, tokenCount) = buildMessagesAndCountTokens(message, chatHistory)
-        _inputTokenCount = tokenCount // 更新内部token计数器
         jsonObject.put("messages", messagesArray)
 
         // 使用分块日志函数记录完整的请求体
@@ -192,7 +197,9 @@ open class OpenAIProvider(
             chatHistory: List<Pair<String, String>>
     ): Pair<JSONArray, Int> {
         val messagesArray = JSONArray()
-        var tokenCount = 0
+
+        // 使用TokenCacheManager计算token数量
+        val tokenCount = tokenCacheManager.calculateInputTokens(message, chatHistory)
 
         // 添加聊天历史
         if (chatHistory.isNotEmpty()) {
@@ -213,7 +220,6 @@ open class OpenAIProvider(
                 historyMessage.put("role", role)
                 historyMessage.put("content", content)
                 messagesArray.put(historyMessage)
-                tokenCount += ChatUtils.estimateTokenCount(content)
             }
         }
 
@@ -228,13 +234,11 @@ open class OpenAIProvider(
             messageObject.put("role", "user")
             messageObject.put("content", message)
             messagesArray.put(messageObject)
-            tokenCount += ChatUtils.estimateTokenCount(message)
         } else {
             val lastMessage = messagesArray.getJSONObject(messagesArray.length() - 1)
             if (lastMessage.getString("content") != message) {
                 val combinedContent = lastMessage.getString("content") + "\n" + message
                 lastMessage.put("content", combinedContent)
-                tokenCount += ChatUtils.estimateTokenCount(message)
             }
         }
         return Pair(messagesArray, tokenCount)
@@ -244,16 +248,16 @@ open class OpenAIProvider(
             message: String,
             chatHistory: List<Pair<String, String>>
     ): Int {
-        // 调用核心逻辑，只返回token计数
-        val (_, tokenCount) = buildMessagesAndCountTokens(message, chatHistory)
-        return tokenCount
+        // 使用TokenCacheManager计算token数量
+        return tokenCacheManager.calculateInputTokens(message, chatHistory)
     }
 
     // 创建请求
-    private fun createRequest(requestBody: RequestBody): Request {
+    private suspend fun createRequest(requestBody: RequestBody): Request {
+        val currentApiKey = apiKeyProvider.getApiKey()
         val builder = Request.Builder()
                 .url(EndpointCompleter.completeEndpoint(apiEndpoint))
-                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Authorization", "Bearer $currentApiKey")
                 .addHeader("Content-Type", "application/json")
 
         // 添加自定义请求头
@@ -271,14 +275,13 @@ open class OpenAIProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
-            onTokensUpdated: suspend (input: Int, output: Int) -> Unit,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
         isManuallyCancelled = false
-        // 重置token计数
-        _inputTokenCount = 0
-        _outputTokenCount = 0
-        onTokensUpdated(_inputTokenCount, _outputTokenCount)
+        // 重置输出token计数（输入token由TokenCacheManager管理）
+        tokenCacheManager.addOutputTokens(-tokenCacheManager.outputTokenCount)
+        onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
 
         Log.d(
                 "AIService",
@@ -321,7 +324,7 @@ open class OpenAIProvider(
                         "【发送消息】准备构建请求体，模型参数数量: ${modelParameters.size}，已启用参数: ${modelParameters.count { it.isEnabled }}"
                 )
                 val requestBody = createRequestBody(currentMessage, standardizedHistory, modelParameters, enableThinking)
-                onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
                 val request = createRequest(requestBody)
                 Log.d("AIService", "【发送消息】请求体构建完成，目标模型: $modelName，API端点: $apiEndpoint")
 
@@ -424,11 +427,12 @@ open class OpenAIProvider(
                                                             // 发射思考内容
                                                             emit(reasoningContent)
                                                             receivedContent.append(reasoningContent)
-                                                            _outputTokenCount +=
+                                                            tokenCacheManager.addOutputTokens(
                                                                     ChatUtils.estimateTokenCount(
                                                                             reasoningContent
                                                                     )
-                                                            onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                                                            )
+                                                            onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
                                                         }
                                                         // 处理常规内容
                                                         else if (regularContent.isNotEmpty() &&
@@ -455,11 +459,12 @@ open class OpenAIProvider(
                                                             receivedContent.append(regularContent)
 
                                                             // 计算输出tokens
-                                                            _outputTokenCount +=
+                                                            tokenCacheManager.addOutputTokens(
                                                                     ChatUtils.estimateTokenCount(
                                                                             regularContent
                                                                     )
-                                                            onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                                                            )
+                                                            onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
 
                                                             // 发射内容
                                                             emit(regularContent)
@@ -488,11 +493,12 @@ open class OpenAIProvider(
                                                                         "</think>"
                                                                 emit(thinkContent)
                                                                 receivedContent.append(thinkContent)
-                                                                _outputTokenCount +=
+                                                                tokenCacheManager.addOutputTokens(
                                                                         ChatUtils.estimateTokenCount(
                                                                                 reasoningContent
                                                                         )
-                                                                onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                                                                )
+                                                                onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
                                                             }
 
                                                             // 然后处理常规内容
@@ -501,11 +507,12 @@ open class OpenAIProvider(
                                                             ) {
                                                                 emit(regularContent)
                                                                 receivedContent.append(regularContent)
-                                                                _outputTokenCount +=
+                                                                tokenCacheManager.addOutputTokens(
                                                                         ChatUtils.estimateTokenCount(
                                                                                 regularContent
                                                                         )
-                                                                onTokensUpdated(_inputTokenCount, _outputTokenCount)
+                                                                )
+                                                                onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
                                                             }
                                                         }
                                                     }
@@ -528,7 +535,7 @@ open class OpenAIProvider(
                             }
                             Log.d(
                                     "AIService",
-                                    "【发送消息】响应流处理完成，总块数: $chunkCount，输出token: $_outputTokenCount"
+                                    "【发送消息】响应流处理完成，总块数: $chunkCount，输出token: ${tokenCacheManager.outputTokenCount}"
                             )
                         } catch (e: IOException) {
                             // 捕获IO异常，可能是由于取消Call导致的，也可能是网络中断
@@ -556,7 +563,7 @@ open class OpenAIProvider(
                 // 成功处理后返回
                 Log.d(
                         "AIService",
-                        "【发送消息】请求成功完成，输入token: $_inputTokenCount，输出token: $_outputTokenCount"
+                        "【发送消息】请求成功完成，输入token: ${tokenCacheManager.totalInputTokenCount}(缓存:${tokenCacheManager.cachedInputTokenCount})，输出token: ${tokenCacheManager.outputTokenCount}"
                 )
                 return@stream
             } catch (e: NonRetriableException) {

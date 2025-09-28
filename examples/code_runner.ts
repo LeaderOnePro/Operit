@@ -8,7 +8,7 @@
   tools: [
     {
       name: run_javascript_es5
-      description: 运行自定义 JavaScript 脚本
+      description: 运行自定义 JavaScript (ES5) 脚本。会捕获 console.log 的输出以及最终的返回值。
       // This tool takes parameters
       parameters: [
         {
@@ -21,7 +21,7 @@
     },
     {
       name: run_javascript_file
-      description: 运行 JavaScript 文件
+      description: 运行 JavaScript (ES5) 文件。会捕获 console.log 的输出以及最终的返回值。
       parameters: [
         {
           name: file_path
@@ -33,7 +33,7 @@
     },
     {
       name: run_python
-      description: 运行自定义 Python 脚本
+      description: 运行自定义 Python 脚本。脚本的输出应使用 'print' 函数，以便能够被捕获。
       parameters: [
         {
           name: script
@@ -45,7 +45,7 @@
     },
     {
       name: run_python_file
-      description: 运行 Python 文件
+      description: 运行 Python 文件。脚本的输出应使用 'print' 函数，以便能够被捕获。
       parameters: [
         {
           name: file_path
@@ -136,6 +136,8 @@
 
 const codeRunner = (function () {
 
+  const CARGO_MIRROR_ENV = 'export CARGO_REGISTRIES_CRATES_IO_REPLACE_WITH="ustc" && export CARGO_REGISTRIES_USTC_INDEX="https://mirrors.ustc.edu.cn/crates.io-index"';
+
   // Helper function to execute a terminal command using the new session-based API
   async function executeTerminalCommand(command: string, timeoutMs?: number): Promise<import("./types/results").TerminalCommandResultData> {
     // Use a consistent session name to allow for session reuse
@@ -143,7 +145,118 @@ const codeRunner = (function () {
     return await Tools.System.terminal.exec(session.sessionId, command, timeoutMs);
   }
 
+  // Helper function to safely escape strings for shell commands
+  function escapeForShell(str: string): string {
+    return str.replace(/'/g, "'\\''");
+  }
+
+  // Helper function to execute JavaScript code and capture logs/return value
+  async function executeJavaScript(script: string): Promise<string> {
+    const logs: string[] = [];
+
+    // Create a proxy for the console object
+    const consoleProxy = {
+      log: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(formattedArgs.join(' '));
+      },
+      warn: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(`WARN: ${formattedArgs.join(' ')}`);
+      },
+      error: (...args: any[]) => {
+        const formattedArgs = args.map(arg => {
+          if (arg === null) return 'null';
+          if (arg === undefined) return 'undefined';
+          if (typeof arg === 'object') {
+            try { return JSON.stringify(arg, null, 2); } catch (e) { return arg.toString(); }
+          }
+          return arg.toString();
+        });
+        logs.push(`ERROR: ${formattedArgs.join(' ')}`);
+      },
+    };
+
+    try {
+      // Use the Function constructor to create a new function in the global scope.
+      // Pass the console proxy to it. This is safer than eval.
+      const func = new Function('console', `
+        // Wrap in an IIFE to handle return statements properly and avoid variable leakage.
+        return (function(){
+          "use strict";
+          ${script}
+        })();
+      `);
+
+      const returnValue = func(consoleProxy);
+
+      let output = logs.join('\n');
+
+      if (returnValue !== undefined) {
+        if (output) {
+          output += '\n';
+        }
+        let formattedReturnValue;
+        if (returnValue === null) {
+          formattedReturnValue = 'null';
+        } else if (typeof returnValue === 'object') {
+          try {
+            formattedReturnValue = JSON.stringify(returnValue, null, 2);
+          } catch (e) {
+            formattedReturnValue = returnValue.toString();
+          }
+        } else {
+          formattedReturnValue = returnValue.toString();
+        }
+        output += `Return value: ${formattedReturnValue}`;
+      }
+
+      return output || "(No output from console.log or return value)";
+
+    } catch (e: any) {
+      const errorOutput = logs.join('\n');
+      if (errorOutput) {
+        throw new Error(`Script execution failed: ${e.message}\n\nLogs before error:\n${errorOutput}`);
+      } else {
+        throw new Error(`Script execution failed: ${e.message}`);
+      }
+    }
+  }
+
+  // Helper function to check for errors in command output when exit code is unreliable
+  function hasError(output: string): boolean {
+    const errorPatterns = [
+      "command not found",
+      "No such file or directory",
+      "error:",
+      "Error:",
+      "failed",
+      "Failed",
+      "unable",
+      "Unable"
+    ];
+    const lowercasedOutput = output.toLowerCase();
+    return errorPatterns.some(pattern => lowercasedOutput.includes(pattern));
+  }
+
   async function main() {
+    // Ensure /tmp exists
+    await executeTerminalCommand("mkdir -p /tmp");
+
     const results = {
       javascript: await testJavaScript(),
       python: await testPython(),
@@ -165,11 +278,12 @@ const codeRunner = (function () {
   async function testJavaScript() {
     try {
       // 测试简单的JS代码
-      const script = "const testVar = 42; return 'JavaScript运行正常，测试值: ' + testVar;";
-      const result = await run_javascript_es5({ script });
-      const expected = 'JavaScript运行正常，测试值: 42';
-      if (result !== expected) {
-        return { success: false, message: `JavaScript执行器测试失败: 期望 "${expected}", 实际 "${result}"` };
+      const script = "console.log('JavaScript 运行正常'); const testVar = 42; return '测试值: ' + testVar;";
+      const result = await executeJavaScript(script);
+      const expectedOutput = `JavaScript 运行正常\nReturn value: "测试值: 42"`;
+
+      if (result !== expectedOutput) {
+        return { success: false, message: `JavaScript执行器测试失败: 期望 "${expectedOutput}", 实际 "${result}"` };
       }
       return { success: true, message: "JavaScript执行器测试成功" };
     } catch (error) {
@@ -182,13 +296,20 @@ const codeRunner = (function () {
     try {
       // 检查Python是否可用
       const pythonCheckResult = await executeTerminalCommand("python3 --version", 10000);
-      if (pythonCheckResult.exitCode !== 0) {
+      if (pythonCheckResult.exitCode !== 0 || hasError(pythonCheckResult.output)) {
         return { success: false, message: "Python不可用，请确保已安装Python" };
       }
 
       // 测试简单的Python代码
       const script = "print('Python运行正常')";
-      await run_python({ script });
+      const tempPyFile = "/tmp/test_python.py";
+      await executeTerminalCommand(`cat <<'EOF' > ${tempPyFile}\n${script}\nEOF`);
+      const runResult = await executeTerminalCommand(`python3 ${tempPyFile}`, 10000);
+      await executeTerminalCommand(`rm -f ${tempPyFile}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("Python运行正常")) {
+        return { success: false, message: `Python执行器测试失败: ${runResult.output}` };
+      }
       return { success: true, message: "Python执行器测试成功" };
     } catch (error) {
       return { success: false, message: `Python执行器测试失败: ${error.message}` };
@@ -200,13 +321,20 @@ const codeRunner = (function () {
     try {
       // 检查Ruby是否可用
       const rubyCheckResult = await executeTerminalCommand("ruby --version", 10000);
-      if (rubyCheckResult.exitCode !== 0) {
+      if (rubyCheckResult.exitCode !== 0 || hasError(rubyCheckResult.output)) {
         return { success: false, message: "Ruby不可用，请确保已安装Ruby" };
       }
 
       // 测试简单的Ruby代码
       const script = "puts 'Ruby运行正常'";
-      await run_ruby({ script });
+      const tempRbFile = "/tmp/test_ruby.rb";
+      await executeTerminalCommand(`cat <<'EOF' > ${tempRbFile}\n${script}\nEOF`);
+      const runResult = await executeTerminalCommand(`ruby ${tempRbFile}`, 10000);
+      await executeTerminalCommand(`rm -f ${tempRbFile}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("Ruby运行正常")) {
+        return { success: false, message: `Ruby执行器测试失败: ${runResult.output}` };
+      }
       return { success: true, message: "Ruby执行器测试成功" };
     } catch (error) {
       return { success: false, message: `Ruby执行器测试失败: ${error.message}` };
@@ -218,33 +346,74 @@ const codeRunner = (function () {
     try {
       // 检查Go是否可用
       const goCheckResult = await executeTerminalCommand("go version", 10000);
-      if (goCheckResult.exitCode !== 0) {
+      if (goCheckResult.exitCode !== 0 || hasError(goCheckResult.output)) {
         return { success: false, message: "Go不可用，请确保已安装Go" };
       }
 
       // 测试简单的Go代码
       const script = `
 package main
-
 import "fmt"
-
 func main() {
   fmt.Println("Go运行正常")
 }`;
-      await run_go({ script });
+      const tempGoDir = "/tmp/test_go_project";
+      const tempGoFile = `${tempGoDir}/main.go`;
+      const tempGoExec = `${tempGoDir}/main`;
+      await executeTerminalCommand(`mkdir -p ${tempGoDir}`);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempGoFile}\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`cd ${tempGoDir} && go build -o main main.go`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        await executeTerminalCommand(`rm -rf ${tempGoDir}`);
+        return { success: false, message: `Go 编译失败: ${compileResult.output}` };
+      }
+
+      const runResult = await executeTerminalCommand(tempGoExec, 10000);
+      await executeTerminalCommand(`rm -rf ${tempGoDir}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("Go运行正常")) {
+        return { success: false, message: `Go 执行失败: ${runResult.output}` };
+      }
+
       return { success: true, message: "Go执行器测试成功" };
     } catch (error) {
       return { success: false, message: `Go执行器测试失败: ${error.message}` };
     }
   }
 
+  // 检查并配置Rust环境
+  async function ensureRustConfigured(): Promise<{ success: boolean; message: string }> {
+    // 在有效目录中运行，避免 "Could not locate working directory" 错误
+    let rustCheckResult = await executeTerminalCommand("cd /tmp && rustc --version", 10000);
+
+    if (rustCheckResult.exitCode === 0 && !hasError(rustCheckResult.output)) {
+      return { success: true, message: "Rust环境已配置" };
+    }
+
+    // 如果未配置默认工具链，则尝试设置
+    if (rustCheckResult.output.includes("no default is configured")) {
+      const setupResult = await executeTerminalCommand('export RUSTUP_DIST_SERVER="https://mirrors.ustc.edu.cn/rust-static" && export RUSTUP_UPDATE_ROOT="https://mirrors.ustc.edu.cn/rust-static/rustup" && rustup default stable', 60000);
+      if (setupResult.exitCode !== 0 || hasError(setupResult.output)) {
+        return { success: false, message: `运行 'rustup default stable' 失败: ${setupResult.output}` };
+      }
+
+      // 再次检查
+      rustCheckResult = await executeTerminalCommand("cd /tmp && rustc --version", 10000);
+      if (rustCheckResult.exitCode === 0 && !hasError(rustCheckResult.output)) {
+        return { success: true, message: "Rust环境已自动配置" };
+      }
+    }
+
+    return { success: false, message: `Rust环境检查失败: ${rustCheckResult.output}` };
+  }
+
   // 测试Rust执行功能
   async function testRust() {
     try {
-      // 检查Rust是否可用
-      const rustCheckResult = await executeTerminalCommand("rustc --version", 10000);
-      if (rustCheckResult.exitCode !== 0) {
-        return { success: false, message: "Rust不可用，请确保已安装Rust" };
+      const rustConfig = await ensureRustConfigured();
+      if (!rustConfig.success) {
+        return { success: false, message: rustConfig.message };
       }
 
       // 测试简单的Rust代码
@@ -252,7 +421,35 @@ func main() {
 fn main() {
   println!("Rust运行正常");
 }`;
-      await run_rust({ script });
+      const tempRustDir = "/tmp/test_rust_project";
+      const tempRustSrcDir = `${tempRustDir}/src`;
+      const tempRustFile = `${tempRustSrcDir}/main.rs`;
+      const cargoToml = `
+[package]
+name = "test_rust"
+version = "0.1.0"
+edition = "2021"
+[dependencies]
+`;
+      await executeTerminalCommand(`mkdir -p ${tempRustSrcDir}`);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempRustDir}/Cargo.toml\n${cargoToml}\nEOF`);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempRustFile}\n${script}\nEOF`);
+
+      // 在有效目录中运行 cargo
+      const compileResult = await executeTerminalCommand(`cd ${tempRustDir} && ${CARGO_MIRROR_ENV} && cargo build --release`, 60000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        await executeTerminalCommand(`rm -rf ${tempRustDir}`);
+        return { success: false, message: `Rust 编译失败: ${compileResult.output}` };
+      }
+
+      const execPath = `${tempRustDir}/target/release/test_rust`;
+      const runResult = await executeTerminalCommand(execPath, 30000);
+      await executeTerminalCommand(`rm -rf ${tempRustDir}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("Rust运行正常")) {
+        return { success: false, message: `Rust 执行失败: ${runResult.output}` };
+      }
+
       return { success: true, message: "Rust执行器测试成功" };
     } catch (error) {
       return { success: false, message: `Rust执行器测试失败: ${error.message}` };
@@ -264,8 +461,7 @@ fn main() {
     if (!script || script.trim() === "") {
       throw new Error("请提供要执行的脚本内容");
     }
-    // Wrap in a function to allow return statements
-    return eval(`(function(){${script}})()`);
+    return executeJavaScript(script);
   }
 
   async function run_javascript_file(params: { file_path: string }) {
@@ -281,8 +477,7 @@ fn main() {
       throw new Error(`无法读取文件: ${filePath}`);
     }
 
-    // Wrap in a function to allow return statements
-    return eval(`(function(){${fileResult.content}})()`);
+    return executeJavaScript(fileResult.content);
   }
 
   async function run_python(params: { script: string }) {
@@ -292,17 +487,17 @@ fn main() {
       throw new Error("请提供要执行的 Python 脚本内容");
     }
 
-    const tempFilePath = "/sdcard/Download/Operit/temp_script.py";
+    const tempFilePath = "/tmp/temp_script.py";
     try {
-      await Tools.Files.write(tempFilePath, script);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
       const result = await executeTerminalCommand(`python3 ${tempFilePath}`, 30000);
-      if (result.exitCode === 0) {
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Python 脚本执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Python 脚本执行失败:\n${result.output}`);
       }
     } finally {
-      await Tools.Files.deleteFile(tempFilePath).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+      await executeTerminalCommand(`rm -f ${tempFilePath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
     }
   }
 
@@ -313,16 +508,16 @@ fn main() {
       throw new Error("请提供要执行的 Python 文件路径");
     }
 
-    const fileExists = await Tools.Files.exists(filePath);
-    if (!fileExists || !fileExists.exists) {
-      throw new Error(`Python 文件不存在: ${filePath}`);
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`Python 文件不存在或路径错误: ${filePath}`);
     }
 
     const result = await executeTerminalCommand(`python3 ${filePath}`, 30000);
-    if (result.exitCode === 0) {
+    if (result.exitCode === 0 && !hasError(result.output)) {
       return result.output.trim();
     } else {
-      throw new Error(`Python 文件执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+      throw new Error(`Python 文件执行失败:\n${result.output}`);
     }
   }
 
@@ -332,17 +527,17 @@ fn main() {
       throw new Error("请提供要执行的 Ruby 脚本内容");
     }
 
-    const tempFilePath = "/sdcard/Download/Operit/temp_script.rb";
+    const tempFilePath = "/tmp/temp_script.rb";
     try {
-      await Tools.Files.write(tempFilePath, script);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
       const result = await executeTerminalCommand(`ruby ${tempFilePath}`, 30000);
-      if (result.exitCode === 0) {
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Ruby 脚本执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Ruby 脚本执行失败:\n${result.output}`);
       }
     } finally {
-      await Tools.Files.deleteFile(tempFilePath).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+      await executeTerminalCommand(`rm -f ${tempFilePath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
     }
   }
 
@@ -352,16 +547,16 @@ fn main() {
       throw new Error("请提供要执行的 Ruby 文件路径");
     }
 
-    const fileExists = await Tools.Files.exists(filePath);
-    if (!fileExists || !fileExists.exists) {
-      throw new Error(`Ruby 文件不存在: ${filePath}`);
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`Ruby 文件不存在或路径错误: ${filePath}`);
     }
 
     const result = await executeTerminalCommand(`ruby ${filePath}`, 30000);
-    if (result.exitCode === 0) {
+    if (result.exitCode === 0 && !hasError(result.output)) {
       return result.output.trim();
     } else {
-      throw new Error(`Ruby 文件执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+      throw new Error(`Ruby 文件执行失败:\n${result.output}`);
     }
   }
 
@@ -372,30 +567,26 @@ fn main() {
       throw new Error("请提供要执行的 Go 代码内容");
     }
 
-    const tempDirPath = "/sdcard/Download/Operit/temp_go";
+    const tempDirPath = "/tmp/temp_go";
     const tempFilePath = `${tempDirPath}/main.go`;
-    const homeTempBin = "/data/data/com.termux/files/home/temp_go_bin";
 
     try {
       await executeTerminalCommand(`mkdir -p ${tempDirPath}`, 10000);
-      await Tools.Files.write(tempFilePath, script);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
 
       const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && go build -o main main.go`, 30000);
-      if (compileResult.exitCode !== 0) {
-        throw new Error(`Go 代码编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`Go 代码编译失败:\n${compileResult.output}`);
       }
 
-      await executeTerminalCommand(`cp ${tempDirPath}/main ${homeTempBin}`, 10000);
-      await executeTerminalCommand(`chmod +x ${homeTempBin}`, 10000);
-      const result = await executeTerminalCommand(homeTempBin, 30000);
+      const result = await executeTerminalCommand(`${tempDirPath}/main`, 30000);
 
-      if (result.exitCode === 0) {
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Go 代码执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Go 代码执行失败:\n${result.output}`);
       }
     } finally {
-      await executeTerminalCommand(`rm -f ${homeTempBin}`, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
       await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
     }
   }
@@ -406,30 +597,27 @@ fn main() {
       throw new Error("请提供要执行的 Go 文件路径");
     }
 
-    const fileExists = await Tools.Files.exists(filePath);
-    if (!fileExists || !fileExists.exists) {
-      throw new Error(`Go 文件不存在: ${filePath}`);
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`Go 文件不存在或路径错误: ${filePath}`);
     }
 
-    const tempExecPath = "/sdcard/Download/Operit/temp_exec";
-    const homeTempBin = "/data/data/com.termux/files/home/temp_go_bin";
+    const tempExecPath = "/tmp/temp_go_exec";
     try {
       const compileResult = await executeTerminalCommand(`go build -o ${tempExecPath} ${filePath}`, 30000);
-      if (compileResult.exitCode !== 0) {
-        throw new Error(`Go 文件编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`Go 文件编译失败:\n${compileResult.output}`);
       }
-      await executeTerminalCommand(`cp ${tempExecPath} ${homeTempBin}`, 10000);
-      await executeTerminalCommand(`chmod +x ${homeTempBin}`, 10000);
-      const result = await executeTerminalCommand(homeTempBin, 30000);
 
-      if (result.exitCode === 0) {
+      const result = await executeTerminalCommand(tempExecPath, 30000);
+
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Go 文件执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Go 文件执行失败:\n${result.output}`);
       }
     } finally {
-      await executeTerminalCommand(`rm -f ${homeTempBin}`, 10000).catch(err => console.error(`删除临时文件失败: ${err.message}`));
-      await Tools.Files.deleteFile(tempExecPath).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+      await executeTerminalCommand(`rm -f ${tempExecPath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
     }
   }
 
@@ -438,7 +626,13 @@ fn main() {
     if (!script || script.trim() === "") {
       throw new Error("请提供要执行的 Rust 代码内容");
     }
-    const tempDirPath = "/data/data/com.termux/files/home/temp_rust_project";
+
+    const rustConfig = await ensureRustConfigured();
+    if (!rustConfig.success) {
+      throw new Error(rustConfig.message);
+    }
+
+    const tempDirPath = "/tmp/temp_rust_project";
     try {
       const cargoToml = `
 [package]
@@ -449,19 +643,20 @@ edition = "2021"
 [dependencies]
       `;
       await executeTerminalCommand(`mkdir -p ${tempDirPath}/src`, 10000);
-      await executeTerminalCommand(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, 10000);
-      await executeTerminalCommand(`echo '${script.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, 10000);
-      const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && cargo build --release`, 60000);
-      if (compileResult.exitCode !== 0) {
-        throw new Error(`Rust 代码编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempDirPath}/Cargo.toml\n${cargoToml}\nEOF`);
+      await executeTerminalCommand(`cat <<'EOF' > ${tempDirPath}/src/main.rs\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && ${CARGO_MIRROR_ENV} && cargo build --release`, 60000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`Rust 代码编译失败:\n${compileResult.output}`);
       }
+
       const execPath = `${tempDirPath}/target/release/temp_rust_script`;
-      await executeTerminalCommand(`chmod +x ${execPath}`, 10000);
       const result = await executeTerminalCommand(execPath, 30000);
-      if (result.exitCode === 0) {
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Rust 代码执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Rust 代码执行失败:\n${result.output}`);
       }
     } finally {
       await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));
@@ -473,12 +668,17 @@ edition = "2021"
     if (!filePath || filePath.trim() === "") {
       throw new Error("请提供要执行的 Rust 文件路径");
     }
-    const fileExists = await Tools.Files.exists(filePath);
-    if (!fileExists || !fileExists.exists) {
-      throw new Error(`Rust 文件不存在: ${filePath}`);
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`Rust 文件不存在或路径错误: ${filePath}`);
     }
 
-    const tempDirPath = "/data/data/com.termux/files/home/temp_rust_project";
+    const rustConfig = await ensureRustConfigured();
+    if (!rustConfig.success) {
+      throw new Error(rustConfig.message);
+    }
+
+    const tempDirPath = "/tmp/temp_rust_project";
     try {
       const cargoToml = `
 [package]
@@ -489,23 +689,26 @@ edition = "2021"
 [dependencies]
       `;
       await executeTerminalCommand(`mkdir -p ${tempDirPath}/src`, 10000);
-      await executeTerminalCommand(`echo '${cargoToml}' > ${tempDirPath}/Cargo.toml`, 10000);
-      const fileContent = await Tools.Files.read(filePath);
-      if (!fileContent || !fileContent.content) {
+      await executeTerminalCommand(`cat <<'EOF' > ${tempDirPath}/Cargo.toml\n${cargoToml}\nEOF`);
+
+      const readResult = await executeTerminalCommand(`cat ${filePath}`);
+      if (readResult.exitCode !== 0 || hasError(readResult.output)) {
         throw new Error(`无法读取文件: ${filePath}`);
       }
-      await executeTerminalCommand(`echo '${fileContent.content.replace(/'/g, "'\\''")}' > ${tempDirPath}/src/main.rs`, 10000);
-      const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && cargo build --release`, 60000);
-      if (compileResult.exitCode !== 0) {
-        throw new Error(`Rust 文件编译失败 (退出码: ${compileResult.exitCode}):\n${compileResult.output}`);
+      const fileContent = readResult.output;
+      await executeTerminalCommand(`cat <<'EOF' > ${tempDirPath}/src/main.rs\n${fileContent}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`cd ${tempDirPath} && ${CARGO_MIRROR_ENV} && cargo build --release`, 60000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`Rust 文件编译失败:\n${compileResult.output}`);
       }
+
       const execPath = `${tempDirPath}/target/release/temp_rust_script`;
-      await executeTerminalCommand(`chmod +x ${execPath}`, 10000);
       const result = await executeTerminalCommand(execPath, 30000);
-      if (result.exitCode === 0) {
+      if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
-        throw new Error(`Rust 项目执行失败 (退出码: ${result.exitCode}):\n${result.output}`);
+        throw new Error(`Rust 项目执行失败:\n${result.output}`);
       }
     } finally {
       await executeTerminalCommand(`rm -rf ${tempDirPath}`, 10000).catch(err => console.error(`删除临时目录失败: ${err.message}`));

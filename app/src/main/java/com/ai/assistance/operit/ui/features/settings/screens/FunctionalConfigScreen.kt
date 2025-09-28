@@ -376,11 +376,9 @@ fun FunctionConfigCard(
 
                                             val service =
                                                     AIServiceFactory.createService(
-                                                            apiProviderType = fullConfig.apiProviderType,
-                                                            apiEndpoint = fullConfig.apiEndpoint,
-                                                            apiKey = fullConfig.apiKey,
-                                                            modelName = fullConfig.modelName,
-                                                            customHeadersJson = customHeadersJson
+                                                            config = fullConfig,
+                                                            customHeadersJson = customHeadersJson,
+                                                            modelConfigManager = modelConfigManager
                                                     )
                                             testResult = service.testConnection()
                                         } catch (e: Exception) {

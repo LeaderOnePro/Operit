@@ -39,12 +39,25 @@ class ApiPreferences private constructor(private val context: Context) {
                 instance
             }
         }
-        // 动态生成FunctionType的Token键
-        fun getTokenInputKey(functionType: FunctionType) =
-                intPreferencesKey("token_input_${functionType.name}")
+        // 动态生成供应商:模型的Token键
+        fun getTokenInputKey(providerModel: String) =
+                intPreferencesKey("token_input_${providerModel.replace(":", "_")}")
 
-        fun getTokenOutputKey(functionType: FunctionType) =
-                intPreferencesKey("token_output_${functionType.name}")
+        fun getTokenCachedInputKey(providerModel: String) =
+                intPreferencesKey("token_cached_input_${providerModel.replace(":", "_")}")
+
+        fun getTokenOutputKey(providerModel: String) =
+                intPreferencesKey("token_output_${providerModel.replace(":", "_")}")
+
+        // 模型定价键
+        fun getModelInputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_input_price_${providerModel.replace(":", "_")}")
+
+        fun getModelCachedInputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_cached_input_price_${providerModel.replace(":", "_")}")
+
+        fun getModelOutputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_output_price_${providerModel.replace(":", "_")}")
 
         val SHOW_FPS_COUNTER = booleanPreferencesKey("show_fps_counter")
         val ENABLE_AI_PLANNING = booleanPreferencesKey("enable_ai_planning")
@@ -56,6 +69,9 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Key for Memory Attachment
         val ENABLE_MEMORY_ATTACHMENT = booleanPreferencesKey("enable_memory_attachment")
+
+        // Key for Auto Read
+        val ENABLE_AUTO_READ = booleanPreferencesKey("enable_auto_read")
 
         // Key for Waifu Mode
         val ENABLE_WAIFU_MODE = booleanPreferencesKey("enable_waifu_mode")
@@ -93,6 +109,9 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Default value for Memory Attachment
         const val DEFAULT_ENABLE_MEMORY_ATTACHMENT = true
+
+        // Default value for Auto Read
+        const val DEFAULT_ENABLE_AUTO_READ = false
 
         // Default value for Waifu Mode
         const val DEFAULT_ENABLE_WAIFU_MODE = false
@@ -146,16 +165,6 @@ class ApiPreferences private constructor(private val context: Context) {
             }
         }
     }
-
-    // 获取指定功能类型的token计数
-    fun getTokensForFunctionFlow(functionType: FunctionType): Flow<Pair<Int, Int>> {
-        return context.apiDataStore.data.map { preferences ->
-            val inputTokens = preferences[getTokenInputKey(functionType)] ?: 0
-            val outputTokens = preferences[getTokenOutputKey(functionType)] ?: 0
-            Pair(inputTokens, outputTokens)
-        }
-    }
-
     // Get FPS Counter Display setting as Flow
     val showFpsCounterFlow: Flow<Boolean> =
             context.apiDataStore.data.map { preferences ->
@@ -190,6 +199,12 @@ class ApiPreferences private constructor(private val context: Context) {
     val enableMemoryAttachmentFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
             preferences[ENABLE_MEMORY_ATTACHMENT] ?: DEFAULT_ENABLE_MEMORY_ATTACHMENT
+        }
+
+    // Flow for Auto Read
+    val enableAutoReadFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_AUTO_READ] ?: DEFAULT_ENABLE_AUTO_READ
         }
 
     // Flow for Waifu Mode
@@ -310,6 +325,13 @@ class ApiPreferences private constructor(private val context: Context) {
         }
     }
 
+    // Save Auto Read setting
+    suspend fun saveEnableAutoRead(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_AUTO_READ] = isEnabled
+        }
+    }
+
     // Save Waifu Mode setting
     suspend fun saveEnableWaifuMode(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences ->
@@ -411,27 +433,106 @@ class ApiPreferences private constructor(private val context: Context) {
     }
 
     /**
-     * 更新指定功能类型的token计数
-     * @param functionType 要更新的功能类型
+     * 更新指定供应商:模型的token计数
+     * @param providerModel 供应商:模型标识符，格式如"DEEPSEEK:deepseek-chat"
      * @param inputTokens 新增的输入token
      * @param outputTokens 新增的输出token
+     * @param cachedInputTokens 新增的缓存命中token
      */
-    suspend fun updateTokensForFunction(
-            functionType: FunctionType,
+    suspend fun updateTokensForProviderModel(
+            providerModel: String,
             inputTokens: Int,
-            outputTokens: Int
+            outputTokens: Int,
+            cachedInputTokens: Int = 0
     ) {
         context.apiDataStore.edit { preferences ->
-            val inputKey = getTokenInputKey(functionType)
-            val outputKey = getTokenOutputKey(functionType)
+            val inputKey = getTokenInputKey(providerModel)
+            val cachedInputKey = getTokenCachedInputKey(providerModel)
+            val outputKey = getTokenOutputKey(providerModel)
 
             val currentInputTokens = preferences[inputKey] ?: 0
+            val currentCachedInputTokens = preferences[cachedInputKey] ?: 0
             val currentOutputTokens = preferences[outputKey] ?: 0
 
             preferences[inputKey] = currentInputTokens + inputTokens
+            preferences[cachedInputKey] = currentCachedInputTokens + cachedInputTokens
             preferences[outputKey] = currentOutputTokens + outputTokens
         }
     }
+
+    /**
+     * 获取指定供应商:模型的输入token数量
+     */
+    suspend fun getInputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenInputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取指定供应商:模型的缓存输入token数量
+     */
+    suspend fun getCachedInputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenCachedInputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取指定供应商:模型的输出token数量
+     */
+    suspend fun getOutputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenOutputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取所有供应商:模型的token统计
+     * @return Map<供应商:模型, Triple<输入tokens, 输出tokens, 缓存tokens>>
+     */
+    suspend fun getAllProviderModelTokens(): Map<String, Triple<Int, Int, Int>> {
+        val preferences = context.apiDataStore.data.first()
+        val result = mutableMapOf<String, Triple<Int, Int, Int>>()
+        
+        // 遍历所有preferences，查找token相关的key
+        preferences.asMap().forEach { (key, value) ->
+            val keyName = key.name
+            if (keyName.startsWith("token_input_")) {
+                val providerModel = keyName.removePrefix("token_input_").replace("_", ":")
+                val inputTokens = value as? Int ?: 0
+                val outputTokens = preferences[getTokenOutputKey(providerModel)] ?: 0
+                val cachedInputTokens = preferences[getTokenCachedInputKey(providerModel)] ?: 0
+                if (inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0) {
+                    result[providerModel] = Triple(inputTokens, outputTokens, cachedInputTokens)
+                }
+            }
+        }
+        
+        return result
+    }
+
+    /**
+     * 获取所有供应商:模型的token统计的Flow
+     * @return Flow<Map<供应商:模型, Triple<输入tokens, 输出tokens, 缓存tokens>>>
+     */
+    val allProviderModelTokensFlow: Flow<Map<String, Triple<Int, Int, Int>>> =
+        context.apiDataStore.data.map { preferences ->
+            val result = mutableMapOf<String, Triple<Int, Int, Int>>()
+            
+            // 遍历所有preferences，查找token相关的key
+            preferences.asMap().forEach { (key, value) ->
+                val keyName = key.name
+                if (keyName.startsWith("token_input_")) {
+                    val providerModel = keyName.removePrefix("token_input_").replace("_", ":")
+                    val inputTokens = value as? Int ?: 0
+                    val outputTokens = preferences[getTokenOutputKey(providerModel)] ?: 0
+                    val cachedInputTokens = preferences[getTokenCachedInputKey(providerModel)] ?: 0
+                    if (inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0) {
+                        result[providerModel] = Triple(inputTokens, outputTokens, cachedInputTokens)
+                    }
+                }
+            }
+            
+            result
+        }
 
     // Save custom prompts
     suspend fun saveCustomPrompts(introPrompt: String) {
@@ -461,13 +562,67 @@ class ApiPreferences private constructor(private val context: Context) {
         }
     }
 
-    // 重置所有功能类型的token计数
-    suspend fun resetAllFunctionTokenCounts() {
+    // 重置所有供应商:模型的token计数
+    suspend fun resetAllProviderModelTokenCounts() {
         context.apiDataStore.edit { preferences ->
-            for (functionType in FunctionType.values()) {
-                preferences[getTokenInputKey(functionType)] = 0
-                preferences[getTokenOutputKey(functionType)] = 0
+            val keysToRemove = mutableListOf<Preferences.Key<*>>()
+            preferences.asMap().forEach { (key, _) ->
+                val keyName = key.name
+                if (keyName.startsWith("token_input_") || keyName.startsWith("token_output_") || keyName.startsWith("token_cached_input_")) {
+                    keysToRemove.add(key)
+                }
             }
+            keysToRemove.forEach { key ->
+                preferences.remove(key)
+            }
+        }
+    }
+
+    // 重置指定供应商:模型的token计数
+    suspend fun resetProviderModelTokenCounts(providerModel: String) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getTokenInputKey(providerModel)] = 0
+            preferences[getTokenCachedInputKey(providerModel)] = 0
+            preferences[getTokenOutputKey(providerModel)] = 0
+        }
+    }
+
+    // 获取模型输入价格（每百万tokens的美元价格）
+    suspend fun getModelInputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelInputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 获取模型缓存输入价格（每百万tokens的美元价格）
+    suspend fun getModelCachedInputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelCachedInputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 获取模型输出价格（每百万tokens的美元价格）
+    suspend fun getModelOutputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelOutputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 设置模型输入价格（每百万tokens的美元价格）
+    suspend fun setModelInputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelInputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // 设置模型缓存输入价格（每百万tokens的美元价格）
+    suspend fun setModelCachedInputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelCachedInputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // 设置模型输出价格（每百万tokens的美元价格）
+    suspend fun setModelOutputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelOutputPriceKey(providerModel)] = price.toFloat()
         }
     }
 }
