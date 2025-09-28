@@ -261,6 +261,8 @@ fun AssistantConfigScreen(
                                                         value = modelConfig?.name ?: stringResource(R.string.not_configured),
                                                         onClick = navigateToFunctionalConfig
                                                 )
+
+                                                // 移除：启动桌宠入口已迁移到“AI功能”菜单下的“桌宠”页面
                                         }
                                 }
 

@@ -55,6 +55,7 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.speechtotext.SpeechT
 import com.ai.assistance.operit.ui.features.toolbox.screens.texttospeech.TextToSpeechToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.tooltester.ToolTesterScreen
 import com.ai.assistance.operit.ui.features.update.screens.UpdateScreen
+import com.ai.assistance.operit.ui.features.pet.PetLauncherScreen
 
 // 路由配置类
 typealias ScreenNavigationHandler = (Screen) -> Unit
@@ -229,6 +230,22 @@ sealed class Screen(
                 onNavigateBack = onGoBack,
                 editingIssue = editingIssue
             )
+        }
+    }
+
+    data object DesktopPet : Screen(navItem = NavItem.DesktopPet) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            PetLauncherScreen()
         }
     }
 
@@ -988,6 +1005,7 @@ object OperitRouter {
             NavItem.AiChat -> Screen.AiChat
             NavItem.MemoryBase -> Screen.MemoryBase
             NavItem.Packages -> Screen.Packages
+            NavItem.DesktopPet -> Screen.DesktopPet
             NavItem.Toolbox -> Screen.Toolbox
             NavItem.ShizukuCommands -> Screen.ShizukuCommands
             NavItem.Settings -> Screen.Settings
