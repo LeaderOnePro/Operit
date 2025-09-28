@@ -988,8 +988,8 @@
     <string name="accessibility_risk_warning_message">启用无障碍服务虽然可以加速UI操作，但某些应用可能会检测到此服务并采取限制措施，包括封号。请仅在了解并接受相关风险后开启。</string>
     
     <string name="accessibility_risk_warning_additional">请注意: 调试模式默认已具备UI操作能力，开启无障碍服务仅用于加速UI操作，但会增加被封号风险。若无极速需求，建议不要开启。若已开启，建议用完后立即关闭。</string>
-    <string name="accessibility_risk_warning_input">请输入\"明白\"或\"ok\"确认</string>
-    <string name="accessibility_risk_warning_input_error">请输入\"明白\"或\"ok\"确认您已了解风险</string>
+    <string name="accessibility_risk_warning_input">请输入\"我已明确并知晓无障碍权限导致的其他应用封号、限制账号功能风险，并后果自己承担\"确认</string>
+    <string name="accessibility_risk_warning_input_error">请输入\"我已明确并知晓无障碍权限导致的其他应用封号、限制账号功能风险，并后果自己承担\"确认您已了解风险</string>
     <string name="accessibility_risk_warning_confirm">确认继续</string>
     <string name="accessibility_risk_warning_cancel">取消</string>
 

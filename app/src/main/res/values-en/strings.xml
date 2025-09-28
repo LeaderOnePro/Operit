@@ -970,8 +970,8 @@
     <string name="accessibility_risk_warning_message">While enabling the accessibility service can speed up UI operations, some apps may detect this service and impose restrictions, including account bans. Please enable only after understanding and accepting the associated risks.</string>
     
     <string name="accessibility_risk_warning_additional">Please note: Debug mode already has UI operation capabilities. Enabling the accessibility service only accelerates UI operations but increases the risk of account bans. Unless you need maximum speed, it\'s not recommended. If enabled, please disable it immediately after use.</string>
-    <string name="accessibility_risk_warning_input">Type \"ok\" to confirm</string>
-    <string name="accessibility_risk_warning_input_error">Please type \"ok\" to confirm you understand the risks</string>
+    <string name="accessibility_risk_warning_input">Type \"I understand and acknowledge the risks of account bans and restricted account functions caused by accessibility permissions, and I bear the consequences myself\" to confirm</string>
+    <string name="accessibility_risk_warning_input_error">Please type \"I understand and acknowledge the risks of account bans and restricted account functions caused by accessibility permissions, and I bear the consequences myself\" to confirm you understand the risks</string>
     <string name="accessibility_risk_warning_confirm">Confirm</string>
     <string name="accessibility_risk_warning_cancel">Cancel</string>
 

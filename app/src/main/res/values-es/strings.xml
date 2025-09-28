@@ -453,8 +453,8 @@
     <string name="accessibility_risk_warning_title">Advertencia de riesgo del servicio de accesibilidad</string>
     <string name="accessibility_risk_warning_message">Aunque habilitar el servicio de accesibilidad puede acelerar las operaciones de UI, algunas aplicaciones pueden detectar este servicio e imponer restricciones, incluyendo prohibiciones de cuenta. Habilítelo solo después de entender y aceptar los riesgos relacionados.</string>
     <string name="accessibility_risk_warning_additional">Tenga en cuenta: El modo de depuración ya tiene capacidades de operación de UI por defecto. Habilitar el servicio de accesibilidad solo se usa para acelerar operaciones de UI, pero aumenta el riesgo de prohibición de cuenta. Si no necesita velocidad extrema, se recomienda no habilitarlo. Si ya está habilitado, se recomienda deshabilitarlo inmediatamente después del uso.</string>
-    <string name="accessibility_risk_warning_input">Escriba \"entiendo\" u \"ok\" para confirmar</string>
-    <string name="accessibility_risk_warning_input_error">Escriba \"entiendo\" u \"ok\" para confirmar que entiende los riesgos</string>
+    <string name="accessibility_risk_warning_input">Escriba \"Entiendo y reconozco los riesgos de prohibición de cuentas y funciones de cuenta restringidas causados por los permisos de accesibilidad, y asumo las consecuencias yo mismo\" para confirmar</string>
+    <string name="accessibility_risk_warning_input_error">Escriba \"Entiendo y reconozco los riesgos de prohibición de cuentas y funciones de cuenta restringidas causados por los permisos de accesibilidad, y asumo las consecuencias yo mismo\" para confirmar que entiende los riesgos</string>
     <string name="accessibility_risk_warning_confirm">Confirmar continuar</string>
     <string name="accessibility_risk_warning_cancel">Cancelar</string>
     
