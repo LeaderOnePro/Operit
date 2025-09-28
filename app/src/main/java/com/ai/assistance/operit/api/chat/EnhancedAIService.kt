@@ -494,6 +494,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                         _inputProcessingState.value =
                                 InputProcessingState.Error(message = "错误: ${e.message}")
                     }
+                    // 将致命错误也通过回调传递给调用方，以便UI（如桌宠）可以提示用户
+                    try {
+                        onNonFatalError(e.message ?: "发生未知错误")
+                    } catch (_: Exception) {
+                        // 忽略回调中的任何异常，避免影响后续清理流程
+                    }
                 }
 
                 // 发生无法处理的错误时，也应停止服务，但用户取消除外

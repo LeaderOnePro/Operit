@@ -24,7 +24,8 @@
     <string name="nav_help">使用手册</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
-    
+    <string name="desktop_pet_start">启动桌宠</string>
+
     <!-- 附件面板 -->
     <string name="screen_content">屏幕内容</string>
     <string name="current_notifications">当前通知</string>
@@ -135,7 +136,7 @@
     <string name="update_log">更新日志</string>
     <string name="app_logo_description">应用图标</string>
     <string name="github_star_description">GitHub Star</string>
-    
+
     <!-- AI Chat Screen -->
     <string name="configure_ai">配置 AI 接口</string>
     <string name="save_and_start">保存并开始对话</string>
@@ -904,6 +905,10 @@
     <string name="voice_function_desc">语音互动功能，自定义语音助手的提示词配置</string>
     <string name="desktop_pet_function">桌宠功能</string>
     <string name="desktop_pet_function_desc">桌面宠物功能，自定义桌宠的性格和互动方式</string>
+    
+    <!-- 桌宠服务通知 -->
+    <string name="pet_service_notification_title">桌面宠物服务</string>
+    <string name="pet_service_notification_text">桌面宠物正在运行中</string>
     
     <!-- 设置屏幕新增字符串 -->
     <string name="settings_prompt_section">提示词配置</string>
@@ -2424,7 +2429,7 @@
     <string name="screen_title_mcp_market">MCP 市场</string>
     <string name="screen_title_mcp_publish">发布 MCP 插件</string>
     <string name="screen_title_mcp_manage">管理我的插件</string>
-    
+
     <!-- Model Prompts Settings Screen -->
     <string name="unknown_error">未知错误</string>
     <string name="file_read_error">读取文件失败: %1$s</string>
@@ -2553,7 +2558,7 @@
     <string name="title_label">标题</string>
     <string name="url_label">URL</string>
     <string name="settings_config">设置</string>
-    
+
     <!-- Terminal Environment Wizard -->
     <string name="configure_terminal_environment">配置终端环境</string>
     <string name="nodejs_pip_environment_ready">NodeJS和pip环境已就绪</string>
@@ -2564,7 +2569,7 @@
     <string name="go_to_terminal_config">前往终端配置</string>
     <string name="nodejs_pip_environment_configured">NodeJS和pip环境已经配置完成，可以正常使用MCP插件功能。</string>
     <string name="open_terminal">打开终端</string>
-    
+
     <!-- MCP市场界面 -->
     <string name="login_github_to_manage_mcp_plugins">登录 GitHub 以发布和管理您的 MCP 插件</string>
     <string name="browse">浏览</string>
@@ -2592,7 +2597,7 @@
     <string name="publish_mcp_plugins_to_market">• 发布您的 MCP 插件到市场</string>
     <string name="manage_published_plugins">• 管理您已发布的插件</string>
     <string name="better_installation_experience">• 获得更好的安装体验</string>
-    
+
     <!-- MCP发布界面 -->
     <string name="edit_description">编辑说明</string>
     <string name="publish_description">发布说明</string>
@@ -2608,7 +2613,7 @@
     <string name="publish_failed_check_network_repo">发布失败，请检查网络连接和仓库地址</string>
     <string name="update_success">更新成功</string>
     <string name="publish_success">发布成功</string>
-    
+
     <!-- MCP配置界面 -->
     <string name="mcp_community_resources">MCP 社区资源</string>
     <string name="mcp_official_repo">MCP 官方仓库</string>
@@ -2624,7 +2629,7 @@
     <string name="mcp_market">MCP市场</string>
     <string name="more">更多</string>
     <string name="copy_link">复制链接</string>
-    
+
     <!-- MCP管理界面 -->
     <string name="need_login_github_manage_plugins">需要登录 GitHub 才能管理您发布的插件</string>
     <string name="no_published_plugins_yet">还没有发布任何插件</string>
@@ -2634,7 +2639,7 @@
     <string name="removed">已移除</string>
     <string name="remove">移除</string>
     <string name="republish">重新发布</string>
-    
+
     <!-- 附加字符串 -->
     <string name="author_colon">作者:</string>
     <string name="share_colon">分享:</string>
@@ -2656,7 +2661,7 @@
     <string name="awesome_mcp">Awesome MCP</string>
     <string name="loading_your_plugins">正在加载您的插件...</string>
     <string name="confirm_remove_plugin_from_market">确定要从市场移除插件「%1$s」吗？此操作会关闭对应的 Issue，但不会删除您的代码仓库。</string>
-    
+
     <!-- MCPPublishScreen 额外字符串 -->
     <string name="edit_plugin_info_description">您正在编辑已发布的插件信息。修改后的信息将更新到市场仓库的对应 Issue 中。</string>
     <string name="publish_plugin_info_description">您的插件信息将作为 GitHub Issue 发布到市场仓库。请确保提供的信息准确完整。表单内容会自动保存为草稿，直到成功发布后才会清空。</string>
@@ -2676,7 +2681,7 @@
     <string name="publish_failed_with_error">发布失败：%1$s</string>
     <string name="mcp_plugin_update_success_message">您的 MCP 插件信息已成功更新。</string>
     <string name="mcp_plugin_publish_success_message">您的 MCP 插件已成功发布到市场，等待审核通过后即可被其他用户发现和使用。</string>
-    
+
     <!-- MCP Plugin Detail Screen -->
     <string name="mcp_plugin_detail_title">插件详情</string>
     <string name="mcp_plugin_author">作者: %1$s</string>
@@ -2702,7 +2707,7 @@
     <string name="mcp_plugin_cancel">取消</string>
     <string name="mcp_plugin_refresh_comments">刷新评论</string>
     <string name="mcp_plugin_unknown_author">未知</string>
-    
+
     <!-- Advanced Settings Section -->
     <string name="advanced_settings">高级设置</string>
     <string name="use_api_key_pool">使用API密钥池</string>
@@ -2721,9 +2726,9 @@
     <string name="imported_keys_count">成功导入 %1$d 个密钥</string>
     <string name="invalid_file_format">无效的文件格式，请选择文本文件</string>
     <string name="no_valid_keys_found">未找到有效的密钥</string>
-    
+
     <!-- 手动更新记忆 -->
     <string name="manual_memory_update">手动更新记忆</string>
     <string name="manual_memory_update_desc">当AI在任务完成后忘记总结时，手动触发记忆保存，将本次对话的有价值内容存入长期记忆库。</string>
-    
+
 </resources>

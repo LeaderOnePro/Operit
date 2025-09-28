@@ -20,6 +20,7 @@ temp.json
 /app/src/main/jniLibs
 /app/src/main/assets/models
 /app/src/main/assets/subpack
+app/src/main/assets/pets/emoji
 
 .gradle
 .idea
