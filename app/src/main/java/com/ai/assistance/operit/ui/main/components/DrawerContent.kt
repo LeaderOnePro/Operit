@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -32,6 +33,7 @@ import com.ai.assistance.operit.ui.main.screens.OperitRouter
 import com.ai.assistance.operit.ui.main.screens.Screen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import android.content.Intent
 
 /** Content for the expanded navigation drawer */
 @Composable
@@ -45,6 +47,7 @@ fun DrawerContent(
         drawerState: androidx.compose.material3.DrawerState,
         onScreenSelected: (Screen, NavItem) -> Unit
 ) {
+        val context = LocalContext.current
         // 添加滚动功能的Column
         Column(
                 modifier =
@@ -100,11 +103,16 @@ fun DrawerContent(
                                         label = stringResource(id = item.titleResId),
                                         selected = selectedItem == item,
                                         onClick = {
-                                                onScreenSelected(
-                                                        OperitRouter.getScreenForNavItem(item),
-                                                        item
-                                                )
-                                                scope.launch { drawerState.close() }
+                                                if (item == NavItem.DesktopPet) {
+                                                        startPetService(context)
+                                                        scope.launch { drawerState.close() }
+                                                } else {
+                                                        onScreenSelected(
+                                                                OperitRouter.getScreenForNavItem(item),
+                                                                item
+                                                        )
+                                                        scope.launch { drawerState.close() }
+                                                }
                                         }
                                 )
                         }
@@ -123,6 +131,7 @@ fun CollapsedDrawerContent(
         isNetworkAvailable: Boolean,
         onScreenSelected: (Screen, NavItem) -> Unit
 ) {
+        val context = LocalContext.current
         // 折叠状态下只显示图标
         Column(
                 modifier =
@@ -156,10 +165,14 @@ fun CollapsedDrawerContent(
                 for (item in navItems) {
                         IconButton(
                                 onClick = {
-                                        onScreenSelected(
-                                                OperitRouter.getScreenForNavItem(item),
-                                                item
-                                        )
+                                        if (item == NavItem.DesktopPet) {
+                                                startPetService(context)
+                                        } else {
+                                                onScreenSelected(
+                                                        OperitRouter.getScreenForNavItem(item),
+                                                        item
+                                                )
+                                        }
                                 },
                                 modifier = Modifier.padding(vertical = 8.dp)
                         ) {
@@ -177,5 +190,16 @@ fun CollapsedDrawerContent(
 
                 // 底部留白，避免最后一项靠底
                 Spacer(modifier = Modifier.height(16.dp))
+        }
+}
+
+private fun startPetService(context: android.content.Context) {
+        try {
+                val intent = Intent(context, com.ai.assistance.operit.services.PetOverlayService::class.java)
+                context.startForegroundService(intent)
+        } catch (e: Exception) {
+                try {
+                        context.startService(Intent(context, com.ai.assistance.operit.services.PetOverlayService::class.java))
+                } catch (_: Exception) {}
         }
 }

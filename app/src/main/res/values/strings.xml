@@ -24,7 +24,7 @@
     <string name="nav_help">使用手册</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
-    
+
     <!-- 附件面板 -->
     <string name="screen_content">屏幕内容</string>
     <string name="current_notifications">当前通知</string>
@@ -258,6 +258,11 @@
     <string name="theme_reset">重置为默认主题</string>
     <string name="theme_saved">设置已保存</string>
     <string name="theme_video_too_large">视频文件过大，可能导致应用卡顿或崩溃。请选择小于30MB的视频。</string>
+    
+    <!-- Desktop Pet -->
+    <string name="desktop_pet_start">桌宠</string>
+    <string name="pet_service_notification_title">桌宠正在运行</string>
+    <string name="pet_service_notification_text">点击返回应用以配置与交互</string>
     <string name="theme_video_saved">背景视频已保存</string>
     <string name="theme_image_saved">背景图片已保存</string>
     <string name="theme_copy_failed">无法复制视频，请选择其他视频</string>

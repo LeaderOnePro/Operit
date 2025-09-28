@@ -224,6 +224,8 @@ class SherpaSpeechProvider(private val context: Context) : SpeechService {
         if (isRecognizing) return false
 
         _recognitionState.value = SpeechService.RecognitionState.PREPARING
+        // 清空上一轮的识别结果，避免新的订阅者立刻收到旧的 StateFlow 值
+        _recognitionResult.value = SpeechService.RecognitionResult(text = "", isFinal = false, confidence = 0f)
         recognizer?.reset(false) // 使用SherpaNcnn中的reset方法，参数为false不重新创建识别器
 
         val sampleRateInHz = 16000
@@ -333,6 +335,8 @@ class SherpaSpeechProvider(private val context: Context) : SpeechService {
         audioRecord = null
         _recognitionState.value = SpeechService.RecognitionState.IDLE
         _volumeLevelFlow.value = 0f // 重置音量
+        // 同步清空识别文本，避免下次订阅拿到旧文本
+        _recognitionResult.value = SpeechService.RecognitionResult(text = "", isFinal = false, confidence = 0f)
     }
 
     override fun shutdown() {
@@ -345,6 +349,7 @@ class SherpaSpeechProvider(private val context: Context) : SpeechService {
             _isInitialized.value = false
             _recognitionState.value = SpeechService.RecognitionState.UNINITIALIZED
             _volumeLevelFlow.value = 0f // 重置音量
+            _recognitionResult.value = SpeechService.RecognitionResult(text = "", isFinal = false, confidence = 0f)
         }
     }
 
