@@ -41,7 +41,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
-import com.ai.assistance.operit.ui.features.pet.PetEmotion
+import com.ai.assistance.operit.core.avatar.common.control.AvatarController
+import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
+import com.ai.assistance.operit.core.avatar.common.view.AvatarRendererFactory
 
 /**
  * Minimal pet overlay UI: bubble with short text, mic button and close.
@@ -56,9 +58,12 @@ fun PetOverlay(
 
     onClose: () -> Unit,
     onDrag: (dx: Float, dy: Float, end: Boolean) -> Unit = { _, _, _ -> },
-    emotion: PetEmotion = PetEmotion.IDLE,
-    // When provided, renders a video avatar from android assets instead of the vector avatar
-    videoAssetPath: String? = null,
+
+    // Avatar system integration
+    avatarModel: AvatarModel?,
+    avatarController: AvatarController?,
+    avatarRendererFactory: AvatarRendererFactory,
+
     // Text input extensions
     showTextInput: Boolean = false,
     textInputValue: String = "",
@@ -93,11 +98,12 @@ fun PetOverlay(
                 modifier = Modifier
                     .size(96.dp)
             ) {
-                // Always use media-based avatar; if path is null/blank, display nothing
-                videoAssetPath?.takeIf { it.isNotBlank() }?.let { path ->
-                    PetVideoAvatar(
-                        assetPath = path,
-                        modifier = Modifier.align(Alignment.Center)
+                // Use the new Avatar Rendering System
+                if (avatarModel != null && avatarController != null) {
+                    val renderer = avatarRendererFactory.CreateRenderer(model = avatarModel)
+                    renderer?.invoke(
+                        modifier = Modifier.align(Alignment.Center),
+                        controller = avatarController
                     )
                 }
 

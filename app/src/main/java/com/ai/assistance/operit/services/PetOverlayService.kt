@@ -24,11 +24,17 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.speech.SpeechService
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
+import com.ai.assistance.operit.core.avatar.common.state.AvatarEmotion
+import com.ai.assistance.operit.core.avatar.common.control.AvatarController
+import com.ai.assistance.operit.core.avatar.impl.AvatarRendererFactoryImpl
+import com.ai.assistance.operit.core.avatar.impl.webp.control.WebPAvatarController
+import com.ai.assistance.operit.core.avatar.impl.webp.model.WebPAvatarModel
+import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
+import com.ai.assistance.operit.core.avatar.common.view.AvatarRendererFactory
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.floating.FloatingWindowState
 import com.ai.assistance.operit.ui.features.pet.PetOverlay
-import com.ai.assistance.operit.ui.features.pet.PetEmotion
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,14 +75,17 @@ class PetOverlayService : Service() {
     private var isListening by mutableStateOf(false)
     private var isThinking by mutableStateOf(false)
     private var petText by mutableStateOf("嗨，我是Operit娘~")
-    private var petEmotion by mutableStateOf(PetEmotion.IDLE)
-    private var petVideoAsset by mutableStateOf<String?>(null)
     // 最近一次交互（用户/AI）的时间戳，用于超时回退
     @Volatile private var lastActivityAt: Long = System.currentTimeMillis()
     private var isCollapsed by mutableStateOf(false)
     private var showTextInput by mutableStateOf(false)
     private var textInputValue by mutableStateOf("")
     @Volatile private var sttSessionId: Long = 0L
+
+    // Avatar System
+    private var avatarModel by mutableStateOf<AvatarModel?>(null)
+    private var avatarController by mutableStateOf<AvatarController?>(null)
+    private lateinit var avatarRendererFactory: AvatarRendererFactory
 
     // STT watchdog state
     @Volatile private var lastRecognizedText: String = ""
@@ -124,6 +133,25 @@ class PetOverlayService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
 
+        // Initialize Avatar System
+        avatarRendererFactory = AvatarRendererFactoryImpl()
+        val model = WebPAvatarModel(
+            id = "pet",
+            name = "operit",
+            basePath = "pets/emoji",
+            emotionToFileMap = mapOf(
+                AvatarEmotion.IDLE to "anime-smile-transparent.webp",
+                AvatarEmotion.LISTENING to "anime-smile-talking-transparent.webp",
+                AvatarEmotion.THINKING to "anime-smile-talking-transparent.webp",
+                AvatarEmotion.HAPPY to "anime-happy-transparent.webp",
+                AvatarEmotion.SAD to "anime-cry-transparent.webp"
+            )
+        )
+        avatarModel = model
+        avatarController = WebPAvatarController(model).apply {
+            setEmotion(AvatarEmotion.IDLE)
+        }
+
         showOverlay()
 
         // 启动闲置检测任务：超过1分钟无交互且未在听写/思考中，自动回到idle表情
@@ -135,7 +163,7 @@ class PetOverlayService : Service() {
                     val inactive = now - lastActivityAt
                     if (!isListening && !isThinking && inactive > 60_000L) {
                         withContext(Dispatchers.Main) {
-                            updateVideoAsset(assetForIdle(), "inactivityTimeout(${inactive}ms)")
+                            avatarController?.setEmotion(AvatarEmotion.IDLE)
                         }
                     }
                 }
@@ -197,12 +225,6 @@ class PetOverlayService : Service() {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-            // Ensure an initial avatar asset is ready before composing
-            try {
-                updateVideoAsset(assetForIdle(), "init")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to init idle video asset before compose: ${e.message}")
-            }
             setContent {
                 PetOverlay(
                     text = petText,
@@ -211,8 +233,9 @@ class PetOverlayService : Service() {
                     onMicClick = { toggleListening() },
                     onClose = { stopSelf() },
                     onDrag = { dx, dy, end -> handleDrag(dx, dy, end) },
-                    emotion = petEmotion,
-                    videoAssetPath = petVideoAsset,
+                    avatarModel = avatarModel,
+                    avatarController = avatarController,
+                    avatarRendererFactory = avatarRendererFactory,
                     showTextInput = showTextInput,
                     textInputValue = textInputValue,
                     onTextInputClick = {
@@ -337,8 +360,7 @@ class PetOverlayService : Service() {
                 stt?.initialize()
                 withContext(Dispatchers.Main) {
                     isListening = true
-                    petEmotion = PetEmotion.LISTENING
-                    // 保持当前表情，不主动切换
+                    avatarController?.setEmotion(AvatarEmotion.LISTENING)
                 }
                 // New STT session id to ignore stale emissions
                 sttSessionId += 1
@@ -378,8 +400,7 @@ class PetOverlayService : Service() {
                     lastTextUpdateAt = System.currentTimeMillis()
                     Log.d(TAG, "STT partial: '${result.text}' (final=${result.isFinal})")
                     withContext(Dispatchers.Main) {
-                        petEmotion = PetEmotion.LISTENING
-                        // 倾听阶段不切换 talking 动图
+                        avatarController?.setEmotion(AvatarEmotion.LISTENING)
                     }
                     lastActivityAt = System.currentTimeMillis()
                 }
@@ -389,8 +410,7 @@ class PetOverlayService : Service() {
                     hasDispatchedQuery = true
                     Log.d(TAG, "STT final: dispatch to AI -> '${result.text}'")
                     withContext(Dispatchers.Main) {
-                        petEmotion = inferEmotionFromText(result.text)
-                        // 倾听结束，等待AI回复，不切换 talking 动图
+                        avatarController?.setEmotion(inferEmotionFromText(result.text))
                     }
                     lastActivityAt = System.currentTimeMillis()
                     askAi(result.text)
@@ -410,7 +430,7 @@ class PetOverlayService : Service() {
             }
             withContext(Dispatchers.Main) {
                 isListening = false
-                // 不主动切换表情；交由AI返回的mood或闲置计时回退
+                avatarController?.setEmotion(AvatarEmotion.IDLE)
             }
             // Cancel watchdog
             silenceWatchJob?.cancel()
@@ -500,7 +520,7 @@ class PetOverlayService : Service() {
                 withContext(Dispatchers.Main) {
                     isThinking = true
                     petText = "…"
-                    petEmotion = PetEmotion.THINKING
+                    avatarController?.setEmotion(AvatarEmotion.THINKING)
                 }
                 Log.d(TAG, "askAi: streaming request. text='${userText}' history=${history.size}")
                 // Stream response
@@ -556,17 +576,8 @@ class PetOverlayService : Service() {
                     // 最终显示为去除<mood>标签后的文本
                     petText = finalText
                     // Prefer explicit mood -> set PetEmotion accordingly; else infer heuristically.
-                    petEmotion = parsedMood?.let { moodToEmotion(it) } ?: inferEmotionFromText(finalText)
-                    // Mood video priority: explicit <mood> > idle (no TTS)
-                    val chosen = when (parsedMood) {
-                        Mood.ANGRY -> assetForAngry()
-                        Mood.HAPPY -> assetForHappy()
-                        Mood.SHY -> assetForShy()
-                        Mood.AOJIAO -> assetForAojiao()
-                        Mood.CRY -> assetForCry()
-                        null -> petVideoAsset ?: assetForIdle() // 未提供mood则保持当前表情
-                    }
-                    updateVideoAsset(chosen, "aiFinal(mood=${parsedMood?.name ?: "none"})")
+                    val finalEmotion = parsedMood?.let { moodToEmotion(it) } ?: inferEmotionFromText(finalText)
+                    avatarController?.setEmotion(finalEmotion)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "askAi error", e)
@@ -579,27 +590,23 @@ class PetOverlayService : Service() {
         }
     }
 
-    // TTS disabled in desktop pet mode; no speaking-state observer.
-
     // Basic heuristic mapping from text to emotion
-    private fun inferEmotionFromText(text: String): PetEmotion {
+    private fun inferEmotionFromText(text: String): AvatarEmotion {
         val t = text.lowercase()
         // Chinese & emoji keywords
         val happyKeywords = listOf("开心", "高兴", "不错", "棒", "太好了", "😀", "🙂", "😊", "😄", "赞")
         val angryKeywords = listOf("生气", "愤怒", "气死", "讨厌", "糟糕", "😡", "怒")
         val cryKeywords = listOf("难过", "伤心", "沮丧", "忧伤", "哭", "😭", "😢")
         val shyKeywords = listOf("害羞", "羞", "脸红", "不好意思", "///")
-        val aojiaoKeywords = listOf("傲娇")
 
         fun containsAny(keys: List<String>): Boolean = keys.any { t.contains(it) || text.contains(it) }
 
         return when {
-            containsAny(happyKeywords) -> PetEmotion.HAPPY
-            containsAny(angryKeywords) -> PetEmotion.ANGRY
-            containsAny(cryKeywords) -> PetEmotion.CRY
-            containsAny(shyKeywords) -> PetEmotion.SHY
-            containsAny(aojiaoKeywords) -> PetEmotion.AOJIAO
-            else -> PetEmotion.IDLE
+            containsAny(happyKeywords) -> AvatarEmotion.HAPPY
+            containsAny(angryKeywords) -> AvatarEmotion.SAD // No ANGRY, use SAD
+            containsAny(cryKeywords) -> AvatarEmotion.SAD
+            containsAny(shyKeywords) -> AvatarEmotion.CONFUSED // No SHY, use CONFUSED
+            else -> AvatarEmotion.IDLE
         }
     }
 
@@ -621,16 +628,6 @@ class PetOverlayService : Service() {
                 else -> null // Only allow the specified moods
             }
         } catch (_: Exception) { null }
-    }
-
-    private fun stripMoodTags(text: String): String {
-        return text.replace(
-            Regex(
-                pattern = "<mood[^>]*>.*?</mood>",
-                options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-            ),
-            ""
-        ).trim()
     }
 
     // 更通用的标签清理：移除所有形如 <tag>...</tag> 的成对标签及其内容，
@@ -692,74 +689,11 @@ class PetOverlayService : Service() {
         return m?.groupValues?.getOrNull(1)?.ifBlank { s } ?: s
     }
 
-    private fun moodToEmotion(mood: Mood): PetEmotion = when (mood) {
-        Mood.ANGRY -> PetEmotion.ANGRY
-        Mood.HAPPY -> PetEmotion.HAPPY
-        Mood.SHY -> PetEmotion.SHY
-        Mood.AOJIAO -> PetEmotion.AOJIAO
-        Mood.CRY -> PetEmotion.CRY
+    private fun moodToEmotion(mood: Mood): AvatarEmotion = when (mood) {
+        Mood.ANGRY -> AvatarEmotion.SAD // No ANGRY
+        Mood.HAPPY -> AvatarEmotion.HAPPY
+        Mood.SHY -> AvatarEmotion.CONFUSED // No SHY
+        Mood.AOJIAO -> AvatarEmotion.CONFUSED // No SHY
+        Mood.CRY -> AvatarEmotion.SAD
     }
-
-    private fun isExplicitMoodVideo(assetPath: String?): Boolean {
-        if (assetPath.isNullOrEmpty()) return false
-        val name = assetPath.substringAfterLast('/')
-        return listOf(
-            // webp preferred
-            "anime-aojiao-transparent.webp",
-            "anime-angry-transparent.webp",
-            "anime-happy-transparent.webp",
-            "anime-shy-transparent.webp",
-            "anime-cry-transparent.webp",
-            // webm/mov/mp4 fallbacks
-            "anime-aojiao-transparent.mov",
-            "anime-angry-transparent.mov",
-            "anime-happy-transparent.mov",
-            "anime-shy-transparent.mov",
-            "anime-cry-transparent.mov",
-            // mp4 fallbacks
-            "anime-aojiao-transparent.mp4",
-            "anime-angry-transparent.mp4",
-            "result_anime-angry-transparent.mp4",
-            "anime-happy-transparent.mp4",
-            "result_anime-happy-transparent.mp4",
-            "anime-shy-transparent.mp4",
-            "result_anime-shy-transparent.mp4",
-            "anime-cry-transparent.mp4"
-        ).any { name.equals(it, ignoreCase = true) }
-    }
-
-    private fun assetForIdle(): String = "pets/emoji/anime-smile-transparent.webp"
-    private fun assetForTalking(): String = ensureWebpOrIdle("pets/emoji/anime-smile-talking-transparent.webp")
-
-    private fun assetForAngry(): String = ensureWebpOrIdle("pets/emoji/anime-angry-transparent.webp")
-    private fun assetForHappy(): String = ensureWebpOrIdle("pets/emoji/anime-happy-transparent.webp")
-    private fun assetForShy(): String = ensureWebpOrIdle("pets/emoji/anime-shy-transparent.webp")
-    private fun assetForAojiao(): String = ensureWebpOrIdle("pets/emoji/anime-aojiao-transparent.webp")
-    private fun assetForCry(): String = ensureWebpOrIdle("pets/emoji/anime-cry-transparent.webp")
-
-    private fun assetExists(path: String): Boolean {
-        return try {
-            assets.open(path.removePrefix("/"))?.close()
-            true
-        } catch (_: Exception) { false }
-    }
-
-    private fun ensureWebpOrIdle(path: String): String {
-        return if (path.endsWith(".webp", true) && assetExists(path)) path else assetForIdle()
-    }
-
-    private fun updateVideoAsset(newPath: String, reason: String) {
-        val chosen = if (assetExists(newPath) && newPath.endsWith(".webp", true)) newPath else assetForIdle()
-        if (petVideoAsset != chosen) {
-            Log.d(TAG, "Video asset change: '$petVideoAsset' -> '$chosen' (reason=$reason; requested=$newPath)")
-            if (chosen != newPath) {
-                Log.w(TAG, "Requested asset missing/unsupported: $newPath; fallback=$chosen")
-            }
-            petVideoAsset = chosen
-        } else {
-            Log.d(TAG, "Video asset unchanged: '$chosen' (reason=$reason)")
-        }
-    }
-
-    // legacy helpers removed; use ensureWebpOrIdle
 }
