@@ -63,6 +63,12 @@ class DragonBonesAvatarController(
     override fun lookAt(x: Float, y: Float) {
         // No-op
     }
+
+    override fun updateSettings(settings: Map<String, Any>) {
+        settings["scale"]?.let { if (it is Number) libController.scale = it.toFloat() }
+        settings["translateX"]?.let { if (it is Number) libController.translationX = it.toFloat() }
+        settings["translateY"]?.let { if (it is Number) libController.translationY = it.toFloat() }
+    }
 }
 
 /**

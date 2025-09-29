@@ -43,4 +43,12 @@ interface AvatarController {
      * @param y The normalized y-coordinate (-1 to 1).
      */
     fun lookAt(x: Float, y: Float)
+    
+    /**
+     * Updates avatar-specific settings, such as scale or position.
+     * Each controller implementation should handle the settings relevant to it.
+     *
+     * @param settings A map of setting keys to values.
+     */
+    fun updateSettings(settings: Map<String, Any>) {}
 } 

@@ -43,7 +43,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.core.avatar.common.control.AvatarController
 import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
-import com.ai.assistance.operit.core.avatar.common.view.AvatarRendererFactory
+import com.ai.assistance.operit.core.avatar.common.factory.AvatarRendererFactory
 
 /**
  * Minimal pet overlay UI: bubble with short text, mic button and close.
@@ -100,7 +100,7 @@ fun PetOverlay(
             ) {
                 // Use the new Avatar Rendering System
                 if (avatarModel != null && avatarController != null) {
-                    val renderer = avatarRendererFactory.CreateRenderer(model = avatarModel)
+                    val renderer = avatarRendererFactory.createRenderer(model = avatarModel)
                     renderer?.invoke(
                         modifier = Modifier.align(Alignment.Center),
                         controller = avatarController

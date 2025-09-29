@@ -21,18 +21,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dragonbones.rememberDragonBonesController
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.*
-import com.ai.assistance.operit.ui.features.assistant.components.DragonBonesConfigSection
-import com.ai.assistance.operit.ui.features.assistant.components.DragonBonesPreviewSection
+import com.ai.assistance.operit.ui.features.assistant.components.AvatarConfigSection
+import com.ai.assistance.operit.ui.features.assistant.components.AvatarPreviewSection
 import com.ai.assistance.operit.ui.features.assistant.components.HowToImportSection
 import com.ai.assistance.operit.ui.features.assistant.components.SettingItem
 import com.ai.assistance.operit.ui.features.assistant.viewmodel.AssistantConfigViewModel
 import com.ai.assistance.operit.ui.features.settings.screens.getFunctionDisplayName
-import kotlinx.coroutines.launch
 
 /** 助手配置屏幕 提供DragonBones模型预览和相关配置 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +59,7 @@ fun AssistantConfigScreen(
                         if (result.resultCode == Activity.RESULT_OK) {
                                 result.data?.data?.let { uri ->
                                         // 导入选择的zip文件
-                                        viewModel.importModelFromZip(uri)
+                                        viewModel.importAvatarFromZip(uri)
                                 }
                         }
                 }
@@ -109,45 +107,10 @@ fun AssistantConfigScreen(
 
         val snackbarHostState = remember { SnackbarHostState() }
         val scrollState = rememberScrollState(initial = uiState.scrollPosition)
-        val scope = rememberCoroutineScope()
-        val dragonBonesController = rememberDragonBonesController()
 
         // 在 Composable 函数中获取字符串资源，以便在 LaunchedEffect 中使用
         val operationSuccessString = context.getString(R.string.operation_success)
         val errorOccurredString = context.getString(R.string.error_occurred_simple)
-
-        // Sync ViewModel state with Controller
-        LaunchedEffect(uiState.config) {
-                uiState.config?.let {
-                        dragonBonesController.scale = it.scale
-                        dragonBonesController.translationX = it.translateX
-                        dragonBonesController.translationY = it.translateY
-                }
-        }
-
-        // Sync Controller changes back to ViewModel
-        LaunchedEffect(
-                dragonBonesController.scale,
-                dragonBonesController.translationX,
-                dragonBonesController.translationY
-        ) {
-                uiState.config?.let {
-                        if (it.scale != dragonBonesController.scale ||
-                                        it.translateX != dragonBonesController.translationX ||
-                                        it.translateY != dragonBonesController.translationY
-                        ) {
-                                viewModel.updateScale(dragonBonesController.scale)
-                                viewModel.updateTranslateX(dragonBonesController.translationX)
-                                viewModel.updateTranslateY(dragonBonesController.translationY)
-                        }
-                }
-        }
-
-        LaunchedEffect(dragonBonesController) {
-                dragonBonesController.onSlotTap = { slotName ->
-                        scope.launch { snackbarHostState.showSnackbar("Tapped on: $slotName") }
-                }
-        }
 
         LaunchedEffect(scrollState) {
                 snapshotFlow { scrollState.value }.collect { position ->
@@ -185,7 +148,7 @@ fun AssistantConfigScreen(
 
                                         // 刷新模型列表按钮
                                         IconButton(
-                                                onClick = { viewModel.scanUserModels() },
+                                                onClick = { viewModel.scanUserAvatars() },
                                                 enabled =
                                                         !uiState.isImporting &&
                                                                 !uiState.isLoading &&
@@ -209,21 +172,19 @@ fun AssistantConfigScreen(
                                                 .padding(horizontal = 12.dp)
                                                 .verticalScroll(scrollState)
                         ) {
-                                // DragonBones预览区域
-                                DragonBonesPreviewSection(
+                                // Avatar预览区域
+                                AvatarPreviewSection(
                                         modifier = Modifier.fillMaxWidth().height(300.dp),
-                                        controller = dragonBonesController,
                                         uiState = uiState,
                                         onDeleteCurrentModel =
-                                                uiState.currentModel?.let { model ->
-                                                        { viewModel.deleteUserModel(model.id) }
+                                                uiState.currentAvatarConfig?.let { model ->
+                                                        { viewModel.deleteAvatar(model.id) }
                                                 }
                                 )
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                DragonBonesConfigSection(
-                                        controller = dragonBonesController,
+                                AvatarConfigSection(
                                         viewModel = viewModel,
                                         uiState = uiState,
                                         onImportClick = { openZipFilePicker() }

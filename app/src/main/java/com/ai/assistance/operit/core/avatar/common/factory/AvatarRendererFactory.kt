@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.core.avatar.common.view
+package com.ai.assistance.operit.core.avatar.common.factory
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,5 +17,5 @@ interface AvatarRendererFactory {
      * @return A composable function that renders the avatar, or null if the model type is not supported.
      */
     @Composable
-    fun CreateRenderer(model: AvatarModel): @Composable ((modifier: Modifier, controller: AvatarController) -> Unit)?
+    fun createRenderer(model: AvatarModel): @Composable ((modifier: Modifier, controller: AvatarController) -> Unit)?
 } 

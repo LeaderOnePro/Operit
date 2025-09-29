@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.core.avatar.impl
+package com.ai.assistance.operit.core.avatar.impl.factory
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -7,7 +7,7 @@ import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
 import com.ai.assistance.operit.core.avatar.common.model.AvatarType
 import com.ai.assistance.operit.core.avatar.common.model.IFrameSequenceAvatarModel
 import com.ai.assistance.operit.core.avatar.common.model.ISkeletalAvatarModel
-import com.ai.assistance.operit.core.avatar.common.view.AvatarRendererFactory
+import com.ai.assistance.operit.core.avatar.common.factory.AvatarRendererFactory
 import com.ai.assistance.operit.core.avatar.impl.dragonbones.view.DragonBonesRenderer
 import com.ai.assistance.operit.core.avatar.impl.webp.view.WebPRenderer
 
@@ -19,7 +19,7 @@ import com.ai.assistance.operit.core.avatar.impl.webp.view.WebPRenderer
 class AvatarRendererFactoryImpl : AvatarRendererFactory {
 
     @Composable
-    override fun CreateRenderer(model: AvatarModel): @Composable ((modifier: Modifier, controller: AvatarController) -> Unit)? {
+    override fun createRenderer(model: AvatarModel): @Composable ((modifier: Modifier, controller: AvatarController) -> Unit)? {
         return when (model.type) {
             AvatarType.DRAGONBONES -> {
                 // Ensure the model is of the correct subtype for the renderer.

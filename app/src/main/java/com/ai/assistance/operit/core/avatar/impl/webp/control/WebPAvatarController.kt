@@ -26,6 +26,16 @@ class WebPAvatarController(
     private val _currentModel = MutableStateFlow(model)
     val currentModel: StateFlow<WebPAvatarModel> = _currentModel.asStateFlow()
 
+    // Transform properties for scaling and positioning
+    private val _scale = MutableStateFlow(1.0f)
+    val scale: StateFlow<Float> = _scale.asStateFlow()
+    
+    private val _translateX = MutableStateFlow(0.0f)
+    val translateX: StateFlow<Float> = _translateX.asStateFlow()
+    
+    private val _translateY = MutableStateFlow(0.0f)
+    val translateY: StateFlow<Float> = _translateY.asStateFlow()
+
     override val availableAnimations: List<String>
         get() = model.emotionToFileMap.values.toList()
 
@@ -55,6 +65,12 @@ class WebPAvatarController(
     override fun lookAt(x: Float, y: Float) {
         // WebP avatars don't support lookAt functionality
         // This is a no-op for frame-based animations
+    }
+
+    override fun updateSettings(settings: Map<String, Any>) {
+        settings["scale"]?.let { if (it is Number) _scale.value = it.toFloat() }
+        settings["translateX"]?.let { if (it is Number) _translateX.value = it.toFloat() }
+        settings["translateY"]?.let { if (it is Number) _translateY.value = it.toFloat() }
     }
 
     /**

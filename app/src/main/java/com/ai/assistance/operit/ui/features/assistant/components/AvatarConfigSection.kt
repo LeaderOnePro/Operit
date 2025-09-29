@@ -44,88 +44,89 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.assistant.viewmodel.AssistantConfigViewModel
 
 @Composable
-fun DragonBonesConfigSection(
-        controller: com.dragonbones.DragonBonesController,
-        viewModel: AssistantConfigViewModel,
-        uiState: AssistantConfigViewModel.UiState,
-        onImportClick: () -> Unit
+fun AvatarConfigSection(
+    viewModel: AssistantConfigViewModel,
+    uiState: AssistantConfigViewModel.UiState,
+    onImportClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp, start = 4.dp)) {
         Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(stringResource(R.string.dragon_bones_config), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.avatar_config), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Icon(
-                    imageVector =
-                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                imageVector =
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
             )
         }
     }
 
     if (expanded) {
         Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.weight(1f)) {
                         ModelSelector(
-                                models = uiState.models,
-                                currentModelId = uiState.currentModel?.id,
-                                onModelSelected = { viewModel.switchModel(it) },
-                                onModelDelete = { viewModel.deleteUserModel(it) }
+                            models = uiState.avatarConfigs,
+                            currentModelId = uiState.currentAvatarConfig?.id,
+                            onModelSelected = { viewModel.switchAvatar(it) },
+                            onModelDelete = { viewModel.deleteAvatar(it) }
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = onImportClick) {
                         Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = stringResource(R.string.import_model)
+                            imageVector = Icons.Default.AddPhotoAlternate,
+                            contentDescription = stringResource(R.string.import_model)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                if (uiState.currentAvatarConfig != null && uiState.config != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // Scale Slider
-                Text(
-                        text = stringResource(R.string.scale, String.format("%.2f", controller.scale)),
+                    // Scale Slider
+                    Text(
+                        text = stringResource(R.string.scale, String.format("%.2f", uiState.config.scale)),
                         style = MaterialTheme.typography.bodyMedium
-                )
-                Slider(
-                        value = controller.scale,
-                        onValueChange = { controller.scale = it },
+                    )
+                    Slider(
+                        value = uiState.config.scale,
+                        onValueChange = { viewModel.updateScale(it) },
                         valueRange = 0.1f..2.0f
-                )
+                    )
 
-                // TranslationX Slider
-                Text(
-                        text = stringResource(R.string.x_translation, String.format("%.1f", controller.translationX)),
+                    // TranslationX Slider
+                    Text(
+                        text = stringResource(R.string.x_translation, String.format("%.1f", uiState.config.translateX)),
                         style = MaterialTheme.typography.bodyMedium
-                )
-                Slider(
-                        value = controller.translationX,
-                        onValueChange = { controller.translationX = it },
+                    )
+                    Slider(
+                        value = uiState.config.translateX,
+                        onValueChange = { viewModel.updateTranslateX(it) },
                         valueRange = -500f..500f
-                )
+                    )
 
-                // TranslationY Slider
-                Text(
-                        text = stringResource(R.string.y_translation, String.format("%.1f", controller.translationY)),
+                    // TranslationY Slider
+                    Text(
+                        text = stringResource(R.string.y_translation, String.format("%.1f", uiState.config.translateY)),
                         style = MaterialTheme.typography.bodyMedium
-                )
-                Slider(
-                        value = controller.translationY,
-                        onValueChange = { controller.translationY = it },
+                    )
+                    Slider(
+                        value = uiState.config.translateY,
+                        onValueChange = { viewModel.updateTranslateY(it) },
                         valueRange = -500f..500f
-                )
+                    )
+                }
             }
         }
     }
@@ -134,7 +135,7 @@ fun DragonBonesConfigSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelSelector(
-        models: List<com.ai.assistance.operit.data.model.DragonBonesModel>,
+        models: List<com.ai.assistance.operit.data.repository.AvatarConfig>,
         currentModelId: String?,
         onModelSelected: (String) -> Unit,
         onModelDelete: (String) -> Unit
@@ -170,7 +171,7 @@ fun ModelSelector(
                 modifier = Modifier.menuAnchor().fillMaxWidth()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            models.forEach { model ->
+            for (model in models) {
                 DropdownMenuItem(
                         text = { Text(model.name) },
                         onClick = {

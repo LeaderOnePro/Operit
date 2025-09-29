@@ -35,25 +35,26 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.core.avatar.common.view.AvatarView
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarControllerFactoryImpl
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarModelFactoryImpl
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarRendererFactoryImpl
 import com.ai.assistance.operit.data.model.PromptFunctionType
-import com.ai.assistance.operit.data.repository.DragonBonesRepository
-import com.ai.assistance.operit.ui.components.ManagedDragonBonesView
+import com.ai.assistance.operit.data.repository.AvatarRepository
 import com.ai.assistance.operit.ui.floating.FloatContext
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.ui.floating.ui.window.ResizeEdge
-import com.dragonbones.rememberDragonBonesController
-import java.io.File
 import kotlin.math.roundToInt
 
 // A data class to hold the UI state that changes during drag
 private data class DraggableWindowState(
-        val width: Dp,
-        val height: Dp,
-        val scale: Float,
+    val width: Dp,
+    val height: Dp,
+    val scale: Float,
 )
 
 @Composable
-fun FloatingDragonBonesMode(floatContext: FloatContext) {
+fun FloatingAvatarMode(floatContext: FloatContext) {
     val isLocked by floatContext.windowState?.isPetModeLocked ?: remember { mutableStateOf(false) }
 
     var showPetChatInput by remember { mutableStateOf(false) }
@@ -69,12 +70,10 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
     }
 
     val cornerRadius = 12.dp
-    val borderThickness = 3.dp
-    val edgeHighlightColor = MaterialTheme.colorScheme.primary
     val backgroundColor = Color.Transparent // 透明背景
 
     var windowState by remember {
-        mutableStateOf(
+        mutableStateOf<DraggableWindowState>(
                 DraggableWindowState(
                         width = floatContext.windowWidthState,
                         height = floatContext.windowHeightState,
@@ -101,14 +100,19 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
     }
 
     val context = LocalContext.current
-    val repository = remember { DragonBonesRepository.getInstance(context) }
-    val models by repository.models.collectAsState()
-    val currentConfig by repository.currentConfig.collectAsState()
+    val modelFactory = remember { AvatarModelFactoryImpl() }
+    val repository = remember { AvatarRepository.getInstance(context, modelFactory) }
+    val currentAvatar by repository.currentAvatar.collectAsState()
+    val instanceSettings by repository.instanceSettings.collectAsState()
+    
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val rendererFactory = remember { AvatarRendererFactoryImpl() }
+    val controllerFactory = remember { AvatarControllerFactoryImpl() }
 
     val density = LocalDensity.current
     Layout(
@@ -235,7 +239,7 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
                                         }
 
                                         Text(
-                                                text = "龙骨模式",
+                                                text = "虚拟形象模式",
                                                 style =
                                                         MaterialTheme.typography.titleMedium.copy(
                                                                 fontWeight = FontWeight.Medium
@@ -365,9 +369,9 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
                                     modifier = Modifier.fillMaxSize().weight(1f),
                                     contentAlignment = Alignment.Center
                             ) {
-                                if (models.isEmpty()) {
+                                if (currentAvatar == null) {
                                     Text(
-                                            "没有可用的龙骨模型",
+                                            "没有可用的虚拟形象",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onBackground
                                     )
@@ -378,64 +382,36 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
                                             color = MaterialTheme.colorScheme.error
                                     )
                                 } else {
-                                    val currentModel =
-                                            models.find { it.id == currentConfig?.modelId }
-                                    if (currentModel != null && currentConfig != null) {
-
-                                        val dragonBonesController = rememberDragonBonesController()
-
-                                        val viewableModel =
-                                                remember(currentModel) {
-                                                    com.dragonbones.DragonBonesModel(
-                                                            skeletonPath =
-                                                                    File(
-                                                                                    currentModel
-                                                                                            .folderPath,
-                                                                                    currentModel
-                                                                                            .skeletonFile
-                                                                            )
-                                                                            .absolutePath,
-                                                            textureJsonPath =
-                                                                    File(
-                                                                                    currentModel
-                                                                                            .folderPath,
-                                                                                    currentModel
-                                                                                            .textureJsonFile
-                                                                            )
-                                                                            .absolutePath,
-                                                            textureImagePath =
-                                                                    File(
-                                                                                    currentModel
-                                                                                            .folderPath,
-                                                                                    currentModel
-                                                                                            .textureImageFile
-                                                                            )
-                                                                            .absolutePath
-                                                    )
-                                                }
-
-                                        LaunchedEffect(currentConfig) {
-                                            currentConfig?.let {
-                                                dragonBonesController.scale = it.scale
-                                                dragonBonesController.translationX = it.translateX
-                                                dragonBonesController.translationY = it.translateY
+                                    currentAvatar?.let { avatarModel ->
+                                        val controller = controllerFactory.createController(model = avatarModel)
+                                        
+                                        if (controller != null) {
+                                            val currentSettings = instanceSettings[avatarModel.id]
+                                            
+                                            LaunchedEffect(currentSettings) {
+                                                 currentSettings?.let {
+                                                    controller.updateSettings(mapOf(
+                                                        "scale" to it.scale,
+                                                        "translateX" to it.translateX,
+                                                        "translateY" to it.translateY
+                                                    ))
+                                                 }
                                             }
-                                        }
-
-                                        ManagedDragonBonesView(
+                                            
+                                            AvatarView(
                                                 modifier = Modifier.fillMaxSize(),
-                                                model = viewableModel,
-                                                controller = dragonBonesController,
-                                                enableGestures = true,
-                                                zOrderOnTop = false,
+                                                model = avatarModel,
+                                                controller = controller,
+                                                rendererFactory = rendererFactory,
                                                 onError = { error -> errorMessage = "加载失败: $error" }
-                                        )
-                                    } else {
-                                        Text(
-                                                "未选择模型",
+                                            )
+                                        } else {
+                                             Text(
+                                                "不支持的虚拟形象类型: ${avatarModel.type}",
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.onBackground
-                                        )
+                                            )
+                                        }
                                     }
                                 }
 
@@ -666,7 +642,7 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
                                     modifier =
                                             Modifier.size(8.dp)
                                                     .background(
-                                                            color = edgeHighlightColor,
+                                                            color = primaryColor,
                                                             shape = CircleShape
                                                     )
                                                     .align(Alignment.BottomEnd)
@@ -779,4 +755,4 @@ fun FloatingDragonBonesMode(floatContext: FloatContext) {
             }
         }
     }
-}
+} 

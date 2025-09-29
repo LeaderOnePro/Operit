@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.core.avatar.common.control.AvatarController
 import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
+import com.ai.assistance.operit.core.avatar.common.factory.AvatarRendererFactory
 
 /**
  * The single, unified Composable for displaying any virtual avatar.
@@ -28,7 +29,7 @@ fun AvatarView(
     rendererFactory: AvatarRendererFactory,
     onError: (String) -> Unit = {}
 ) {
-    val renderer = rendererFactory.CreateRenderer(model)
+    val renderer = rendererFactory.createRenderer(model)
 
     if (renderer != null) {
         renderer(modifier, controller)

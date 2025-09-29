@@ -7,6 +7,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.util.Log
 import android.widget.ImageView
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -14,11 +15,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ai.assistance.operit.core.avatar.common.control.AvatarController
 import com.ai.assistance.operit.core.avatar.common.model.IFrameSequenceAvatarModel
 import com.ai.assistance.operit.core.avatar.impl.webp.control.WebPAvatarController
+import java.io.File
+import java.io.FileInputStream
 import java.nio.ByteBuffer
 
 /**
@@ -48,6 +53,11 @@ fun WebPRenderer(
     val controllerState by webpController.state.collectAsState()
     val currentModel by webpController.currentModel.collectAsState()
     
+    // Listen to transform properties
+    val scale by webpController.scale.collectAsState()
+    val translateX by webpController.translateX.collectAsState()
+    val translateY by webpController.translateY.collectAsState()
+    
     val animationPath = currentModel.animationPath
 
     val drawableState = remember(animationPath) {
@@ -67,7 +77,12 @@ fun WebPRenderer(
         try {
             if (Build.VERSION.SDK_INT >= 28) {
                 // Always decode from bytes to support compressed assets in APK
-                val bytes = assets.open(animationPath).use { it.readBytes() }
+                val inputStream = if (File(animationPath).isAbsolute) {
+                    FileInputStream(animationPath)
+                } else {
+                    assets.open(animationPath)
+                }
+                val bytes = inputStream.use { it.readBytes() }
                 val src = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
                 val drawable = ImageDecoder.decodeDrawable(src)
                 drawableState.value = drawable
@@ -85,8 +100,12 @@ fun WebPRenderer(
                 }
             } else {
                 // API < 28: show first frame as static
-                val input = assets.open(animationPath)
-                val bmp = input.use { BitmapFactory.decodeStream(it) }
+                val inputStream = if (File(animationPath).isAbsolute) {
+                    FileInputStream(animationPath)
+                } else {
+                    assets.open(animationPath)
+                }
+                val bmp = inputStream.use { BitmapFactory.decodeStream(it) }
                 drawableState.value = BitmapDrawable(context.resources, bmp)
                 Log.d("WebPRenderer", "Static fallback (API<28): $animationPath")
             }
@@ -109,7 +128,9 @@ fun WebPRenderer(
     val drawable = drawableState.value
     if (drawable != null) {
         AndroidView(
-            modifier = modifier,
+            modifier = modifier
+                .scale(scale)
+                .offset(x = translateX.dp, y = translateY.dp),
             factory = { ctx ->
                 ImageView(ctx).apply {
                     scaleType = ImageView.ScaleType.CENTER_CROP

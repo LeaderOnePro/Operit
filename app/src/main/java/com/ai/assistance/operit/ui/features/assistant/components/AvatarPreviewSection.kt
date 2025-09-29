@@ -31,22 +31,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.dragonbones.DragonBonesModel
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.ui.components.ManagedDragonBonesView
+import com.ai.assistance.operit.core.avatar.common.view.AvatarView
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarControllerFactoryImpl
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarRendererFactoryImpl
 import com.ai.assistance.operit.ui.features.assistant.viewmodel.AssistantConfigViewModel
-import java.io.File
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun DragonBonesPreviewSection(
+fun AvatarPreviewSection(
         modifier: Modifier = Modifier,
-        controller: com.dragonbones.DragonBonesController,
         uiState: AssistantConfigViewModel.UiState,
         onDeleteCurrentModel: (() -> Unit)? = null
 ) {
         var showDeleteDialog by remember { mutableStateOf(false) }
+        
+        // Create factories for abstract avatar system
+        val controllerFactory = remember { AvatarControllerFactoryImpl() }
+        val rendererFactory = remember { AvatarRendererFactoryImpl() }
+        
         Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(16.dp),
@@ -67,56 +71,32 @@ fun DragonBonesPreviewSection(
                         )
         ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                        val currentModel = uiState.currentModel
+                        val currentModel = uiState.currentAvatarModel
                         if (currentModel != null) {
-                                val model =
-                                        remember(currentModel) {
-                                                DragonBonesModel(
-                                                        skeletonPath =
-                                                                File(
-                                                                                currentModel
-                                                                                        .folderPath,
-                                                                                currentModel
-                                                                                        .skeletonFile
-                                                                        )
-                                                                        .absolutePath,
-                                                        textureJsonPath =
-                                                                File(
-                                                                                currentModel
-                                                                                        .folderPath,
-                                                                                currentModel
-                                                                                        .textureJsonFile
-                                                                        )
-                                                                        .absolutePath,
-                                                        textureImagePath =
-                                                                File(
-                                                                                currentModel
-                                                                                        .folderPath,
-                                                                                currentModel
-                                                                                        .textureImageFile
-                                                                        )
-                                                                        .absolutePath
-                                                )
+                                // Create avatar controller
+                                val avatarController = controllerFactory.createController(currentModel)
+                                
+                                if (avatarController != null) {
+                                        // Apply current settings to controller
+                                        uiState.config?.let { settings ->
+                                                avatarController.updateSettings(mapOf(
+                                                        "scale" to settings.scale,
+                                                        "translateX" to settings.translateX,
+                                                        "translateY" to settings.translateY
+                                                ))
                                         }
 
-                                ManagedDragonBonesView(
+                                        // Use abstract avatar view
+                                        AvatarView(
                                         modifier = Modifier.fillMaxSize(),
-                                        model = model,
-                                        controller = controller,
-                                        onError = { error -> println("DragonBones error: $error") }
+                                                model = currentModel,
+                                                controller = avatarController,
+                                                rendererFactory = rendererFactory,
+                                                onError = { error -> println("Avatar error: $error") }
                                 )
-                        } else {
-                                Text(
-                                        text =
-                                                if (uiState.models.isEmpty()) stringResource(R.string.no_models_available)
-                                                else stringResource(R.string.please_select_model),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.align(Alignment.Center)
-                                )
-                        }
-
-                        // 动画控制区域
-                        if (controller.animationNames.isNotEmpty()) {
+                                        
+                                        // Animation control area for skeletal models
+                                        if (avatarController.availableAnimations.isNotEmpty()) {
                                 var selectedAnim by remember { mutableStateOf<String?>(null) }
 
                                 // A quick effect to de-select the chip after a short time
@@ -144,25 +124,35 @@ fun DragonBonesPreviewSection(
                                         verticalArrangement = Arrangement.Center,
                                         maxItemsInEachRow = 4
                                 ) {
-                                        controller.animationNames.forEach { name ->
+                                                        avatarController.availableAnimations.forEach { name ->
                                                 FilterChip(
                                                         modifier =
                                                                 Modifier.padding(horizontal = 4.dp),
                                                         selected = selectedAnim == name,
                                                         onClick = {
                                                                 selectedAnim = name
-                                                                // Use a safe, higher layer for
-                                                                // manual playback.
-                                                                controller.fadeInAnimation(
-                                                                        name,
-                                                                        layer = 3,
-                                                                        loop = 1
-                                                                )
+                                                                                avatarController.playAnimation(name, 1)
                                                         },
                                                         label = { Text(name) }
                                                 )
                                         }
                                 }
+                                        }
+                                } else {
+                                        Text(
+                                                text = stringResource(R.string.unsupported_model_type, currentModel.type.name),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                modifier = Modifier.align(Alignment.Center)
+                                        )
+                                }
+                        } else {
+                                Text(
+                                        text =
+                                                if (uiState.avatarConfigs.isEmpty()) stringResource(R.string.no_models_available)
+                                                else stringResource(R.string.please_select_model),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier = Modifier.align(Alignment.Center)
+                                )
                         }
                 }
         }
