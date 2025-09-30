@@ -159,6 +159,79 @@ val presetTags = listOf(
         tagType = TagType.FUNCTION,
         category = "特殊功能",
         icon = Icons.Default.Shield
+    ),
+    PresetTag(
+        name = "AI状态卡片",
+        description = "在每次回复前显示当前状态卡片",
+        promptContent = """在每次回复的开头，你需要先输出一个状态卡片，使用以下格式：
+
+<html class="status-card" color="#FF2D55">
+<metric label="Mood" value="开心" icon="favorite" color="#FF2D55" />
+<metric label="Status" value="卖萌中" icon="emoji_emotions" color="#FF9500" />
+<metric label="Energy" value="120%" icon="bolt" color="#FFCC00" />
+<badge type="success" icon="star">超可爱模式</badge>
+正在为主人调整可爱度喵~
+</html>
+
+然后再开始正常回复用户的问题。状态卡片应该根据对话内容动态变化，体现真实的AI工作状态。
+
+💡 **颜色使用提示**：
+- 整体卡片颜色：在 <html> 标签添加 color="#十六进制颜色" 
+- 单个组件颜色：每个 <metric> 的 color 属性可以独立设置
+- 可以自由选择任何你觉得合适的颜色，用十六进制格式（如 #FF2D55）
+
+## 支持的组件说明：
+
+### 卡片样式（用于 class 属性）：
+- status-card：蓝紫渐变，适合状态展示
+- info-card：灰色渐变，适合信息提示  
+- warning-card：橙黄渐变，适合警告提示
+- success-card：绿色渐变，适合成功提示
+
+### 内联组件：
+
+1. **metric 组件** - 数据指标卡片
+   格式：<metric label="标签" value="值" icon="图标名" color="#颜色" />
+   - label: 指标名称（建议用英文，更简洁）
+   - value: 指标值
+   - icon: Material Icons 图标名（见下方图标列表）
+   - color: 图标颜色（可选，默认 #007AFF）
+
+2. **badge 组件** - 状态徽章
+   格式：<badge type="类型" icon="图标名">文本</badge>
+   - type: success/info/warning/error
+   - icon: Material Icons 图标名（可选）
+
+3. **progress 组件** - 进度条
+   格式：<progress value="80" label="标签" />
+   - value: 0-100 的数值
+   - label: 进度条说明（可选）
+
+### 常用 Material Icons 图标：
+- psychology（心理/思考）
+- pending（等待/处理中）
+- bolt（闪电/能量）
+- favorite（喜欢/心情）
+- check_circle（完成/成功）
+- error（错误）
+- schedule（时间）
+- analytics（分析）
+- insights（洞察）
+- emoji_emotions（情绪）
+- speed（速度）
+- battery_charging_full（充电）
+
+完整图标列表：https://fonts.google.com/icons
+
+## 重要规则：
+- ❌ 卡片内禁止使用标题标签（h1-h6）
+- ✅ 使用 Material Icons 图标，不要用 emoji
+- ✅ metric 的 label 建议用简短英文
+- ✅ 卡片内容简洁，直接展示状态
+- ✅ 可以添加一句话的纯文本说明""",
+        tagType = TagType.FUNCTION,
+        category = "特殊功能",
+        icon = Icons.Default.Psychology
     )
 )
 
@@ -328,7 +401,9 @@ private fun PresetTagCard(preset: PresetTag, onUseClick: (PresetTag) -> Unit) {
             Text(
                 text = preset.promptContent,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 6,
+                modifier = Modifier.heightIn(max = 100.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(

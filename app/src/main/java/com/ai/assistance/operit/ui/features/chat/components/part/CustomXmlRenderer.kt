@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.ui.features.chat.components.part
 
+import android.webkit.WebView
+import android.webkit.WebSettings
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -14,10 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.common.markdown.DefaultXmlRenderer
 import com.ai.assistance.operit.ui.common.markdown.XmlContentRenderer
@@ -30,7 +35,7 @@ class CustomXmlRenderer(
 ) : XmlContentRenderer {
     // 定义渲染器能够处理的内置标签集合
     private val builtInTags =
-            setOf("think", "tool", "status", "plan_item", "plan_update", "tool_result")
+            setOf("think", "tool", "status", "plan_item", "plan_update", "tool_result", "html", "mood")
 
     @Composable
     override fun RenderXmlContent(xmlContent: String, modifier: Modifier, textColor: Color) {
@@ -79,6 +84,8 @@ class CustomXmlRenderer(
             "status" -> renderStatus(trimmedContent, modifier, textColor)
             "plan_item" -> renderPlanItem(trimmedContent, modifier, textColor)
             "plan_update" -> renderPlanUpdate(trimmedContent, modifier, textColor)
+            "html" -> renderHtmlContent(trimmedContent, modifier, textColor)
+            "mood" -> renderMoodTag(trimmedContent, modifier, textColor)
             else -> fallback.RenderXmlContent(xmlContent, modifier, textColor)
         }
     }
@@ -413,5 +420,435 @@ class CustomXmlRenderer(
                 isUpdate = true,
                 modifier = modifier
         )
+    }
+
+    /** 渲染 <html> 标签内容 - 使用WebView渲染，支持完整的HTML/CSS功能 */
+    @Composable
+    private fun renderHtmlContent(content: String, modifier: Modifier, textColor: Color) {
+        // 提取html内部的HTML内容
+        val htmlContent = extractContentFromXml(content, "html")
+        
+        // 提取class属性
+        val classRegex = "class=\"([^\"]+)\"".toRegex()
+        val classMatch = classRegex.find(content)
+        val className = classMatch?.groupValues?.get(1)
+        
+        // 提取color属性 - 用于自定义卡片主题色
+        val colorRegex = "color=\"([^\"]+)\"".toRegex()
+        val colorMatch = colorRegex.find(content)
+        val customColor = colorMatch?.groupValues?.get(1)
+        
+        // 如果内容不为空，则作为HTML渲染
+        if (htmlContent.isNotBlank()) {
+            val context = LocalContext.current
+            
+            // 应用内置样式
+            val styledHtml = applyBuiltInStyles(htmlContent, className, customColor, textColor)
+            
+            // 构建完整的HTML文档
+            val fullHtml = buildFullHtmlDocument(styledHtml, textColor)
+            
+            AndroidView(
+                modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.apply {
+                            javaScriptEnabled = false
+                            domStorageEnabled = false
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            builtInZoomControls = false
+                            displayZoomControls = false
+                        }
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    }
+                },
+                update = { webView ->
+                    webView.loadDataWithBaseURL(null, fullHtml, "text/html", "UTF-8", null)
+                }
+            )
+        }
+    }
+    
+    /**
+     * 构建完整的HTML文档，包含CSS样式
+     */
+    private fun buildFullHtmlDocument(bodyContent: String, textColor: Color): String {
+        val textColorHex = String.format("#%06X", 0xFFFFFF and textColor.toArgb())
+        
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+                <style>
+                    * {
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        font-size: 13px;
+                        line-height: 1.4;
+                        color: $textColorHex;
+                        padding: 0;
+                        background: transparent;
+                    }
+                    .material-symbols-rounded {
+                        font-family: 'Material Symbols Rounded';
+                        font-weight: normal;
+                        font-style: normal;
+                        font-size: 20px;
+                        display: inline-block;
+                        line-height: 1;
+                        text-transform: none;
+                        letter-spacing: normal;
+                        word-wrap: normal;
+                        white-space: nowrap;
+                        direction: ltr;
+                        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+                    }
+                    h1, h2, h3, h4, h5, h6 {
+                        margin: 2px 0 3px 0;
+                        font-weight: 600;
+                        line-height: 1.3;
+                        color: inherit;
+                    }
+                    h1 { font-size: 15px; }
+                    h2 { font-size: 14px; }
+                    h3 { font-size: 13px; }
+                    h4 { font-size: 13px; }
+                    h5 { font-size: 12px; }
+                    h6 { font-size: 12px; }
+                    p {
+                        margin: 2px 0;
+                        font-size: 13px;
+                    }
+                    a {
+                        color: #007AFF;
+                        text-decoration: none;
+                    }
+                    a:hover {
+                        text-decoration: underline;
+                    }
+                    strong, b {
+                        font-weight: 600;
+                    }
+                </style>
+            </head>
+            <body>
+                $bodyContent
+            </body>
+            </html>
+        """.trimIndent()
+    }
+    
+    /**
+     * 应用内置样式到HTML内容
+     * 支持的class类型：
+     * - status-card: 状态卡片样式
+     * - info-card: 信息卡片样式
+     * - warning-card: 警告卡片样式
+     * - success-card: 成功卡片样式
+     * - metric-grid: 指标网格布局
+     * - badge: 徽章样式
+     * - progress-bar: 进度条
+     * 
+     * @param customColor 自定义颜色（十六进制，如 #FF2D55），会覆盖默认的卡片主题色
+     */
+    private fun applyBuiltInStyles(htmlContent: String, className: String?, customColor: String?, textColor: Color): String {
+        // 如果没有指定class，直接返回原内容
+        if (className == null) return htmlContent
+        
+        // 先处理内容中的内置组件（递归处理）
+        var processedContent = processInlineComponents(htmlContent)
+        
+        // 根据不同的class应用不同的样式
+        return when (className) {
+            "status-card" -> applyStatusCardStyle(processedContent, customColor)
+            "info-card" -> applyInfoCardStyle(processedContent, customColor)
+            "warning-card" -> applyWarningCardStyle(processedContent, customColor)
+            "success-card" -> applySuccessCardStyle(processedContent, customColor)
+            "metric-grid" -> applyMetricGridStyle(processedContent)
+            else -> processedContent
+        }
+    }
+    
+    /**
+     * 处理内联组件标签，将自定义标签转换为带样式的HTML
+     * 支持的组件：
+     * - <metric label="xxx" value="yyy" />
+     * - <badge type="xxx">text</badge>
+     * - <progress value="80" />
+     */
+    private fun processInlineComponents(content: String): String {
+        var result = content
+        
+        // 处理 <metric> 标签
+        result = processMetricTags(result)
+        
+        // 处理 <badge> 标签
+        result = processBadgeTags(result)
+        
+        // 处理 <progress> 标签
+        result = processProgressTags(result)
+        
+        return result
+    }
+    
+    /** 处理 <metric label="标签" value="值" icon="icon_name" color="#xxx" /> */
+    private fun processMetricTags(content: String): String {
+        val metricRegex = """<metric\s+label="([^"]+)"\s+value="([^"]+)"(?:\s+icon="([^"]+)")?(?:\s+color="([^"]+)")?\s*/>""".toRegex()
+        return metricRegex.replace(content) { matchResult ->
+            val label = matchResult.groupValues[1]
+            val value = matchResult.groupValues[2]
+            val iconName = matchResult.groupValues.getOrNull(3) ?: "analytics"
+            val color = matchResult.groupValues.getOrNull(4) ?: "#007AFF"
+            
+            // 将十六进制颜色转换为 RGB 值，用于生成半透明背景
+            val rgb = hexToRgb(color)
+            val bgGradient = "linear-gradient(135deg, rgba($rgb, 0.08) 0%, rgba($rgb, 0.04) 100%)"
+            val borderColor = "rgba($rgb, 0.15)"
+            
+            """
+            <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin: 0 4px 4px 0;
+                padding: 4px 8px;
+                background: $bgGradient;
+                border-radius: 8px;
+                border: 1px solid $borderColor;
+                min-width: 60px;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);">
+                <span class="material-symbols-rounded" style="font-size: 14px; color: $color;">$iconName</span>
+                <div style="display: flex; flex-direction: column; gap: 0;">
+                    <div style="font-size: 8px; color: rgba(120, 120, 128, 0.65); font-weight: 500; letter-spacing: 0.2px; text-transform: uppercase;">$label</div>
+                    <div style="font-size: 11px; font-weight: 600; color: inherit; letter-spacing: -0.1px; line-height: 1.1;">$value</div>
+                </div>
+            </div>
+            """.trimIndent()
+        }
+    }
+    
+    /** 将十六进制颜色 (#RRGGBB) 转换为 RGB 字符串 "r, g, b" */
+    private fun hexToRgb(hex: String): String {
+        val cleanHex = hex.removePrefix("#")
+        return try {
+            val r = cleanHex.substring(0, 2).toInt(16)
+            val g = cleanHex.substring(2, 4).toInt(16)
+            val b = cleanHex.substring(4, 6).toInt(16)
+            "$r, $g, $b"
+        } catch (e: Exception) {
+            // 如果解析失败，默认返回蓝色
+            "0, 122, 255"
+        }
+    }
+    
+    /** 处理 <badge type="success|info|warning|error" icon="icon_name">文本</badge> */
+    private fun processBadgeTags(content: String): String {
+        val badgeRegex = """<badge(?:\s+type="([^"]+)")?(?:\s+icon="([^"]+)")?>([^<]+)</badge>""".toRegex()
+        return badgeRegex.replace(content) { matchResult ->
+            val type = matchResult.groupValues.getOrNull(1) ?: "info"
+            val iconName = matchResult.groupValues.getOrNull(2)
+            val text = matchResult.groupValues[3]
+            
+            val (bgColor, textColor, borderColor) = when (type) {
+                "success" -> Triple("rgba(52, 199, 89, 0.15)", "#34C759", "rgba(52, 199, 89, 0.3)")
+                "warning" -> Triple("rgba(255, 159, 10, 0.15)", "#FF9F0A", "rgba(255, 159, 10, 0.3)")
+                "error" -> Triple("rgba(255, 69, 58, 0.15)", "#FF453A", "rgba(255, 69, 58, 0.3)")
+                else -> Triple("rgba(120, 120, 128, 0.12)", "rgba(120, 120, 128, 0.9)", "rgba(120, 120, 128, 0.25)")
+            }
+            
+            val iconHtml = if (iconName != null) {
+                """<span class="material-symbols-rounded" style="font-size: 11px; margin-right: 2px;">$iconName</span>"""
+            } else ""
+            
+            """<span style="
+                display: inline-flex;
+                align-items: center;
+                padding: 2px 6px;
+                margin: 0 2px;
+                background: $bgColor;
+                color: $textColor;
+                border: 1px solid $borderColor;
+                border-radius: 5px;
+                font-size: 10px;
+                font-weight: 600;
+                letter-spacing: 0.1px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                ">$iconHtml$text</span>"""
+        }
+    }
+    
+    /** 处理 <progress value="80" label="能量" /> */
+    private fun processProgressTags(content: String): String {
+        val progressRegex = """<progress\s+value="([^"]+)"(?:\s+label="([^"]+)")?\s*/>""".toRegex()
+        return progressRegex.replace(content) { matchResult ->
+            val valueStr = matchResult.groupValues[1]
+            val label = matchResult.groupValues.getOrNull(2) ?: ""
+            val value = valueStr.toIntOrNull() ?: 0
+            val clampedValue = value.coerceIn(0, 100)
+            
+            val barColor = when {
+                clampedValue >= 80 -> "#34C759"
+                clampedValue >= 50 -> "#007AFF"
+                clampedValue >= 30 -> "#FF9F0A"
+                else -> "#FF453A"
+            }
+            
+            val labelHtml = if (label.isNotEmpty()) {
+                """<div style="font-size: 8px; color: rgba(120, 120, 128, 0.65); margin-bottom: 2px; font-weight: 500;">$label</div>"""
+            } else ""
+            
+            """
+            <div style="margin: 3px 0;">
+                $labelHtml
+                <div style="
+                    width: 100%;
+                    height: 2px;
+                    background-color: rgba(120, 120, 128, 0.1);
+                    border-radius: 1px;
+                    overflow: hidden;">
+                    <div style="
+                        width: ${clampedValue}%;
+                        height: 100%;
+                        background: $barColor;
+                        border-radius: 1px;
+                        transition: width 0.3s ease;"></div>
+                </div>
+                <div style="font-size: 8px; color: rgba(120, 120, 128, 0.55); margin-top: 1px; text-align: right; font-weight: 500;">$clampedValue%</div>
+            </div>
+            """.trimIndent()
+        }
+    }
+    
+    /** 状态卡片样式 - 现代渐变设计 */
+    private fun applyStatusCardStyle(content: String, customColor: String? = null): String {
+        // 如果提供了自定义颜色，使用自定义颜色；否则使用默认蓝紫渐变
+        val rgb = if (customColor != null) hexToRgb(customColor) else null
+        
+        val bgGradient = if (rgb != null) {
+            "linear-gradient(135deg, rgba($rgb, 0.1) 0%, rgba($rgb, 0.08) 100%)"
+        } else {
+            "linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(88, 86, 214, 0.08) 100%)"
+        }
+        
+        val borderColor = if (rgb != null) {
+            "rgba($rgb, 0.2)"
+        } else {
+            "rgba(0, 122, 255, 0.2)"
+        }
+        
+        val shadowColor = if (rgb != null) {
+            "0 2px 8px rgba($rgb, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)"
+        } else {
+            "0 2px 8px rgba(0, 122, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)"
+        }
+        
+        return """
+            <div style="
+                background: $bgGradient;
+                padding: 10px 12px;
+                border-radius: 12px;
+                margin: 4px 0;
+                border: 1px solid $borderColor;
+                box-shadow: $shadowColor;
+                backdrop-filter: blur(8px);">
+                $content
+            </div>
+        """.trimIndent()
+    }
+    
+    /** 信息卡片样式 - 中性色调玻璃态 */
+    private fun applyInfoCardStyle(content: String, customColor: String? = null): String {
+        val rgb = if (customColor != null) hexToRgb(customColor) else "120, 120, 128"
+        
+        return """
+            <div style="
+                background: linear-gradient(135deg, rgba($rgb, 0.1) 0%, rgba($rgb, 0.06) 100%);
+                padding: 10px 12px;
+                border-radius: 12px;
+                margin: 4px 0;
+                border: 1px solid rgba($rgb, 0.18);
+                box-shadow: 0 2px 8px rgba($rgb, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+                backdrop-filter: blur(8px);">
+                $content
+            </div>
+        """.trimIndent()
+    }
+    
+    /** 警告卡片样式 - 橙色渐变 */
+    private fun applyWarningCardStyle(content: String, customColor: String? = null): String {
+        val rgb = if (customColor != null) hexToRgb(customColor) else "255, 159, 10"
+        
+        return """
+            <div style="
+                background: linear-gradient(135deg, rgba($rgb, 0.12) 0%, rgba($rgb, 0.08) 100%);
+                padding: 10px 12px;
+                border-radius: 12px;
+                margin: 4px 0;
+                border: 1px solid rgba($rgb, 0.25);
+                box-shadow: 0 2px 8px rgba($rgb, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+                backdrop-filter: blur(8px);">
+                $content
+            </div>
+        """.trimIndent()
+    }
+    
+    /** 成功卡片样式 - 绿色渐变 */
+    private fun applySuccessCardStyle(content: String, customColor: String? = null): String {
+        val rgb = if (customColor != null) hexToRgb(customColor) else "52, 199, 89"
+        
+        return """
+            <div style="
+                background: linear-gradient(135deg, rgba($rgb, 0.12) 0%, rgba($rgb, 0.08) 100%);
+                padding: 10px 12px;
+                border-radius: 12px;
+                margin: 4px 0;
+                border: 1px solid rgba($rgb, 0.25);
+                box-shadow: 0 2px 8px rgba($rgb, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+                backdrop-filter: blur(8px);">
+                $content
+            </div>
+        """.trimIndent()
+    }
+    
+    /** 指标网格样式 - 用于展示多个指标 */
+    private fun applyMetricGridStyle(content: String): String {
+        return """
+            <div style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0;
+                margin: 0 -4px;">
+                $content
+            </div>
+        """.trimIndent()
+    }
+
+    /** 
+     * 渲染 <mood> 标签 - 这是一个虚拟形象动画触发器，不应在聊天界面显示
+     * 
+     * mood标签的格式: <mood>HAPPY</mood> 或 <mood>ANGRY</mood>
+     * 支持的mood值（在 AvatarEmotionManager 中定义）：
+     * - ANGRY: 愤怒/生气 -> 映射到 AvatarEmotion.SAD
+     * - HAPPY: 开心/快乐 -> 映射到 AvatarEmotion.HAPPY
+     * - SHY: 害羞 -> 映射到 AvatarEmotion.CONFUSED
+     * - AOJIAO: 傲娇 -> 映射到 AvatarEmotion.CONFUSED
+     * - CRY: 哭泣/难过 -> 映射到 AvatarEmotion.SAD
+     * 
+     * 注意：此标签不会在UI中渲染任何内容。虚拟形象的情感控制
+     * 是在 FloatingAvatarMode 中通过 AvatarEmotionManager.analyzeEmotion() 实现的。
+     */
+    @Composable
+    private fun renderMoodTag(content: String, modifier: Modifier, textColor: Color) {
+        // mood标签不显示任何内容
+        // 它只是作为一个标记存在于文本中，供虚拟形象系统解析
+        // 实际的情感触发由 AvatarEmotionManager.analyzeEmotion() 处理
     }
 }
