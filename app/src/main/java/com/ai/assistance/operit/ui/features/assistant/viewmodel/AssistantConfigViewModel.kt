@@ -33,7 +33,6 @@ class AssistantConfigViewModel(
             val config: AvatarInstanceSettings? = null,
             val errorMessage: String? = null,
             val operationSuccess: Boolean = false,
-            val isScanning: Boolean = false,
             val scrollPosition: Int = 0,
             val isImporting: Boolean = false
     )
@@ -74,7 +73,6 @@ class AssistantConfigViewModel(
             config: AvatarInstanceSettings? = null,
             errorMessage: String? = null,
             operationSuccess: Boolean? = null,
-            isScanning: Boolean? = null,
             isImporting: Boolean? = null
     ) {
         val currentState = _uiState.value
@@ -87,7 +85,6 @@ class AssistantConfigViewModel(
                         config = config ?: currentState.config,
                         errorMessage = errorMessage,
                         operationSuccess = operationSuccess ?: currentState.operationSuccess,
-                        isScanning = isScanning ?: currentState.isScanning,
                         scrollPosition = currentState.scrollPosition,
                         isImporting = isImporting ?: currentState.isImporting
                 )
@@ -121,29 +118,6 @@ class AssistantConfigViewModel(
         val updatedConfig = currentConfig.copy(translateY = translateY)
         viewModelScope.launch { repository.updateAvatarSettings(avatarId, updatedConfig) }
     }
-
-    /** 扫描用户模型 */
-    fun refreshAvatars() {
-        updateUiState(isScanning = true)
-        viewModelScope.launch {
-            try {
-                repository.refreshAvatars()
-                updateUiState(
-                        isScanning = false,
-                        operationSuccess = true
-                )
-            } catch (e: Exception) {
-                updateUiState(
-                        isScanning = false,
-                        operationSuccess = false,
-                        errorMessage = context.getString(R.string.error_occurred, e.message)
-                )
-            }
-        }
-    }
-
-    /** 扫描用户模型 - 别名方法 */
-    fun scanUserAvatars() = refreshAvatars()
 
     /** 删除用户模型 */
     fun deleteAvatar(modelId: String) {

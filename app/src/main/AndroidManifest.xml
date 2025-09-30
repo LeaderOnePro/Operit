@@ -174,13 +174,6 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
-
-        <!-- Desktop Pet Overlay Service -->
-        <service
-            android:name=".services.PetOverlayService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync|microphone|specialUse" />
         
     </application>
 

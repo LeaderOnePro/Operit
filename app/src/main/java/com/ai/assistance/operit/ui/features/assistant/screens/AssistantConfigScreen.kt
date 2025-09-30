@@ -7,10 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,38 +15,22 @@ import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.data.model.FunctionType
-import com.ai.assistance.operit.data.model.PromptFunctionType
-import com.ai.assistance.operit.data.preferences.*
 import com.ai.assistance.operit.ui.features.assistant.components.AvatarConfigSection
 import com.ai.assistance.operit.ui.features.assistant.components.AvatarPreviewSection
 import com.ai.assistance.operit.ui.features.assistant.components.HowToImportSection
-import com.ai.assistance.operit.ui.features.assistant.components.SettingItem
 import com.ai.assistance.operit.ui.features.assistant.viewmodel.AssistantConfigViewModel
-import com.ai.assistance.operit.ui.features.settings.screens.getFunctionDisplayName
 
 /** 助手配置屏幕 提供DragonBones模型预览和相关配置 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssistantConfigScreen(
-        navigateToModelConfig: () -> Unit,
-        navigateToModelPrompts: () -> Unit,
-        navigateToFunctionalConfig: () -> Unit,
-        navigateToUserPreferences: () -> Unit
-) {
+fun AssistantConfigScreen() {
         val context = LocalContext.current
         val viewModel: AssistantConfigViewModel =
                 viewModel(factory = AssistantConfigViewModel.Factory(context))
         val uiState by viewModel.uiState.collectAsState()
-
-        // Preferences Managers
-        val functionalConfigManager = remember { FunctionalConfigManager(context) }
-        val modelConfigManager = remember { ModelConfigManager(context) }
-        val userPrefsManager = remember { UserPreferencesManager(context) }
 
         // 启动文件选择器
         val zipFileLauncher =
@@ -78,33 +59,6 @@ fun AssistantConfigScreen(
                 zipFileLauncher.launch(intent)
         }
 
-        // State for the selected function type
-        var selectedFunctionType by remember { mutableStateOf(PromptFunctionType.CHAT) }
-
-        // 获取当前活跃的用户偏好/性格配置
-        val activeUserPrefProfileId by
-                userPrefsManager.activeProfileIdFlow.collectAsState(initial = "default")
-        val activeUserPrefProfile by
-                userPrefsManager
-                        .getUserPreferencesFlow(activeUserPrefProfileId)
-                        .collectAsState(initial = null)
-        val activeUserPrefProfileName = activeUserPrefProfile?.name ?: stringResource(R.string.processing)
-
-        val functionType =
-                when (selectedFunctionType) {
-                        PromptFunctionType.CHAT -> FunctionType.CHAT
-                        PromptFunctionType.VOICE -> FunctionType.SUMMARY
-                        PromptFunctionType.DESKTOP_PET -> FunctionType.PROBLEM_LIBRARY
-                }
-        val modelConfigId = remember { mutableStateOf(FunctionalConfigManager.DEFAULT_CONFIG_ID) }
-        LaunchedEffect(selectedFunctionType) {
-                modelConfigId.value = functionalConfigManager.getConfigIdForFunction(functionType)
-        }
-        val modelConfig by
-                modelConfigManager
-                        .getModelConfigFlow(modelConfigId.value)
-                        .collectAsState(initial = null)
-
         val snackbarHostState = remember { SnackbarHostState() }
         val scrollState = rememberScrollState(initial = uiState.scrollPosition)
 
@@ -130,38 +84,7 @@ fun AssistantConfigScreen(
         }
 
         CustomScaffold(
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-                topBar = {
-                        TopAppBar(
-                                title = { Text(stringResource(R.string.assistant_config_title)) },
-                                actions = {
-                                        // 导入模型按钮
-                                        IconButton(
-                                                onClick = openZipFilePicker,
-                                                enabled = !uiState.isImporting && !uiState.isLoading
-                                        ) {
-                                                Icon(
-                                                        imageVector = Icons.Default.FileUpload,
-                                                        contentDescription = stringResource(R.string.import_model)
-                                                )
-                                        }
-
-                                        // 刷新模型列表按钮
-                                        IconButton(
-                                                onClick = { viewModel.scanUserAvatars() },
-                                                enabled =
-                                                        !uiState.isImporting &&
-                                                                !uiState.isLoading &&
-                                                                !uiState.isScanning
-                                        ) {
-                                                Icon(
-                                                        imageVector = Icons.Default.Refresh,
-                                                        contentDescription = stringResource(R.string.scan_user_models)
-                                                )
-                                        }
-                                }
-                        )
-                }
+                snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
                 Box(modifier = Modifier.fillMaxSize()) {
                         // 主要内容
@@ -191,41 +114,6 @@ fun AssistantConfigScreen(
                                 )
 
                                 HowToImportSection()
-
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color =
-                                                MaterialTheme.colorScheme.surfaceVariant.copy(
-                                                        alpha = 0.1f
-                                                )
-                                ) {
-                                        Column(
-                                                modifier =
-                                                        Modifier.padding(
-                                                                vertical = 4.dp,
-                                                                horizontal = 8.dp
-                                                        )
-                                        ) {
-
-                                                SettingItem(
-                                                        icon = Icons.Default.Face,
-                                                        title = stringResource(R.string.user_personality),
-                                                        value = activeUserPrefProfileName,
-                                                        onClick = navigateToUserPreferences
-                                                )
-
-                                                SettingItem(
-                                                        icon = Icons.Default.Api,
-                                                        title = stringResource(R.string.function_model),
-                                                        value = modelConfig?.name ?: stringResource(R.string.not_configured),
-                                                        onClick = navigateToFunctionalConfig
-                                                )
-                                        }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
 
                                 // 底部空间
                                 Spacer(modifier = Modifier.height(16.dp))

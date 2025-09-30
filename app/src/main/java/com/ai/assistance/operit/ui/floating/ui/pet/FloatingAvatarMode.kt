@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.floating.ui.pet
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.core.avatar.common.state.AvatarEmotion
 import com.ai.assistance.operit.core.avatar.common.view.AvatarView
 import com.ai.assistance.operit.core.avatar.impl.factory.AvatarControllerFactoryImpl
 import com.ai.assistance.operit.core.avatar.impl.factory.AvatarModelFactoryImpl
@@ -61,11 +63,40 @@ fun FloatingAvatarMode(floatContext: FloatContext) {
     val latestMessage = floatContext.messages.lastOrNull { it.sender == "ai" }
     var showPetChatBubble by remember { mutableStateOf(false) }
     var closeBubbleManually by remember { mutableStateOf(false) }
+    
+    // 用于触发表情更新的状态
+    var emotionTrigger by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(latestMessage) {
         if (latestMessage != null) {
             closeBubbleManually = false
             showPetChatBubble = true
+        }
+    }
+    
+    // 监听最新消息的流完成事件
+    LaunchedEffect(latestMessage?.contentStream) {
+        latestMessage?.contentStream?.let { stream ->
+            Log.d("FloatingAvatarMode", "开始监听消息流...")
+            try {
+                // 收集整个流（但不处理内容，只等待完成）
+                val contentBuilder = StringBuilder()
+                stream.collect { chunk ->
+                    contentBuilder.append(chunk)
+                }
+                // 流完成后，分析完整内容并更新表情
+                val finalContent = contentBuilder.toString()
+                Log.d("FloatingAvatarMode", "消息流完成，最终内容长度: ${finalContent.length}")
+                Log.d("FloatingAvatarMode", "内容预览: ${finalContent.take(100)}")
+                
+                val emotion = AvatarEmotionManager.analyzeEmotion(finalContent)
+                Log.d("FloatingAvatarMode", "分析出的情感: $emotion")
+                
+                // 更新触发器，让下面的LaunchedEffect更新表情
+                emotionTrigger++
+            } catch (e: Exception) {
+                Log.e("FloatingAvatarMode", "监听消息流时出错", e)
+            }
         }
     }
 
@@ -398,6 +429,15 @@ fun FloatingAvatarMode(floatContext: FloatContext) {
                                                  }
                                             }
                                             
+                                            // 监听情感触发器并更新Avatar表情
+                                            LaunchedEffect(emotionTrigger) {
+                                                if (emotionTrigger > 0 && latestMessage != null) {
+                                                    val emotion = AvatarEmotionManager.analyzeEmotion(latestMessage.content)
+                                                    Log.d("FloatingAvatarMode", "更新Avatar表情为: $emotion")
+                                                    controller.setEmotion(emotion)
+                                                }
+                                            }
+                                            
                                             AvatarView(
                                                 modifier = Modifier.fillMaxSize(),
                                                 model = avatarModel,
@@ -716,7 +756,7 @@ fun FloatingAvatarMode(floatContext: FloatContext) {
                                         if (message.isNotBlank()) {
                                             floatContext.onSendMessage?.invoke(
                                                     message,
-                                                    PromptFunctionType.CHAT
+                                                    PromptFunctionType.DESKTOP_PET
                                             )
                                             showPetChatInput = false
                                             // 释放输入法焦点

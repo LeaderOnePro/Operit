@@ -390,12 +390,7 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            AssistantConfigScreen(
-                    navigateToModelConfig = { navigateTo(ModelConfig) },
-                    navigateToModelPrompts = { navigateTo(ModelPromptsSettings) },
-                    navigateToFunctionalConfig = { navigateTo(FunctionalConfig) },
-                    navigateToUserPreferences = { navigateTo(UserPreferencesSettings) }
-            )
+            AssistantConfigScreen()
         }
     }
 

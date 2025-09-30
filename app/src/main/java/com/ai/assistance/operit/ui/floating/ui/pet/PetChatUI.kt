@@ -44,9 +44,9 @@ fun PetChatBubble(message: String) {
     // 使用LaunchedEffect来实现打字机效果
     LaunchedEffect(message) {
         displayedMessage = ""
-        // 先对消息进行trim处理，去除首尾换行符
-        val trimmedMessage = message.trim()
-        for (char in trimmedMessage) {
+        // 先对消息进行trim和XML标签清理
+        val cleanedMessage = AvatarEmotionManager.stripXmlLikeTags(message).trim()
+        for (char in cleanedMessage) {
             displayedMessage += char
             delay(15) // 字符显示的延迟，可以调整以改变速度
         }
@@ -173,9 +173,9 @@ fun PetChatBubble(chatMessage: ChatMessage, onClose: () -> Unit = {}) {
         }
                 ?: run {
                     // 如果没有流，则显示静态内容，但仍然使用打字机效果
-                    // 先对消息进行trim处理
-                    val trimmedContent = chatMessage.content.trim()
-                    for (char in trimmedContent) {
+                    // 先对消息进行trim和XML标签清理
+                    val cleanedContent = AvatarEmotionManager.stripXmlLikeTags(chatMessage.content).trim()
+                    for (char in cleanedContent) {
                         displayedMessage += char
                         delay(15)
                     }
