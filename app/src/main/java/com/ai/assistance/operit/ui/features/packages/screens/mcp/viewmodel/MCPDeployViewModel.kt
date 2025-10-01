@@ -5,10 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.mcp.MCPRepository
-import com.ai.assistance.operit.data.mcp.plugins.MCPCommandGenerator
 import com.ai.assistance.operit.data.mcp.plugins.MCPDeployer
-import com.ai.assistance.operit.data.mcp.plugins.MCPProjectAnalyzer
-import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,42 +56,25 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
             return false
         }
 
-        try {
-            val pluginDir = File(pluginPath)
-            if (!pluginDir.exists() || !pluginDir.isDirectory) {
-                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("插件目录不存在: $pluginPath")
-                return false
+        // 在协程中调用挂起函数
+        viewModelScope.launch {
+            try {
+                // 使用MCPDeployer的getDeployCommands方法
+                val deployCommands = mcpDeployer.getDeployCommands(pluginId, pluginPath)
+                
+                if (deployCommands.isEmpty()) {
+                    _deploymentStatus.value =
+                            MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
+                } else {
+                    // 保存生成的命令
+                    _generatedCommands.value = deployCommands
+                }
+            } catch (e: Exception) {
+                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
             }
-
-            // 创建项目分析器
-            val projectAnalyzer = MCPProjectAnalyzer()
-
-            // 查找README文件
-            val readmeFile = projectAnalyzer.findReadmeFile(pluginDir)
-            val readmeContent = readmeFile?.readText() ?: ""
-
-            // 分析项目结构
-            val projectStructure = projectAnalyzer.analyzeProjectStructure(pluginDir, readmeContent)
-
-            // 创建命令生成器
-            val commandGenerator = MCPCommandGenerator()
-
-            // 生成部署命令
-            val deployCommands =
-                    commandGenerator.generateDeployCommands(projectStructure, readmeContent)
-            if (deployCommands.isEmpty()) {
-                _deploymentStatus.value =
-                        MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
-                return false
-            }
-
-            // 保存生成的命令
-            _generatedCommands.value = deployCommands
-            return true
-        } catch (e: Exception) {
-            _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
-            return false
         }
+        
+        return true
     }
 
     /**

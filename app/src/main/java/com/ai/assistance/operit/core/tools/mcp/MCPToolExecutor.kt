@@ -135,7 +135,8 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
     /**
      * 自动转换参数类型
      *
-     * 将字符串参数转换为适当的数字类型
+     * 将字符串参数转换为适当的类型（包括 number、boolean、array 等）
+     * 支持递归处理数组内的元素
      */
     private fun convertParameterTypes(
             parameters: Map<String, Any>,
@@ -144,50 +145,21 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
         val result = mutableMapOf<String, Any>()
 
         parameters.forEach { (name, value) ->
-            // 默认使用原始值
-            var convertedValue: Any = value
+            // 尝试从工具定义中获取参数类型（从 inputSchema.properties 中获取）
+            val expectedType =
+                    toolInfo?.optJSONObject("inputSchema")?.optJSONObject("properties")?.let {
+                                properties ->
+                        properties.optJSONObject(name)?.optString("type")
+                    }
 
-            // 尝试根据工具信息进行类型转换
-            if (value is String) {
-                // 尝试从工具定义中获取参数类型
-                val expectedType =
-                        toolInfo?.optJSONArray("parameters")?.let { params ->
-                            for (i in 0 until params.length()) {
-                                val param = params.optJSONObject(i)
-                                if (param?.optString("name") == name) {
-                                    return@let param.optString("type")
-                                }
-                            }
-                            null
-                        }
+            // 使用 MCPToolParameter.smartConvert 进行智能类型转换
+            val convertedValue = MCPToolParameter.smartConvert(value, expectedType)
 
-                // 即使没有工具定义，也尝试智能类型转换
-                convertedValue =
-                        when {
-                            // 如果工具参数明确要求数字类型或字符串看起来是数字
-                            expectedType == "number" ||
-                                    value.matches(Regex("-?\\d+(\\.\\d+)?")) -> {
-                                try {
-                                    if (value.contains(".")) value.toDouble() else value.toLong()
-                                } catch (e: Exception) {
-                                    Log.d(TAG, "数字转换失败，使用原始字符串: $value")
-                                    value
-                                }
-                            }
-                            expectedType == "boolean" ||
-                                    value.lowercase() == "true" ||
-                                    value.lowercase() == "false" -> {
-                                value.lowercase() == "true"
-                            }
-                            else -> value
-                        }
-
-                if (convertedValue != value) {
-                    Log.d(
-                            TAG,
-                            "参数 $name 从 ${value::class.java.simpleName} 转换为 ${convertedValue::class.java.simpleName}: $value -> $convertedValue"
-                    )
-                }
+            if (convertedValue != value) {
+                Log.d(
+                        TAG,
+                        "参数 $name 从 ${value::class.java.simpleName} 转换为 ${convertedValue::class.java.simpleName}: $value -> $convertedValue"
+                )
             }
 
             result[name] = convertedValue

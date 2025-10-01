@@ -17,15 +17,12 @@ interface BridgeConfig {
 declare class McpBridge {
     private config;
     private server;
-    private mcpProcesses;
-    private remoteServiceClients;
+    private serviceClients;
     private mcpToolsMap;
     private serviceReadyMap;
     private serviceRegistry;
     private activeConnections;
     private pendingRequests;
-    private toolResponseMapping;
-    private toolCallServiceMap;
     private readonly REQUEST_TIMEOUT;
     private mcpErrors;
     private restartAttempts;
@@ -49,29 +46,25 @@ declare class McpBridge {
      */
     private isServiceActive;
     /**
-     * 连接到远程MCP服务
+     * 连接到远程MCP服务 (HTTP/SSE)
      */
     private connectToRemoteService;
     /**
-     * 处理远程连接关闭和重连
+     * 处理服务连接关闭和重连 (本地和远程服务统一处理)
      */
-    private handleRemoteClosure;
+    private handleServiceClosure;
     /**
-     * 启动特定服务的子进程
+     * 启动本地MCP服务 (使用官方 MCPClient 的 stdio 连接)
      */
-    private startMcpProcess;
     /**
-     * 发送请求到指定服务 (本地或远程)
+     * 展开路径中的 ~ 符号为用户主目录
      */
-    private sendRequestToService;
+    private expandPath;
+    private startLocalService;
     /**
-     * 获取特定服务的MCP工具列表
+     * 获取特定服务的MCP工具列表 (统一处理本地和远程服务)
      */
     private fetchMcpTools;
-    /**
-     * 处理来自特定服务的MCP响应数据
-     */
-    private handleMcpResponse;
     /**
      * 处理客户端MCP命令
      */

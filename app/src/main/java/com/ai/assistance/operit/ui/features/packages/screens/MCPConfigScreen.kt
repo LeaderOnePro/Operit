@@ -141,8 +141,7 @@ fun MCPConfigScreen(
             android.util.Log.d("MCPConfigScreen", "已安装的MCP插件列表:")
             installedPlugins.forEach { pluginId ->
                 try {
-                    val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-                    val isEnabled = serverStatus?.isEnabled != false // 默认为true
+                    val isEnabled = mcpLocalServer.isServerEnabled(pluginId) // 从配置读取
                     android.util.Log.d("MCPConfigScreen", "插件ID: $pluginId, 已启用: $isEnabled")
                 } catch (e: Exception) {
                     android.util.Log.e("MCPConfigScreen", "无法读取插件 $pluginId 的启用状态: ${e.message}")
@@ -892,9 +891,9 @@ fun MCPConfigScreen(
                             mutableStateOf(serverStatus?.deploySuccess == true)
                         }
 
-                        // 获取插件启用状态
+                        // 获取插件启用状态 - 从配置读取
                         val pluginEnabledState = remember(pluginId) {
-                            mutableStateOf(serverStatus?.isEnabled != false) // 默认为true
+                            mutableStateOf(mcpLocalServer.isServerEnabled(pluginId))
                         }
 
                         // 获取插件运行状态
@@ -912,9 +911,15 @@ fun MCPConfigScreen(
                             mcpLocalServer.serverStatus.collect { statusMap ->
                                 val status = statusMap[pluginId]
                                 deploySuccessState.value = status?.deploySuccess == true
-                                pluginEnabledState.value = status?.isEnabled != false
                                 pluginRunningState.value = status?.active == true
                                 lastDeployTimeState.value = status?.lastDeployTime ?: 0L
+                            }
+                        }
+                        
+                        // 监听配置变化（isEnabled状态）
+                        LaunchedEffect(pluginId) {
+                            mcpLocalServer.mcpConfig.collect { _ ->
+                                pluginEnabledState.value = mcpLocalServer.isServerEnabled(pluginId)
                             }
                         }
 
@@ -944,7 +949,7 @@ fun MCPConfigScreen(
                                 isEnabled = pluginEnabledState.value,
                                 onEnabledChange = { isChecked ->
                                     scope.launch {
-                                        mcpLocalServer.updateServerStatus(pluginId, isEnabled = isChecked)
+                                        mcpLocalServer.setServerEnabled(pluginId, isChecked)
                                     }
                                 },
                                 isRunning = pluginRunningState.value,

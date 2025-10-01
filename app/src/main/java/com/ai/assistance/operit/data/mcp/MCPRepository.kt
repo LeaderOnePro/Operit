@@ -788,8 +788,7 @@ class MCPRepository(private val context: Context) {
             mcpLocalServer.addOrUpdatePluginMetadata(metadata)
 
             mcpLocalServer.updateServerStatus(
-                serverId = server.id,
-                isEnabled = true,
+                server.id,
                 active = false, // The bridge will report the active status
                 deploySuccess = true
             )

@@ -252,6 +252,30 @@ class MCPBridge private constructor(private val context: Context) {
                     }
                 }
 
+        // 重置桥接器（静态方法）
+        suspend fun reset(context: Context? = null): JSONObject? =
+                withContext(Dispatchers.IO) {
+                    try {
+                        Log.d(TAG, "重置桥接器 - 关闭所有服务并清空注册表...")
+                        val command =
+                                JSONObject().apply {
+                                    put("command", "reset")
+                                    put("id", UUID.randomUUID().toString())
+                                }
+
+                        val response = sendCommand(command)
+                        if (response?.optBoolean("success", false) == true) {
+                            Log.i(TAG, "桥接器重置成功")
+                        } else {
+                            Log.w(TAG, "桥接器重置失败")
+                        }
+                        return@withContext response
+                    } catch (e: Exception) {
+                        Log.e(TAG, "重置桥接器异常", e)
+                        return@withContext null
+                    }
+                }
+
         // 发送命令到桥接器
         suspend fun sendCommand(
                 command: JSONObject,
@@ -631,6 +655,37 @@ class MCPBridge private constructor(private val context: Context) {
                     return@withContext null
                 } catch (e: Exception) {
                     Log.e(TAG, "Ping服务时出错: ${e.message}")
+                    return@withContext null
+                }
+            }
+
+    /**
+     * 重置桥接器 - 关闭所有服务、清空注册表和池子
+     * 
+     * @return 重置是否成功
+     */
+    suspend fun resetBridge(): JSONObject? =
+            withContext(Dispatchers.IO) {
+                try {
+                    Log.d(TAG, "开始重置桥接器，关闭所有服务并清空注册表...")
+
+                    val command =
+                            JSONObject().apply {
+                                put("command", "reset")
+                                put("id", UUID.randomUUID().toString())
+                            }
+
+                    val response = sendCommand(command)
+
+                    if (response?.optBoolean("success", false) == true) {
+                        Log.i(TAG, "桥接器重置成功")
+                        return@withContext response
+                    } else {
+                        Log.w(TAG, "桥接器重置失败")
+                        return@withContext null
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "重置桥接器时出错: ${e.message}")
                     return@withContext null
                 }
             }

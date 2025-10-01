@@ -86,10 +86,27 @@ class MCPStarter(private val context: Context) {
 
     /** Initialize and start the bridge */
     private suspend fun initBridge(): Boolean {
-        if (bridgeInitialized) {
-            val pingResult = MCPBridge.ping()
-            if (pingResult != null) return true
+        // 检查 bridge 是否已经在运行
+        val pingResult = MCPBridge.ping(context)
+        if (pingResult != null) {
+            Log.d(TAG, "Bridge is already running, resetting to clear all services and child processes...")
+            
+            // 重置桥接器，清空所有服务、杀死子进程和清空池子
+            val resetResult = MCPBridge.reset(context)
+            
+            if (resetResult != null) {
+                Log.i(TAG, "Bridge reset successful: all services closed, child processes killed, registry cleared")
+                bridgeInitialized = true
+                return true
+            } else {
+                Log.w(TAG, "Bridge reset failed, but bridge is running. Proceeding anyway...")
+                bridgeInitialized = true
+                return true
+            }
         }
+
+        // Bridge 未运行，需要启动
+        Log.d(TAG, "Bridge is not running, starting fresh...")
 
         // Check if terminal service is available
         if (!isTerminalServiceConnected()) {
@@ -169,14 +186,63 @@ class MCPStarter(private val context: Context) {
                 val serverStatus = mcpLocalServer.getServerStatus(pluginId)
                 val isDeployed = serverStatus?.deploySuccess == true
                 if (!isDeployed) {
-                    statusCallback(StartStatus.Error("Plugin not deployed: $pluginId"))
-                    return false
+                    // 自动部署未部署的插件
+                    statusCallback(StartStatus.InProgress("插件未部署，开始自动部署: $pluginId"))
+                    Log.d(TAG, "插件 $pluginId 未部署，开始自动部署")
+                    
+                    val pluginPath = mcpRepository.installedPluginIds.first()
+                        .find { it == pluginId }
+                        ?.let { mcpRepository.getInstalledPluginPath(it) }
+                    
+                    if (pluginPath == null) {
+                        statusCallback(StartStatus.Error("无法获取插件路径: $pluginId"))
+                        return false
+                    }
+                    
+                    // 使用MCPDeployer自动部署
+                    val deployer = MCPDeployer(context)
+                    val deployCommands = deployer.getDeployCommands(pluginId, pluginPath)
+                    
+                    if (deployCommands.isEmpty()) {
+                        statusCallback(StartStatus.Error("无法确定如何部署插件: $pluginId"))
+                        return false
+                    }
+                    
+                    // 执行部署
+                    var deploySuccess = false
+                    deployer.deployPluginWithCommands(
+                        pluginId = pluginId,
+                        pluginPath = pluginPath,
+                        customCommands = deployCommands,
+                        environmentVariables = emptyMap(),
+                        statusCallback = { deployStatus ->
+                            when (deployStatus) {
+                                is MCPDeployer.DeploymentStatus.Success -> {
+                                    deploySuccess = true
+                                    statusCallback(StartStatus.InProgress("插件部署成功: $pluginId"))
+                                }
+                                is MCPDeployer.DeploymentStatus.Error -> {
+                                    statusCallback(StartStatus.Error("部署失败: ${deployStatus.message}"))
+                                }
+                                is MCPDeployer.DeploymentStatus.InProgress -> {
+                                    statusCallback(StartStatus.InProgress(deployStatus.message))
+                                }
+                                else -> {}
+                            }
+                        }
+                    )
+                    
+                    if (!deploySuccess) {
+                        statusCallback(StartStatus.Error("插件部署失败: $pluginId"))
+                        return false
+                    }
+                    
+                    statusCallback(StartStatus.InProgress("插件部署完成，继续启动: $pluginId"))
                 }
             }
 
             // Check if plugin is enabled by the user
-            val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-            val isEnabled = serverStatus?.isEnabled != false // 默认为true
+            val isEnabled = mcpLocalServer.isServerEnabled(pluginId) // 从配置读取
             if (!isEnabled) {
                 statusCallback(StartStatus.Error("Plugin not enabled by user: $pluginId"))
                 return false
@@ -343,22 +409,11 @@ class MCPStarter(private val context: Context) {
                 val mcpRepository = MCPRepository(context)
                 val mcpLocalServer = MCPLocalServer.getInstance(context)
 
-                // Get plugins to start: enabled remote plugins, or enabled and deployed local plugins
+                // Get plugins to start: all enabled plugins (local plugins will be auto-deployed if needed)
                 val pluginList = mcpRepository.installedPluginIds.first()
                 val pluginsToStart =
                         pluginList.filter { pluginId ->
-                            val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-                            val isEnabled = serverStatus?.isEnabled != false // 默认为true
-                            if (!isEnabled) {
-                                false
-                            } else {
-                                val pluginInfo = mcpRepository.getInstalledPluginInfo(pluginId)
-                                when (pluginInfo?.type) {
-                                    "remote" -> true // Remote plugins only need to be enabled
-                                    else -> // Local plugins must also be deployed
-                                    serverStatus?.deploySuccess == true
-                                }
-                            }
+                            mcpLocalServer.isServerEnabled(pluginId) // 只检查是否启用，不再检查部署状态
                         }
 
                 if (pluginsToStart.isEmpty()) {

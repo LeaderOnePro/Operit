@@ -674,12 +674,26 @@ class PluginLoadingState {
                         return@launch
                     }
 
-                    // 设置插件列表，传入List<String>
+                    // 筛选出将要启动的插件（已启用且满足条件的插件）
+                    val pluginsToStart = installedPluginsList.filter { pluginId ->
+                        val isEnabled = mcpLocalServer.isServerEnabled(pluginId)
+                        if (!isEnabled) {
+                            false
+                        } else {
+                            val pluginInfo = mcpRepository.getInstalledPluginInfo(pluginId)
+                            when (pluginInfo?.type) {
+                                "remote" -> true // 远程插件只需启用
+                                else -> true // 本地插件现在会自动部署，所以也包含在内
+                            }
+                        }
+                    }
+
+                    // 设置插件列表，只传入将要启动的插件
                     updateMessage(
-                            context.getString(R.string.plugin_preparing, installedPluginsList.size)
+                            context.getString(R.string.plugin_preparing, pluginsToStart.size)
                     )
                     updateProgress(0.32f)
-                    setPlugins(installedPluginsList)
+                    setPlugins(pluginsToStart)
 
                     // 有安装的插件，使用MCPStarter启动
                     updateMessage(context.getString(R.string.plugin_checking_env))
@@ -740,8 +754,7 @@ class PluginLoadingState {
         return object : MCPStarter.PluginStartProgressListener {
             override fun onPluginStarting(pluginId: String, index: Int, total: Int) {
                 // 在这里检查插件是否被启用
-                val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-                val isEnabled = serverStatus?.isEnabled != false // 默认为true
+                val isEnabled = mcpLocalServer.isServerEnabled(pluginId) // 从配置读取
 
                 // 更新总体状态
                 val disabledSuffix =

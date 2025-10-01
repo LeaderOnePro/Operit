@@ -23,12 +23,14 @@ class MCPConfigGenerator {
      * @param pluginId 插件ID
      * @param projectStructure 项目结构
      * @param environmentVariables 环境变量键值对
+     * @param pluginDirPath 插件在终端环境中的部署路径（如 ~/mcp_plugins/plugin_name）
      * @return MCP配置JSON
      */
     fun generateMcpConfig(
             pluginId: String,
             projectStructure: ProjectStructure,
-            environmentVariables: Map<String, String> = emptyMap()
+            environmentVariables: Map<String, String> = emptyMap(),
+            pluginDirPath: String? = null
     ): String {
         // 存储最终要使用的配置JSON
         var finalConfigJson: JsonObject? = null
@@ -89,17 +91,31 @@ class MCPConfigGenerator {
             when (projectStructure.type) {
                 ProjectType.PYTHON -> {
                     if (!serverJson.has("command")) {
-                        serverJson.addProperty("command", "python")
+                        // 如果提供了插件目录路径，使用 venv 中的 Python
+                        // 否则使用系统 Python（兼容旧逻辑）
+                        val pythonCommand = if (pluginDirPath != null) {
+                            "$pluginDirPath/venv/bin/python"
+                        } else {
+                            "python"
+                        }
+                        serverJson.addProperty("command", pythonCommand)
+                        Log.d(TAG, "Python 项目使用命令: $pythonCommand")
                     }
 
                     if (!serverJson.has("args")) {
                         val argsArray = com.google.gson.JsonArray()
                         argsArray.add("-m")
+                        // 优先级: pyproject.toml 包名 > mainPythonModule > 插件ID
                         val moduleName =
-                                projectStructure.moduleNameFromConfig
+                                projectStructure.pythonPackageName
                                         ?: projectStructure.mainPythonModule
                                                 ?: pluginId.replace("-", "_").lowercase()
-                        argsArray.add(moduleName.split('/').last())
+                        argsArray.add(moduleName)
+                        Log.d(TAG, "Python 项目使用模块名: $moduleName (来源: ${when {
+                            projectStructure.pythonPackageName != null -> "pyproject.toml"
+                            projectStructure.mainPythonModule != null -> "mainPythonModule"
+                            else -> "pluginId"
+                        }})")
                         serverJson.add("args", argsArray)
                     }
                 }
@@ -135,6 +151,11 @@ class MCPConfigGenerator {
                                         mainTsFile.replace("src/", "$outDir/").replace(".ts", ".js")
                                 argsArray.add(compiledPath)
                                 Log.d(TAG, "根据src/和outDir推断编译路径: $compiledPath")
+                            } else if (rootDir == "." || rootDir.isEmpty()) {
+                                // 如果rootDir是根目录，文件会被编译到outDir下
+                                val compiledPath = "$outDir/" + mainTsFile.replace(".ts", ".js")
+                                argsArray.add(compiledPath)
+                                Log.d(TAG, "rootDir为根目录，推断编译路径: $compiledPath")
                             } else {
                                 // 直接替换扩展名
                                 val compiledPath = mainTsFile.replace(".ts", ".js")
@@ -165,8 +186,14 @@ class MCPConfigGenerator {
                 }
                 else -> {
                     if (!serverJson.has("command")) {
-                        // 使用默认配置
-                        serverJson.addProperty("command", "python")
+                        // 使用默认配置（尝试使用 venv 中的 Python）
+                        val pythonCommand = if (pluginDirPath != null) {
+                            "$pluginDirPath/venv/bin/python"
+                        } else {
+                            "python"
+                        }
+                        serverJson.addProperty("command", pythonCommand)
+                        Log.d(TAG, "UNKNOWN 项目类型使用命令: $pythonCommand")
                     }
 
                     if (!serverJson.has("args")) {
@@ -179,9 +206,7 @@ class MCPConfigGenerator {
             }
 
             // 确保其他必要字段存在
-            if (!serverJson.has("disabled")) {
-                serverJson.addProperty("disabled", false)
-            }
+            // 注意：disabled字段不再默认生成，不写表示启用（符合MCP标准）
 
             if (!serverJson.has("autoApprove")) {
                 val autoApproveArray = com.google.gson.JsonArray()

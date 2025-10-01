@@ -79,8 +79,17 @@ class MCPDeployer(private val context: Context) {
                     // 创建配置生成器
                     val configGenerator = MCPConfigGenerator()
                     
-                    // 生成MCP配置，包含环境变量
-                    val mcpConfig = configGenerator.generateMcpConfig(pluginId, projectStructure, environmentVariables)
+                    // 定义插件在 proot 环境中的目录路径
+                    val pluginHomeDir = "~/mcp_plugins"
+                    val pluginDirPath = "$pluginHomeDir/${pluginId.split("/").last()}"
+                    
+                    // 生成MCP配置，包含环境变量和插件目录路径
+                    val mcpConfig = configGenerator.generateMcpConfig(
+                        pluginId, 
+                        projectStructure, 
+                        environmentVariables,
+                        pluginDirPath
+                    )
                     
                     // 保存MCP配置
                     statusCallback(DeploymentStatus.InProgress("保存MCP配置..."))
@@ -113,6 +122,48 @@ class MCPDeployer(private val context: Context) {
             }
         
     /**
+     * 获取部署命令 - 在部署前调用，用于分析和生成命令
+     *
+     * @param pluginId 插件ID
+     * @param pluginPath 插件路径
+     * @return 生成的命令列表，如果失败则返回空列表
+     */
+    suspend fun getDeployCommands(pluginId: String, pluginPath: String): List<String> = withContext(Dispatchers.IO) {
+        try {
+            val pluginDir = File(pluginPath)
+            if (!pluginDir.exists() || !pluginDir.isDirectory) {
+                Log.e(TAG, "插件目录不存在: $pluginPath")
+                return@withContext emptyList()
+            }
+
+            // 创建项目分析器
+            val projectAnalyzer = MCPProjectAnalyzer()
+
+            // 查找README文件
+            val readmeFile = projectAnalyzer.findReadmeFile(pluginDir)
+            val readmeContent = readmeFile?.readText() ?: ""
+
+            // 分析项目结构
+            val projectStructure = projectAnalyzer.analyzeProjectStructure(pluginDir, readmeContent)
+
+            // 创建命令生成器
+            val commandGenerator = MCPCommandGenerator()
+
+            // 生成部署命令
+            val deployCommands = commandGenerator.generateDeployCommands(projectStructure, readmeContent)
+            if (deployCommands.isEmpty()) {
+                Log.e(TAG, "无法确定如何部署此插件: $pluginId")
+                return@withContext emptyList()
+            }
+
+            return@withContext deployCommands
+        } catch (e: Exception) {
+            Log.e(TAG, "分析插件时出错: ${e.message}", e)
+            return@withContext emptyList()
+        }
+    }
+    
+    /**
      * 执行部署命令（提取的公共方法）
      */
     private suspend fun executeDeployCommands(
@@ -122,15 +173,19 @@ class MCPDeployer(private val context: Context) {
             statusCallback: (DeploymentStatus) -> Unit,
             serverName: String?
     ): Boolean = withContext(Dispatchers.IO) {
+        var sessionId: String? = null
+        var deploySuccess = false
         try {
-            // 获取或创建共享终端会话
-            val sessionId = getOrCreateSharedSession()
+            // 为每个插件创建独立的终端会话，方便查看部署日志
+            val terminal = Terminal.getInstance(context)
+            val pluginShortName = pluginId.split("/").last()
+            sessionId = terminal.createSession("deploy-$pluginShortName")
             if (sessionId == null) {
-                statusCallback(DeploymentStatus.Error("无法获取终端会话"))
+                statusCallback(DeploymentStatus.Error("无法创建终端会话"))
                 return@withContext false
             }
             
-            val terminal = Terminal.getInstance(context)
+            Log.d(TAG, "为插件 $pluginId 创建独立部署会话: $sessionId")
 
             // 定义插件在 proot 环境中的主目录路径
             val pluginHomeDir = "~/mcp_plugins"
@@ -250,11 +305,25 @@ class MCPDeployer(private val context: Context) {
             }
 
             statusCallback(DeploymentStatus.Success(successMessage.toString()))
+            deploySuccess = true
             return@withContext true
         } catch (e: Exception) {
             Log.e(TAG, "执行部署命令时出错", e)
             statusCallback(DeploymentStatus.Error("部署出错: ${e.message}"))
             return@withContext false
+        } finally {
+            // 无论成功失败，都关闭部署会话
+            sessionId?.let { 
+                try {
+                    // 延迟关闭会话让用户看到结果
+                    val delayTime = if (deploySuccess) 2000L else 3000L
+                    kotlinx.coroutines.delay(delayTime)
+                    Terminal.getInstance(context).closeSession(it)
+                    Log.d(TAG, "部署${if (deploySuccess) "完成" else "失败"}，已关闭会话: $it")
+                } catch (e: Exception) {
+                    Log.e(TAG, "关闭部署会话时出错: ${e.message}")
+                }
+            }
         }
     }
 

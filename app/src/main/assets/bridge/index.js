@@ -39,8 +39,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const net = __importStar(require("net"));
-const child_process_1 = require("child_process");
 const uuid_1 = require("uuid");
+const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 /**
@@ -49,9 +49,8 @@ const os = __importStar(require("os"));
 class McpBridge {
     constructor(config = {}) {
         this.server = null;
-        // 服务进程/连接映射
-        this.mcpProcesses = new Map();
-        this.remoteServiceClients = new Map();
+        // 统一的服务客户端映射 (本地和远程都使用 MCPClient)
+        this.serviceClients = new Map();
         this.mcpToolsMap = new Map();
         this.serviceReadyMap = new Map();
         // 服务注册表 (纯内存)
@@ -60,8 +59,6 @@ class McpBridge {
         this.activeConnections = new Set();
         // 请求跟踪
         this.pendingRequests = new Map();
-        this.toolResponseMapping = new Map();
-        this.toolCallServiceMap = new Map();
         // 请求超时(毫秒)
         this.REQUEST_TIMEOUT = 60000; // 60秒超时
         // 服务错误记录
@@ -136,18 +133,11 @@ class McpBridge {
         if (!serviceInfo) {
             return false;
         }
-        if (serviceInfo.type === 'local') {
-            return this.mcpProcesses.has(serviceName) &&
-                !this.mcpProcesses.get(serviceName)?.stdin.destroyed;
-        }
-        else if (serviceInfo.type === 'remote') {
-            const client = this.remoteServiceClients.get(serviceName);
-            return !!client; // MCPClient doesn't expose a public "isConnected" property easily. We'll rely on its existence.
-        }
-        return false;
+        // 统一检查：客户端是否存在
+        return this.serviceClients.has(serviceName);
     }
     /**
-     * 连接到远程MCP服务
+     * 连接到远程MCP服务 (HTTP/SSE)
      */
     async connectToRemoteService(serviceName, endpoint, connectionType = 'httpStream') {
         if (this.isServiceActive(serviceName)) {
@@ -162,7 +152,7 @@ class McpBridge {
                 version: '1.0.0',
             });
             // Store client immediately to mark as "active"
-            this.remoteServiceClients.set(serviceName, client);
+            this.serviceClients.set(serviceName, client);
             this.serviceReadyMap.set(serviceName, false);
             this.mcpToolsMap.set(serviceName, []);
             await client.connect({
@@ -176,35 +166,50 @@ class McpBridge {
         }
         catch (error) {
             console.error(`Failed to connect to remote service ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
-            this.handleRemoteClosure(serviceName); // Use the closure handler for reconnection logic
+            this.handleServiceClosure(serviceName); // Use the closure handler for reconnection logic
         }
     }
     /**
-     * 处理远程连接关闭和重连
+     * 处理服务连接关闭和重连 (本地和远程服务统一处理)
      */
-    handleRemoteClosure(serviceName) {
-        console.log(`Remote service ${serviceName} connection closed or failed.`);
-        this.remoteServiceClients.delete(serviceName);
+    handleServiceClosure(serviceName) {
+        console.log(`Service ${serviceName} connection closed or failed.`);
+        this.serviceClients.delete(serviceName);
         this.serviceReadyMap.set(serviceName, false);
         const serviceInfo = this.serviceRegistry.get(serviceName);
-        if (serviceInfo && serviceInfo.type === 'remote' && serviceInfo.endpoint) { // Only reconnect if it's still registered
-            const attempts = (this.restartAttempts.get(serviceName) || 0) + 1;
-            this.restartAttempts.set(serviceName, attempts);
-            if (attempts > this.MAX_RESTART_ATTEMPTS) {
-                console.error(`Service ${serviceName} has disconnected too many times. Will not reconnect again.`);
-                return;
-            }
-            const reconnectDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
-            console.log(`Attempting to reconnect to service ${serviceName} in ${reconnectDelay / 1000}s (attempt ${attempts})...`);
-            setTimeout(() => {
-                this.connectToRemoteService(serviceName, serviceInfo.endpoint, serviceInfo.connectionType);
-            }, reconnectDelay);
+        if (!serviceInfo) {
+            return; // Service unregistered, don't reconnect
         }
+        const attempts = (this.restartAttempts.get(serviceName) || 0) + 1;
+        this.restartAttempts.set(serviceName, attempts);
+        if (attempts > this.MAX_RESTART_ATTEMPTS) {
+            console.error(`Service ${serviceName} has failed too many times. Will not reconnect again.`);
+            return;
+        }
+        const reconnectDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
+        console.log(`Attempting to reconnect to service ${serviceName} in ${reconnectDelay / 1000}s (attempt ${attempts})...`);
+        setTimeout(() => {
+            if (serviceInfo.type === 'remote') {
+                this.connectToRemoteService(serviceName, serviceInfo.endpoint, serviceInfo.connectionType);
+            }
+            else if (serviceInfo.type === 'local') {
+                this.startLocalService(serviceName, serviceInfo.command, serviceInfo.args, serviceInfo.env, serviceInfo.cwd);
+            }
+        }, reconnectDelay);
     }
     /**
-     * 启动特定服务的子进程
+     * 启动本地MCP服务 (使用官方 MCPClient 的 stdio 连接)
      */
-    startMcpProcess(serviceName, command, args, env, cwd) {
+    /**
+     * 展开路径中的 ~ 符号为用户主目录
+     */
+    expandPath(filePath) {
+        if (filePath.startsWith('~/') || filePath === '~') {
+            return path.join(os.homedir(), filePath.slice(1));
+        }
+        return filePath;
+    }
+    async startLocalService(serviceName, command, args, env, cwd) {
         if (!command) {
             console.log(`[${serviceName}] No command specified, skipping startup`);
             return;
@@ -214,60 +219,60 @@ class McpBridge {
             return;
         }
         try {
-            const workingDir = path.join(os.homedir(), 'mcp_plugins', serviceName);
-            console.log(`[${serviceName}] Starting process: ${command} ${args.join(' ')} in ${workingDir}`);
-            const mcpProcess = (0, child_process_1.spawn)(command, args, {
-                stdio: ['pipe', 'pipe', 'pipe'],
-                cwd: workingDir,
-                env: {
-                    ...process.env,
-                    ...env
-                }
+            // 展开 cwd 中的 ~ 路径
+            let workingDir = cwd || path.join(os.homedir(), 'mcp_plugins', serviceName);
+            workingDir = this.expandPath(workingDir);
+            // 自动转换 npx 为 pnpm dlx（因为系统使用 pnpm）
+            let actualCommand = command;
+            let actualArgs = args;
+            if (command === 'npx') {
+                console.log(`[${serviceName}] Detected npx command, converting to pnpm dlx`);
+                actualCommand = 'pnpm';
+                // 过滤掉 npx 特有的参数（如 -y, --yes），pnpm dlx 不需要这些
+                const filteredArgs = args.filter(arg => arg !== '-y' && arg !== '--yes');
+                actualArgs = ['dlx', ...filteredArgs];
+            }
+            // 展开 command 中的 ~ 路径（支持如 ~/venv/bin/python 的路径）
+            actualCommand = this.expandPath(actualCommand);
+            console.log(`[${serviceName}] Starting local service: ${actualCommand} ${actualArgs.join(' ')} in ${workingDir}`);
+            console.log(`[${serviceName}] Node.js version: ${process.version}`);
+            // 确保工作目录存在
+            if (!fs.existsSync(workingDir)) {
+                console.log(`[${serviceName}] Working directory does not exist, creating: ${workingDir}`);
+                fs.mkdirSync(workingDir, { recursive: true });
+            }
+            const { MCPClient } = await import('mcp-client');
+            const client = new MCPClient({
+                name: `bridge-client-for-${serviceName}`,
+                version: '1.0.0',
             });
-            this.mcpProcesses.set(serviceName, mcpProcess);
-            this.mcpToolsMap.set(serviceName, this.mcpToolsMap.get(serviceName) || []);
+            // Store client immediately
+            this.serviceClients.set(serviceName, client);
             this.serviceReadyMap.set(serviceName, false);
-            this.mcpErrors.delete(serviceName); // Clear previous errors
-            mcpProcess.stdout?.on('data', (data) => {
-                this.handleMcpResponse(data, serviceName);
+            this.mcpToolsMap.set(serviceName, []);
+            this.mcpErrors.delete(serviceName);
+            // 准备环境变量：合并 process.env 和用户指定的 env
+            // 添加一些有用的环境变量来避免 npm 缓存问题
+            const mergedEnv = {
+                ...process.env,
+                ...env,
+                // 如果用户没有指定这些，添加它们来避免 npm 问题
+                ...(env?.npm_config_cache ? {} : { npm_config_cache: path.join(workingDir, '.npm-cache') }),
+                ...(env?.npm_config_prefer_offline ? {} : { npm_config_prefer_offline: 'true' }),
+            };
+            // 连接到本地 stdio 服务
+            await client.connect({
+                type: 'stdio',
+                command: actualCommand,
+                args: actualArgs,
+                env: mergedEnv,
+                cwd: workingDir
             });
-            mcpProcess.stderr?.on('data', (data) => {
-                const errorText = data.toString().trim();
-                console.error(`[${serviceName}] STDERR: ${errorText}`);
-                const currentErrors = this.mcpErrors.get(serviceName) || "";
-                this.mcpErrors.set(serviceName, `${currentErrors}\n${errorText}`.trim());
-            });
-            mcpProcess.on('error', (err) => {
-                console.error(`[${serviceName}] Spawn Error: ${err.message}`);
-                this.mcpErrors.set(serviceName, `Spawn Error: ${err.message}`);
-            });
-            mcpProcess.on('close', (code, signal) => {
-                console.log(`[${serviceName}] Process exited with code: ${code}, signal: ${signal}`);
-                const errorOutput = this.mcpErrors.get(serviceName);
-                if (code !== 0 && errorOutput) {
-                    console.error(`[${serviceName}] Process exited with an error. Last known error output:\n${errorOutput}`);
-                }
-                this.mcpProcesses.delete(serviceName);
-                this.serviceReadyMap.set(serviceName, false);
-                const serviceInfo = this.serviceRegistry.get(serviceName);
-                if (serviceInfo && code !== 0) { // Only restart on non-zero exit codes
-                    const attempts = (this.restartAttempts.get(serviceName) || 0) + 1;
-                    this.restartAttempts.set(serviceName, attempts);
-                    if (attempts > this.MAX_RESTART_ATTEMPTS) {
-                        console.error(`[${serviceName}] Service has crashed too many times. Will not restart again.`);
-                        return;
-                    }
-                    const restartDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
-                    console.log(`[${serviceName}] Attempting to restart in ${restartDelay / 1000}s (attempt ${attempts})...`);
-                    setTimeout(() => {
-                        this.startMcpProcess(serviceName, serviceInfo.command, serviceInfo.args, serviceInfo.env, serviceInfo.cwd);
-                    }, restartDelay);
-                }
-                else {
-                    console.log(`[${serviceName}] Not restarting (exit code 0 or service unregistered).`);
-                }
-            });
-            setTimeout(() => this.fetchMcpTools(serviceName), 1000);
+            console.log(`[${serviceName}] Successfully connected to local service`);
+            this.restartAttempts.set(serviceName, 0); // Reset restart attempts on successful connection
+            // Fetch tools after connection
+            await this.fetchMcpTools(serviceName);
+            // Set up stability check
             setTimeout(() => {
                 if (this.isServiceActive(serviceName)) {
                     console.log(`[${serviceName}] Service appears stable, resetting restart counter.`);
@@ -276,68 +281,28 @@ class McpBridge {
             }, 60000);
         }
         catch (error) {
-            console.error(`[${serviceName}] Failed to start process: ${error instanceof Error ? error.message : String(error)}`);
-            this.serviceReadyMap.set(serviceName, true); // Mark as ready to prevent deadlocks
+            console.error(`[${serviceName}] Failed to start local service: ${error instanceof Error ? error.message : String(error)}`);
+            this.mcpErrors.set(serviceName, error instanceof Error ? error.message : String(error));
+            this.handleServiceClosure(serviceName); // Trigger reconnection logic
         }
     }
     /**
-     * 发送请求到指定服务 (本地或远程)
-     */
-    sendRequestToService(serviceName, request) {
-        const serviceInfo = this.serviceRegistry.get(serviceName);
-        if (!serviceInfo || !this.isServiceActive(serviceName)) {
-            console.error(`Cannot send request: Service ${serviceName} is not active.`);
-            return false;
-        }
-        const requestString = JSON.stringify(request) + '\n';
-        try {
-            if (serviceInfo.type === 'local') {
-                const process = this.mcpProcesses.get(serviceName);
-                return process.stdin.write(requestString);
-            }
-            else if (serviceInfo.type === 'remote') {
-                // For remote services, we don't send raw requests. This is handled by handleToolCall.
-                console.warn(`sendRequestToService called for remote service ${serviceName}, but this should be handled by specific methods like handleToolCall.`);
-                return true;
-            }
-        }
-        catch (e) {
-            console.error(`Failed to write to service ${serviceName}: ${e}`);
-            return false;
-        }
-        return false;
-    }
-    /**
-     * 获取特定服务的MCP工具列表
+     * 获取特定服务的MCP工具列表 (统一处理本地和远程服务)
      */
     async fetchMcpTools(serviceName) {
         if (!this.isServiceActive(serviceName)) {
-            // 如果进程/客户端不可用，设置空工具并标记为就绪
+            // 如果客户端不可用，设置空工具并标记为就绪
             this.mcpToolsMap.set(serviceName, []);
             this.serviceReadyMap.set(serviceName, true);
-            console.log(`MCP service ${serviceName} marked ready with no tools (process unavailable)`);
+            console.log(`MCP service ${serviceName} marked ready with no tools (client unavailable)`);
             return;
         }
-        const serviceInfo = this.serviceRegistry.get(serviceName);
         try {
-            if (serviceInfo?.type === 'local') {
-                // 创建tools/list请求
-                const toolsListRequest = {
-                    jsonrpc: '2.0',
-                    id: `init_${serviceName}_${Date.now()}`,
-                    method: 'tools/list',
-                    params: {}
-                };
-                // 发送请求
-                this.sendRequestToService(serviceName, toolsListRequest);
-            }
-            else if (serviceInfo?.type === 'remote') {
-                const client = this.remoteServiceClients.get(serviceName);
-                if (client) {
-                    const tools = await client.getAllTools();
-                    this.mcpToolsMap.set(serviceName, tools);
-                    console.log(`MCP service ${serviceName} is ready with ${tools.length} tools`);
-                }
+            const client = this.serviceClients.get(serviceName);
+            if (client) {
+                const tools = await client.getAllTools();
+                this.mcpToolsMap.set(serviceName, tools);
+                console.log(`MCP service ${serviceName} is ready with ${tools.length} tools`);
             }
         }
         catch (error) {
@@ -347,59 +312,6 @@ class McpBridge {
         finally {
             // 标记服务为就绪状态
             this.serviceReadyMap.set(serviceName, true);
-        }
-    }
-    /**
-     * 处理来自特定服务的MCP响应数据
-     */
-    handleMcpResponse(data, serviceName) {
-        try {
-            const responseText = data.toString().trim();
-            if (!responseText)
-                return;
-            const response = JSON.parse(responseText);
-            // 检查是否为工具调用响应
-            if (response.id && this.toolResponseMapping.has(response.id)) {
-                const bridgeRequestId = this.toolResponseMapping.get(response.id);
-                const pendingRequest = this.pendingRequests.get(bridgeRequestId);
-                if (pendingRequest) {
-                    // 转发响应给客户端
-                    pendingRequest.socket.write(JSON.stringify({
-                        id: bridgeRequestId,
-                        success: !response.error,
-                        result: response.result,
-                        error: response.error
-                    }) + '\n');
-                    // 清理
-                    this.pendingRequests.delete(bridgeRequestId);
-                    this.toolResponseMapping.delete(response.id);
-                    this.toolCallServiceMap.delete(response.id);
-                }
-            }
-            else if (response.id && typeof response.id === 'string' && response.id.startsWith(`init_${serviceName}_`)) {
-                // 处理工具列表响应
-                if (response.error) {
-                    // 错误时设置空工具列表
-                    this.mcpToolsMap.set(serviceName, []);
-                    return;
-                }
-                // 从响应中提取工具
-                let tools = [];
-                if (response.result && response.result.tools && Array.isArray(response.result.tools)) {
-                    tools = response.result.tools;
-                }
-                else if (response.result && Array.isArray(response.result)) {
-                    tools = response.result;
-                }
-                // 存储该服务的工具
-                this.mcpToolsMap.set(serviceName, tools);
-                console.log(`MCP service ${serviceName} is ready with ${tools.length} tools`);
-            }
-        }
-        catch (e) {
-            console.error(`Error handling MCP response from ${serviceName}: ${e instanceof Error ? e.message : String(e)}`);
-            // 不要崩溃服务器
-            this.mcpToolsMap.set(serviceName, []);
         }
     }
     /**
@@ -449,7 +361,7 @@ class McpBridge {
                     }
                     else {
                         // 普通bridge健康检查
-                        const runningServices = [...this.mcpProcesses.keys(), ...this.remoteServiceClients.keys()];
+                        const runningServices = [...this.serviceClients.keys()];
                         response = {
                             id,
                             success: true,
@@ -465,7 +377,7 @@ class McpBridge {
                     break;
                 case 'status':
                     // bridge状态及所有运行服务
-                    const activeServices = [...this.mcpProcesses.keys(), ...this.remoteServiceClients.keys()];
+                    const activeServices = [...this.serviceClients.keys()];
                     const serviceStatus = {};
                     for (const name of activeServices) {
                         serviceStatus[name] = {
@@ -571,7 +483,7 @@ class McpBridge {
                     // 如果未提供命令，但服务已注册，则使用注册表信息
                     if (serviceInfo) {
                         if (serviceInfo.type === 'local') {
-                            this.startMcpProcess(spawnServiceName, serviceInfo.command, serviceInfo.args, serviceInfo.env, serviceInfo.cwd);
+                            this.startLocalService(spawnServiceName, serviceInfo.command, serviceInfo.args, serviceInfo.env, serviceInfo.cwd);
                         }
                         else if (serviceInfo.type === 'remote') {
                             this.connectToRemoteService(spawnServiceName, serviceInfo.endpoint, serviceInfo.connectionType);
@@ -588,7 +500,7 @@ class McpBridge {
                             env: serviceEnv,
                         });
                         console.log(`Auto-registered new service: ${spawnServiceName}`);
-                        this.startMcpProcess(spawnServiceName, serviceCommand, serviceArgs, serviceEnv, serviceCwd);
+                        this.startLocalService(spawnServiceName, serviceCommand, serviceArgs, serviceEnv, serviceCwd);
                     }
                     else {
                         // 如果服务未注册且没有提供command，则无法启动
@@ -646,13 +558,12 @@ class McpBridge {
                         const serviceInfoToShutDown = this.serviceRegistry.get(serviceToShutdown);
                         // 终止进程或连接
                         if (serviceInfoToShutDown.type === 'local') {
-                            this.mcpProcesses.get(serviceToShutdown).kill();
-                            this.mcpProcesses.delete(serviceToShutdown);
+                            this.serviceClients.delete(serviceToShutdown);
                         }
                         else if (serviceInfoToShutDown.type === 'remote') {
-                            const client = this.remoteServiceClients.get(serviceToShutdown);
+                            const client = this.serviceClients.get(serviceToShutdown);
                             client?.close();
-                            this.remoteServiceClients.delete(serviceToShutdown);
+                            this.serviceClients.delete(serviceToShutdown);
                         }
                         response = {
                             id,
@@ -745,13 +656,12 @@ class McpBridge {
                     if (this.isServiceActive(serviceNameToUnregister)) {
                         const serviceInfoToShutdown = this.serviceRegistry.get(serviceNameToUnregister);
                         if (serviceInfoToShutdown.type === 'local') {
-                            this.mcpProcesses.get(serviceNameToUnregister).kill();
-                            this.mcpProcesses.delete(serviceNameToUnregister);
+                            this.serviceClients.delete(serviceNameToUnregister);
                         }
                         else if (serviceInfoToShutdown.type === 'remote') {
-                            const client = this.remoteServiceClients.get(serviceNameToUnregister);
+                            const client = this.serviceClients.get(serviceNameToUnregister);
                             client?.close();
-                            this.remoteServiceClients.delete(serviceNameToUnregister);
+                            this.serviceClients.delete(serviceNameToUnregister);
                         }
                     }
                     const unregistered = this.unregisterService(serviceNameToUnregister);
@@ -772,6 +682,40 @@ class McpBridge {
                 case 'toolcall':
                     // 调用工具
                     this.handleToolCall(command, socket);
+                    break;
+                case 'reset':
+                    // 重置所有服务：关闭所有客户端，清空注册表
+                    console.log('Resetting bridge: closing all services and clearing registry...');
+                    // 关闭所有活跃的服务客户端
+                    for (const [name, client] of this.serviceClients.entries()) {
+                        try {
+                            console.log(`Closing service: ${name}`);
+                            client.close();
+                        }
+                        catch (error) {
+                            console.error(`Error closing service ${name}: ${error instanceof Error ? error.message : String(error)}`);
+                        }
+                    }
+                    // 清空所有映射和状态
+                    this.serviceClients.clear();
+                    this.mcpToolsMap.clear();
+                    this.serviceReadyMap.clear();
+                    this.mcpErrors.clear();
+                    this.restartAttempts.clear();
+                    // 清空服务注册表
+                    this.serviceRegistry.clear();
+                    // 清空待处理的请求
+                    this.pendingRequests.clear();
+                    console.log('Bridge reset complete: all services closed, registry cleared');
+                    response = {
+                        id,
+                        success: true,
+                        result: {
+                            status: 'reset',
+                            message: 'All services closed and registry cleared'
+                        }
+                    };
+                    socket.write(JSON.stringify(response) + '\n');
                     break;
                 default:
                     // 未知命令
@@ -806,7 +750,7 @@ class McpBridge {
         const { id, params } = command;
         const { method, params: methodParams, name: requestedServiceName } = params || {};
         // 确定使用哪个服务
-        const serviceName = requestedServiceName || this.mcpProcesses.keys().next().value || this.remoteServiceClients.keys().next().value;
+        const serviceName = requestedServiceName || this.serviceClients.keys().next().value;
         if (!serviceName) {
             console.error(`Cannot handle tool call: No service specified and no default available`);
             const response = {
@@ -857,18 +801,9 @@ class McpBridge {
                 };
                 // Update pending request with toolCallId for response mapping
                 this.pendingRequests.get(id).toolCallId = toolCallId;
-                this.toolResponseMapping.set(toolCallId, id);
-                this.toolCallServiceMap.set(toolCallId, serviceName);
-                const writeResult = this.sendRequestToService(serviceName, toolCallRequest);
-                if (!writeResult) {
-                    throw new Error(`Failed to send request to ${serviceName}`);
-                }
-                // For local services, the response is handled asynchronously in handleMcpResponse, so we return here.
-                return;
-            }
-            else if (serviceInfo.type === 'remote') {
-                // --- REMOTE SERVICE TOOLCALL (new logic) ---
-                const client = this.remoteServiceClients.get(serviceName);
+                // this.toolResponseMapping.set(toolCallId, id); // No longer needed
+                // this.toolCallServiceMap.set(toolCallId, serviceName); // No longer needed
+                const client = this.serviceClients.get(serviceName);
                 if (!client) {
                     throw new Error(`MCPClient for service ${serviceName} not found`);
                 }
@@ -880,18 +815,29 @@ class McpBridge {
                 toolCallResult = { content: result.content };
                 toolCallError = result.isError ? { code: -32000, message: result.content[0]?.text || "Remote tool error" } : undefined;
             }
-            // --- SEND RESPONSE FOR REMOTE CALL ---
-            // (Local call response is sent in handleMcpResponse)
-            if (serviceInfo.type === 'remote') {
-                const response = {
-                    id,
-                    success: !toolCallError,
-                    result: toolCallResult,
-                    error: toolCallError
-                };
-                socket.write(JSON.stringify(response) + '\n');
-                this.pendingRequests.delete(id);
+            else if (serviceInfo.type === 'remote') {
+                // --- REMOTE SERVICE TOOLCALL (new logic) ---
+                const client = this.serviceClients.get(serviceName);
+                if (!client) {
+                    throw new Error(`MCPClient for service ${serviceName} not found`);
+                }
+                const result = await client.callTool({
+                    name: method,
+                    arguments: methodParams || {},
+                });
+                // The mcp-client result is the "content" part of the MCP response
+                toolCallResult = { content: result.content };
+                toolCallError = result.isError ? { code: -32000, message: result.content[0]?.text || "Remote tool error" } : undefined;
             }
+            // --- SEND RESPONSE (统一处理本地和远程服务) ---
+            const response = {
+                id,
+                success: !toolCallError,
+                result: toolCallResult,
+                error: toolCallError
+            };
+            socket.write(JSON.stringify(response) + '\n');
+            this.pendingRequests.delete(id);
         }
         catch (error) {
             console.error(`Error handling tool call for ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
@@ -908,8 +854,8 @@ class McpBridge {
             // 清理
             const pendingRequest = this.pendingRequests.get(id);
             if (pendingRequest?.toolCallId) {
-                this.toolResponseMapping.delete(pendingRequest.toolCallId);
-                this.toolCallServiceMap.delete(pendingRequest.toolCallId);
+                // this.toolResponseMapping.delete(pendingRequest.toolCallId); // No longer needed
+                // this.toolCallServiceMap.delete(pendingRequest.toolCallId); // No longer needed
             }
             this.pendingRequests.delete(id);
         }
@@ -928,18 +874,15 @@ class McpBridge {
                     success: false,
                     error: {
                         code: -32603,
-                        message: "Request timeout",
-                        data: this.mcpErrors.get(this.toolCallServiceMap.get(requestId) || '') ?
-                            { stderr: this.mcpErrors.get(this.toolCallServiceMap.get(requestId) || '') } :
-                            undefined
+                        message: "Request timeout"
                     }
                 };
                 request.socket.write(JSON.stringify(response) + '\n');
                 // 清理
                 this.pendingRequests.delete(requestId);
                 if (request.toolCallId) {
-                    this.toolResponseMapping.delete(request.toolCallId);
-                    this.toolCallServiceMap.delete(request.toolCallId);
+                    // this.toolResponseMapping.delete(request.toolCallId); // No longer needed
+                    // this.toolCallServiceMap.delete(request.toolCallId); // No longer needed
                 }
             }
         }
@@ -953,7 +896,8 @@ class McpBridge {
             console.log(`New client connection: ${socket.remoteAddress}:${socket.remotePort}`);
             this.activeConnections.add(socket);
             // 添加socket超时以防止客户端挂起
-            socket.setTimeout(30000); // 30秒超时
+            // 设置为请求超时的 2 倍，确保有足够时间完成工具调用
+            socket.setTimeout(120000); // 120秒超时 (REQUEST_TIMEOUT * 2)
             socket.on('timeout', () => {
                 console.log(`Socket timeout: ${socket.remoteAddress}:${socket.remotePort}`);
                 socket.end();
@@ -1008,8 +952,8 @@ class McpBridge {
                         const toolCallId = request.toolCallId;
                         this.pendingRequests.delete(requestId);
                         if (toolCallId) {
-                            this.toolResponseMapping.delete(toolCallId);
-                            this.toolCallServiceMap.delete(toolCallId);
+                            // this.toolResponseMapping.delete(toolCallId); // No longer needed
+                            // this.toolCallServiceMap.delete(toolCallId); // No longer needed
                         }
                     }
                 }
@@ -1046,17 +990,11 @@ class McpBridge {
             this.server.close();
         }
         // 终止所有MCP进程
-        for (const [name, mcpProcess] of this.mcpProcesses.entries()) {
-            console.log(`Terminating MCP process: ${name}`);
-            mcpProcess.kill();
-        }
-        this.mcpProcesses.clear();
-        // 关闭所有远程连接
-        for (const [name, client] of this.remoteServiceClients.entries()) {
-            console.log(`Closing remote connection: ${name}`);
+        for (const [name, client] of this.serviceClients.entries()) {
+            console.log(`Closing MCP client: ${name}`);
             client.close();
         }
-        this.remoteServiceClients.clear();
+        this.serviceClients.clear();
         console.log('Bridge shut down');
         process.exit(0);
     }

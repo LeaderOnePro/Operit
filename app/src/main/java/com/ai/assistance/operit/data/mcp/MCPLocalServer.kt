@@ -183,6 +183,7 @@ class MCPLocalServer private constructor(private val context: Context) {
 
     /**
      * 服务器运行状态
+     * 注意：启用/禁用状态已移至ServerConfig.disabled字段
      */
     @Serializable
     data class ServerStatus(
@@ -190,8 +191,6 @@ class MCPLocalServer private constructor(private val context: Context) {
         val serverId: String,
         @SerializedName("active")
         val active: Boolean = false,
-        @SerializedName("isEnabled")
-        val isEnabled: Boolean = true,
         @SerializedName("lastStartTime")
         val lastStartTime: Long = 0L,
         @SerializedName("lastStopTime")
@@ -364,11 +363,11 @@ class MCPLocalServer private constructor(private val context: Context) {
 
     /**
      * 更新服务器状态
+     * 注意：启用/禁用状态请使用 setServerEnabled() 方法
      */
     suspend fun updateServerStatus(
         serverId: String,
         active: Boolean? = null,
-        isEnabled: Boolean? = null,
         deploySuccess: Boolean? = null,
         errorMessage: String? = null
     ) {
@@ -377,7 +376,6 @@ class MCPLocalServer private constructor(private val context: Context) {
         
         val updatedStatus = existingStatus.copy(
             active = active ?: existingStatus.active,
-            isEnabled = isEnabled ?: existingStatus.isEnabled,
             deploySuccess = deploySuccess ?: existingStatus.deploySuccess,
             errorMessage = errorMessage ?: existingStatus.errorMessage,
             lastStartTime = if (active == true) System.currentTimeMillis() else existingStatus.lastStartTime,
@@ -416,6 +414,32 @@ class MCPLocalServer private constructor(private val context: Context) {
         return _serverStatus.value.toMap()
     }
 
+    /**
+     * 检查服务器是否启用
+     * 从MCP配置的disabled字段读取，默认为启用（disabled=false或不存在）
+     */
+    fun isServerEnabled(serverId: String): Boolean {
+        val serverConfig = getMCPServer(serverId)
+        return serverConfig?.disabled != true // disabled为true表示禁用，其他情况均为启用
+    }
+
+    /**
+     * 设置服务器启用状态
+     * 修改MCP配置的disabled字段
+     */
+    suspend fun setServerEnabled(serverId: String, enabled: Boolean) {
+        val serverConfig = getMCPServer(serverId) ?: return
+        addOrUpdateMCPServer(
+            serverId = serverId,
+            command = serverConfig.command,
+            args = serverConfig.args,
+            env = serverConfig.env,
+            disabled = !enabled,
+            autoApprove = serverConfig.autoApprove
+        )
+        Log.d(TAG, "服务器启用状态已更新: $serverId, enabled=$enabled")
+    }
+
     // ==================== 兼容性方法 ====================
 
     /**
@@ -440,13 +464,21 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 保存插件配置（兼容旧接口）
      *
      * @param pluginId 插件ID
-     * @param config 配置内容JSON字符串
+     * @param config 配置内容JSON字符串，可以是完整的MCPConfig或单个ServerConfig
      * @return 是否保存成功
      */
     suspend fun savePluginConfig(pluginId: String, config: String): Boolean {
         return try {
-            // 尝试解析为ServerConfig
-            val serverConfig = gson.fromJson(config, MCPConfig.ServerConfig::class.java)
+            // 先尝试解析为完整的MCPConfig（getPluginConfig返回的格式）
+            val serverConfig = try {
+                val fullConfig = gson.fromJson(config, MCPConfig::class.java)
+                // 如果包含mcpServers且有对应的pluginId，使用该配置
+                fullConfig.mcpServers[pluginId] ?: throw Exception("No server config found for $pluginId")
+            } catch (e: Exception) {
+                // 如果失败，尝试直接解析为ServerConfig
+                gson.fromJson(config, MCPConfig.ServerConfig::class.java)
+            }
+            
             _mcpConfig.update { currentConfig ->
                 val newServers = currentConfig.mcpServers.toMutableMap()
                 newServers[pluginId] = serverConfig

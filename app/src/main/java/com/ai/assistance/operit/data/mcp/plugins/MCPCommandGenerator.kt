@@ -38,17 +38,25 @@ class MCPCommandGenerator {
                     // 使用README中指定的pip安装命令
                     Log.d(TAG, "使用README中指定的pip安装命令: $pipInstallCommand")
                     commands.add(pipInstallCommand)
-                } else if (projectStructure.hasRequirementsTxt) {
+                } else {
+                    // 先安装依赖
+                    if (projectStructure.hasRequirementsTxt) {
                     commands.add("pip install -r requirements.txt")
-                } else if (projectStructure.hasPyprojectToml) {
-                    commands.add("pip install .")
-                } else if (projectStructure.hasSetupPy) {
-                    commands.add("pip install .")
+                    }
+                    
+                    // 再安装包本身（对于使用 python -m module_name 启动的服务）
+                    if (projectStructure.hasPyprojectToml || projectStructure.hasSetupPy) {
+                        commands.add("pip install -e .")
+                    } else if (projectStructure.hasRequirementsTxt) {
+                        // 即使只有 requirements.txt，也尝试以可编辑模式安装
+                        // 这样可以让 python -m module_name 正常工作
+                        commands.add("pip install -e . || echo 'Package install skipped'")
                 } else {
                     // 尝试从插件名称生成安装命令
                     val packageName = extractPackageNameFromDirectory(projectStructure)
                     if (packageName != null) {
                         commands.add("pip install $packageName")
+                        }
                     }
                 }
             }

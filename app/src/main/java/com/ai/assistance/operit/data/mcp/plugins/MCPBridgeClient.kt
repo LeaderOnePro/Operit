@@ -6,6 +6,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** MCPBridgeClient - Client for communicating with MCP services through a bridge */
@@ -202,8 +203,42 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
     /** Synchronous tool call with Map */
     fun callToolSync(method: String, params: Map<String, Any>): JSONObject? {
         val paramsJson = JSONObject()
-        params.forEach { (key, value) -> paramsJson.put(key, value) }
+        params.forEach { (key, value) -> 
+            // 将值转换为正确的 JSON 类型
+            val jsonValue = convertToJsonType(value)
+            paramsJson.put(key, jsonValue)
+        }
         return callToolSync(method, paramsJson)
+    }
+
+    /**
+     * 将 Kotlin 类型转换为 JSON 类型
+     * - List -> JSONArray
+     * - Map -> JSONObject
+     * - 其他 -> 保持原样
+     */
+    private fun convertToJsonType(value: Any?): Any? {
+        return when (value) {
+            null -> JSONObject.NULL
+            is List<*> -> {
+                val jsonArray = JSONArray()
+                value.forEach { item ->
+                    jsonArray.put(convertToJsonType(item))
+                }
+                jsonArray
+            }
+            is Map<*, *> -> {
+                val jsonObject = JSONObject()
+                value.forEach { (k, v) ->
+                    if (k is String) {
+                        jsonObject.put(k, convertToJsonType(v))
+                    }
+                }
+                jsonObject
+            }
+            // 基本类型和 JSONObject/JSONArray 保持原样
+            else -> value
+        }
     }
 
     /** Get all tools provided by the service */
