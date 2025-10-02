@@ -56,6 +56,12 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
             return false
         }
 
+        // 对于虚拟路径（npx/uvx 插件），直接返回空命令列表
+        if (pluginPath.startsWith("virtual://")) {
+            _generatedCommands.value = emptyList()
+            return true
+        }
+
         // 在协程中调用挂起函数
         viewModelScope.launch {
             try {
@@ -121,15 +127,22 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
      */
     fun deployPlugin(pluginId: String) {
         viewModelScope.launch {
-            // 确保命令已生成
+            val pluginPath = mcpRepository.getInstalledPluginPath(pluginId)
+            if (pluginPath == null) {
+                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法获取插件路径: $pluginId")
+                return@launch
+            }
+            
+            // 对于 npx/uvx 类型的插件（虚拟路径），使用空命令列表直接部署
+            if (pluginPath.startsWith("virtual://")) {
+                deployPluginWithCommands(pluginId, emptyList())
+                return@launch
+            }
+            
+            // 确保命令已生成（普通插件）
             if (_generatedCommands.value.isEmpty()) {
                 // 先获取命令
                 val deployCommands = try {
-                    val pluginPath = mcpRepository.getInstalledPluginPath(pluginId)
-                    if (pluginPath == null) {
-                        _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法获取插件路径: $pluginId")
-                        return@launch
-                    }
                     mcpDeployer.getDeployCommands(pluginId, pluginPath)
                 } catch (e: Exception) {
                     _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")

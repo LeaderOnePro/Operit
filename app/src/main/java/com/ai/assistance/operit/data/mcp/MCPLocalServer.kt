@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 /**
@@ -204,6 +205,16 @@ class MCPLocalServer private constructor(private val context: Context) {
     )
 
     // ==================== 配置文件操作 ====================
+    
+    /**
+     * 重新加载配置文件（用于用户手动编辑配置后刷新）
+     */
+    suspend fun reloadConfigurations() {
+        withContext(Dispatchers.IO) {
+            loadAllConfigurations()
+            Log.d(TAG, "配置已重新加载")
+        }
+    }
 
     /**
      * 加载所有配置文件
@@ -214,7 +225,18 @@ class MCPLocalServer private constructor(private val context: Context) {
             if (mcpConfigFile.exists()) {
                 val configJson = mcpConfigFile.readText()
                 val config = gson.fromJson(configJson, MCPConfig::class.java) ?: MCPConfig()
-                _mcpConfig.value = config
+                
+                // 自动为 mcpServers 中存在但 pluginMetadata 中缺失的服务器创建默认元数据
+                val updatedConfig = autoFillMissingMetadata(config)
+                _mcpConfig.value = updatedConfig
+                
+                // 如果有新增的元数据，保存配置
+                if (updatedConfig.pluginMetadata.size > config.pluginMetadata.size) {
+                    coroutineScope.launch {
+                        saveMCPConfig()
+                        Log.d(TAG, "自动创建了 ${updatedConfig.pluginMetadata.size - config.pluginMetadata.size} 个缺失的插件元数据")
+                    }
+                }
             }
 
             // 加载服务器状态
@@ -224,10 +246,90 @@ class MCPLocalServer private constructor(private val context: Context) {
                 val status = gson.fromJson<Map<String, ServerStatus>>(statusJson, typeToken) ?: emptyMap()
                 _serverStatus.value = status
             }
+            
+            // 为新配置的服务器初始化状态
+            initializeMissingServerStatus()
 
             Log.d(TAG, "配置加载完成 - MCP服务器: ${_mcpConfig.value.mcpServers.size}, 插件元数据: ${_mcpConfig.value.pluginMetadata.size}")
         } catch (e: Exception) {
             Log.e(TAG, "加载配置时出错", e)
+        }
+    }
+    
+    /**
+     * 自动为缺失的服务器创建默认元数据
+     */
+    private fun autoFillMissingMetadata(config: MCPConfig): MCPConfig {
+        val newMetadata = config.pluginMetadata.toMutableMap()
+        var hasNewMetadata = false
+        
+        config.mcpServers.forEach { (serverId, serverConfig) ->
+            if (!newMetadata.containsKey(serverId)) {
+                // 从 serverId 生成友好的显示名称
+                val displayName = serverId
+                    .replace("_", " ")
+                    .replace("-", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                
+                // 创建默认元数据
+                val metadata = PluginMetadata(
+                    id = serverId,
+                    name = displayName,
+                    description = "",
+                    logoUrl = null,
+                    author = "Unknown",
+                    isInstalled = true,
+                    version = "1.0.0",
+                    updatedAt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                    longDescription = "通过配置文件自动识别的 MCP 服务器",
+                    repoUrl = "",
+                    type = "local",
+                    endpoint = null,
+                    connectionType = "httpStream"
+                )
+                
+                newMetadata[serverId] = metadata
+                hasNewMetadata = true
+                Log.d(TAG, "自动创建元数据: $serverId -> $displayName")
+            }
+        }
+        
+        return if (hasNewMetadata) {
+            config.copy(pluginMetadata = newMetadata)
+        } else {
+            config
+        }
+    }
+    
+    /**
+     * 为新配置的服务器初始化状态
+     */
+    private fun initializeMissingServerStatus() {
+        val currentStatus = _serverStatus.value.toMutableMap()
+        var hasNewStatus = false
+        
+        _mcpConfig.value.mcpServers.forEach { (serverId, _) ->
+            if (!currentStatus.containsKey(serverId)) {
+                currentStatus[serverId] = ServerStatus(
+                    serverId = serverId,
+                    active = false,
+                    lastStartTime = 0L,
+                    lastStopTime = 0L,
+                    deploySuccess = false,
+                    lastDeployTime = 0L,
+                    errorMessage = null
+                )
+                hasNewStatus = true
+                Log.d(TAG, "初始化服务器状态: $serverId")
+            }
+        }
+        
+        if (hasNewStatus) {
+            _serverStatus.value = currentStatus
+            coroutineScope.launch {
+                saveServerStatus()
+            }
         }
     }
 

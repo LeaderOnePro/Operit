@@ -167,8 +167,22 @@ class MCPStarter(private val context: Context) {
         }
     }
 
+    /** Start a plugin without initializing bridge (for batch operations) */
+    private suspend fun startPluginWithoutBridgeInit(pluginId: String, statusCallback: (StartStatus) -> Unit): Boolean {
+        return startPluginInternal(pluginId, statusCallback, initBridgeFirst = false)
+    }
+
     /** Start a plugin using the bridge */
     suspend fun startPlugin(pluginId: String, statusCallback: (StartStatus) -> Unit): Boolean {
+        return startPluginInternal(pluginId, statusCallback, initBridgeFirst = true)
+    }
+
+    /** Internal plugin start logic */
+    private suspend fun startPluginInternal(
+        pluginId: String, 
+        statusCallback: (StartStatus) -> Unit,
+        initBridgeFirst: Boolean
+    ): Boolean {
         try {
             val mcpLocalServer = MCPLocalServer.getInstance(context)
             val mcpRepository = MCPRepository(context)
@@ -201,9 +215,16 @@ class MCPStarter(private val context: Context) {
                     
                     // 使用MCPDeployer自动部署
                     val deployer = MCPDeployer(context)
-                    val deployCommands = deployer.getDeployCommands(pluginId, pluginPath)
                     
-                    if (deployCommands.isEmpty()) {
+                    // 对于虚拟路径（npx/uvx 插件），直接使用空命令列表
+                    val deployCommands = if (pluginPath.startsWith("virtual://")) {
+                        emptyList()
+                    } else {
+                        deployer.getDeployCommands(pluginId, pluginPath)
+                    }
+                    
+                    // 只有非虚拟路径且命令为空时才报错
+                    if (deployCommands.isEmpty() && !pluginPath.startsWith("virtual://")) {
                         statusCallback(StartStatus.Error("无法确定如何部署插件: $pluginId"))
                         return false
                     }
@@ -262,7 +283,8 @@ class MCPStarter(private val context: Context) {
                     return false
                 }
                 
-                if (!initBridge()) {
+                // Initialize bridge only if requested
+                if (initBridgeFirst && !initBridge()) {
                     statusCallback(StartStatus.Error("Failed to initialize bridge for remote service"))
                     return false
                 }
@@ -315,9 +337,9 @@ class MCPStarter(private val context: Context) {
                 return true
             }
 
-            // Initialize bridge
+            // Initialize bridge only if requested (for single plugin start)
+            if (initBridgeFirst) {
             if (!initBridge()) {
-                // Check specifically if Termux is not running, not authorized, or Node.js is missing
                 when {
                     !isTerminalServiceConnected() -> {
                         statusCallback(StartStatus.TerminalServiceUnavailable())
@@ -330,6 +352,7 @@ class MCPStarter(private val context: Context) {
                     }
                 }
                 return false
+                }
             }
 
             statusCallback(StartStatus.InProgress("Starting plugin via bridge..."))
@@ -398,9 +421,8 @@ class MCPStarter(private val context: Context) {
                     return@launch
                 }
 
-                // Initialize bridge, which also checks for pnpm
+                // Initialize bridge ONCE before starting all plugins
                 if (!initBridge()) {
-                    // initBridge now handles setting the correct status
                     val status = if (pnpmInstalled == false) PluginInitStatus.NODEJS_MISSING else PluginInitStatus.BRIDGE_FAILED
                     progressListener.onAllPluginsStarted(0, 0, status)
                     return@launch
@@ -413,7 +435,7 @@ class MCPStarter(private val context: Context) {
                 val pluginList = mcpRepository.installedPluginIds.first()
                 val pluginsToStart =
                         pluginList.filter { pluginId ->
-                            mcpLocalServer.isServerEnabled(pluginId) // 只检查是否启用，不再检查部署状态
+                            mcpLocalServer.isServerEnabled(pluginId)
                         }
 
                 if (pluginsToStart.isEmpty()) {
@@ -421,7 +443,7 @@ class MCPStarter(private val context: Context) {
                     return@launch
                 }
 
-                // 并行启动所有插件
+                // 并行启动所有插件（跳过bridge初始化）
                 val deferreds =
                         pluginsToStart.mapIndexed { index, pluginId ->
                             starterScope.async {
@@ -431,7 +453,7 @@ class MCPStarter(private val context: Context) {
                                         pluginsToStart.size
                                 )
                                 val success =
-                                        startPlugin(pluginId) {
+                                        startPluginWithoutBridgeInit(pluginId) {
                                             // Status callback is not used here
                                         }
                                 progressListener.onPluginStarted(

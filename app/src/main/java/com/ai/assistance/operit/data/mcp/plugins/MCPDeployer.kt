@@ -59,7 +59,29 @@ class MCPDeployer(private val context: Context) {
                     statusCallback(DeploymentStatus.InProgress("开始部署插件: $pluginId"))
                     Log.d(TAG, "开始部署插件(自定义命令): $pluginId, 路径: $pluginPath")
 
-                    // 验证插件路径
+                    val mcpLocalServer = MCPLocalServer.getInstance(context)
+                    
+                    // 检查是否是虚拟路径（npx/uvx 类型的插件）
+                    if (pluginPath.startsWith("virtual://")) {
+                        val serverConfig = mcpLocalServer.getMCPServer(pluginId)
+                        val command = serverConfig?.command?.lowercase() ?: "npx/uvx"
+                        
+                        Log.d(TAG, "插件 $pluginId 使用 $command 命令（虚拟路径），无需部署，直接标记为部署完成")
+                        statusCallback(DeploymentStatus.InProgress("检测到 $command 类型插件，无需部署"))
+                        
+                        // 直接标记为部署成功
+                        try {
+                            mcpLocalServer.updateServerStatus(pluginId, deploySuccess = true)
+                            Log.d(TAG, "已标记 $pluginId 为部署成功")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "标记部署成功状态失败: ${e.message}")
+                        }
+                        
+                        statusCallback(DeploymentStatus.Success("$command 类型插件无需部署，已可直接使用"))
+                        return@withContext true
+                    }
+
+                    // 验证插件路径（仅对物理路径）
                     val pluginDir = File(pluginPath)
                     if (!pluginDir.exists() || !pluginDir.isDirectory) {
                         Log.e(TAG, "插件目录不存在: $pluginPath")
@@ -93,7 +115,6 @@ class MCPDeployer(private val context: Context) {
                     
                     // 保存MCP配置
                     statusCallback(DeploymentStatus.InProgress("保存MCP配置..."))
-                    val mcpLocalServer = MCPLocalServer.getInstance(context)
                     
                     // 解析生成的MCP配置并保存为正确的格式
                     val configSaveResult = saveMCPConfigToLocalServer(mcpLocalServer, pluginId, mcpConfig)

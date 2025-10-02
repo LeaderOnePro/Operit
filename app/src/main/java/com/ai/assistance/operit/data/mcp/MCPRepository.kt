@@ -118,21 +118,19 @@ class MCPRepository(private val context: Context) {
             val installedIds = mutableSetOf<String>()
             
             pluginMetadata.values.forEach { metadata ->
-                val isPhysicallyInstalled = when (metadata.type) {
-                    "remote" -> true // 远程服务器配置后即为"已安装"
-                    "local" -> isPluginPhysicallyInstalled(metadata.id)
-                    else -> isPluginPhysicallyInstalled(metadata.id)
+                // 统一检查：根据 command 判断是否需要物理安装
+                val isInstalled = if (metadata.type == "remote") {
+                    true // 远程服务器
+                } else {
+                    isPluginPhysicallyInstalled(metadata.id) // 自动处理 npx/uvx
                 }
                 
-                if (isPhysicallyInstalled || metadata.type == "remote") {
+                if (isInstalled) {
                     installedIds.add(metadata.id)
                 }
                 
                 // 创建更新的metadata，确保isInstalled字段正确
-                val updatedMetadata = metadata.copy(
-                    isInstalled = isPhysicallyInstalled || metadata.type == "remote"
-                )
-                
+                val updatedMetadata = metadata.copy(isInstalled = isInstalled)
                 servers.add(updatedMetadata)
             }
             
@@ -165,9 +163,29 @@ class MCPRepository(private val context: Context) {
     }
 
     /**
+     * 判断插件是否需要物理安装（npx/uvx/remote 类型不需要）
+     */
+    private fun needsPhysicalInstallation(serverId: String): Boolean {
+        val serverConfig = mcpLocalServer.getMCPServer(serverId)
+        val command = serverConfig?.command?.lowercase() ?: return true
+        
+        // npx、uvx、remote 类型的插件不需要物理安装
+        return when {
+            command == "npx" -> false
+            command == "uvx" -> false
+            else -> true
+        }
+    }
+    
+    /**
      * 检查插件是否在文件系统中物理存在
      */
     private fun isPluginPhysicallyInstalled(serverId: String): Boolean {
+        // 如果不需要物理安装，直接返回 true
+        if (!needsPhysicalInstallation(serverId)) {
+            return true
+        }
+        
         val pluginDir = File(pluginsBaseDir, serverId)
         return if (pluginDir.exists() && pluginDir.isDirectory) {
             val hasContent = pluginDir.listFiles()?.isNotEmpty() ?: false
@@ -180,11 +198,12 @@ class MCPRepository(private val context: Context) {
      */
     fun isPluginInstalled(serverId: String): Boolean {
         val metadata = mcpLocalServer.getPluginMetadata(serverId)
-        return when (metadata?.type) {
-            "remote" -> true // 远程服务器配置后即为已安装
-            "local" -> isPluginPhysicallyInstalled(serverId)
-            null -> false // 没有元数据记录
-            else -> isPluginPhysicallyInstalled(serverId)
+        return if (metadata == null) {
+            false // 没有元数据记录
+        } else if (metadata.type == "remote") {
+            true // 远程服务器配置后即为已安装
+        } else {
+            isPluginPhysicallyInstalled(serverId) // 自动处理 npx/uvx
         }
     }
 
@@ -192,6 +211,11 @@ class MCPRepository(private val context: Context) {
      * 获取已安装插件的路径
      */
     fun getInstalledPluginPath(serverId: String): String? {
+        // 对于 npx/uvx 类型的插件，返回一个虚拟路径标记
+        if (!needsPhysicalInstallation(serverId)) {
+            return "virtual://$serverId"
+        }
+        
         val pluginDir = File(pluginsBaseDir, serverId)
         if (!pluginDir.exists() || !pluginDir.isDirectory) return null
 
@@ -938,10 +962,15 @@ class MCPRepository(private val context: Context) {
 
     /**
      * 手动刷新插件列表
+     * 会重新加载配置文件，自动识别新添加的 mcpServers 配置
      */
     suspend fun refreshPluginList() {
         withContext(Dispatchers.IO) {
+            // 重新加载配置文件（会自动识别新的 mcpServers 配置并创建元数据）
+            mcpLocalServer.reloadConfigurations()
+            // 重新加载插件列表
             loadPluginsFromMCPLocalServer()
+            Log.d(TAG, "插件列表已刷新")
         }
     }
 

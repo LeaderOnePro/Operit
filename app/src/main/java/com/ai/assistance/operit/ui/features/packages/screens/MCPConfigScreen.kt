@@ -821,7 +821,12 @@ fun MCPConfigScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(8.dp)
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    top = 8.dp,
+                    end = 8.dp,
+                    bottom = 200.dp // 为悬浮按钮留出空间
+                )
             ) {
                 // 状态指示器
                 item {

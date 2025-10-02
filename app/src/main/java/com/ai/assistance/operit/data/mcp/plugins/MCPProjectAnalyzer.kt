@@ -181,12 +181,17 @@ class MCPProjectAnalyzer {
             val tsConfig = JSONObject(contentWithoutComments)
             val compilerOptions = tsConfig.optJSONObject("compilerOptions")
 
-            val outDir = compilerOptions?.optString("outDir")
-            val rootDir = compilerOptions?.optString("rootDir")
+            // 获取原始路径
+            val rawOutDir = compilerOptions?.optString("outDir")
+            val rawRootDir = compilerOptions?.optString("rootDir")
+            
+            // 标准化路径：移除 ./ 前缀和尾部斜杠
+            val outDir = rawOutDir?.removePrefix("./")?.removeSuffix("/")?.ifEmpty { null }
+            val rootDir = rawRootDir?.removePrefix("./")?.removeSuffix("/")?.ifEmpty { null }
 
             Log.d(
                     TAG,
-                    "解析tsconfig.json - outDir: $outDir, rootDir: $rootDir, 原始内容长度: ${tsConfigContent.length}"
+                    "解析tsconfig.json - outDir: $outDir (原始: $rawOutDir), rootDir: $rootDir (原始: $rawRootDir)"
             )
 
             return Triple(outDir, rootDir, tsConfigContent)
@@ -339,6 +344,26 @@ class MCPProjectAnalyzer {
         if (packageJsonFile.exists()) {
             try {
                 val packageJson = JSONObject(packageJsonFile.readText())
+
+                // 检查bin字段（优先级最高，因为它明确指定了可执行入口）
+                if (packageJson.has("bin")) {
+                    val binField = packageJson.get("bin")
+                    val binPath = when {
+                        binField is String -> binField
+                        binField is JSONObject -> binField.keys().asSequence().firstOrNull()?.let { binField.getString(it) }
+                        else -> null
+                    }
+                    if (binPath != null && binPath.endsWith(".js")) {
+                        // 尝试推断.ts源文件位置：dist/stdio.js -> src/stdio.ts
+                        val jsFileName = binPath.substringAfterLast('/')
+                        val tsFileName = jsFileName.replace(".js", ".ts")
+                        listOf("src/$tsFileName", tsFileName, binPath.replace(".js", ".ts")).forEach { 
+                            if (File(pluginDir, it).exists()) return it
+                        }
+                    } else if (binPath != null && binPath.endsWith(".ts")) {
+                        return binPath
+                    }
+                }
 
                 // 检查main字段
                 if (packageJson.has("main")) {

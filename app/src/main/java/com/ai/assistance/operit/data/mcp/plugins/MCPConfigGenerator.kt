@@ -136,32 +136,41 @@ class MCPConfigGenerator {
                         // 根据项目结构决定可能的输出路径
                         val mainTsFile = projectStructure.mainTsFile
                         if (mainTsFile != null) {
+                            // 标准化 rootDir（为空或null都视为根目录）
+                            val normalizedRootDir = if (rootDir.isNullOrEmpty()) "" else rootDir
+                            
                             // 尝试确定编译输出位置
-                            if (mainTsFile.startsWith("$rootDir/")) {
-                                // 如果文件在rootDir中，使用outDir作为输出目录
-                                val compiledPath =
-                                        mainTsFile
-                                                .replace("$rootDir/", "$outDir/")
-                                                .replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "根据rootDir和outDir推断编译路径: $compiledPath")
-                            } else if (mainTsFile.startsWith("src/")) {
-                                // 如果只是常规的src/目录结构
-                                val compiledPath =
-                                        mainTsFile.replace("src/", "$outDir/").replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "根据src/和outDir推断编译路径: $compiledPath")
-                            } else if (rootDir == "." || rootDir.isEmpty()) {
-                                // 如果rootDir是根目录，文件会被编译到outDir下
-                                val compiledPath = "$outDir/" + mainTsFile.replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "rootDir为根目录，推断编译路径: $compiledPath")
-                            } else {
-                                // 直接替换扩展名
-                                val compiledPath = mainTsFile.replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "简单替换扩展名得到编译路径: $compiledPath")
+                            val compiledPath = when {
+                                // 如果rootDir为空或为根目录，文件会直接编译到outDir下
+                                normalizedRootDir.isEmpty() -> {
+                                    // 对于 rootDir="." 和 mainTsFile="index.ts" -> dist/index.js
+                                    val relativePath = mainTsFile.removePrefix("src/")
+                                    val jsFile = relativePath.replace(".ts", ".js")
+                                    "$outDir/$jsFile"
+                                }
+                                // 如果文件在rootDir中，需要保持相对路径结构
+                                mainTsFile.startsWith("$normalizedRootDir/") -> {
+                                    mainTsFile
+                                        .removePrefix("$normalizedRootDir/")
+                                        .replace(".ts", ".js")
+                                        .let { "$outDir/$it" }
+                                }
+                                // 如果是src目录结构
+                                mainTsFile.startsWith("src/") && normalizedRootDir == "src" -> {
+                                    mainTsFile
+                                        .removePrefix("src/")
+                                        .replace(".ts", ".js")
+                                        .let { "$outDir/$it" }
+                                }
+                                // 其他情况，假设文件在根目录
+                                else -> {
+                                    val jsFile = mainTsFile.replace(".ts", ".js")
+                                    "$outDir/$jsFile"
+                                }
                             }
+                            
+                            argsArray.add(compiledPath)
+                            Log.d(TAG, "TypeScript编译路径推断: $mainTsFile (rootDir=$normalizedRootDir) -> $compiledPath")
                         } else {
                             // 如果没有找到主TS文件，使用常见的输出位置
                             argsArray.add("$outDir/index.js")
