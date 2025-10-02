@@ -234,7 +234,7 @@ class MCPStarter(private val context: Context) {
                     
                     if (!deploySuccess) {
                         statusCallback(StartStatus.Error("插件部署失败: $pluginId"))
-                        return false
+                    return false
                     }
                     
                     statusCallback(StartStatus.InProgress("插件部署完成，继续启动: $pluginId"))

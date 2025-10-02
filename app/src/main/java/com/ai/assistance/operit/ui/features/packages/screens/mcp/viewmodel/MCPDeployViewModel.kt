@@ -120,16 +120,34 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
      * @param pluginId 要部署的插件ID
      */
     fun deployPlugin(pluginId: String) {
-        if (_generatedCommands.value.isEmpty()) {
-            // 如果没有预先获取命令，先获取
-            if (!getDeployCommands(pluginId)) {
-                // 获取命令失败，状态已在getDeployCommands中更新
-                return
+        viewModelScope.launch {
+            // 确保命令已生成
+            if (_generatedCommands.value.isEmpty()) {
+                // 先获取命令
+                val deployCommands = try {
+                    val pluginPath = mcpRepository.getInstalledPluginPath(pluginId)
+                    if (pluginPath == null) {
+                        _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法获取插件路径: $pluginId")
+                        return@launch
+                    }
+                    mcpDeployer.getDeployCommands(pluginId, pluginPath)
+                } catch (e: Exception) {
+                    _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
+                    return@launch
+                }
+                
+                if (deployCommands.isEmpty()) {
+                    _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
+                    return@launch
+                }
+                
+                // 保存生成的命令
+                _generatedCommands.value = deployCommands
             }
-        }
 
-        // 使用生成的命令部署
-        deployPluginWithCommands(pluginId, _generatedCommands.value)
+            // 使用生成的命令部署
+            deployPluginWithCommands(pluginId, _generatedCommands.value)
+        }
     }
 
     /**

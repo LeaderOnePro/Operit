@@ -308,14 +308,8 @@ fun MCPConfigScreen(
                     // 在协程内部复制当前的pluginId避免外部状态变化导致空指针异常
                     val pluginId = pluginToDeploy!!
                     
-                    // 确保已获取命令
-                    scope.launch {
-                        if (deployViewModel.generatedCommands.value.isEmpty()) {
-                            deployViewModel.getDeployCommands(pluginId)
-                        }
-                        // 使用默认命令部署
-                        deployViewModel.deployPlugin(pluginId)
-                    }
+                    // 使用默认命令部署（会自动获取命令）
+                    deployViewModel.deployPlugin(pluginId)
 
                     // 重置状态
                     showConfirmDialog = false
