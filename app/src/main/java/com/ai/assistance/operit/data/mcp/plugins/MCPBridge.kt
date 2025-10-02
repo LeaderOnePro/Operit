@@ -74,6 +74,13 @@ class MCPBridge private constructor(private val context: Context) {
                     outputFile.writeText(indexJsContent)
                     inputStream.close()
 
+                    // 复制 spawn-helper.js 到公共目录
+                    val spawnHelperInputStream = context.assets.open("bridge/spawn-helper.js")
+                    val spawnHelperJsContent = spawnHelperInputStream.bufferedReader().use { it.readText() }
+                    val spawnHelperOutputFile = File(publicBridgeDir, "spawn-helper.js")
+                    spawnHelperOutputFile.writeText(spawnHelperJsContent)
+                    spawnHelperInputStream.close()
+
                     // 创建package.json文件
                     val packageJsonContent =
                             """
@@ -124,6 +131,7 @@ class MCPBridge private constructor(private val context: Context) {
                             """
                         mkdir -p $TERMUX_BRIDGE_PATH && 
                         cp -f $sdcardBridgePath/index.js $TERMUX_BRIDGE_PATH/ && 
+                        cp -f $sdcardBridgePath/spawn-helper.js $TERMUX_BRIDGE_PATH/ &&
                         cp -f $sdcardBridgePath/package.json $TERMUX_BRIDGE_PATH/ && 
                         cd $TERMUX_BRIDGE_PATH && 
                         if [ ! -d "node_modules/mcp-client" ] || [ ! -d "node_modules/uuid" ]; then pnpm install; fi

@@ -1,8 +1,3 @@
-/**
- * MCP TCP Bridge
- *
- * Creates a bridge that connects STDIO-based MCP servers to TCP clients
- */
 interface BridgeConfig {
     port: number;
     host: string;
@@ -11,13 +6,26 @@ interface BridgeConfig {
     registryPath?: string;
     env?: Record<string, string>;
 }
+export interface McpServiceInfo {
+    name: string;
+    description: string;
+    type: 'local' | 'remote';
+    command?: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+    endpoint?: string;
+    connectionType?: 'httpStream' | 'sse';
+    created: number;
+    lastUsed?: number;
+}
 /**
  * MCP Bridge class
  */
 declare class McpBridge {
     private config;
     private server;
-    private serviceClients;
+    private serviceHelpers;
     private mcpToolsMap;
     private serviceReadyMap;
     private serviceRegistry;
@@ -61,6 +69,14 @@ declare class McpBridge {
      */
     private expandPath;
     private startLocalService;
+    /**
+     * Spawns a helper process for a service
+     */
+    private spawnServiceHelper;
+    /**
+     * Handles messages from helper processes
+     */
+    private handleHelperMessage;
     /**
      * 获取特定服务的MCP工具列表 (统一处理本地和远程服务)
      */
