@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -180,6 +181,9 @@ fun MCPConfigScreen(
     var remoteEndpointInput by remember { mutableStateOf("") }
     var remoteConnectionType by remember { mutableStateOf("httpStream") }
     var remoteConnectionTypeExpanded by remember { mutableStateOf(false) }
+    
+    // 新增：配置导入相关状态
+    var configJsonInput by remember { mutableStateOf("") }
 
     // 新增：远程服务编辑对话框状态
     var showRemoteEditDialog by remember { mutableStateOf(false) }
@@ -436,11 +440,19 @@ fun MCPConfigScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 添加顶部导入方式选择
-                    ScrollableTabRow(
-                        selectedTabIndex = importTabIndex,
-                        edgePadding = 0.dp,
-                        divider = {}
-                    ) {
+                    Column {
+                        ScrollableTabRow(
+                            selectedTabIndex = importTabIndex,
+                            edgePadding = 8.dp,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                if (importTabIndex < tabPositions.size) {
+                                    TabRowDefaults.SecondaryIndicator(
+                                        Modifier.tabIndicatorOffset(tabPositions[importTabIndex])
+                                    )
+                                }
+                            }
+                        ) {
                         Tab(
                             selected = importTabIndex == 0,
                             onClick = { importTabIndex = 0 },
@@ -474,6 +486,43 @@ fun MCPConfigScreen(
                                 ) 
                             }
                         )
+                        Tab(
+                            selected = importTabIndex == 3,
+                            onClick = { importTabIndex = 3 },
+                            text = { 
+                                Text(
+                                    "配置导入",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1
+                                ) 
+                            }
+                        )
+                    }
+                        
+                        // 滚动提示
+                        if (importTabIndex < 2) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = "更多选项",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "左滑查看更多选项",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
                     }
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -582,40 +631,110 @@ fun MCPConfigScreen(
                                 }
                             }
                         }
+                        3 -> {
+                            // 配置导入
+                            Text("粘贴 MCP 配置 JSON", style = MaterialTheme.typography.bodyMedium)
+                            
+                            OutlinedTextField(
+                                value = configJsonInput,
+                                onValueChange = { configJsonInput = it },
+                                label = { Text("配置内容") },
+                                placeholder = { Text("{\n  \"mcpServers\": {\n    \"playwright\": {\n      \"command\": \"npx\",\n      \"args\": [\"@playwright/mcp@latest\"]\n    }\n  }\n}") },
+                                modifier = Modifier.fillMaxWidth().height(180.dp),
+                                maxLines = 8
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            TextButton(
+                                onClick = {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                                    intent.setDataAndType(android.net.Uri.parse(mcpLocalServer.getConfigFilePath()), "application/json")
+                                    intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        val fileIntent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                                        fileIntent.setDataAndType(android.net.Uri.parse("file://${mcpLocalServer.getConfigFilePath()}"), "*/*")
+                                        fileIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                        try {
+                                            context.startActivity(android.content.Intent.createChooser(fileIntent, "打开配置文件"))
+                                        } catch (e2: Exception) {
+                                            Toast.makeText(context, "配置文件位置: ${mcpLocalServer.getConfigFilePath()}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("打开配置文件", fontSize = 12.sp)
+                            }
+                        }
                     }
                     
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
-                    Text(stringResource(R.string.service_metadata), style = MaterialTheme.typography.titleSmall)
-                    
-                    OutlinedTextField(
-                        value = pluginNameInput,
-                        onValueChange = { newValue ->
-                            // 只允许英文字母、数字和下划线
-                            val filtered = newValue.filter { it.isLetterOrDigit() || it == '_' }
-                            pluginNameInput = filtered
-                        },
-                        label = { Text(stringResource(R.string.plugin_name)) },
-                        placeholder = { Text(stringResource(R.string.my_mcp_plugin)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        supportingText = { 
-                            Text(
-                                stringResource(R.string.plugin_name_description),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    )
+                    if (importTabIndex != 3) {
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        Text(stringResource(R.string.service_metadata), style = MaterialTheme.typography.titleSmall)
+                        
+                        OutlinedTextField(
+                            value = pluginNameInput,
+                            onValueChange = { newValue ->
+                                // 只允许英文字母、数字和下划线
+                                val filtered = newValue.filter { it.isLetterOrDigit() || it == '_' }
+                                pluginNameInput = filtered
+                            },
+                            label = { Text(stringResource(R.string.plugin_name)) },
+                            placeholder = { Text(stringResource(R.string.my_mcp_plugin)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            supportingText = { 
+                                Text(
+                                    stringResource(R.string.plugin_name_description),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         val isRemote = importTabIndex == 2
+                        val isConfigImport = importTabIndex == 3
                         val isRepoImport = importTabIndex == 0 && repoUrlInput.isNotBlank() && pluginNameInput.isNotBlank()
                         val isZipImport = importTabIndex == 1 && zipFilePath.isNotBlank() && pluginNameInput.isNotBlank()
                         val isRemoteConnect = isRemote && remoteEndpointInput.isNotBlank() && pluginNameInput.isNotBlank()
 
-                        if (isRepoImport || isZipImport || isRemoteConnect) {
+                        if (isConfigImport) {
+                            if (configJsonInput.isNotBlank()) {
+                                isImporting = true
+                                scope.launch {
+                                    Log.d("MCPConfigScreen", "开始导入配置，内容长度: ${configJsonInput.length}")
+                                    try {
+                                        val result = mcpLocalServer.mergeConfigFromJson(configJsonInput)
+                                        result.onSuccess { count ->
+                                            Log.i("MCPConfigScreen", "配置导入成功，合并了 $count 个服务器")
+                                            Toast.makeText(context, "已合并 $count 个服务器配置", Toast.LENGTH_SHORT).show()
+                                            mcpRepository.refreshPluginList()
+                                            configJsonInput = ""
+                                            showImportDialog = false
+                                        }.onFailure { error ->
+                                            Log.e("MCPConfigScreen", "配置导入失败: ${error.message}", error)
+                                            Toast.makeText(context, "✗ 合并失败: ${error.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("MCPConfigScreen", "配置导入异常", e)
+                                        Toast.makeText(context, "✗ 导入异常: ${e.message}", Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isImporting = false
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "请输入配置内容", Toast.LENGTH_SHORT).show()
+                            }
+                        } else if (isRepoImport || isZipImport || isRemoteConnect) {
                             // 检查插件ID是否冲突
                             val proposedId = pluginNameInput.replace(" ", "_").lowercase()
                             if (mcpRepository.isPluginInstalled(proposedId)) {
@@ -678,7 +797,8 @@ fun MCPConfigScreen(
                     enabled = !isImporting && 
                              ((importTabIndex == 0 && repoUrlInput.isNotBlank() && pluginNameInput.isNotBlank()) ||
                               (importTabIndex == 1 && zipFilePath.isNotBlank() && pluginNameInput.isNotBlank()) ||
-                              (importTabIndex == 2 && remoteEndpointInput.isNotBlank() && pluginNameInput.isNotBlank()))
+                              (importTabIndex == 2 && remoteEndpointInput.isNotBlank() && pluginNameInput.isNotBlank()) ||
+                              (importTabIndex == 3 && configJsonInput.isNotBlank()))
                 ) {
                     if (isImporting) {
                         CircularProgressIndicator(
@@ -687,7 +807,11 @@ fun MCPConfigScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(if(importTabIndex == 2) stringResource(R.string.connect) else stringResource(R.string.import_action))
+                    Text(when(importTabIndex) {
+                        2 -> stringResource(R.string.connect)
+                        3 -> "合并配置"
+                        else -> stringResource(R.string.import_action)
+                    })
                 }
             },
             dismissButton = {
@@ -698,6 +822,7 @@ fun MCPConfigScreen(
                     remoteEndpointInput = ""
                     remoteConnectionType = "httpStream"
                     remoteConnectionTypeExpanded = false
+                    configJsonInput = ""
                     showImportDialog = false 
                 }) {
                     Text(stringResource(R.string.cancel))

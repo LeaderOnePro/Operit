@@ -71,14 +71,19 @@
     <string name="how_to_import">如何制作和导入模型?</string>
     <string name="enter">进入</string>
     <string name="about_avatar_formats">本应用支持多种虚拟形象格式，包括DragonBones。以下是制作和导入模型的说明。</string>
+    <string name="dragon_bones_config">DragonBones配置</string>
+    <string name="dragon_bones_renamed">DragonBones已更名为LoongBones，并推出了新的在线编辑器。\nLoongBones支持IK、网格变形、骨骼绑定等专业动画功能。</string>
     <string name="making_models">1. 制作模型：</string>
+    <string name="making_models_desc">    · 推荐：使用新版在线编辑器。\n    · 备选：从第三方存档网站下载旧版 v5.6.3 离线编辑器。</string>
     <string name="making_models_desc_general">    · 您可以使用多种工具来创建您的虚拟形象模型。\n    · 对于DragonBones，推荐使用新版在线编辑器，也可使用旧版 v5.6.3 离线编辑器。</string>
     <string name="exporting_files">2. 导出文件：</string>
+    <string name="exporting_files_desc">    · 无论使用哪个版本，导出数据时类型请选择 JSON，版本请选择 5.5（当前还不支持 6.0 运行时）。\n    · 导出的核心文件为：*_ske.json、*_tex.json、*_tex.png。</string>
     <string name="exporting_files_desc_general">    · 请遵循您所选格式的导出指南。\n    · 对于DragonBones，导出数据时类型请选择 JSON，版本请选择 5.5（当前还不支持 6.0 运行时）。\n    · 导出的核心文件为：*_ske.json、*_tex.json、*_tex.png。</string>
     <string name="configuring_interaction">3. 配置交互：</string>
     <string name="configuring_interaction_desc">    · 如需实现头部跟随，请添加 IK 约束，并将其目标骨骼命名为 ik_target。\n    · idle 动画：请确保有一个命名为 idle 的动画，作为基础待机动画，会自动循环播放。\n    · 随机动画：可添加如 blink（眨眼）、shake_head（摇头）、wag_tail（摇尾巴）等动画，\n      系统会随机自动触发这些动画，丰富宠物表现。</string>
     <string name="packaging_and_importing">4. 打包与导入：</string>
     <string name="packaging_and_importing_desc">    · 将导出的三个文件打包成一个 .zip 文件后导入。</string>
+    <string name="important_tip">重要提示：旧版编辑器下载页面中，Windows和Mac的下载链接放反了，请注意选择正确的链接下载。</string>
     <string name="dragonbones_important_tip">重要提示：旧版编辑器下载页面中，Windows和Mac的下载链接放反了，请注意选择正确的链接下载。</string>
     <string name="download_old_editor">下载旧版编辑器</string>
     <string name="visit_online_editor">访问在线编辑器</string>
@@ -1084,6 +1089,7 @@
     <string name="ai_assistant">AI助手</string>
     <string name="send_message">发送消息</string>
     <string name="chat_with_pet">和宠物对话</string>
+    <string name="dragonbones_mode">DragonBones模式</string>
     <string name="avatar_mode">虚拟形象模式</string>
     <string name="loading_failed">加载失败: %1$s</string>
     <string name="loading">正在加载...</string>

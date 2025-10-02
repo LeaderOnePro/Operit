@@ -20,6 +20,17 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
         ToolExecutor {
     companion object {
         private const val TAG = "MCPToolExecutor"
+        private const val MAX_RESULT_LENGTH = 2000 // 最大返回长度，约2000个token
+    }
+
+    /** 截断过长的结果字符串 */
+    private fun truncateResult(result: String): String {
+        if (result.length <= MAX_RESULT_LENGTH) {
+            return result
+        }
+        val truncated = result.substring(0, MAX_RESULT_LENGTH)
+        val remainingLength = result.length - MAX_RESULT_LENGTH
+        return "$truncated\n\n[... 结果过长，已截断 $remainingLength 个字符。建议使用文件操作或分页查询。]"
     }
 
     override fun invoke(tool: AITool): ToolResult {
@@ -63,47 +74,52 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
         // 调用MCP工具 - 使用同步版本
         val result =
                 try {
-                    // 直接调用工具
-                    val jsonResponse = mcpClient.callToolSync(actualToolName, convertedParameters)
+                    // 直接调用工具，返回完整的响应（包括 success, result, error）
+                    val response = mcpClient.callToolSync(actualToolName, convertedParameters)
 
-                    if (jsonResponse != null) {
-                        Log.d(TAG, "MCP工具调用成功: $serverName:$actualToolName")
-                        ToolResult(
-                                toolName = tool.name,
-                                success = true,
-                                result = StringResultData(jsonResponse.toString()),
-                                error = null
-                        )
-                    } else {
-                        // 从原始响应中提取错误信息
-                        var errorMessage = "工具调用失败"
-
-                        // 检查是否有详细错误可以提取
-                        try {
-                            // 尝试从客户端内部获取错误响应
-                            val errorField =
-                                    mcpClient.javaClass.getDeclaredMethod("getLastErrorResponse")
-                            errorField.isAccessible = true
-                            val errorResponse = errorField.invoke(mcpClient) as? JSONObject
-
-                            if (errorResponse != null) {
-                                val error = errorResponse.optJSONObject("error")
-                                if (error != null) {
-                                    errorMessage = error.optString("message", errorMessage)
-                                }
-                            }
-                        } catch (e: Exception) {
-                            // 如果无法提取错误，使用默认错误消息
-                            errorMessage = "工具调用失败: $serverName:$actualToolName"
-                        }
-
-                        Log.w(TAG, "MCP工具调用失败: $serverName:$actualToolName - $errorMessage")
+                    if (response == null) {
+                        // 如果响应为空（不应该发生，但做个保护）
+                        Log.e(TAG, "MCP工具调用返回空响应: $serverName:$actualToolName")
                         ToolResult(
                                 toolName = tool.name,
                                 success = false,
                                 result = StringResultData(""),
-                                error = errorMessage
+                                error = "工具调用返回空响应"
                         )
+                    } else {
+                        val success = response.optBoolean("success", false)
+                        
+                        if (success) {
+                            // 成功：提取 result 字段
+                            val resultData = response.optJSONObject("result")
+                            val resultString = resultData?.toString() ?: "{}"
+                            val truncatedResult = truncateResult(resultString)
+                            Log.d(TAG, "MCP工具调用成功: $serverName:$actualToolName")
+                            ToolResult(
+                                    toolName = tool.name,
+                                    success = true,
+                                    result = StringResultData(truncatedResult),
+                                    error = null
+                            )
+                        } else {
+                            // 失败：提取 error 字段
+                            val errorObj = response.optJSONObject("error")
+                            val errorMessage = if (errorObj != null) {
+                                val code = errorObj.optInt("code", -1)
+                                val message = errorObj.optString("message", "未知错误")
+                                "[$code] $message"
+                            } else {
+                                "工具调用失败，但未返回错误信息"
+                            }
+                            
+                            Log.w(TAG, "MCP工具调用失败: $serverName:$actualToolName - $errorMessage")
+                            ToolResult(
+                                    toolName = tool.name,
+                                    success = false,
+                                    result = StringResultData(""),
+                                    error = errorMessage
+                            )
+                        }
                     }
                 } catch (e: Exception) {
                     val errorMessage = "调用工具时发生异常: ${e.message}"

@@ -64,8 +64,8 @@ import kotlinx.serialization.json.jsonPrimitive
 class JsEngine(private val context: Context) {
     companion object {
         private const val TAG = "JsEngine"
-        private const val TIMEOUT_SECONDS = 60L // 增加超时时间到60秒
-        private const val PRE_TIMEOUT_SECONDS = 55L // 提前5秒触发JavaScript端的超时保护
+        private const val TIMEOUT_SECONDS = 180L // 超时时间：3分钟
+        private const val PRE_TIMEOUT_SECONDS = 175L // 提前5秒触发JavaScript端的超时保护
         private const val BINARY_DATA_THRESHOLD = 32 * 1024 // 32KB
         private const val BINARY_HANDLE_PREFIX = "@binary_handle:"
     }

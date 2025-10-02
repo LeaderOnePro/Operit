@@ -176,7 +176,7 @@ class MCPRepository(private val context: Context) {
             else -> true
         }
     }
-    
+
     /**
      * 检查插件是否在文件系统中物理存在
      */

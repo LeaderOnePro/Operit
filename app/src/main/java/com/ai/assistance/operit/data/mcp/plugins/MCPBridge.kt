@@ -307,7 +307,7 @@ class MCPBridge private constructor(private val context: Context) {
                         // Create socket with timeout and proper options
                         socket = Socket()
                         socket.reuseAddress = true
-                        socket.soTimeout = 60000 // 60 seconds read timeout
+                        socket.soTimeout = 180000 // 180 seconds read timeout (3 minutes)
                         socket.connect(
                                 java.net.InetSocketAddress(host, port),
                                 5000

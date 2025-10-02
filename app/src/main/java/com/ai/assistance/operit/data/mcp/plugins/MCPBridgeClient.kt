@@ -120,7 +120,7 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
     /** Get last ping time */
     fun getLastPingTime(): Long = lastPingTime
 
-    /** Call a tool on the MCP service */
+    /** Call a tool on the MCP service - 返回完整的响应（包括 success, result, error） */
     suspend fun callTool(method: String, params: JSONObject): JSONObject? =
             withContext(Dispatchers.IO) {
                 try {
@@ -130,7 +130,14 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
                         val connectSuccess = connect()
                         if (!connectSuccess) {
                             Log.e(TAG, "无法连接到 $serviceName 服务")
-                            return@withContext null
+                            // 返回一个包含错误信息的响应
+                            return@withContext JSONObject().apply {
+                                put("success", false)
+                                put("error", JSONObject().apply {
+                                    put("code", -1)
+                                    put("message", "无法连接到 $serviceName 服务")
+                                })
+                            }
                         }
                     }
 
@@ -154,19 +161,30 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
                     // Send command
                     val response = MCPBridge.sendCommand(command)
 
-                    if (response?.optBoolean("success", false) == true) {
-                        return@withContext response.optJSONObject("result")
+                    if (response == null) {
+                        // 如果响应为空，返回一个包含错误信息的对象
+                        return@withContext JSONObject().apply {
+                            put("success", false)
+                            put("error", JSONObject().apply {
+                                put("code", -1)
+                                put("message", "无法连接到桥接器或未收到响应")
+                            })
+                        }
+                    }
+
+                    // 返回完整的响应（包括 success, result, error）
+                    if (response.optBoolean("success", false)) {
+                        return@withContext response
                     } else {
                         val errorMsg =
-                                response?.optJSONObject("error")?.optString("message")
+                                response.optJSONObject("error")?.optString("message")
                                         ?: "Unknown error"
 
                         // Check for connection errors and handle reconnection
                         if (errorMsg.contains("not available") ||
                                         errorMsg.contains("not connected") ||
                                         errorMsg.contains("connection closed") ||
-                                        errorMsg.contains("timeout") ||
-                                        response == null
+                                        errorMsg.contains("timeout")
                         ) {
                             Log.w(TAG, "检测到连接错误: $errorMsg, 标记为已断开")
                             isConnected.set(false)
@@ -179,20 +197,27 @@ class MCPBridgeClient(context: Context, private val serviceName: String) {
                                 val retryCommand = JSONObject(command.toString())
                                 val retryResponse = MCPBridge.sendCommand(retryCommand)
 
-                                if (retryResponse?.optBoolean("success", false) == true) {
-                                    return@withContext retryResponse.optJSONObject("result")
+                                if (retryResponse != null) {
+                                    return@withContext retryResponse
                                 }
                             }
                         }
 
                         Log.e(TAG, "工具调用错误: $errorMsg")
-                        return@withContext null
+                        return@withContext response
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error calling tool $method: ${e.message}")
+                    Log.e(TAG, "Error calling tool $method: ${e.message}", e)
                     // Mark as disconnected on exception
                     isConnected.set(false)
-                    return@withContext null
+                    // 返回包含异常信息的响应
+                    return@withContext JSONObject().apply {
+                        put("success", false)
+                        put("error", JSONObject().apply {
+                            put("code", -1)
+                            put("message", "调用工具时发生异常: ${e.message}")
+                        })
+                    }
                 }
             }
     /** Synchronous tool call */

@@ -406,6 +406,73 @@ class MCPLocalServer private constructor(private val context: Context) {
     }
 
     /**
+     * 合并JSON配置到现有配置
+     */
+    suspend fun mergeConfigFromJson(jsonConfig: String): Result<Int> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "开始合并配置，输入长度: ${jsonConfig.length}")
+                Log.d(TAG, "配置内容预览: ${jsonConfig.take(200)}")
+                
+                val parsedConfig = try {
+                    gson.fromJson(jsonConfig, MCPConfig::class.java)
+                } catch (e: Exception) {
+                    Log.e(TAG, "JSON 解析失败", e)
+                    return@withContext Result.failure(Exception("JSON 格式错误: ${e.message}"))
+                }
+                
+                if (parsedConfig?.mcpServers == null) {
+                    Log.e(TAG, "配置解析结果为 null 或 mcpServers 字段为 null")
+                    return@withContext Result.failure(Exception("配置中没有找到 mcpServers 字段"))
+                }
+                
+                if (parsedConfig.mcpServers.isEmpty()) {
+                    Log.e(TAG, "mcpServers 为空")
+                    return@withContext Result.failure(Exception("配置中 mcpServers 为空"))
+                }
+                
+                Log.d(TAG, "解析到 ${parsedConfig.mcpServers.size} 个服务器配置")
+                parsedConfig.mcpServers.forEach { (serverId, serverConfig) ->
+                    Log.d(TAG, "服务器: $serverId, command: ${serverConfig.command}, args: ${serverConfig.args}")
+                }
+                
+                var addedCount = 0
+                _mcpConfig.update { currentConfig ->
+                    val newServers = currentConfig.mcpServers.toMutableMap()
+                    parsedConfig.mcpServers.forEach { (serverId, serverConfig) ->
+                        newServers[serverId] = serverConfig
+                        addedCount++
+                        Log.d(TAG, "添加服务器配置: $serverId")
+                    }
+                    currentConfig.copy(mcpServers = newServers)
+                }
+                
+                Log.d(TAG, "自动填充缺失的元数据")
+                val updatedConfig = autoFillMissingMetadata(_mcpConfig.value)
+                _mcpConfig.value = updatedConfig
+                
+                Log.d(TAG, "保存配置文件")
+                saveMCPConfig()
+                
+                Log.d(TAG, "初始化服务器状态")
+                initializeMissingServerStatus()
+                
+                Log.i(TAG, "成功合并 $addedCount 个服务器配置")
+                Result.success(addedCount)
+            } catch (e: Exception) {
+                Log.e(TAG, "合并配置失败: ${e.message}", e)
+                e.printStackTrace()
+                Result.failure(Exception("合并配置失败: ${e.message}"))
+            }
+        }
+    }
+
+    /**
+     * 获取配置文件路径
+     */
+    fun getConfigFilePath(): String = mcpConfigFile.absolutePath
+
+    /**
      * 获取MCP服务器配置
      */
     fun getMCPServer(serverId: String): MCPConfig.ServerConfig? {

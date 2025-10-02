@@ -22,6 +22,7 @@
     <string name="nav_help">User Manual</string>
     <string name="menu">Menu</string>
     <string name="token_config">Get API Key</string>
+    <string name="desktop_pet_start">Start Desktop Pet</string>
     
     <!-- Attachment Panel -->
     <string name="screen_content">Screen Content</string>
@@ -54,6 +55,7 @@
     <string name="importing_model">Importing model...</string>
     <string name="processing">Processing...</string>
     <string name="error_occurred">Error occurred: %1$s</string>
+    <string name="avatar_config">Avatar Configuration</string>
     <string name="dragon_bones_config">DragonBones Config</string>
     <string name="collapse">Collapse</string>
     <string name="expand">Expand</string>
@@ -69,16 +71,20 @@
     <string name="unsupported_model_type">Unsupported model type: %1$s</string>
     <string name="how_to_import">How to create and import models?</string>
     <string name="enter">Enter</string>
+    <string name="about_avatar_formats">This app supports multiple avatar formats, including DragonBones. Here are instructions for creating and importing models.</string>
     <string name="dragon_bones_renamed">DragonBones has been renamed to LoongBones, and a new online editor has been launched.\nLoongBones supports professional animation features like IK, mesh deformation, and bone binding.</string>
     <string name="making_models">1. Creating Models:</string>
     <string name="making_models_desc">    · Recommended: Use the new online editor.\n    · Alternative: Download the old v5.6.3 offline editor from third-party archive sites.</string>
+    <string name="making_models_desc_general">    · You can use various tools to create your avatar models.\n    · For DragonBones, we recommend using the new online editor, or you can use the old v5.6.3 offline editor.</string>
     <string name="exporting_files">2. Exporting Files:</string>
     <string name="exporting_files_desc">    · Regardless of which version you use, when exporting data, select JSON for type and version 5.5 (current version doesn\'t support 6.0 runtime).\n    · The core export files are: *_ske.json, *_tex.json, *_tex.png.</string>
+    <string name="exporting_files_desc_general">    · Please follow the export guidelines for your chosen format.\n    · For DragonBones, when exporting data, select JSON for type and version 5.5 (current version doesn\'t support 6.0 runtime).\n    · The core export files are: *_ske.json, *_tex.json, *_tex.png.</string>
     <string name="configuring_interaction">3. Configuring Interaction:</string>
     <string name="configuring_interaction_desc">    · For head tracking, add an IK constraint and name the target bone \"ik_target\".\n    · idle animation: Make sure you have an animation named \"idle\" as the base idle animation, which will automatically loop.\n    · Random animations: You can add animations like blink, shake_head, wag_tail, etc.,\n      the system will randomly trigger these animations to enrich the pet\'s expression.</string>
     <string name="packaging_and_importing">4. Packaging and Importing:</string>
     <string name="packaging_and_importing_desc">    · Package the three exported files into one .zip file for import.</string>
     <string name="important_tip">Important Note: In the old editor download page, the Windows and Mac download links are reversed. Please make sure to select the correct link.</string>
+    <string name="dragonbones_important_tip">Important Note: In the old editor download page, the Windows and Mac download links are reversed. Please make sure to select the correct link.</string>
     <string name="download_old_editor">Download Old Editor</string>
     <string name="visit_online_editor">Visit Online Editor</string>
     
@@ -912,6 +918,10 @@
     <string name="desktop_pet_function">Desktop Pet</string>
     <string name="desktop_pet_function_desc">Desktop pet function, customize pet personality and interaction style</string>
     
+    <!-- Desktop Pet Service Notification -->
+    <string name="pet_service_notification_title">Desktop Pet Service</string>
+    <string name="pet_service_notification_text">Desktop pet is running</string>
+    
     <!-- Settings Screen Additional Strings -->
     <string name="settings_prompt_section">Prompt Configuration</string>
     <string name="settings_prompt_title">Prompt Editor</string>
@@ -1046,6 +1056,7 @@
     <string name="send_message">Send Message</string>
     <string name="chat_with_pet">Chat with Pet</string>
     <string name="dragonbones_mode">DragonBones Mode</string>
+    <string name="avatar_mode">Avatar Mode</string>
     <string name="loading_failed">Loading failed: %1$s</string>
     <string name="loading">Loading...</string>
     <string name="floating_service_description">Display AI assistant floating window service</string>

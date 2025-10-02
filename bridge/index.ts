@@ -103,7 +103,7 @@ class McpBridge {
     private pendingRequests: Map<string, PendingRequest> = new Map();
 
     // 请求超时(毫秒)
-    private readonly REQUEST_TIMEOUT = 60000; // 60秒超时
+    private readonly REQUEST_TIMEOUT = 180000; // 180秒超时 (3分钟)
 
     // 服务错误记录
     private mcpErrors: Map<string, string> = new Map();
@@ -341,13 +341,15 @@ class McpBridge {
             this.mcpErrors.delete(serviceName);
 
             // 准备环境变量：合并 process.env 和用户指定的 env
-            // 添加一些有用的环境变量来避免 npm 缓存问题
+            // 添加一些有用的环境变量来避免 npm 和 uv 缓存问题
             const mergedEnv = {
                 ...process.env,
                 ...env,
                 // 如果用户没有指定这些，添加它们来避免 npm 问题
                 ...(env?.npm_config_cache ? {} : { npm_config_cache: path.join(workingDir, '.npm-cache') }),
                 ...(env?.npm_config_prefer_offline ? {} : { npm_config_prefer_offline: 'true' }),
+                // 为 uvx/uv 添加环境变量以避免硬链接问题（在某些文件系统上会失败）
+                ...(env?.UV_LINK_MODE ? {} : { UV_LINK_MODE: 'copy' }),
             };
 
             // 连接到本地 stdio 服务
@@ -668,16 +670,26 @@ class McpBridge {
                             }
                         };
                     } else {
-                        const serviceInfoToShutDown = this.serviceRegistry.get(serviceToShutdown)!;
-                        // 终止进程或连接
-                        if (serviceInfoToShutDown.type === 'local') {
-                            this.serviceClients.delete(serviceToShutdown);
-                        } else if (serviceInfoToShutDown.type === 'remote') {
-                            const client = this.serviceClients.get(serviceToShutdown);
-                            client?.close();
-                            this.serviceClients.delete(serviceToShutdown);
+                        // 获取客户端并关闭（异步操作）
+                        const client = this.serviceClients.get(serviceToShutdown);
+                        if (client) {
+                            console.log(`[${serviceToShutdown}] Closing MCP client...`);
+                            // 异步关闭客户端，不等待完成
+                            client.close().then(() => {
+                                console.log(`[${serviceToShutdown}] MCP client closed successfully`);
+                            }).catch((error: Error) => {
+                                console.error(`[${serviceToShutdown}] Error closing client: ${error.message}`);
+                            });
                         }
 
+                        // 完全注销服务，清理所有相关状态
+                        this.serviceClients.delete(serviceToShutdown);
+                        this.serviceReadyMap.delete(serviceToShutdown);
+                        this.mcpToolsMap.delete(serviceToShutdown);
+                        this.restartAttempts.delete(serviceToShutdown);
+                        this.serviceRegistry.delete(serviceToShutdown); // 从注册表中移除，防止自动重连
+
+                        console.log(`[${serviceToShutdown}] Service completely unregistered`);
 
                         response = {
                             id,
