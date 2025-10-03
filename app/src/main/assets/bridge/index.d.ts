@@ -31,13 +31,24 @@ declare class McpBridge {
     private serviceRegistry;
     private activeConnections;
     private pendingRequests;
+    private pendingSpawnRequests;
     private readonly REQUEST_TIMEOUT;
+    private readonly SPAWN_TIMEOUT;
     private mcpErrors;
     private serviceExitSignals;
     private restartAttempts;
     private readonly MAX_RESTART_ATTEMPTS;
     private readonly RESTART_DELAY_MS;
+    private readonly IDLE_TIMEOUT_MS;
     constructor(config?: Partial<BridgeConfig>);
+    /**
+     * 检查 spawn 请求超时
+     */
+    private checkSpawnTimeouts;
+    /**
+     * 检查并关闭闲置的服务
+     */
+    private checkIdleServices;
     /**
      * 注册新的MCP服务
      */

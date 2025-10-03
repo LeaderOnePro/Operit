@@ -79,7 +79,8 @@ data class PluginInfo(
         val id: String,
         val displayName: String,
         var status: PluginStatus = PluginStatus.WAITING,
-        var message: String = ""
+        var message: String = "",
+        var serviceName: String = ""
 ) {
     val shortName: String
         get() = id.split("/").lastOrNull() ?: id
@@ -540,6 +541,27 @@ class PluginLoadingState {
         }
     }
 
+    /** 更新插件注册状态 */
+    fun updatePluginRegistration(pluginId: String, serviceName: String, success: Boolean) {
+        val currentPlugins = _plugins.value.toMutableList()
+        val pluginIndex = currentPlugins.indexOfFirst { it.id == pluginId }
+
+        if (pluginIndex >= 0) {
+            val plugin = currentPlugins[pluginIndex]
+            val message = if (success) {
+                appContext?.getString(R.string.plugin_registered) ?: "已注册"
+            } else {
+                appContext?.getString(R.string.plugin_registration_failed) ?: "注册失败"
+            }
+            currentPlugins[pluginIndex] = plugin.copy(
+                serviceName = serviceName,
+                // 不要改变主状态，只更新消息
+                message = message
+            )
+            _plugins.value = currentPlugins
+        }
+    }
+
     /** 开始加载指定插件 */
     fun startLoadingPlugin(pluginId: String) {
         updatePluginStatus(
@@ -767,10 +789,17 @@ class PluginLoadingState {
                                 disabledSuffix
                         )
                 )
-                updateProgress(0.4f + 0.6f * (index.toFloat() / total))
+                updateProgress(0.4f + 0.6f * (index.toFloat() / total) * 0.3f) // 注册占30%
 
                 // 更新特定插件状态
                 startLoadingPlugin(pluginId)
+            }
+
+            override fun onPluginRegistered(pluginId: String, serviceName: String, success: Boolean) {
+                updatePluginRegistration(pluginId, serviceName, success)
+                if (!success) {
+                    setPluginFailed(pluginId, context.getString(R.string.plugin_registration_failed))
+                }
             }
 
             override fun onPluginStarted(
@@ -783,7 +812,7 @@ class PluginLoadingState {
                 if (success) {
                     setPluginSuccess(pluginId)
                 } else {
-                    setPluginFailed(pluginId)
+                    setPluginFailed(pluginId, context.getString(R.string.plugin_verification_failed))
                 }
 
                 // 更新总体进度

@@ -60,6 +60,18 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
             )
         }
 
+        // 在调用工具前，检查服务是否处于激活状态
+        val isActive = kotlinx.coroutines.runBlocking { mcpClient.isActive() }
+        if (!isActive) {
+            return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error =
+                            "MCP服务 '$serverName' 未激活。请先使用 'use_package' 工具并指定包名 '$serverName' 来激活它。"
+            )
+        }
+
         Log.d(TAG, "准备调用MCP工具: $serverName:$actualToolName")
 
         // 将AITool参数转换为Map

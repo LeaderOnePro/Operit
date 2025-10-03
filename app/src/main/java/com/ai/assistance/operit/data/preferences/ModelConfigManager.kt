@@ -69,26 +69,20 @@ class ModelConfigManager(private val context: Context) {
 
     // 初始化，确保至少有一个默认配置
     suspend fun initializeIfNeeded() {
-        Log.d("CONFIG_TIMING", "ModelConfigManager.initializeIfNeeded开始")
         // 检查配置列表，如果为空则创建默认配置
         // This is important for first-time users
         val configList = configListFlow.first()
-        Log.d("CONFIG_TIMING", "当前配置列表: $configList")
         if (configList.isEmpty()) {
-            Log.d("CONFIG_TIMING", "配置列表为空，创建默认配置")
             val defaultConfig = createFreshDefaultConfig()
-            Log.d("CONFIG_TIMING", "创建的默认配置apiKey: '${defaultConfig.apiKey}'")
             saveConfigToDataStore(defaultConfig)
 
             // 保存配置列表，移除活跃ID
             context.modelConfigDataStore.edit { preferences ->
                 preferences[CONFIG_LIST_KEY] = json.encodeToString(listOf(DEFAULT_CONFIG_ID))
             }
-            Log.d("CONFIG_TIMING", "默认配置已保存")
         } else {
             Log.d("CONFIG_TIMING", "配置列表不为空，跳过初始化")
         }
-        Log.d("CONFIG_TIMING", "ModelConfigManager.initializeIfNeeded完成")
     }
 
     // 从原有ApiPreferences创建默认配置

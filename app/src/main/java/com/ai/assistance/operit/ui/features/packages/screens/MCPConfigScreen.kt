@@ -208,55 +208,52 @@ fun MCPConfigScreen(
     // 存储每个插件的工具信息
     var pluginToolsMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
 
-    LaunchedEffect(isAnyServerRunning, installedPlugins, toolRefreshTrigger) {
-        // Only run when servers are running
-        if (isAnyServerRunning) {
-            if (installedPlugins.isEmpty()) {
-                Log.d("MCPConfigScreen", "Waiting for installed plugins list before fetching tools.")
-                return@LaunchedEffect
-            }
+    LaunchedEffect(installedPlugins, toolRefreshTrigger) {
+        // 只有在安装了插件后才运行
+        if (installedPlugins.isEmpty()) {
+            Log.d("MCPConfigScreen", "No installed plugins, clearing tool list.")
+            pluginToolsMap = emptyMap()
+            return@LaunchedEffect
+        }
 
-            // Give services a moment to initialize after starting
-            delay(1000)
+        // Give services a moment to initialize after starting
+        delay(1000)
 
-            Log.d("MCPConfigScreen", "Fetching tools for running services...")
-            
-            val toolsMap = mutableMapOf<String, List<String>>()
+        Log.d("MCPConfigScreen", "Fetching tools for installed services...")
 
-            try {
-                // 遍历已安装的插件，获取每个插件的工具信息
-                for (pluginId in installedPlugins) {
-                    try {
-                        val client = MCPBridgeClient(context, pluginId)
-                        val serviceInfo = client.getServiceInfo()
-                        
-                        if (serviceInfo != null && serviceInfo.active && serviceInfo.toolNames.isNotEmpty()) {
-                            toolsMap[pluginId] = serviceInfo.toolNames
-                            Log.d("MCPConfigScreen", "Plugin $pluginId has ${serviceInfo.toolNames.size} tools: ${serviceInfo.toolNames.joinToString(", ")}")
-                        } else {
-                            Log.d("MCPConfigScreen", "Plugin $pluginId: no tools or not active")
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MCPConfigScreen", "Error getting tools for plugin $pluginId: ${e.message}")
+        val toolsMap = mutableMapOf<String, List<String>>()
+
+        try {
+            // 遍历已安装的插件，获取每个插件的工具信息
+            for (pluginId in installedPlugins) {
+                try {
+                    val client = MCPBridgeClient(context, pluginId)
+                    val serviceInfo = client.getServiceInfo()
+
+                    if (serviceInfo != null && serviceInfo.toolNames.isNotEmpty()) {
+                        toolsMap[pluginId] = serviceInfo.toolNames
+                        Log.d("MCPConfigScreen", "Plugin $pluginId has ${serviceInfo.toolNames.size} tools: ${serviceInfo.toolNames.joinToString(", ")}")
+                    } else {
+                        Log.d("MCPConfigScreen", "Plugin $pluginId: no cached tools found.")
                     }
+                } catch (e: Exception) {
+                    Log.e("MCPConfigScreen", "Error getting tools for plugin $pluginId: ${e.message}")
                 }
-
-                // 更新工具映射
-                pluginToolsMap = toolsMap
-                
-                if (toolsMap.isNotEmpty()) {
-                    val totalTools = toolsMap.values.sumOf { it.size }
-                    Toast.makeText(context, context.getString(R.string.tools_loaded, totalTools), Toast.LENGTH_SHORT).show()
-                    Log.i("MCPConfigScreen", "Loaded $totalTools tools from ${toolsMap.size} plugins")
-                } else {
-                    Log.i("MCPConfigScreen", "No tools found for any running plugins.")
-                }
-            } catch (e: Exception) {
-                Log.e("MCPConfigScreen", "Error fetching tools", e)
-                Toast.makeText(context, context.getString(R.string.tools_load_error, e.message), Toast.LENGTH_SHORT).show()
             }
-        } else {
-            pluginToolsMap = emptyMap() // 清空工具映射
+
+            // 更新工具映射
+            pluginToolsMap = toolsMap
+
+            if (toolsMap.isNotEmpty()) {
+                val totalTools = toolsMap.values.sumOf { it.size }
+                Toast.makeText(context, context.getString(R.string.tools_loaded, totalTools), Toast.LENGTH_SHORT).show()
+                Log.i("MCPConfigScreen", "Loaded $totalTools tools from ${toolsMap.size} plugins")
+            } else {
+                Log.i("MCPConfigScreen", "No tools found for any installed plugins.")
+            }
+        } catch (e: Exception) {
+            Log.e("MCPConfigScreen", "Error fetching tools", e)
+            Toast.makeText(context, context.getString(R.string.tools_load_error, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -234,6 +234,9 @@
     <string name="plugin_complete_success">已完成启动，成功率: %1$d%%</string>
     <string name="plugin_no_plugins_to_start">没有需要启动的插件</string>
     <string name="plugin_copyright">© 2023 AI Assistance</string>
+    <string name="plugin_registered">已注册</string>
+    <string name="plugin_registration_failed">注册失败</string>
+    <string name="plugin_verification_failed">验证失败</string>
     
     <!-- Theme Settings Screen -->
     <string name="theme_title_mode">主题模式</string>

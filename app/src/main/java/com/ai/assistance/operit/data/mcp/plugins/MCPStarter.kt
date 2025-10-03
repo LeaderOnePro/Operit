@@ -17,6 +17,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * MCP Plugin Starter
@@ -46,8 +47,15 @@ class MCPStarter(private val context: Context) {
     /** Plugin start progress listener interface */
     interface PluginStartProgressListener {
         fun onPluginStarting(pluginId: String, index: Int, total: Int) {}
+        fun onPluginRegistered(pluginId: String, serviceName: String, success: Boolean) {}
         fun onPluginStarted(pluginId: String, success: Boolean, index: Int, total: Int) {}
-        fun onAllPluginsStarted(successCount: Int, totalCount: Int, status: PluginInitStatus = PluginInitStatus.SUCCESS) {}
+        fun onAllPluginsStarted(
+            successCount: Int,
+            totalCount: Int,
+            status: PluginInitStatus = PluginInitStatus.SUCCESS
+        ) {
+        }
+
         fun onAllPluginsVerified(verificationResults: List<VerificationResult>) {}
     }
 
@@ -87,15 +95,22 @@ class MCPStarter(private val context: Context) {
     /** Initialize and start the bridge */
     private suspend fun initBridge(): Boolean {
         // 检查 bridge 是否已经在运行
-        val pingResult = MCPBridge.ping(context)
-        if (pingResult != null) {
-            Log.d(TAG, "Bridge is already running, resetting to clear all services and child processes...")
-            
+        val bridge = MCPBridge.getInstance(context)
+        val listResult = bridge.listMcpServices()
+        if (listResult != null && listResult.optBoolean("success", false)) {
+            Log.d(
+                TAG,
+                "Bridge is already running, resetting to clear all services and child processes..."
+            )
+
             // 重置桥接器，清空所有服务、杀死子进程和清空池子
             val resetResult = MCPBridge.reset(context)
-            
+
             if (resetResult != null) {
-                Log.i(TAG, "Bridge reset successful: all services closed, child processes killed, registry cleared")
+                Log.i(
+                    TAG,
+                    "Bridge reset successful: all services closed, child processes killed, registry cleared"
+                )
                 bridgeInitialized = true
                 return true
             } else {
@@ -135,9 +150,10 @@ class MCPStarter(private val context: Context) {
 
         // Start bridge
         if (!MCPBridge.startBridge(
-            context = context,
-            sessionId = null // Use a dedicated session for the bridge server
-        )) {
+                context = context,
+                sessionId = null // Use a dedicated session for the bridge server
+            )
+        ) {
             Log.e(TAG, "Failed to start bridge")
             return false
         }
@@ -146,29 +162,11 @@ class MCPStarter(private val context: Context) {
         return true
     }
 
-    /** Check if a server is running */
-    private fun isServerRunning(serverName: String): Boolean {
-        try {
-            // Create a bridge instance
-            val bridge = MCPBridge.getInstance(context)
-
-            // Get ping response
-            val pingResult = kotlinx.coroutines.runBlocking { bridge.pingMcpService(serverName) }
-
-            if (pingResult != null) {
-                val result = pingResult.optJSONObject("result")
-                // 直接检查running状态
-                return result?.optBoolean("running", false) ?: false
-            }
-            return false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking server status: ${e.message}")
-            return false
-        }
-    }
-
     /** Start a plugin without initializing bridge (for batch operations) */
-    private suspend fun startPluginWithoutBridgeInit(pluginId: String, statusCallback: (StartStatus) -> Unit): Boolean {
+    private suspend fun startPluginWithoutBridgeInit(
+        pluginId: String,
+        statusCallback: (StartStatus) -> Unit
+    ): Boolean {
         return startPluginInternal(pluginId, statusCallback, initBridgeFirst = false)
     }
 
@@ -179,7 +177,7 @@ class MCPStarter(private val context: Context) {
 
     /** Internal plugin start logic */
     private suspend fun startPluginInternal(
-        pluginId: String, 
+        pluginId: String,
         statusCallback: (StartStatus) -> Unit,
         initBridgeFirst: Boolean
     ): Boolean {
@@ -203,32 +201,32 @@ class MCPStarter(private val context: Context) {
                     // 自动部署未部署的插件
                     statusCallback(StartStatus.InProgress("插件未部署，开始自动部署: $pluginId"))
                     Log.d(TAG, "插件 $pluginId 未部署，开始自动部署")
-                    
+
                     val pluginPath = mcpRepository.installedPluginIds.first()
                         .find { it == pluginId }
                         ?.let { mcpRepository.getInstalledPluginPath(it) }
-                    
+
                     if (pluginPath == null) {
                         statusCallback(StartStatus.Error("无法获取插件路径: $pluginId"))
                         return false
                     }
-                    
+
                     // 使用MCPDeployer自动部署
                     val deployer = MCPDeployer(context)
-                    
+
                     // 对于虚拟路径（npx/uvx 插件），直接使用空命令列表
                     val deployCommands = if (pluginPath.startsWith("virtual://")) {
                         emptyList()
                     } else {
                         deployer.getDeployCommands(pluginId, pluginPath)
                     }
-                    
+
                     // 只有非虚拟路径且命令为空时才报错
                     if (deployCommands.isEmpty() && !pluginPath.startsWith("virtual://")) {
                         statusCallback(StartStatus.Error("无法确定如何部署插件: $pluginId"))
                         return false
                     }
-                    
+
                     // 执行部署
                     var deploySuccess = false
                     deployer.deployPluginWithCommands(
@@ -242,22 +240,25 @@ class MCPStarter(private val context: Context) {
                                     deploySuccess = true
                                     statusCallback(StartStatus.InProgress("插件部署成功: $pluginId"))
                                 }
+
                                 is MCPDeployer.DeploymentStatus.Error -> {
                                     statusCallback(StartStatus.Error("部署失败: ${deployStatus.message}"))
                                 }
+
                                 is MCPDeployer.DeploymentStatus.InProgress -> {
                                     statusCallback(StartStatus.InProgress(deployStatus.message))
                                 }
+
                                 else -> {}
                             }
                         }
                     )
-                    
+
                     if (!deploySuccess) {
                         statusCallback(StartStatus.Error("插件部署失败: $pluginId"))
-                    return false
+                        return false
                     }
-                    
+
                     statusCallback(StartStatus.InProgress("插件部署完成，继续启动: $pluginId"))
                 }
             }
@@ -271,7 +272,8 @@ class MCPStarter(private val context: Context) {
 
             statusCallback(StartStatus.InProgress("Starting plugin: $pluginId"))
 
-            val serverName = pluginInfo.name.replace(" ", "_").lowercase().ifEmpty { pluginId.split("/").last().lowercase() }
+            val serverName = pluginInfo.name.replace(" ", "_").lowercase()
+                .ifEmpty { pluginId.split("/").last().lowercase() }
 
             // Handle remote services differently
             if (serviceType == "remote") {
@@ -282,7 +284,7 @@ class MCPStarter(private val context: Context) {
                     statusCallback(StartStatus.Error("Remote service is missing endpoint: $pluginId"))
                     return false
                 }
-                
+
                 // Initialize bridge only if requested
                 if (initBridgeFirst && !initBridge()) {
                     statusCallback(StartStatus.Error("Failed to initialize bridge for remote service"))
@@ -292,23 +294,25 @@ class MCPStarter(private val context: Context) {
                 val bridge = MCPBridge.getInstance(context)
 
                 // Register remote service with the bridge
-                val registerResult = bridge.registerMcpService(
-                    name = serverName,
-                    type = "remote",
-                    endpoint = endpoint,
-                    connectionType = connectionType,
-                    description = "Remote MCP Server: $pluginId"
-                )
+                val registerResult =
+                    bridge.registerMcpService(
+                        name = serverName,
+                        type = "remote",
+                        endpoint = endpoint,
+                        connectionType = connectionType,
+                        description = "Remote MCP Server: $pluginId"
+                    )
 
                 if (registerResult == null || !registerResult.optBoolean("success", false)) {
                     statusCallback(StartStatus.Error("Failed to register remote MCP service"))
                     return false
                 }
-                
-                // "Spawn" the remote service to trigger a connection
-                val spawnResult = bridge.spawnMcpService(serverName)
-                if (spawnResult == null || !spawnResult.optBoolean("success", false)) {
-                     statusCallback(StartStatus.Error("Failed to connect to remote MCP service"))
+
+                // "Connect" the remote service to trigger a connection and verify
+                val client = MCPBridgeClient(context, serverName)
+                val connectSuccess = client.connect() // connect will try to spawn if not active
+                if (!connectSuccess) {
+                    statusCallback(StartStatus.Error("Failed to connect to remote MCP service"))
                     return false
                 }
 
@@ -319,7 +323,8 @@ class MCPStarter(private val context: Context) {
             // --- Existing logic for local plugins ---
             val pluginConfig = mcpLocalServer.getPluginConfig(pluginId)
             val config = parseConfigJson(pluginConfig)
-            val extractedServerName = extractServerNameFromConfig(pluginConfig) ?: serverName
+            val extractedServerName =
+                extractServerNameFromConfig(pluginConfig) ?: serverName
 
             // Get server command and args
             val serverConfig = config?.mcpServers?.get(extractedServerName)
@@ -328,30 +333,30 @@ class MCPStarter(private val context: Context) {
                 return false
             }
 
-            // 不再需要旧的注册方法
-            // registerServerIfNeeded(extractedServerName, serverConfig, pluginId)
-
             // Check if plugin service is already running
-            if (isServerRunning(extractedServerName)) {
+            val clientForCheck = MCPBridgeClient(context, extractedServerName)
+            if (clientForCheck.isActive()) {
                 statusCallback(StartStatus.Success("Plugin $pluginId is already running"))
                 return true
             }
 
             // Initialize bridge only if requested (for single plugin start)
             if (initBridgeFirst) {
-            if (!initBridge()) {
-                when {
-                    !isTerminalServiceConnected() -> {
-                        statusCallback(StartStatus.TerminalServiceUnavailable())
+                if (!initBridge()) {
+                    when {
+                        !isTerminalServiceConnected() -> {
+                            statusCallback(StartStatus.TerminalServiceUnavailable())
+                        }
+
+                        !isPnpmInstalled() -> {
+                            statusCallback(StartStatus.PnpmMissing())
+                        }
+
+                        else -> {
+                            statusCallback(StartStatus.Error("Failed to initialize bridge"))
+                        }
                     }
-                    !isPnpmInstalled() -> {
-                        statusCallback(StartStatus.PnpmMissing())
-                    }
-                    else -> {
-                        statusCallback(StartStatus.Error("Failed to initialize bridge"))
-                    }
-                }
-                return false
+                    return false
                 }
             }
 
@@ -359,42 +364,29 @@ class MCPStarter(private val context: Context) {
 
             // Use MCPBridge instance
             val bridge = MCPBridge.getInstance(context)
-            val termuxPluginDir =
-                    "~/mcp_plugins/${pluginId.split("/").last()}"
+            val termuxPluginDir = "~/mcp_plugins/${pluginId.split("/").last()}"
 
             // Register MCP service
             val registerResult =
-                    bridge.registerMcpService(
-                            name = extractedServerName,
-                            command = serverConfig.command,
-                            args = serverConfig.args,
-                            description = "MCP Server: $pluginId",
-                            env = serverConfig.env,
-                            cwd = termuxPluginDir
-                    )
+                bridge.registerMcpService(
+                    name = extractedServerName,
+                    command = serverConfig.command,
+                    args = serverConfig.args,
+                    description = "MCP Server: $pluginId",
+                    env = serverConfig.env,
+                    cwd = termuxPluginDir
+                )
 
             if (registerResult == null || !registerResult.optBoolean("success", false)) {
                 statusCallback(StartStatus.Error("Failed to register MCP service"))
                 return false
             }
 
-            // Start MCP service
-            val spawnResult = bridge.spawnMcpService(extractedServerName)
+            // Start and verify MCP service using the client
+            val client = MCPBridgeClient(context, extractedServerName)
+            val connectSuccess = client.connect()
 
-            if (spawnResult == null || !spawnResult.optBoolean("success", false)) {
-                statusCallback(StartStatus.Error("Failed to start MCP service"))
-                return false
-            }
-
-            // Wait a moment for the service to initialize
-            delay(3000)
-
-            val finalStatus = bridge.pingMcpService(extractedServerName)
-            if (
-                    finalStatus != null &&
-                            finalStatus.optJSONObject("result")?.optBoolean("active", false) ==
-                                    true
-            ) {
+            if (connectSuccess) {
                 statusCallback(StartStatus.Success("Service $pluginId started successfully"))
                 return true
             } else {
@@ -410,20 +402,25 @@ class MCPStarter(private val context: Context) {
 
     /** Start all deployed plugins */
     fun startAllDeployedPlugins(
-            progressListener: PluginStartProgressListener = object : PluginStartProgressListener {}
+        progressListener: PluginStartProgressListener = object : PluginStartProgressListener {}
     ) {
         starterScope.launch {
             try {
                 // Check if terminal service is available
                 if (!isTerminalServiceConnected()) {
                     Log.e(TAG, "Terminal service is not connected. Please start it first.")
-                    progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.TERMINAL_SERVICE_UNAVAILABLE)
+                    progressListener.onAllPluginsStarted(
+                        0,
+                        0,
+                        PluginInitStatus.TERMINAL_SERVICE_UNAVAILABLE
+                    )
                     return@launch
                 }
 
-                // Initialize bridge ONCE before starting all plugins
+                // Initialize bridge ONCE, this will also reset existing services
                 if (!initBridge()) {
-                    val status = if (pnpmInstalled == false) PluginInitStatus.NODEJS_MISSING else PluginInitStatus.BRIDGE_FAILED
+                    val status =
+                        if (pnpmInstalled == false) PluginInitStatus.NODEJS_MISSING else PluginInitStatus.BRIDGE_FAILED
                     progressListener.onAllPluginsStarted(0, 0, status)
                     return@launch
                 }
@@ -431,57 +428,229 @@ class MCPStarter(private val context: Context) {
                 val mcpRepository = MCPRepository(context)
                 val mcpLocalServer = MCPLocalServer.getInstance(context)
 
-                // Get plugins to start: all enabled plugins (local plugins will be auto-deployed if needed)
+                // Get plugins to start: all enabled plugins
                 val pluginList = mcpRepository.installedPluginIds.first()
                 val pluginsToStart =
-                        pluginList.filter { pluginId ->
-                            mcpLocalServer.isServerEnabled(pluginId)
-                        }
+                    pluginList.filter { pluginId ->
+                        mcpLocalServer.isServerEnabled(pluginId)
+                    }
 
                 if (pluginsToStart.isEmpty()) {
                     progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.SUCCESS)
                     return@launch
                 }
 
-                // 并行启动所有插件（跳过bridge初始化）
-                val deferreds =
-                        pluginsToStart.mapIndexed { index, pluginId ->
-                            starterScope.async {
-                                progressListener.onPluginStarting(
-                                        pluginId,
-                                        index + 1,
-                                        pluginsToStart.size
-                                )
-                                val success =
-                                        startPluginWithoutBridgeInit(pluginId) {
-                                            // Status callback is not used here
-                                        }
-                                progressListener.onPluginStarted(
-                                        pluginId,
-                                        success,
-                                        index + 1,
-                                        pluginsToStart.size
-                                )
-                                success
+                // --- STAGE 1: Register all plugins ---
+                val registrationJobs =
+                    pluginsToStart.mapIndexed { index, pluginId ->
+                        async {
+                            progressListener.onPluginStarting(
+                                pluginId,
+                                index + 1,
+                                pluginsToStart.size
+                            )
+                            val serviceName = registerPlugin(pluginId)
+                            serviceName?.let {
+                                progressListener.onPluginRegistered(pluginId, it, true)
+                                pluginId to it // Return a pair of pluginId to serviceName
+                            } ?: run {
+                                progressListener.onPluginRegistered(pluginId, "", false)
+                                null
                             }
                         }
+                    }
+                val registrationResults = registrationJobs.awaitAll().filterNotNull().toMap()
+                val servicesToSpawn = registrationResults.values.toList()
 
-                val results = deferreds.awaitAll()
-                val successCount = results.count { it }
-
-                // Notify all plugins started
-                progressListener.onAllPluginsStarted(
-                        successCount,
+                if (servicesToSpawn.isEmpty()) {
+                    Log.w(TAG, "No plugins were successfully registered.")
+                    progressListener.onAllPluginsStarted(
+                        0,
                         pluginsToStart.size,
                         PluginInitStatus.SUCCESS
+                    )
+                    return@launch
+                }
+
+                // --- STAGE 2, 3, 4: Spawn, Verify, Process, and Unspawn in batches ---
+                val allVerificationResults = mutableListOf<VerificationResult>()
+                val batchSize = 4
+                val serviceChunks = registrationResults.toList().chunked(batchSize)
+
+                for ((chunkIndex, chunk) in serviceChunks.withIndex()) {
+                    Log.d(TAG, "Processing plugin chunk ${chunkIndex + 1}/${serviceChunks.size}...")
+
+                    // Spawn batch
+                    val spawnJobs = chunk.map { (_, serviceName) ->
+                        async {
+                            MCPBridgeClient(context, serviceName).spawn()
+                        }
+                    }
+                    spawnJobs.awaitAll()
+                    Log.d(TAG, "Chunk ${chunkIndex + 1} spawned.")
+
+                    // Give a moment for services to initialize after spawning
+                    delay(1000)
+
+                    // Verify batch
+                    val verificationJobs = chunk.map { (pluginId, serviceName) ->
+                        async {
+                            val client = MCPBridgeClient(context, serviceName)
+                            val startTime = System.currentTimeMillis()
+                            val pingSuccess = client.ping()
+                            val responseTime = System.currentTimeMillis() - startTime
+                            VerificationResult(
+                                pluginId = pluginId,
+                                serviceName = serviceName,
+                                isResponding = pingSuccess,
+                                responseTime = responseTime,
+                                details = if (pingSuccess) "Service is responding" else "Service not responding"
+                            )
+                        }
+                    }
+                    val chunkResults = verificationJobs.awaitAll()
+                    allVerificationResults.addAll(chunkResults)
+                    Log.d(TAG, "Chunk ${chunkIndex + 1} verified.")
+
+                    // Process and Unspawn successful ones in the current batch
+                    val successfulInChunk = chunkResults.filter { it.isResponding }
+                    if (successfulInChunk.isNotEmpty()) {
+                        Log.d(TAG, "Processing ${successfulInChunk.size} successful services in chunk ${chunkIndex + 1}.")
+                        // 1. Generate descriptions for the current successful batch
+                        generateMissingDescriptions(successfulInChunk)
+                        // 2. Register tools for the current successful batch
+                        registerToolsForVerifiedPlugins(successfulInChunk)
+                        // 3. Unspawn the current successful batch
+                        val unspawnJobs = successfulInChunk.map {
+                            async {
+                                MCPBridgeClient(context, it.serviceName).unspawn()
+                            }
+                        }
+                        unspawnJobs.awaitAll()
+                        Log.d(TAG, "Chunk ${chunkIndex + 1} processed and unspawned.")
+                    }
+                }
+
+                // --- Final UI Update and Notification ---
+                val successfulPlugins = allVerificationResults.filter { it.isResponding }
+
+                pluginsToStart.forEachIndexed { index, pluginId ->
+                    val isVerified = successfulPlugins.any { it.pluginId == pluginId }
+                    progressListener.onPluginStarted(
+                        pluginId,
+                        isVerified,
+                        index + 1,
+                        pluginsToStart.size
+                    )
+                }
+
+                val successCount = successfulPlugins.size
+                Log.i(TAG, "All plugin batches processed. Total successful: $successCount")
+
+                // --- FINAL: Notify completion ---
+                progressListener.onAllPluginsStarted(
+                    successCount,
+                    pluginsToStart.size,
+                    PluginInitStatus.SUCCESS
                 )
 
-                // Verify plugins
-                verifyPlugins(progressListener)
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting plugins", e)
                 progressListener.onAllPluginsStarted(0, 0, PluginInitStatus.OTHER_ERROR)
             }
+        }
+    }
+
+    /**
+     * Registers a single plugin and returns its service name if successful.
+     * This function contains the logic for auto-deployment and registration.
+     */
+    private suspend fun registerPlugin(pluginId: String): String? {
+        try {
+            val mcpRepository = MCPRepository(context)
+            val pluginInfo = mcpRepository.getInstalledPluginInfo(pluginId) ?: return null
+
+            // Auto-deploy if it's a local plugin and not deployed yet
+            if (pluginInfo.type == "local") {
+                val mcpLocalServer = MCPLocalServer.getInstance(context)
+                if (mcpLocalServer.getServerStatus(pluginId)?.deploySuccess != true) {
+                    val deployer = MCPDeployer(context)
+                    val pluginPath = mcpRepository.getInstalledPluginPath(pluginId) ?: return null
+                    val deployCommands =
+                        if (pluginPath.startsWith("virtual://")) emptyList() else deployer.getDeployCommands(
+                            pluginId,
+                            pluginPath
+                        )
+
+                    if (deployCommands.isEmpty() && !pluginPath.startsWith("virtual://")) return null
+
+                    var deploySuccess = false
+                    deployer.deployPluginWithCommands(
+                        pluginId,
+                        pluginPath,
+                        deployCommands,
+                        emptyMap()
+                    ) { status ->
+                        if (status is MCPDeployer.DeploymentStatus.Success) deploySuccess = true
+                    }
+                    if (!deploySuccess) return null
+                }
+            }
+
+            val bridge = MCPBridge.getInstance(context)
+            val serverName = pluginInfo.name.replace(" ", "_").lowercase()
+                .ifEmpty { pluginId.split("/").last().lowercase() }
+
+            // 用于存储实际注册到Bridge的服务名
+            var actualServiceName = serverName
+
+            val registerResult = when (pluginInfo.type) {
+                "remote" -> {
+                    if (pluginInfo.endpoint == null) {
+                        JSONObject().apply {
+                            put("success", false)
+                            put("error", "Endpoint is missing for remote plugin $pluginId")
+                        }
+                    } else {
+                        bridge.registerMcpService(
+                            name = serverName,
+                            type = "remote",
+                            endpoint = pluginInfo.endpoint,
+                            connectionType = pluginInfo.connectionType,
+                            description = "Remote MCP Server: $pluginId"
+                        )
+                    }
+                }
+
+                "local" -> {
+                    val mcpLocalServer = MCPLocalServer.getInstance(context)
+                    val pluginConfig = mcpLocalServer.getPluginConfig(pluginId)
+                    val config = parseConfigJson(pluginConfig)
+                    val extractedServerName =
+                        extractServerNameFromConfig(pluginConfig) ?: serverName
+                    val serverConfig = config?.mcpServers?.get(extractedServerName) ?: return null
+                    val termuxPluginDir = "~/mcp_plugins/${pluginId.split("/").last()}"
+
+                    // 更新实际使用的服务名
+                    actualServiceName = extractedServerName
+
+                    bridge.registerMcpService(
+                        name = extractedServerName,
+                        command = serverConfig.command,
+                        args = serverConfig.args,
+                        description = "MCP Server: $pluginId",
+                        env = serverConfig.env,
+                        cwd = termuxPluginDir
+                    )
+                }
+
+                else -> null
+            }
+
+            return if (registerResult?.optBoolean("success", false) == true) actualServiceName else null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register plugin $pluginId", e)
+            return null
         }
     }
 
@@ -491,13 +660,13 @@ class MCPStarter(private val context: Context) {
             try {
                 delay(5000) // Wait for services to initialize
                 val results = verifyAllMcpPlugins()
-                
+
                 // 自动生成空描述的工具包描述
                 generateMissingDescriptions(results)
-                
+
                 // 注册验证成功的插件的工具
                 registerToolsForVerifiedPlugins(results)
-                
+
                 progressListener.onAllPluginsVerified(results)
             } catch (e: Exception) {
                 Log.e(TAG, "Error verifying plugins", e)
@@ -516,9 +685,12 @@ class MCPStarter(private val context: Context) {
             val successfulPluginIds = results
                 .filter { it.isResponding }
                 .map { it.pluginId }
-            
+
             if (successfulPluginIds.isNotEmpty()) {
-                Log.d(TAG, "开始为 ${successfulPluginIds.size} 个验证成功的插件注册工具: $successfulPluginIds")
+                Log.d(
+                    TAG,
+                    "开始为 ${successfulPluginIds.size} 个验证成功的插件注册工具: $successfulPluginIds"
+                )
                 mcpRepository.registerToolsForLoadedPlugins(successfulPluginIds)
                 Log.d(TAG, "工具注册流程已完成")
             } else {
@@ -529,43 +701,48 @@ class MCPStarter(private val context: Context) {
         }
     }
 
-    /** 
+    /**
      * 为没有描述的工具包自动生成描述
      */
     private suspend fun generateMissingDescriptions(results: List<VerificationResult>) {
         try {
             val mcpRepository = MCPRepository(context)
             val mcpLocalServer = MCPLocalServer.getInstance(context)
-            
+
             // 筛选出成功响应的插件
             val respondingPlugins = results.filter { it.isResponding }
-            
+
             for (result in respondingPlugins) {
                 try {
                     // 获取插件信息
                     val pluginInfo = mcpRepository.getInstalledPluginInfo(result.pluginId)
-                    
+
                     // 检查描述是否为空
                     if (pluginInfo != null && pluginInfo.description.isBlank()) {
                         Log.d(TAG, "为插件 ${result.pluginId} 生成描述，当前描述为空")
-                        
+
                         // 获取工具描述
                         val client = MCPBridgeClient(context, result.serviceName)
                         val toolDescriptions = client.getToolDescriptions()
-                        
+
                         if (toolDescriptions.isNotEmpty()) {
                             // 调用EnhancedAIService生成描述
-                            val generatedDescription = com.ai.assistance.operit.api.chat.EnhancedAIService.generatePackageDescription(
-                                context = context,
-                                pluginName = pluginInfo.name,
-                                toolDescriptions = toolDescriptions
-                            )
-                            
+                            val generatedDescription =
+                                com.ai.assistance.operit.api.chat.EnhancedAIService.generatePackageDescription(
+                                    context = context,
+                                    pluginName = pluginInfo.name,
+                                    toolDescriptions = toolDescriptions
+                                )
+
                             // 只有在AI成功生成描述时才保存，失败时保持原有的空描述
                             if (generatedDescription.isNotBlank()) {
-                                val updatedMetadata = pluginInfo.copy(description = generatedDescription)
+                                val updatedMetadata =
+                                    pluginInfo.copy(description = generatedDescription)
                                 mcpLocalServer.addOrUpdatePluginMetadata(updatedMetadata)
-                                Log.i(TAG, "已为插件 ${result.pluginId} 生成描述: $generatedDescription")
+                                Log.i(
+                                    TAG,
+                                    "已为插件 ${result.pluginId} 生成描述: $generatedDescription"
+                                )
                             } else {
                                 Log.w(TAG, "插件 ${result.pluginId} 的描述生成失败，保持原有空描述")
                             }
@@ -593,10 +770,10 @@ class MCPStarter(private val context: Context) {
             // Get deployed plugins
             val pluginList = mcpRepository.installedPluginIds.first()
             val deployedPlugins =
-                    pluginList.filter { 
-                        val serverStatus = mcpLocalServer.getServerStatus(it)
-                        serverStatus?.deploySuccess == true
-                    }
+                pluginList.filter {
+                    val serverStatus = mcpLocalServer.getServerStatus(it)
+                    serverStatus?.deploySuccess == true
+                }
 
             // Get registered services
             val bridge = MCPBridge.getInstance(context)
@@ -619,18 +796,18 @@ class MCPStarter(private val context: Context) {
             for (pluginId in deployedPlugins) {
                 val pluginConfig = mcpLocalServer.getPluginConfig(pluginId)
                 val serverName =
-                        extractServerNameFromConfig(pluginConfig)
-                                ?: pluginId.split("/").last().lowercase()
+                    extractServerNameFromConfig(pluginConfig)
+                        ?: pluginId.split("/").last().lowercase()
 
                 if (!servicesList.contains(serverName)) {
                     results.add(
-                            VerificationResult(
-                                    pluginId = pluginId,
-                                    serviceName = serverName,
-                                    isResponding = false,
-                                    responseTime = 0,
-                                    details = "Service not registered"
-                            )
+                        VerificationResult(
+                            pluginId = pluginId,
+                            serviceName = serverName,
+                            isResponding = false,
+                            responseTime = 0,
+                            details = "Service not registered"
+                        )
                     )
                     continue
                 }
@@ -643,23 +820,23 @@ class MCPStarter(private val context: Context) {
 
                 if (pingSuccess) {
                     results.add(
-                            VerificationResult(
-                                    pluginId = pluginId,
-                                    serviceName = serverName,
-                                    isResponding = true,
-                                    responseTime = responseTime,
-                                    details = "Service is responding"
-                            )
+                        VerificationResult(
+                            pluginId = pluginId,
+                            serviceName = serverName,
+                            isResponding = true,
+                            responseTime = responseTime,
+                            details = "Service is responding"
+                        )
                     )
                 } else {
                     results.add(
-                            VerificationResult(
-                                    pluginId = pluginId,
-                                    serviceName = serverName,
-                                    isResponding = false,
-                                    responseTime = 0,
-                                    details = "Service not responding"
-                            )
+                        VerificationResult(
+                            pluginId = pluginId,
+                            serviceName = serverName,
+                            isResponding = false,
+                            responseTime = 0,
+                            details = "Service not responding"
+                        )
                     )
                 }
             }
@@ -698,9 +875,9 @@ class MCPStarter(private val context: Context) {
 
     /** Register server if needed */
     private fun registerServerIfNeeded(
-            serverName: String,
-            serverConfig: MCPLocalServer.MCPConfig.ServerConfig,
-            pluginId: String
+        serverName: String,
+        serverConfig: MCPLocalServer.MCPConfig.ServerConfig,
+        pluginId: String
     ) {
         try {
             val mcpManager = MCPManager.getInstance(context)
@@ -712,13 +889,13 @@ class MCPStarter(private val context: Context) {
             serverConfig.env.forEach { (key, value) -> extraDataMap["env_$key"] = value }
 
             val mcpServerConfig =
-                    MCPServerConfig(
-                            name = serverName,
-                            endpoint = "mcp://plugin/$serverName",
-                            description = "MCP Server from plugin: $pluginId",
-                            capabilities = listOf("tools", "resources"),
-                            extraData = extraDataMap
-                    )
+                MCPServerConfig(
+                    name = serverName,
+                    endpoint = "mcp://plugin/$serverName",
+                    description = "MCP Server from plugin: $pluginId",
+                    capabilities = listOf("tools", "resources"),
+                    extraData = extraDataMap
+                )
 
             mcpManager.registerServer(serverName, mcpServerConfig)
         } catch (e: Exception) {
@@ -733,20 +910,21 @@ class MCPStarter(private val context: Context) {
         data class Success(val message: String) : StartStatus()
         data class Error(val message: String) : StartStatus()
         data class TerminalServiceUnavailable(
-                val message: String = "终端服务不可用，请先启动它"
+            val message: String = "终端服务不可用，请先启动它"
         ) : StartStatus()
+
         data class PnpmMissing(
-                val message: String = "终端中未安装pnpm，请先安装"
+            val message: String = "终端中未安装pnpm，请先安装"
         ) : StartStatus()
     }
 
     /** Verification result */
     data class VerificationResult(
-            val pluginId: String,
-            val serviceName: String,
-            val isResponding: Boolean,
-            val responseTime: Long,
-            val details: String = ""
+        val pluginId: String,
+        val serviceName: String,
+        val isResponding: Boolean,
+        val responseTime: Long,
+        val details: String = ""
     )
 }
 

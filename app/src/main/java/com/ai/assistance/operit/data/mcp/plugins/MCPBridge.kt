@@ -21,14 +21,12 @@ import org.json.JSONArray
  * MCPBridge - 用于与TCP桥接器通信的插件类 支持以下命令:
  * - spawn: 启动新的MCP服务
  * - shutdown: 关闭当前MCP服务
- * - describe: 获取MCP服务描述
  * - listtools: 列出所有可用工具
  * - toolcall: 调用特定工具
- * - ping: 健康检查
- * - status: 获取服务状态
- * - list: 列出已注册的MCP服务
+ * - list: 列出已注册的MCP服务或查询单个服务状态
  * - register: 注册新的MCP服务
  * - unregister: 取消注册MCP服务
+ * - reset: 重置桥接器
  */
 class MCPBridge private constructor(private val context: Context) {
     companion object {
@@ -170,8 +168,8 @@ class MCPBridge private constructor(private val context: Context) {
                         }
 
                         // 首先检查桥接器是否已经在运行
-                        val pingResult = ping(ctx)
-                        if (pingResult != null) {
+                        val listResult = getInstance(ctx).listMcpServices()
+                        if (listResult != null && listResult.optBoolean("success", false)) {
                             Log.d(TAG, "桥接器已经在运行，无需重新启动")
                             return@withContext true
                         }
@@ -221,13 +219,13 @@ class MCPBridge private constructor(private val context: Context) {
                         // 验证桥接器是否成功启动 - 尝试三次
                         var isRunning = false
                         for (i in 1..3) {
-                            val checkResult = ping(ctx)
-                            if (checkResult != null) {
-                                Log.d(TAG, "桥接器成功启动，ping响应: $checkResult")
+                            val checkResult = getInstance(ctx).listMcpServices()
+                            if (checkResult != null && checkResult.optBoolean("success", false)) {
+                                Log.d(TAG, "桥接器成功启动，list响应: $checkResult")
                                 isRunning = true
                                 break
                             }
-                            Log.d(TAG, "第${i}次尝试ping桥接器失败，等待1秒后重试")
+                            Log.d(TAG, "第${i}次尝试连接桥接器失败，等待1秒后重试")
                             delay(1000)
                         }
 
@@ -240,23 +238,6 @@ class MCPBridge private constructor(private val context: Context) {
                     } catch (e: Exception) {
                         Log.e(TAG, "启动桥接器异常", e)
                         return@withContext false
-                    }
-                }
-
-        // 简单的健康检查
-        suspend fun ping(context: Context? = null): JSONObject? =
-                withContext(Dispatchers.IO) {
-                    try {
-                        val command =
-                                JSONObject().apply {
-                                    put("command", "ping")
-                                    put("id", UUID.randomUUID().toString())
-                                }
-
-                        return@withContext sendCommand(command)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Ping失败", e)
-                        return@withContext null
                     }
                 }
 
@@ -501,12 +482,15 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(command)
     }
 
-    // 列出所有注册的MCP服务
-    suspend fun listMcpServices(): JSONObject? {
+    // 列出所有注册的MCP服务或查询单个服务
+    suspend fun listMcpServices(serviceName: String? = null): JSONObject? {
         val command =
                 JSONObject().apply {
                     put("command", "list")
                     put("id", UUID.randomUUID().toString())
+                    if (serviceName != null) {
+                        put("params", JSONObject().apply { put("name", serviceName) })
+                    }
                 }
 
         return sendCommand(command)
@@ -556,6 +540,18 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(commandObj)
     }
 
+    // 停止MCP服务（不注销）
+    suspend fun unspawnMcpService(name: String): JSONObject? {
+        val command =
+                JSONObject().apply {
+                    put("command", "unspawn")
+                    put("id", UUID.randomUUID().toString())
+                    put("params", JSONObject().apply { put("name", name) })
+                }
+
+        return sendCommand(command)
+    }
+
     // 获取工具列表
     suspend fun listTools(serviceName: String? = null): JSONObject? {
         val params = JSONObject()
@@ -578,17 +574,6 @@ class MCPBridge private constructor(private val context: Context) {
 
         // Enhanced logging with service name
         Log.d(TAG, "获取工具列表${if (serviceName != null) " 服务: $serviceName" else " (默认服务)"}")
-
-        return sendCommand(command)
-    }
-
-    // 获取MCP服务状态
-    suspend fun getStatus(): JSONObject? {
-        val command =
-                JSONObject().apply {
-                    put("command", "status")
-                    put("id", UUID.randomUUID().toString())
-                }
 
         return sendCommand(command)
     }
@@ -619,50 +604,18 @@ class MCPBridge private constructor(private val context: Context) {
     }
 
     /**
-     * pingMcpService - 专门针对服务的ping操作，用于验证特定服务的状态
+     * 查询特定MCP服务的状态
      *
-     * @param serviceName 要ping的服务名称
-     * @return ping响应，如果失败则返回null
+     * @param serviceName 要查询的服务名称
+     * @return 服务信息响应，如果失败则返回null
      */
-    suspend fun pingMcpService(serviceName: String): JSONObject? =
+    suspend fun getServiceStatus(serviceName: String): JSONObject? =
             withContext(Dispatchers.IO) {
                 try {
-                    Log.d(TAG, "开始执行针对服务 $serviceName 的ping操作")
-
-                    // 构建带有服务名参数的ping命令
-                    val command =
-                            JSONObject().apply {
-                                put("command", "ping")
-                                put("id", UUID.randomUUID().toString())
-                                put("params", JSONObject().apply { put("name", serviceName) })
-                            }
-
-                    val response = sendCommand(command)
-
-                    if (response?.optBoolean("success", false) == true) {
-                        val result = response.optJSONObject("result")
-
-                        // 检查服务状态
-                        val status = result?.optString("status")
-                        val active = result?.optBoolean("active", false) ?: false
-                        val ready = result?.optBoolean("ready", false) ?: false
-
-                        if (status == "ok") {
-                            Log.d(TAG, "服务 $serviceName 正在运行并响应")
-                            return@withContext response
-                        } else if (active) {
-                            Log.d(TAG, "服务 $serviceName 正在运行但可能尚未完全准备好")
-                            return@withContext response
-                        } else {
-                            Log.d(TAG, "服务 $serviceName 已注册但未运行")
-                            return@withContext response
-                        }
-                    }
-
-                    Log.w(TAG, "Ping服务 $serviceName 失败")
-                    return@withContext null
+                    Log.d(TAG, "查询服务 $serviceName 的状态")
+                    return@withContext listMcpServices(serviceName)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Ping服务时出错: ${e.message}")
+                    Log.e(TAG, "查询服务状态时出错: ${e.message}")
                     return@withContext null
                 }
             }

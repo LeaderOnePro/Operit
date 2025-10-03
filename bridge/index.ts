@@ -46,7 +46,7 @@ export interface McpServiceInfo {
 }
 
 // Command types
-type McpCommandType = 'spawn' | 'shutdown' | 'listtools' | 'toolcall' | 'ping' | 'status' | 'list' | 'register' | 'unregister' | 'reset';
+type McpCommandType = 'spawn' | 'shutdown' | 'listtools' | 'toolcall' | 'list' | 'register' | 'unregister' | 'reset' | 'unspawn';
 
 // Command interface
 interface McpCommand {
@@ -103,9 +103,11 @@ class McpBridge {
 
     // 请求跟踪
     private pendingRequests: Map<string, PendingRequest> = new Map();
+    private pendingSpawnRequests: Map<string, PendingRequest> = new Map(); // 跟踪等待启动的 spawn 请求
 
     // 请求超时(毫秒)
     private readonly REQUEST_TIMEOUT = 180000; // 180秒超时 (3分钟)
+    private readonly SPAWN_TIMEOUT = 60000; // spawn命令60秒超时
 
     // 服务错误记录
     private mcpErrors: Map<string, string> = new Map();
@@ -115,6 +117,7 @@ class McpBridge {
     private restartAttempts: Map<string, number> = new Map();
     private readonly MAX_RESTART_ATTEMPTS = 5; // 最多重启5次
     private readonly RESTART_DELAY_MS = 5000; // 基础重启延迟5秒
+    private readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 默认5分钟闲置超时
 
     constructor(config: Partial<BridgeConfig> = {}) {
         // 默认配置
@@ -128,6 +131,61 @@ class McpBridge {
 
         // 设置超时检查
         setInterval(() => this.checkRequestTimeouts(), 5000);
+        setInterval(() => this.checkSpawnTimeouts(), 5000); // 检查 spawn 请求超时
+        setInterval(() => this.checkIdleServices(), 60 * 1000); // 每分钟检查一次
+    }
+
+    /**
+     * 检查 spawn 请求超时
+     */
+    private checkSpawnTimeouts(): void {
+        const now = Date.now();
+
+        for (const [serviceName, request] of this.pendingSpawnRequests.entries()) {
+            if (now - request.timestamp > this.SPAWN_TIMEOUT) {
+                console.log(`Spawn request timeout for service: ${serviceName}`);
+
+                // 发送超时响应
+                const response: McpResponse = {
+                    id: request.id,
+                    success: false,
+                    error: {
+                        code: -32603,
+                        message: `Service '${serviceName}' failed to start within ${this.SPAWN_TIMEOUT / 1000}s`
+                    }
+                };
+
+                request.socket.write(JSON.stringify(response) + '\n');
+
+                // 清理
+                this.pendingSpawnRequests.delete(serviceName);
+            }
+        }
+    }
+
+    /**
+     * 检查并关闭闲置的服务
+     */
+    private checkIdleServices(): void {
+        const now = Date.now();
+        for (const serviceName of this.serviceHelpers.keys()) {
+            const serviceInfo = this.serviceRegistry.get(serviceName);
+            if (serviceInfo && serviceInfo.lastUsed) {
+                if (now - serviceInfo.lastUsed > this.IDLE_TIMEOUT_MS) {
+                    console.log(`[${serviceName}] Service has been idle for over ${this.IDLE_TIMEOUT_MS / 1000}s. Unspawning...`);
+
+                    // Manually unspawn the service
+                    const helper = this.serviceHelpers.get(serviceName);
+                    if (helper) {
+                        // Temporarily remove from registry to prevent auto-restart logic from firing
+                        this.serviceRegistry.delete(serviceName);
+                        helper.kill();
+                        // Re-add to registry after a short delay
+                        setTimeout(() => this.serviceRegistry.set(serviceName, serviceInfo), 100);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -224,6 +282,24 @@ class McpBridge {
 
         if (attempts > this.MAX_RESTART_ATTEMPTS) {
             console.error(`Service ${serviceName} has failed too many times. Will not reconnect again.`);
+
+            // 通知挂起的 spawn 请求
+            const pendingSpawnRequest = this.pendingSpawnRequests.get(serviceName);
+            if (pendingSpawnRequest) {
+                const errorMessage = this.mcpErrors.get(serviceName) || 'Service failed to start after multiple attempts';
+                const response: McpResponse = {
+                    id: pendingSpawnRequest.id,
+                    success: false,
+                    error: {
+                        code: -32603,
+                        message: `Service '${serviceName}' failed to start: ${errorMessage}`
+                    }
+                };
+                pendingSpawnRequest.socket.write(JSON.stringify(response) + '\n');
+                this.pendingSpawnRequests.delete(serviceName);
+                console.log(`[${serviceName}] Spawn request failed after ${this.MAX_RESTART_ATTEMPTS} attempts`);
+            }
+
             return;
         }
 
@@ -371,6 +447,24 @@ class McpBridge {
                 this.mcpToolsMap.set(serviceName, params.tools);
                 this.serviceReadyMap.set(serviceName, true);
                 this.restartAttempts.set(serviceName, 0); // Reset restart attempts on successful connection
+
+                // 检查是否有等待此服务启动的 spawn 请求
+                const pendingSpawnRequest = this.pendingSpawnRequests.get(serviceName);
+                if (pendingSpawnRequest) {
+                    const response: McpResponse = {
+                        id: pendingSpawnRequest.id,
+                        success: true,
+                        result: {
+                            status: "started",
+                            name: serviceName,
+                            toolCount: params.tools.length,
+                            ready: true
+                        }
+                    };
+                    pendingSpawnRequest.socket.write(JSON.stringify(response) + '\n');
+                    this.pendingSpawnRequests.delete(serviceName);
+                    console.log(`[${serviceName}] Spawn request completed successfully`);
+                }
                 break;
 
             case 'tool_result':
@@ -428,120 +522,41 @@ class McpBridge {
 
         try {
             switch (cmdType) {
-                case 'ping':
-                    // 健康检查(单个服务或所有服务)
-                    const pingServiceName = params?.serviceName || params?.name;
-
-                    if (pingServiceName) {
-                        if (this.serviceRegistry.has(pingServiceName)) {
-                            const serviceInfo = this.serviceRegistry.get(pingServiceName);
-                            const isActive = this.isServiceActive(pingServiceName);
-                            const isReady = this.serviceReadyMap.get(pingServiceName) || false;
-
-                            response = {
-                                id,
-                                success: true,
-                                result: {
-                                    status: isActive ? "ok" : "registered_not_active",
-                                    name: pingServiceName,
-                                    type: serviceInfo?.type,
-                                    description: serviceInfo?.description,
-                                    timestamp: Date.now(),
-                                    active: isActive,
-                                    ready: isReady
-                                }
-                            };
-
-                            // 更新最后使用时间
-                            if (serviceInfo) {
-                                serviceInfo.lastUsed = Date.now();
-                            }
-                        } else {
-                            response = {
-                                id,
-                                success: false,
-                                error: {
-                                    code: -32601,
-                                    message: `Service '${pingServiceName}' not registered`
-                                }
-                            };
-                        }
-                    } else {
-                        // 普通bridge健康检查
-                        const runningServices = [...this.serviceHelpers.keys()];
-                        response = {
-                            id,
-                            success: true,
-                            result: {
-                                timestamp: Date.now(),
-                                status: 'ok',
-                                activeServices: runningServices,
-                                serviceCount: runningServices.length
-                            }
-                        };
-                    }
-
-                    socket.write(JSON.stringify(response) + '\n');
-                    break;
-
-                case 'status':
-                    // bridge状态及所有运行服务
-                    const activeServices = [...this.serviceHelpers.keys()];
-                    const serviceStatus: Record<string, any> = {};
-
-                    for (const name of this.serviceRegistry.keys()) {
-                        serviceStatus[name] = {
-                            active: this.isServiceActive(name),
-                            ready: this.serviceReadyMap.get(name) || false,
-                            toolCount: (this.mcpToolsMap.get(name) || []).length,
-                            type: this.serviceRegistry.get(name)?.type,
-                            error: this.mcpErrors.get(name)
-                        };
-                    }
-
-                    response = {
-                        id,
-                        success: true,
-                        result: {
-                            registeredServices: Object.fromEntries(this.serviceRegistry),
-                            serviceStatus,
-                            pendingRequests: this.pendingRequests.size,
-                            activeConnections: this.activeConnections.size
-                        }
-                    };
-                    socket.write(JSON.stringify(response) + '\n');
-                    break;
-
                 case 'listtools':
                     // 查询特定服务的可用工具列表
                     const serviceToList = params?.name;
 
                     if (serviceToList) {
-                        if (!this.isServiceActive(serviceToList)) {
+                        const cachedTools = this.mcpToolsMap.get(serviceToList);
+                        if (cachedTools) {
+                            // If tools are in the cache, it means the service has been spawned at least once.
+                            response = {
+                                id,
+                                success: true,
+                                result: {
+                                    active: this.isServiceActive(serviceToList),
+                                    tools: cachedTools
+                                }
+                            };
+                        } else {
+                            // If not in the cache, it has never been successfully spawned.
                             response = {
                                 id,
                                 success: false,
                                 error: {
                                     code: -32603,
-                                    message: `Service '${serviceToList}' not active`
-                                }
-                            };
-                        } else {
-                            response = {
-                                id,
-                                success: true,
-                                result: {
-                                    tools: this.mcpToolsMap.get(serviceToList) || []
+                                    message: `Service '${serviceToList}' has not been activated, tool list is unavailable.`
                                 }
                             };
                         }
                     } else {
-                        // 未指定服务，列出所有服务的工具
+                        // 未指定服务，列出所有曾经启动过的服务的工具
                         const allTools: Record<string, any> = {};
                         for (const [name, tools] of this.mcpToolsMap.entries()) {
-                            if (this.isServiceActive(name)) {
-                                allTools[name] = tools;
-                            }
+                            allTools[name] = {
+                                active: this.isServiceActive(name),
+                                tools: tools
+                            };
                         }
 
                         response = {
@@ -556,21 +571,68 @@ class McpBridge {
                     break;
 
                 case 'list':
-                    // 列出已注册的MCP服务并附带运行状态
-                    const services = this.getServiceList().map(service => {
-                        return {
-                            ...service,
-                            active: this.isServiceActive(service.name),
-                            ready: this.serviceReadyMap.get(service.name) || false,
-                            toolCount: (this.mcpToolsMap.get(service.name) || []).length
-                        };
-                    });
+                    // 列出已注册的MCP服务并附带运行状态，或查询单个服务
+                    const queryServiceName = params?.name;
 
-                    response = {
-                        id,
-                        success: true,
-                        result: { services }
-                    };
+                    if (queryServiceName) {
+                        // 查询单个服务
+                        if (this.serviceRegistry.has(queryServiceName)) {
+                            const serviceInfo = this.serviceRegistry.get(queryServiceName);
+                            const isActive = this.isServiceActive(queryServiceName);
+                            const isReady = this.serviceReadyMap.get(queryServiceName) || false;
+                            const tools = this.mcpToolsMap.get(queryServiceName) || [];
+
+                            response = {
+                                id,
+                                success: true,
+                                result: {
+                                    name: queryServiceName,
+                                    type: serviceInfo?.type,
+                                    description: serviceInfo?.description,
+                                    active: isActive,
+                                    ready: isReady,
+                                    toolCount: tools.length,
+                                    tools: tools,
+                                    timestamp: Date.now()
+                                }
+                            };
+
+                            // 更新最后使用时间
+                            if (serviceInfo) {
+                                serviceInfo.lastUsed = Date.now();
+                            }
+                        } else {
+                            response = {
+                                id,
+                                success: false,
+                                error: {
+                                    code: -32601,
+                                    message: `Service '${queryServiceName}' not registered`
+                                }
+                            };
+                        }
+                    } else {
+                        // 列出所有服务
+                        const services = this.getServiceList().map(service => {
+                            const tools = this.mcpToolsMap.get(service.name) || [];
+                            return {
+                                ...service,
+                                active: this.isServiceActive(service.name),
+                                ready: this.serviceReadyMap.get(service.name) || false,
+                                toolCount: tools.length,
+                                tools: tools
+                            };
+                        });
+
+                        response = {
+                            id,
+                            success: true,
+                            result: {
+                                services,
+                                timestamp: Date.now()
+                            }
+                        };
+                    }
                     socket.write(JSON.stringify(response) + '\n');
                     break;
 
@@ -637,20 +699,13 @@ class McpBridge {
                         break;
                     }
 
-                    const finalServiceInfo = this.serviceRegistry.get(spawnServiceName);
-
-                    response = {
+                    // 不立即返回响应，而是挂起此请求，等待服务启动完成
+                    this.pendingSpawnRequests.set(spawnServiceName, {
                         id,
-                        success: true,
-                        result: {
-                            status: "started",
-                            name: spawnServiceName,
-                            command: finalServiceInfo?.command || serviceCommand,
-                            args: finalServiceInfo?.args || serviceArgs,
-                            cwd: finalServiceInfo?.cwd || serviceCwd
-                        }
-                    };
-                    socket.write(JSON.stringify(response) + '\n');
+                        socket,
+                        timestamp: Date.now()
+                    });
+                    console.log(`[${spawnServiceName}] Spawn request pending, waiting for service to be ready...`);
                     break;
 
                 case 'shutdown':
@@ -681,7 +736,7 @@ class McpBridge {
                         // 获取客户端并关闭（异步操作）
                         const helper = this.serviceHelpers.get(serviceToShutdown);
                         if (helper) {
-                            console.log(`[${serviceToShutdown}] Closing MCP helper...`);
+                            console.log(`[${serviceToShutdown}] Closing MCP helper and unregistering...`);
                             // Prevent auto-restarting by removing from registry BEFORE killing
                             this.serviceRegistry.delete(serviceToShutdown);
                             helper.kill(); // This will trigger the 'exit' handler which cleans up the maps
@@ -695,6 +750,35 @@ class McpBridge {
                                 name: serviceToShutdown
                             }
                         };
+                    }
+                    socket.write(JSON.stringify(response) + '\n');
+                    break;
+
+                case 'unspawn':
+                    // 只关闭服务进程，但不从注册表注销
+                    const serviceToUnspawn = params?.name;
+
+                    if (!serviceToUnspawn) {
+                        response = { id, success: false, error: { code: -32602, message: "Missing required parameter: name" } };
+                    } else if (!this.isServiceActive(serviceToUnspawn)) {
+                        response = { id, success: true, result: { status: "already_unspawned", name: serviceToUnspawn } };
+                    } else {
+                        const helper = this.serviceHelpers.get(serviceToUnspawn);
+                        if (helper) {
+                            console.log(`[${serviceToUnspawn}] Unspawning service helper...`);
+                            // Don't unregister, just kill the process. The 'exit' handler will clean up the helper map.
+                            // Temporarily remove from registry to prevent immediate auto-restart
+                            const serviceInfo = this.serviceRegistry.get(serviceToUnspawn);
+                            this.serviceRegistry.delete(serviceToUnspawn);
+
+                            helper.kill();
+
+                            // Add it back to the registry after a short delay
+                            if (serviceInfo) {
+                                setTimeout(() => this.serviceRegistry.set(serviceToUnspawn, serviceInfo), 100);
+                            }
+                        }
+                        response = { id, success: true, result: { status: "unspawned", name: serviceToUnspawn } };
                     }
                     socket.write(JSON.stringify(response) + '\n');
                     break;
@@ -839,6 +923,7 @@ class McpBridge {
 
                     // 清空待处理的请求
                     this.pendingRequests.clear();
+                    this.pendingSpawnRequests.clear();
 
                     console.log('Bridge reset complete: all services closed, registry cleared');
 
@@ -901,6 +986,12 @@ class McpBridge {
             };
             socket.write(JSON.stringify(response) + '\n');
             return;
+        }
+
+        // 更新服务最后使用时间
+        const serviceInfo = this.serviceRegistry.get(serviceName);
+        if (serviceInfo) {
+            serviceInfo.lastUsed = Date.now();
         }
 
         if (!this.isServiceActive(serviceName)) {
@@ -1062,6 +1153,14 @@ class McpBridge {
                                 // this.toolResponseMapping.delete(toolCallId); // No longer needed
                                 // this.toolCallServiceMap.delete(toolCallId); // No longer needed
                             }
+                        }
+                    }
+
+                    // 清理此连接的待处理 spawn 请求
+                    for (const [serviceName, request] of this.pendingSpawnRequests.entries()) {
+                        if (request.socket === socket) {
+                            this.pendingSpawnRequests.delete(serviceName);
+                            console.log(`[${serviceName}] Spawn request cancelled due to client disconnect`);
                         }
                     }
                 });
