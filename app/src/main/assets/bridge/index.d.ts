@@ -33,6 +33,7 @@ declare class McpBridge {
     private pendingRequests;
     private readonly REQUEST_TIMEOUT;
     private mcpErrors;
+    private serviceExitSignals;
     private restartAttempts;
     private readonly MAX_RESTART_ATTEMPTS;
     private readonly RESTART_DELAY_MS;

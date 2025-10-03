@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+const mcp_client_1 = require("mcp-client");
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 let client = null;
@@ -53,8 +54,7 @@ const handlers = {
     async init(params) {
         serviceName = params.serviceName;
         serviceInfo = params.serviceInfo;
-        const { MCPClient } = await import('mcp-client');
-        client = new MCPClient({
+        client = new mcp_client_1.MCPClient({
             name: `helper-for-${serviceName}`,
             version: '1.0.0',
         });

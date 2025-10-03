@@ -64,6 +64,7 @@ class McpBridge {
         this.REQUEST_TIMEOUT = 180000; // 180秒超时 (3分钟)
         // 服务错误记录
         this.mcpErrors = new Map();
+        this.serviceExitSignals = new Map();
         // 重启跟踪
         this.restartAttempts = new Map();
         this.MAX_RESTART_ATTEMPTS = 5; // 最多重启5次
@@ -147,7 +148,7 @@ class McpBridge {
     /**
      * 处理服务连接关闭和重连 (本地和远程服务统一处理)
      */
-    handleServiceClosure(serviceName) {
+    handleServiceClosure(serviceName, signal = null) {
         console.log(`Service ${serviceName} connection closed or failed.`);
         this.serviceHelpers.delete(serviceName);
         this.serviceReadyMap.set(serviceName, false);
@@ -161,8 +162,15 @@ class McpBridge {
             console.error(`Service ${serviceName} has failed too many times. Will not reconnect again.`);
             return;
         }
-        const reconnectDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
-        console.log(`Attempting to reconnect to service ${serviceName} in ${reconnectDelay / 1000}s (attempt ${attempts})...`);
+        let reconnectDelay;
+        if (signal === 'SIGABRT') {
+            reconnectDelay = 0; // 立刻重启
+            console.log(`[${serviceName}] Abort (SIGABRT) detected. Restarting immediately (attempt ${attempts}/${this.MAX_RESTART_ATTEMPTS})...`);
+        }
+        else {
+            reconnectDelay = this.RESTART_DELAY_MS * Math.pow(2, attempts - 1);
+            console.log(`Attempting to reconnect to service ${serviceName} in ${reconnectDelay / 1000}s (attempt ${attempts})...`);
+        }
         setTimeout(() => {
             if (this.serviceRegistry.has(serviceName)) { // Check if service is still registered
                 this.spawnServiceHelper(serviceName);
@@ -216,22 +224,31 @@ class McpBridge {
         this.serviceReadyMap.set(serviceName, false);
         this.mcpToolsMap.set(serviceName, []);
         this.mcpErrors.delete(serviceName);
+        this.serviceExitSignals.delete(serviceName); // Initialize the new map
         helper.stdout?.on('data', (data) => {
             console.log(`[${serviceName}-helper]: ${data.toString().trim()}`);
         });
         helper.stderr?.on('data', (data) => {
-            console.error(`[${serviceName}-helper-stderr]: ${data.toString().trim()}`);
+            const stderrStr = data.toString();
+            console.error(`[${serviceName}-helper-stderr]: ${stderrStr.trim()}`);
+            if (/SIGABRT/i.test(stderrStr)) {
+                console.log(`[${serviceName}] SIGABRT detected in stderr stream. Flagging for immediate restart.`);
+                this.serviceExitSignals.set(serviceName, 'SIGABRT');
+            }
         });
         helper.on('message', (message) => {
             this.handleHelperMessage(message);
         });
         helper.on('exit', (code, signal) => {
             console.log(`[${serviceName}] Helper process exited with code ${code}, signal ${signal}`);
+            // 检查是否有我们从'closed'事件中存储的合成信号
+            const exitSignal = this.serviceExitSignals.get(serviceName) || signal;
+            this.serviceExitSignals.delete(serviceName); // 清理
             this.serviceHelpers.delete(serviceName);
             this.serviceReadyMap.set(serviceName, false);
             // Dont unregister, allow reconnection logic to handle it
             if (this.serviceRegistry.has(serviceName)) {
-                this.handleServiceClosure(serviceName);
+                this.handleServiceClosure(serviceName, exitSignal);
             }
         });
         helper.on('error', (err) => {
@@ -239,7 +256,7 @@ class McpBridge {
             this.serviceHelpers.delete(serviceName);
             this.serviceReadyMap.set(serviceName, false);
             if (this.serviceRegistry.has(serviceName)) {
-                this.handleServiceClosure(serviceName);
+                this.handleServiceClosure(serviceName, null);
             }
         });
         // Send initialization info
@@ -284,6 +301,9 @@ class McpBridge {
                 console.log(`Service ${params.serviceName} connection closed by helper.`);
                 if (params.error) {
                     this.mcpErrors.set(params.serviceName, params.error);
+                }
+                if (params.signal) { // The synthetic signal from the helper
+                    this.serviceExitSignals.set(params.serviceName, params.signal);
                 }
                 // The 'exit' event on the helper process will trigger handleServiceClosure
                 break;
@@ -683,6 +703,7 @@ class McpBridge {
                     this.serviceReadyMap.clear();
                     this.mcpErrors.clear();
                     this.restartAttempts.clear();
+                    this.serviceExitSignals.clear(); // Clear the new map
                     // 清空服务注册表
                     this.serviceRegistry.clear();
                     // 清空待处理的请求

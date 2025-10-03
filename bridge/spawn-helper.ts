@@ -1,9 +1,9 @@
-
+import { MCPClient } from 'mcp-client';
 import * as path from 'path';
 import * as os from 'os';
 import { McpServiceInfo } from './index'; // Assuming McpServiceInfo is exported from index.ts
 
-let client: import('mcp-client').MCPClient | null = null;
+let client: MCPClient | null = null;
 let serviceName: string;
 let serviceInfo: McpServiceInfo;
 
@@ -23,7 +23,6 @@ const handlers = {
         serviceName = params.serviceName;
         serviceInfo = params.serviceInfo;
 
-        const { MCPClient } = await import('mcp-client');
         client = new MCPClient({
             name: `helper-for-${serviceName}`,
             version: '1.0.0',
