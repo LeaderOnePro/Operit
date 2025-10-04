@@ -15,7 +15,7 @@ object MCPPluginParser {
     @Serializable
     data class MCPMetadata(
         val repositoryUrl: String,
-        val installCommand: String,
+        val installConfig: String, // 改为安装配置
         val category: String,
         val tags: String,
         val version: String
@@ -25,7 +25,7 @@ object MCPPluginParser {
         val title: String,
         val description: String,
         val repositoryUrl: String = "",
-        val installCommand: String = "",
+        val installConfig: String = "", // 改为安装配置
         val category: String = "",
         val tags: String = "",
         val version: String = "",
@@ -53,7 +53,7 @@ object MCPPluginParser {
                 title = issue.title,
                 description = description,
                 repositoryUrl = metadata.repositoryUrl,
-                installCommand = metadata.installCommand,
+                installConfig = metadata.installConfig,
                 category = metadata.category,
                 tags = metadata.tags,
                 version = metadata.version,

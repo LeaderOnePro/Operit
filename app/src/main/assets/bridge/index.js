@@ -67,6 +67,7 @@ class McpBridge {
         // 服务错误记录
         this.mcpErrors = new Map();
         this.serviceExitSignals = new Map();
+        this.socketBuffers = new Map();
         // 重启跟踪
         this.restartAttempts = new Map();
         this.MAX_RESTART_ATTEMPTS = 5; // 最多重启5次
@@ -762,6 +763,49 @@ class McpBridge {
                     // 调用工具
                     this.handleToolCall(command, socket);
                     break;
+                case 'cachetools':
+                    // 缓存工具列表到bridge，用于已有缓存的插件
+                    if (!params || !params.name || !params.tools) {
+                        response = {
+                            id,
+                            success: false,
+                            error: {
+                                code: -32602,
+                                message: "Missing required parameters: name, tools"
+                            }
+                        };
+                        socket.write(JSON.stringify(response) + '\n');
+                        break;
+                    }
+                    const cacheServiceName = params.name;
+                    const tools = params.tools;
+                    // 验证服务是否已注册
+                    if (!this.serviceRegistry.has(cacheServiceName)) {
+                        response = {
+                            id,
+                            success: false,
+                            error: {
+                                code: -32602,
+                                message: `Service '${cacheServiceName}' is not registered. Please register it first.`
+                            }
+                        };
+                        socket.write(JSON.stringify(response) + '\n');
+                        break;
+                    }
+                    // 缓存工具列表
+                    this.mcpToolsMap.set(cacheServiceName, tools);
+                    console.log(`[${cacheServiceName}] Cached ${tools.length} tools from client cache`);
+                    response = {
+                        id,
+                        success: true,
+                        result: {
+                            status: 'cached',
+                            name: cacheServiceName,
+                            toolCount: tools.length
+                        }
+                    };
+                    socket.write(JSON.stringify(response) + '\n');
+                    break;
                 case 'reset':
                     // 重置所有服务：关闭所有客户端，清空注册表
                     console.log('Resetting bridge: closing all services and clearing registry...');
@@ -932,6 +976,7 @@ class McpBridge {
             this.server = net.createServer((socket) => {
                 console.log(`New client connection: ${socket.remoteAddress}:${socket.remotePort}`);
                 this.activeConnections.add(socket);
+                this.socketBuffers.set(socket, '');
                 // 添加socket超时以防止客户端挂起
                 // 设置为请求超时的 2 倍，确保有足够时间完成工具调用
                 socket.setTimeout(120000); // 120秒超时 (REQUEST_TIMEOUT * 2)
@@ -942,47 +987,57 @@ class McpBridge {
                 });
                 // 处理来自客户端的数据
                 socket.on('data', (data) => {
-                    const message = data.toString().trim();
-                    try {
-                        // 解析命令
-                        const command = JSON.parse(message);
-                        // 确保命令有ID
-                        if (!command.id) {
-                            command.id = (0, uuid_1.v4)();
+                    let buffer = (this.socketBuffers.get(socket) || '') + data.toString();
+                    let newlineIndex;
+                    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                        const message = buffer.substring(0, newlineIndex).trim();
+                        buffer = buffer.substring(newlineIndex + 1);
+                        if (!message) {
+                            continue;
                         }
-                        // 处理命令
-                        if (command.command) {
-                            this.handleMcpCommand(command, socket);
+                        try {
+                            // 解析命令
+                            const command = JSON.parse(message);
+                            // 确保命令有ID
+                            if (!command.id) {
+                                command.id = (0, uuid_1.v4)();
+                            }
+                            // 处理命令
+                            if (command.command) {
+                                this.handleMcpCommand(command, socket);
+                            }
+                            else {
+                                // 非桥接命令，无默认服务转发
+                                socket.write(JSON.stringify({
+                                    jsonrpc: '2.0',
+                                    id: this.extractId(message),
+                                    error: {
+                                        code: -32600,
+                                        message: 'Invalid request: no service specified'
+                                    }
+                                }) + '\n');
+                            }
                         }
-                        else {
-                            // 非桥接命令，无默认服务转发
+                        catch (e) {
+                            console.error(`Failed to parse client message: ${e}`);
+                            // 发送错误响应
                             socket.write(JSON.stringify({
                                 jsonrpc: '2.0',
-                                id: this.extractId(message),
+                                id: null,
                                 error: {
-                                    code: -32600,
-                                    message: 'Invalid request: no service specified'
+                                    code: -32700,
+                                    message: `Invalid JSON: ${e}`
                                 }
                             }) + '\n');
                         }
                     }
-                    catch (e) {
-                        console.error(`Failed to parse client message: ${e}`);
-                        // 发送错误响应
-                        socket.write(JSON.stringify({
-                            jsonrpc: '2.0',
-                            id: null,
-                            error: {
-                                code: -32700,
-                                message: `Invalid JSON: ${e}`
-                            }
-                        }) + '\n');
-                    }
+                    this.socketBuffers.set(socket, buffer);
                 });
                 // 处理客户端断开连接
                 socket.on('close', () => {
                     console.log(`Client disconnected: ${socket.remoteAddress}:${socket.remotePort}`);
                     this.activeConnections.delete(socket);
+                    this.socketBuffers.delete(socket);
                     // 清理此连接的待处理请求
                     for (const [requestId, request] of this.pendingRequests.entries()) {
                         if (request.socket === socket) {
@@ -1006,6 +1061,7 @@ class McpBridge {
                 socket.on('error', (err) => {
                     console.error(`Client error: ${err.message}`);
                     this.activeConnections.delete(socket);
+                    this.socketBuffers.delete(socket);
                 });
             });
             // 启动TCP服务器

@@ -26,11 +26,13 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import com.ai.assistance.operit.ui.features.packages.utils.MCPPluginParser
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import java.util.regex.Pattern
 
 /**
  * MCP市场ViewModel
@@ -41,10 +43,15 @@ class MCPMarketViewModel(
     private val mcpRepository: MCPRepository
 ) : ViewModel() {
 
+    /**
+     * MCP元数据的数据类
+     * @param version 版本号，用于向前兼容
+     */
     @Serializable
     private data class MCPMetadata(
         val repositoryUrl: String,
-        val installCommand: String,
+        @JsonNames("installCommand")
+        val installConfig: String,
         val category: String,
         val tags: String,
         val version: String
@@ -138,7 +145,7 @@ class MCPMarketViewModel(
         val description: String = "",
         val repositoryUrl: String = "",
         val tags: String = "",
-        val installCommand: String = "",
+        val installConfig: String = "",
         val category: String = ""
     )
     
@@ -149,7 +156,7 @@ class MCPMarketViewModel(
             description = sharedPrefs.getString("description", "") ?: "",
             repositoryUrl = sharedPrefs.getString("repositoryUrl", "") ?: "",
             tags = sharedPrefs.getString("tags", "") ?: "",
-            installCommand = sharedPrefs.getString("installCommand", "") ?: "",
+            installConfig = sharedPrefs.getString("installConfig", "") ?: "",
             category = sharedPrefs.getString("category", "") ?: ""
         )
 
@@ -243,6 +250,32 @@ class MCPMarketViewModel(
                     
                     // 标记插件开始安装
                     _installingPlugins.value = _installingPlugins.value + pluginId
+                    
+                    // 如果提供了安装配置，使用配置合并方式
+                    if (installInfo.installConfig != null && installInfo.installConfig.isNotBlank()) {
+                        Log.d(TAG, "Using config merge installation for plugin $pluginId")
+                        val mcpLocalServer = MCPLocalServer.getInstance(context)
+                        val mergeResult = mcpLocalServer.mergeConfigFromJson(installInfo.installConfig)
+                        
+                        mergeResult.onSuccess { count ->
+                            _installingPlugins.value = _installingPlugins.value - pluginId
+                            Toast.makeText(
+                                context,
+                                "成功导入 ${issue.title} 配置，合并了 $count 个服务器",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            mcpRepository.refreshPluginList()
+                        }.onFailure { error ->
+                            _installingPlugins.value = _installingPlugins.value - pluginId
+                            Toast.makeText(
+                                context,
+                                "配置导入失败: ${error.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            Log.e(TAG, "Config merge failed for plugin $pluginId", error)
+                        }
+                        return@launch
+                    }
                     
                     // 获取作者头像，如果缓存中没有，则使用分享者的头像作为备用
                     val authorAvatarUrl = _userAvatarCache.value[pluginInfo.repositoryOwner] ?: issue.user.avatarUrl
@@ -512,7 +545,7 @@ class MCPMarketViewModel(
         repositoryUrl: String,
         category: String,
         tags: String,
-        installCommand: String,
+        installConfig: String,
         version: String = "v1"
     ) {
         viewModelScope.launch {
@@ -530,7 +563,7 @@ class MCPMarketViewModel(
                     repositoryUrl = repositoryUrl,
                     category = category,
                     tags = tags,
-                    installCommand = installCommand,
+                    installConfig = installConfig,
                     version = version
                 )
 
@@ -688,7 +721,7 @@ class MCPMarketViewModel(
                 description = description,
                 repositoryUrl = metadata.repositoryUrl,
                 tags = metadata.tags,
-                installCommand = metadata.installCommand,
+                installConfig = metadata.installConfig,
                 category = metadata.category
             )
         }
@@ -706,7 +739,7 @@ class MCPMarketViewModel(
         description: String,
         repositoryUrl: String,
         tags: String,
-        installCommand: String,
+        installConfig: String,
         category: String
     ) {
         sharedPrefs.edit().apply {
@@ -714,7 +747,7 @@ class MCPMarketViewModel(
             putString("description", description)
             putString("repositoryUrl", repositoryUrl)
             putString("tags", tags)
-            putString("installCommand", installCommand)
+            putString("installConfig", installConfig)
             putString("category", category)
             apply()
         }
@@ -736,7 +769,7 @@ class MCPMarketViewModel(
         repositoryUrl: String,
         category: String,
         tags: String,
-        installCommand: String,
+        installConfig: String,
         version: String = "v1"
     ): Boolean {
         return try {
@@ -745,7 +778,7 @@ class MCPMarketViewModel(
                 repositoryUrl = repositoryUrl,
                 category = category,
                 tags = tags,
-                installCommand = installCommand,
+                installConfig = installConfig,
                 version = version
             )
             
@@ -772,14 +805,14 @@ class MCPMarketViewModel(
         repositoryUrl: String,
         category: String,
         tags: String,
-        installCommand: String,
+        installConfig: String,
         version: String = "v1"
     ): String {
         return buildString {
             // 嵌入包含所有机器可读信息的JSON数据块
             val metadata = MCPMetadata(
                 repositoryUrl = repositoryUrl,
-                installCommand = installCommand,
+                installConfig = installConfig,
                 category = category,
                 tags = tags,
                 version = version
@@ -807,11 +840,11 @@ class MCPMarketViewModel(
                 appendLine()
             }
 
-            if (installCommand.isNotBlank()) {
+            if (installConfig.isNotBlank()) {
                 appendLine("## ⚡ 快速安装")
                 appendLine()
-                appendLine("```bash")
-                appendLine(installCommand)
+                appendLine("```json")
+                appendLine(installConfig)
                 appendLine("```")
                 appendLine()
             }
@@ -827,10 +860,13 @@ class MCPMarketViewModel(
                 appendLine()
             }
 
-            if (installCommand.isNotBlank()) {
-                appendLine("### 方式二：命令行安装")
-                appendLine("```bash")
-                appendLine(installCommand)
+            if (installConfig.isNotBlank()) {
+                appendLine("### 方式二：配置导入")
+                appendLine("1. 打开 Operit MCP 配置页面")
+                appendLine("2. 点击「导入」→「配置导入」")
+                appendLine("3. 粘贴以下配置：")
+                appendLine("```json")
+                appendLine(installConfig)
                 appendLine("```")
                 appendLine()
             }
@@ -859,18 +895,18 @@ class MCPMarketViewModel(
         val metadata = parseMCPMetadata(body)
         if (metadata != null) {
             val repoUrlValid = metadata.repositoryUrl.startsWith("http")
-            // 校验安装命令，确保不为空且包含有效字符（不只是符号）
-            val installCommandValid = metadata.installCommand.any { it.isLetterOrDigit() }
+            // 校验安装配置，确保不为空且包含有效字符
+            val installConfigValid = metadata.installConfig.isNotBlank() && metadata.installConfig.trim().startsWith("{")
 
-            if (repoUrlValid || installCommandValid) {
+            if (repoUrlValid || installConfigValid) {
                 Log.d(TAG, "Parsed installation info from JSON for issue #${issue.number}")
                 return InstallationInfo(
                     repoUrl = if (repoUrlValid) metadata.repositoryUrl else null,
-                    installCommand = if (installCommandValid) metadata.installCommand else null,
-                    installationType = if (repoUrlValid) "github" else "command"
+                    installConfig = if (installConfigValid) metadata.installConfig else null,
+                    installationType = if (repoUrlValid) "github" else "config"
                 )
             } else {
-                Log.w(TAG, "Found JSON metadata in issue #${issue.number}, but both repositoryUrl ('${metadata.repositoryUrl}') and installCommand ('${metadata.installCommand}') are invalid.")
+                Log.w(TAG, "Found JSON metadata in issue #${issue.number}, but both repositoryUrl ('${metadata.repositoryUrl}') and installConfig ('${metadata.installConfig}') are invalid.")
                 return null
             }
         }
@@ -943,7 +979,7 @@ class MCPMarketViewModel(
      */
     private data class InstallationInfo(
         val repoUrl: String? = null,
-        val installCommand: String? = null,
+        val installConfig: String? = null,
         val installationType: String
     )
 

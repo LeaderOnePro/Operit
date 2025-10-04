@@ -2623,6 +2623,7 @@
     <string name="publish_description">Publish Description</string>
     <string name="only_alphanumeric_underscore_plugin_id">Only alphanumeric characters and underscores allowed, this name will be used as plugin ID</string>
     <string name="install_command">Install Command</string>
+    <string name="install_config">Install Config</string>
     <string name="please_fill_all_required_fields">Please fill in all required fields</string>
     <string name="update_plugin">Update Plugin</string>
     <string name="publish_to_market">Publish to Market</string>

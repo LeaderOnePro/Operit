@@ -42,7 +42,7 @@ fun MCPPublishScreen(
     var title by remember { mutableStateOf(initialDraft.title) }
     var description by remember { mutableStateOf(initialDraft.description) }
     var repositoryUrl by remember { mutableStateOf(initialDraft.repositoryUrl) }
-    var installCommand by remember { mutableStateOf(initialDraft.installCommand) }
+    var installConfig by remember { mutableStateOf(initialDraft.installConfig) }
     // 版本固定为 v1（系统管理）
     val version = "v1"
     
@@ -54,13 +54,13 @@ fun MCPPublishScreen(
     
     // 实时保存草稿（仅新建模式）
     if (!isEditMode) {
-        LaunchedEffect(title, description, repositoryUrl, installCommand) {
+        LaunchedEffect(title, description, repositoryUrl, installConfig) {
             viewModel.saveDraft(
                 title = title,
                 description = description,
                 repositoryUrl = repositoryUrl,
                 tags = "", // Removed
-                installCommand = installCommand,
+                installConfig = installConfig,
                 category = "" // Removed
             )
         }
@@ -159,18 +159,19 @@ fun MCPPublishScreen(
             isError = repositoryUrl.isBlank()
         )
         
-        // 安装命令
+        // 安装配置
         OutlinedTextField(
-            value = installCommand,
-            onValueChange = { installCommand = it },
-            label = { Text(stringResource(R.string.install_command)) },
+            value = installConfig,
+            onValueChange = { installConfig = it },
+            label = { Text(stringResource(R.string.install_config)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
-            placeholder = { Text(stringResource(R.string.install_command_example)) },
-            singleLine = false,
-            leadingIcon = { Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.install_command)) },
-            supportingText = { Text(stringResource(R.string.install_command_optional_description)) }
+            placeholder = { Text(stringResource(R.string.install_config_example)) },
+            minLines = 3,
+            maxLines = 8,
+            leadingIcon = { Icon(Icons.Default.Terminal, contentDescription = stringResource(R.string.install_config)) },
+            supportingText = { Text(stringResource(R.string.install_config_optional_description)) }
         )
         
         // 错误信息
@@ -243,8 +244,8 @@ fun MCPPublishScreen(
                     Text(stringResource(R.string.name_colon, title), style = MaterialTheme.typography.bodyMedium)
                     Text(stringResource(R.string.description_colon, description), style = MaterialTheme.typography.bodyMedium)
                     Text(stringResource(R.string.repository_colon, repositoryUrl), style = MaterialTheme.typography.bodyMedium)
-                    if (installCommand.isNotBlank()) {
-                        Text(stringResource(R.string.install_command_colon, installCommand), style = MaterialTheme.typography.bodyMedium)
+                    if (installConfig.isNotBlank()) {
+                        Text(stringResource(R.string.install_config_colon, installConfig), style = MaterialTheme.typography.bodyMedium)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -272,7 +273,7 @@ fun MCPPublishScreen(
                                         repositoryUrl = repositoryUrl,
                                         category = "", // Removed
                                         tags = "", // Removed
-                                        installCommand = installCommand,
+                                        installConfig = installConfig,
                                         version = version
                                     )
                                     true
@@ -284,7 +285,7 @@ fun MCPPublishScreen(
                                         repositoryUrl = repositoryUrl,
                                         category = "", // Removed
                                         tags = "", // Removed
-                                        installCommand = installCommand,
+                                        installConfig = installConfig,
                                         version = version
                                     )
                                 }

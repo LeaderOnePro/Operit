@@ -36,6 +36,7 @@ declare class McpBridge {
     private readonly SPAWN_TIMEOUT;
     private mcpErrors;
     private serviceExitSignals;
+    private socketBuffers;
     private restartAttempts;
     private readonly MAX_RESTART_ATTEMPTS;
     private readonly RESTART_DELAY_MS;

@@ -578,6 +578,29 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(command)
     }
 
+    // 缓存工具列表到bridge（用于已有缓存的插件）
+    suspend fun cacheTools(serviceName: String, tools: List<JSONObject>): JSONObject? {
+        val toolsArray = JSONArray()
+        tools.forEach { tool ->
+            toolsArray.put(tool)
+        }
+
+        val params = JSONObject().apply {
+            put("name", serviceName)
+            put("tools", toolsArray)
+        }
+
+        val command = JSONObject().apply {
+            put("command", "cachetools")
+            put("id", UUID.randomUUID().toString())
+            put("params", params)
+        }
+
+        Log.d(TAG, "缓存工具列表到bridge 服务: $serviceName 工具数: ${tools.size}")
+
+        return sendCommand(command)
+    }
+
     // 调用工具
     suspend fun callTool(method: String, params: JSONObject): JSONObject? {
         val command =

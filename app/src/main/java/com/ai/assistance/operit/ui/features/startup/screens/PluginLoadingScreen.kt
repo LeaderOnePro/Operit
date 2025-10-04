@@ -789,7 +789,7 @@ class PluginLoadingState {
                                 disabledSuffix
                         )
                 )
-                updateProgress(0.4f + 0.6f * (index.toFloat() / total) * 0.3f) // 注册占30%
+                updateProgress(0.4f + 0.1f * (index.toFloat() / total)) // 注册占10% (0.4 -> 0.5)
 
                 // 更新特定插件状态
                 startLoadingPlugin(pluginId)
@@ -816,7 +816,7 @@ class PluginLoadingState {
                 }
 
                 // 更新总体进度
-                updateProgress(0.4f + 0.6f * (index.toFloat() / total))
+                updateProgress(0.5f + 0.5f * (index.toFloat() / total)) // 验证和处理占50% (0.5 -> 1.0)
             }
 
             override fun onAllPluginsStarted(

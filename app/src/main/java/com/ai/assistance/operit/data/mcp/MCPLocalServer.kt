@@ -133,13 +133,13 @@ class MCPLocalServer private constructor(private val context: Context) {
             @SerializedName("command")
             val command: String,
             @SerializedName("args")
-            val args: List<String> = emptyList(),
+            val args: List<String>? = emptyList(),
             @SerializedName("disabled")
             val disabled: Boolean = false,
             @SerializedName("autoApprove")
-            val autoApprove: List<String> = emptyList(),
+            val autoApprove: List<String>? = emptyList(),
             @SerializedName("env")
-            val env: Map<String, String> = emptyMap()
+            val env: Map<String, String>? = emptyMap()
         )
     }
 
@@ -201,7 +201,26 @@ class MCPLocalServer private constructor(private val context: Context) {
         @SerializedName("lastDeployTime")
         val lastDeployTime: Long = 0L,
         @SerializedName("errorMessage")
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        @SerializedName("cachedTools")
+        val cachedTools: List<CachedToolInfo>? = null,
+        @SerializedName("toolsCachedTime")
+        val toolsCachedTime: Long = 0L
+    )
+
+    /**
+     * 缓存的工具信息
+     */
+    @Serializable
+    data class CachedToolInfo(
+        @SerializedName("name")
+        val name: String,
+        @SerializedName("description")
+        val description: String = "",
+        @SerializedName("inputSchema")
+        val inputSchema: String = "{}", // JSON字符串形式的schema
+        @SerializedName("cachedAt")
+        val cachedAt: Long = System.currentTimeMillis()
     )
 
     // ==================== 配置文件操作 ====================
@@ -367,19 +386,19 @@ class MCPLocalServer private constructor(private val context: Context) {
     suspend fun addOrUpdateMCPServer(
         serverId: String,
         command: String,
-        args: List<String> = emptyList(),
-        env: Map<String, String> = emptyMap(),
+        args: List<String>? = emptyList(),
+        env: Map<String, String>? = emptyMap(),
         disabled: Boolean = false,
-        autoApprove: List<String> = emptyList()
+        autoApprove: List<String>? = emptyList()
     ) {
         _mcpConfig.update { currentConfig ->
             val newServers = currentConfig.mcpServers.toMutableMap()
             newServers[serverId] = MCPConfig.ServerConfig(
                 command = command,
-                args = args,
+                args = args ?: emptyList(),
                 disabled = disabled,
-                autoApprove = autoApprove,
-                env = env
+                autoApprove = autoApprove ?: emptyList(),
+                env = env ?: emptyMap()
             )
             currentConfig.copy(mcpServers = newServers)
         }
@@ -538,7 +557,8 @@ class MCPLocalServer private constructor(private val context: Context) {
         serverId: String,
         active: Boolean? = null,
         deploySuccess: Boolean? = null,
-        errorMessage: String? = null
+        errorMessage: String? = null,
+        cachedTools: List<CachedToolInfo>? = null
     ) {
         val currentStatus = _serverStatus.value.toMutableMap()
         val existingStatus = currentStatus[serverId] ?: ServerStatus(serverId)
@@ -547,6 +567,8 @@ class MCPLocalServer private constructor(private val context: Context) {
             active = active ?: existingStatus.active,
             deploySuccess = deploySuccess ?: existingStatus.deploySuccess,
             errorMessage = errorMessage ?: existingStatus.errorMessage,
+            cachedTools = cachedTools ?: existingStatus.cachedTools,
+            toolsCachedTime = if (cachedTools != null) System.currentTimeMillis() else existingStatus.toolsCachedTime,
             lastStartTime = if (active == true) System.currentTimeMillis() else existingStatus.lastStartTime,
             lastStopTime = if (active == false) System.currentTimeMillis() else existingStatus.lastStopTime,
             lastDeployTime = if (deploySuccess == true) System.currentTimeMillis() else existingStatus.lastDeployTime
@@ -556,6 +578,39 @@ class MCPLocalServer private constructor(private val context: Context) {
         _serverStatus.value = currentStatus
         saveServerStatus()
         Log.d(TAG, "服务器状态已更新: $serverId")
+    }
+
+    /**
+     * 缓存服务器的工具列表
+     */
+    suspend fun cacheServerTools(serverId: String, tools: List<CachedToolInfo>) {
+        updateServerStatus(serverId = serverId, cachedTools = tools)
+        Log.d(TAG, "已缓存服务器 $serverId 的 ${tools.size} 个工具")
+    }
+
+    /**
+     * 获取缓存的工具列表
+     */
+    fun getCachedTools(serverId: String): List<CachedToolInfo>? {
+        return _serverStatus.value[serverId]?.cachedTools
+    }
+
+    /**
+     * 检查工具缓存是否有效 (有效期1天)
+     */
+    fun hasValidToolCache(serverId: String): Boolean {
+        val status = _serverStatus.value[serverId] ?: return false
+        
+        val cachedTools = status.cachedTools
+        val cacheTime = status.toolsCachedTime
+        
+        if (cachedTools.isNullOrEmpty() || cacheTime <= 0) {
+            return false
+        }
+        
+        // 缓存有效期为1天
+        val oneDayInMillis = 24 * 60 * 60 * 1000L
+        return (System.currentTimeMillis() - cacheTime) < oneDayInMillis
     }
 
     /**
@@ -601,10 +656,10 @@ class MCPLocalServer private constructor(private val context: Context) {
         addOrUpdateMCPServer(
             serverId = serverId,
             command = serverConfig.command,
-            args = serverConfig.args,
-            env = serverConfig.env,
+            args = serverConfig.args ?: emptyList(),
+            env = serverConfig.env ?: emptyMap(),
             disabled = !enabled,
-            autoApprove = serverConfig.autoApprove
+            autoApprove = serverConfig.autoApprove ?: emptyList()
         )
         Log.d(TAG, "服务器启用状态已更新: $serverId, enabled=$enabled")
     }

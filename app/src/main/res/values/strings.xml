@@ -2613,6 +2613,7 @@
     <string name="publish_description">发布说明</string>
     <string name="only_alphanumeric_underscore_plugin_id">只允许英文字母、数字和下划线，此名称将作为插件ID使用</string>
     <string name="install_command">安装命令</string>
+    <string name="install_config">安装配置</string>
     <string name="please_fill_all_required_fields">请填写所有必填字段</string>
     <string name="update_plugin">更新插件</string>
     <string name="publish_to_market">发布到市场</string>
@@ -2680,6 +2681,9 @@
     <string name="github_repo_address_required">GitHub 仓库地址 *</string>
     <string name="install_command_example">例如：pnpm install xxx@xxxx</string>
     <string name="install_command_optional_description">如果无填写则使用软件自动识别项目结构。建议为空。</string>
+    <string name="install_config_example">{"mcpServers": {"example": {"command": "npx", "args": ["example@latest"]}}}</string>
+    <string name="install_config_optional_description">提供 MCP 配置 JSON，用户可以直接导入。选填。</string>
+    <string name="install_config_colon">安装配置: %1$s</string>
     <string name="updating_progress">更新中...</string>
     <string name="publishing_progress">发布中...</string>
     <string name="please_check_submitted_info">请检查您提交的信息：</string>
