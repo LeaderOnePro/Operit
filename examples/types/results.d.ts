@@ -149,6 +149,36 @@ export interface FindFilesResultData {
 }
 
 /**
+ * Line match in grep result
+ */
+export interface GrepLineMatch {
+    lineNumber: number;
+    lineContent: string;
+    matchContext?: string;
+}
+
+/**
+ * File match in grep result
+ */
+export interface GrepFileMatch {
+    filePath: string;
+    lineMatches: GrepLineMatch[];
+}
+
+/**
+ * Grep search result data
+ */
+export interface GrepResultData {
+    searchPath: string;
+    pattern: string;
+    filePattern?: string;
+    matches: GrepFileMatch[];
+    totalMatches: number;
+    filesSearched: number;
+    toString(): string;
+}
+
+/**
  * File conversion result data
  */
 export interface FileConversionResultData {

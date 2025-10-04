@@ -82,9 +82,13 @@ object WorkspaceAttachmentProcessor {
             // 提醒AI分离文件
             suggestions.add("请将HTML, CSS, 和 JavaScript 代码分别存放到独立的文件中。")
 
-            // 当文件数量较多时，建议创建子目录
-            val files = workspaceDir.listFiles()
-            if (files != null && files.size > 10) {
+            // 当文件数量较多时，建议创建子目录（排除gitignore中的文件）
+            val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+            val files = workspaceDir.listFiles()?.filter { file ->
+                !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+            } ?: emptyList()
+            
+            if (files.size > 10) {
                 suggestions.add("项目文件较多，建议创建 'css', 'js' 等子目录来组织文件，保持结构清晰。")
             }
 
@@ -163,9 +167,21 @@ object WorkspaceAttachmentProcessor {
         if (!workspaceDir.exists() || !workspaceDir.isDirectory) {
             return emptyList()
         }
+        
+        // 加载 gitignore 规则
+        val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+        
         // 遍历所有文件和目录，并转换为FileMetadata列表
         return workspaceDir.walkTopDown()
+            .onEnter { dir -> 
+                // 使用 gitignore 规则判断是否进入目录
+                !GitIgnoreFilter.shouldIgnore(dir, workspaceDir, ignoreRules)
+            }
             .filter { it != workspaceDir } // 排除根目录本身
+            .filter { file ->
+                // 过滤应该被忽略的文件
+                !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+            }
             .map { file ->
                 FileMetadata(
                     path = file.relativeTo(workspaceDir).path,
@@ -339,8 +355,19 @@ object WorkspaceAttachmentProcessor {
             val currentTime = System.currentTimeMillis()
             val oneDayAgo = currentTime - 24 * 60 * 60 * 1000 // 24小时前
             
+            // 加载 gitignore 规则
+            val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+            
             workspaceDir.walkTopDown()
+                .onEnter { dir -> 
+                    // 使用 gitignore 规则判断是否进入目录
+                    !GitIgnoreFilter.shouldIgnore(dir, workspaceDir, ignoreRules)
+                }
                 .filter { it.isFile }
+                .filter { file ->
+                    // 过滤应该被忽略的文件
+                    !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+                }
                 .filter { it.lastModified() > oneDayAgo }
                 .sortedByDescending { it.lastModified() }
                 .take(10) // 最多显示10个文件

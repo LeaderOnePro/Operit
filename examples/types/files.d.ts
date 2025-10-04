@@ -5,7 +5,7 @@
 import {
     DirectoryListingData, FileContentData, FileOperationData, FileExistsData,
     FindFilesResultData, FileInfoData, FileConversionResultData, FileFormatConversionsResultData,
-    FilePartContentData, FileApplyResultData
+    FilePartContentData, FileApplyResultData, GrepResultData
 } from './results';
 import { FFmpegVideoCodec, FFmpegAudioCodec, FFmpegResolution, FFmpegBitrate } from './ffmpeg';
 
@@ -90,6 +90,23 @@ export namespace Files {
      * @param pattern - Search pattern
      */
     function find(path: string, pattern: string): Promise<FindFilesResultData>;
+
+    /**
+     * Search code content matching a regex pattern in files
+     * @param path - Base directory to search
+     * @param pattern - Regex pattern to search for
+     * @param options - Search options
+     * @param options.file_pattern - File filter pattern (e.g., "*.kt"), default "*"
+     * @param options.case_insensitive - Ignore case in pattern matching, default false
+     * @param options.context_lines - Number of context lines before/after each match, default 3
+     * @param options.max_results - Maximum number of matches to return, default 100
+     */
+    function grep(path: string, pattern: string, options?: {
+        file_pattern?: string;
+        case_insensitive?: boolean;
+        context_lines?: number;
+        max_results?: number;
+    }): Promise<GrepResultData>;
 
     /**
      * Get information about a file

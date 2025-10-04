@@ -1093,3 +1093,77 @@ data class TerminalSessionCloseResultData(
 ) : ToolResultData() {
     override fun toString(): String = message
 }
+
+/** Grep代码搜索结果数据 */
+@Serializable
+data class GrepResultData(
+    val searchPath: String,
+    val pattern: String,
+    val matches: List<FileMatch>,
+    val totalMatches: Int,
+    val filesSearched: Int
+) : ToolResultData() {
+    
+    @Serializable
+    data class FileMatch(
+        val filePath: String,
+        val lineMatches: List<LineMatch>
+    )
+    
+    @Serializable
+    data class LineMatch(
+        val lineNumber: Int,
+        val lineContent: String,
+        val matchContext: String? = null
+    )
+    
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("Grep搜索结果:")
+        sb.appendLine("搜索路径: $searchPath")
+        sb.appendLine("搜索模式: $pattern")
+        sb.appendLine("匹配总数: $totalMatches (在 ${matches.size} 个文件中)")
+        sb.appendLine("搜索文件数: $filesSearched")
+        sb.appendLine()
+        
+        if (matches.isEmpty()) {
+            sb.appendLine("未找到匹配项")
+        } else {
+            matches.forEach { fileMatch ->
+                sb.appendLine("文件: ${fileMatch.filePath}")
+                fileMatch.lineMatches.forEach { lineMatch ->
+                    // 如果有上下文，显示完整的上下文
+                    if (lineMatch.matchContext != null && lineMatch.matchContext.isNotBlank()) {
+                        val contextLines = lineMatch.matchContext.lines()
+                        val centerIndex = contextLines.size / 2
+                        
+                        contextLines.forEachIndexed { idx, contextLine ->
+                            // 计算每行的实际行号
+                            val actualLineNum = lineMatch.lineNumber - centerIndex + idx
+                            val lineNumStr = String.format("%6d", actualLineNum)
+                            
+                            // 匹配行用 > 标记
+                            if (idx == centerIndex) {
+                                sb.appendLine("$lineNumStr|>${contextLine}")
+                            } else {
+                                sb.appendLine("$lineNumStr| ${contextLine}")
+                            }
+                        }
+                        sb.appendLine() // 在每个匹配块后添加空行
+                    } else {
+                        // 没有上下文，只显示匹配行
+                        val lineNumStr = String.format("%6d", lineMatch.lineNumber)
+                        sb.appendLine("$lineNumStr| ${lineMatch.lineContent}")
+                    }
+                }
+                sb.appendLine()
+            }
+            
+            if (matches.size > 20) {
+                sb.appendLine("... 结果过多，仅显示前20个文件的匹配")
+            }
+        }
+        
+        return sb.toString()
+    }
+}

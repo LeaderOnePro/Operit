@@ -42,6 +42,10 @@ fun getJsToolsDefinition(): String {
                     const params = { path, pattern, ...options };
                     return toolCall("find_files", params);
                 },
+                grep: (path, pattern, options = {}) => {
+                    const params = { path, pattern, ...options };
+                    return toolCall("grep_code", params);
+                },
                 info: (path) => toolCall("file_info", { path }),
                 // 智能应用文件绑定
                 apply: (path, content) => toolCall("apply_file", { path, content }),

@@ -16,9 +16,9 @@ class FileBindingService(context: Context) {
     companion object {
         private const val TAG = "FileBindingService"
         private val EDIT_BLOCK_REGEX =
-                """//\s*\[START-(REPLACE|INSERT|DELETE):([\d-]+)\]\s*(?://\s*\[CONTEXT\]\s*(.*?)\s*//\s*\[/CONTEXT\]\s*)?(?:\n)?(.*?)(?:\n)?//\s*\[END-\1\]""".toRegex(
-                        RegexOption.DOT_MATCHES_ALL
-                )
+            """//\s*\[START-(REPLACE|INSERT|DELETE):(?:after_line=)?([\d-]+)\]\n?(?:(?://\s*\[CONTEXT\]\s*(.*?)\s*//\s*\[/CONTEXT\]\s*(.*?))|(.*?))\s*//\s*\[END-\1\]""".toRegex(
+                RegexOption.DOT_MATCHES_ALL
+            )
     }
 
     private enum class EditAction {
@@ -129,7 +129,11 @@ class FileBindingService(context: Context) {
                     EDIT_BLOCK_REGEX
                             .findAll(aiPatchCode)
                             .mapNotNull { matchResult ->
-                                val (actionStr, lineRangeStr, _, content) = matchResult.destructured
+                                val actionStr = matchResult.groupValues[1]
+                                val lineRangeStr = matchResult.groupValues[2]
+                                val context = matchResult.groupValues[3]
+                                val content = if (context.isNotBlank()) matchResult.groupValues[4] else matchResult.groupValues[5]
+
                                 val action = EditAction.valueOf(actionStr)
                                 val contentClean = content.trimEnd('\n')
 
@@ -156,77 +160,101 @@ class FileBindingService(context: Context) {
                 return Pair(false, originalContent)
             }
 
+            Log.d(TAG, "Starting line-based patch application. Found ${operations.size} operations.")
+
             val originalLines = originalContent.lines().toMutableList()
-            var lineOffset = 0
 
-            // Operations must be sorted by their start line to process them sequentially
-            // and correctly calculate the offset for subsequent operations.
-            val sortedOps = operations.sortedBy { it.startLine }
+            // Operations must be sorted in descending order to apply from the bottom up.
+            // This prevents edit operations from shifting the line numbers of subsequent operations.
+            val sortedOps = operations.sortedByDescending { it.startLine }
 
-            for (op in sortedOps) {
-                // Adjust line numbers based on the cumulative offset from previous operations
-                val adjustedStartLine = op.startLine + lineOffset
-                val adjustedEndLine = op.endLine + lineOffset
-
-                // Convert to 0-based index for list manipulation
-                val startIndex = adjustedStartLine - 1
-                val endIndex = adjustedEndLine - 1
-                val maxLine = originalLines.size
-
-                // Boundary checks for the adjusted operation
-                if (adjustedStartLine <= 0 || adjustedStartLine > maxLine + 1 || adjustedEndLine < adjustedStartLine || (op.action != EditAction.INSERT && adjustedEndLine > maxLine)) {
-                    Log.e(
-                        TAG,
-                        "Invalid adjusted line number in operation: ${op.action} ${op.startLine}->${adjustedStartLine}. File now has $maxLine lines."
-                    )
-                    // If one operation is invalid, we can't guarantee the rest, so we fail.
-                    return Pair(false, originalContent)
+            for ((index, op) in sortedOps.withIndex()) {
+                Log.d(TAG, "--- Operation ${index + 1}/${sortedOps.size} ---")
+                Log.d(TAG, "Action: ${op.action}, Target Lines: ${op.startLine}-${op.endLine}")
+                if (op.content.isNotEmpty()) {
+                    Log.d(TAG, "Content to apply:\n---\n${op.content}\n---")
+                } else {
+                    Log.d(TAG, "Content to apply: [EMPTY]")
                 }
 
-                var linesChanged = 0
+                // Convert to 0-based index for list manipulation
+                val startIndex = op.startLine - 1
+                val endIndex = op.endLine - 1
+                val maxLine = originalLines.size
+
+                // Log context around the change
+                val contextSize = 3
+                val contextStart = (startIndex - contextSize).coerceAtLeast(0)
+                val contextEnd = (endIndex + contextSize).coerceAtMost(originalLines.size - 1)
+                if (contextStart <= contextEnd) {
+                    val contextSnippet = originalLines.slice(contextStart..contextEnd)
+                            .mapIndexed { i, line -> "${contextStart + i + 1}| $line" }
+                            .joinToString("\n")
+                    Log.d(TAG, "Context (lines ${contextStart + 1}-${contextEnd + 1}):\n$contextSnippet")
+                }
+
+
+                // Boundary checks for the operation
+                // For INSERT, startLine can be 0 (insert at beginning) to maxLine (insert at end)
+                // For REPLACE/DELETE, startLine must be within [1, maxLine], endLine can exceed maxLine (will be clamped during execution)
+                when (op.action) {
+                    EditAction.INSERT -> {
+                        if (op.startLine < 0 || op.startLine > maxLine) {
+                            Log.e(TAG, "Invalid INSERT line: ${op.startLine}. File has $maxLine lines.")
+                            return Pair(false, originalContent)
+                        }
+                    }
+                    EditAction.REPLACE, EditAction.DELETE -> {
+                        if (op.startLine <= 0 || op.startLine > maxLine || op.endLine < op.startLine) {
+                            Log.e(TAG, "Invalid ${op.action} range: ${op.startLine}-${op.endLine}. File has $maxLine lines.")
+                            return Pair(false, originalContent)
+                        }
+                    }
+                }
 
                 when (op.action) {
                     EditAction.REPLACE -> {
+                        // Use the AI-generated content as-is, without adding any extra indentation
+                        // The AI is responsible for providing correctly indented code
                         val newContentLines = op.content.lines()
-                        // Ensure endIndex is within bounds before removing
-                        val effectiveEndIndex = if (endIndex >= originalLines.size) originalLines.size - 1 else endIndex
-                        
-                        val range = effectiveEndIndex downTo startIndex
+
+                        val range = endIndex downTo startIndex
+                        var removedCount = 0
+
                         for (i in range) {
                             if (i >= 0 && i < originalLines.size) {
                                 originalLines.removeAt(i)
+                                removedCount++
                             }
                         }
-                        
-                        if (op.content.isNotEmpty()) {
-                            originalLines.addAll(startIndex, newContentLines)
-                        }
 
-                        linesChanged = newContentLines.size - (range.count())
+                        val insertionPoint = startIndex.coerceIn(0, originalLines.size)
+                        originalLines.addAll(insertionPoint, newContentLines)
                     }
                     EditAction.INSERT -> {
+                        // Use the AI-generated content as-is, without adding any extra indentation
+                        // The AI is responsible for providing correctly indented code
                         val newContentLines = op.content.lines()
-                        if (op.content.isNotEmpty()) {
-                             originalLines.addAll(adjustedStartLine, newContentLines)
-                        }
-                        linesChanged = newContentLines.size
+
+                        // INSERT means "insert after line N", so the insertion point is op.startLine (not startIndex)
+                        val insertionPoint = op.startLine.coerceIn(0, originalLines.size)
+                        originalLines.addAll(insertionPoint, newContentLines)
                     }
                     EditAction.DELETE -> {
-                        // Ensure endIndex is within bounds before removing
-                        val effectiveEndIndex = if (endIndex >= originalLines.size) originalLines.size - 1 else endIndex
-                        val range = effectiveEndIndex downTo startIndex
-                        
+                        val range = endIndex downTo startIndex
+                        var removedCount = 0
                         for (i in range) {
-                             if (i >= 0 && i < originalLines.size) {
+                            if (i >= 0 && i < originalLines.size) {
                                 originalLines.removeAt(i)
+                                removedCount++
                             }
                         }
-                        linesChanged = -(range.count())
                     }
                 }
-                lineOffset += linesChanged
+                Log.d(TAG, "--- End Operation ${index + 1}/${sortedOps.size} ---")
             }
 
+            Log.d(TAG, "Patch application finished successfully.")
             return Pair(true, originalLines.joinToString("\n"))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to apply line-based patch due to an exception.", e)
@@ -333,9 +361,51 @@ class FileBindingService(context: Context) {
 
         var correctedPatch = originalPatch
         lineMappings.forEach { (originalSpec, correctedSpec) ->
-            val originalTag = "[START-$originalSpec]"
-            val correctedTag = "[START-$correctedSpec]"
-            correctedPatch = correctedPatch.replace(originalTag, correctedTag)
+            val (action, lines) = originalSpec.split(':', limit = 2)
+            val (correctedAction, correctedLines) = correctedSpec.split(':', limit = 2)
+
+            // Normalize the line spec by removing "after_line=" or "after_line " or "after_line:" prefix
+            val normalizedLines = lines.replace(Regex("^after_line[=:\\s]+"), "")
+            val normalizedCorrectedLines = correctedLines.replace(Regex("^after_line[=:\\s]+"), "")
+
+            // Build a list of possible original tag formats to find, accommodating different AI outputs
+            val possibleTagsToFind = if (action == "INSERT") {
+                listOf(
+                    "[START-$action:after_line=$normalizedLines]",
+                    "[START-$action:after_line $normalizedLines]",
+                    "[START-$action:$normalizedLines]"
+                )
+            } else { // For REPLACE, DELETE, the format is simpler
+                listOf(
+                    "[START-$action:$normalizedLines]"
+                    // We could add more variants here if the AI produces them, e.g. with spaces
+                )
+            }
+
+            // Build the single, canonical, correct format for the new tag based on its action type
+            val correctedTag = if (correctedAction == "INSERT") {
+                "[START-$correctedAction:after_line=$normalizedCorrectedLines]"
+            } else { // For REPLACE, DELETE
+                "[START-$correctedAction:$normalizedCorrectedLines]"
+            }
+
+            // Find which tag format exists in the patch and replace it with the canonical one
+            var replaced = false
+            for (tagToFind in possibleTagsToFind) {
+                if (correctedPatch.contains(tagToFind)) {
+                    // Using simple string replacement. This assumes tags are unique enough
+                    // not to partially match other parts of the code, which is a reasonable
+                    // assumption for this structured format.
+                    correctedPatch = correctedPatch.replace(tagToFind, correctedTag)
+                    replaced = true
+                    Log.d(TAG, "Replaced '$tagToFind' with '$correctedTag'")
+                    break
+                }
+            }
+
+            if (!replaced) {
+                Log.w(TAG, "Could not find tag for original spec: $originalSpec. Tried: ${possibleTagsToFind.joinToString()}")
+            }
         }
 
         Log.d(TAG, "Successfully constructed corrected patch from mapping.")

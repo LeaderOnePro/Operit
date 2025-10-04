@@ -28,7 +28,10 @@ import {
     VisitWebResultData as _VisitWebResultData,
     CombinedOperationResultData as _CombinedOperationResultData,
     FilePartContentData as _FilePartContentData,
-    FileApplyResultData as _FileApplyResultData
+    FileApplyResultData as _FileApplyResultData,
+    GrepResultData as _GrepResultData,
+    GrepFileMatch as _GrepFileMatch,
+    GrepLineMatch as _GrepLineMatch
 } from './results';
 import { Intent as AndroidIntent, IntentFlag as AndroidIntentFlag, IntentAction as AndroidIntentAction, IntentCategory as AndroidIntentCategory } from './android';
 import { UINode as UINodeClass, UI as UINamespace } from './ui';
@@ -108,6 +111,9 @@ declare global {
     type CombinedOperationResultData = _CombinedOperationResultData;
     type FilePartContentData = _FilePartContentData;
     type FileApplyResultData = _FileApplyResultData;
+    type GrepResultData = _GrepResultData;
+    type GrepFileMatch = _GrepFileMatch;
+    type GrepLineMatch = _GrepLineMatch;
 
 
     // Global interface definitions

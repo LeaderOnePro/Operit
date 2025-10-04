@@ -587,6 +587,25 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
+    // Grep代码搜索
+    handler.registerTool(
+            name = "grep_code",
+            category = ToolCategory.FILE_READ,
+            descriptionGenerator = { tool ->
+                val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+                val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value
+                if (filePattern != null && filePattern != "*") {
+                    "在 $path 中搜索代码: '$pattern' (文件类型: $filePattern)"
+                } else {
+                    "在 $path 中搜索代码: '$pattern'"
+                }
+            },
+            executor = { tool ->
+                kotlinx.coroutines.runBlocking { fileSystemTools.grepCode(tool) }
+            }
+    )
+
     // 下载文件
     handler.registerTool(
             name = "download_file",

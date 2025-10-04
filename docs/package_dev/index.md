@@ -57,7 +57,7 @@
 
 ### 核心类型
 
--   所有在 `results.d.ts` 中定义的返回结果类型，例如 `UIPageResultData`, `FileContentData`, `HttpResponseData` 等，都在全局可用。
+-   所有在 `results.d.ts` 中定义的返回结果类型，例如 `UIPageResultData`, `FileContentData`, `HttpResponseData`, `GrepResultData` 等，都在全局可用。
 
 ## 开发者如何使用
 

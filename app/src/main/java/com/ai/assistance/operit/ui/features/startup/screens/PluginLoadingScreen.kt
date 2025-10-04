@@ -745,7 +745,7 @@ class PluginLoadingState {
 
                     // 延迟后隐藏
                     lifecycleScope.launch {
-                        delay(5000)
+                        delay(3000)
                         if (isVisible.value) {
                             hide()
                         }
@@ -758,7 +758,7 @@ class PluginLoadingState {
 
                 // 延迟一会儿后如果用户未跳过，则自动隐藏进度条
                 lifecycleScope.launch {
-                    delay(5000) // 等待5秒
+                    delay(3000) // 等待3秒
                     if (isVisible.value) {
                         hide()
                     }
@@ -867,7 +867,7 @@ class PluginLoadingState {
                 updateProgress(1.0f)
 
                 // 对于错误状态，延长显示时间让用户看清消息
-                val delayTime = if (status != MCPStarter.PluginInitStatus.SUCCESS) 5000L else 3000L
+                val delayTime = if (status != MCPStarter.PluginInitStatus.SUCCESS) 3000L else 100L
 
                 // 延迟一会儿后隐藏进度条
                 lifecycleScope.launch {

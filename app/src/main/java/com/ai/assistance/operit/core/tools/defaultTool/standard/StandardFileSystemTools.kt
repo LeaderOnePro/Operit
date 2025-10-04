@@ -12,6 +12,7 @@ import com.ai.assistance.operit.core.tools.FileInfoData
 import com.ai.assistance.operit.core.tools.FileOperationData
 import com.ai.assistance.operit.core.tools.FilePartContentData
 import com.ai.assistance.operit.core.tools.FindFilesResultData
+import com.ai.assistance.operit.core.tools.GrepResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
@@ -2601,6 +2602,178 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                 "Error opening file: ${e.message}"
                                         ),
                                 error = "Error opening file: ${e.message}"
+                        )
+                }
+        }
+
+        /** 
+         * Grep代码搜索工具 - 在指定目录中搜索包含指定模式的代码
+         * 依赖 findFiles 和 readFileFull 函数，不直接使用 File 类
+         */
+        open suspend fun grepCode(tool: AITool): ToolResult {
+                val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+                val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value ?: "*"
+                val caseInsensitive = tool.parameters.find { it.name == "case_insensitive" }?.value?.toBoolean() ?: false
+                val contextLines = tool.parameters.find { it.name == "context_lines" }?.value?.toIntOrNull() ?: 3
+                val maxResults = tool.parameters.find { it.name == "max_results" }?.value?.toIntOrNull() ?: 100
+                
+                if (path.isBlank()) {
+                        return ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Path parameter is required"
+                        )
+                }
+                
+                if (pattern.isBlank()) {
+                        return ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Pattern parameter is required"
+                        )
+                }
+                
+                return try {
+                        // 1. 使用 findFiles 查找所有匹配的文件
+                        val findFilesResult = findFiles(
+                                AITool(
+                                        name = "find_files",
+                                        parameters = listOf(
+                                                ToolParameter("path", path),
+                                                ToolParameter("pattern", filePattern),
+                                                ToolParameter("use_path_pattern", "false"),
+                                                ToolParameter("case_insensitive", "false")
+                                        )
+                                )
+                        )
+                        
+                        if (!findFilesResult.success) {
+                                return ToolResult(
+                                        toolName = tool.name,
+                                        success = false,
+                                        result = StringResultData(""),
+                                        error = "Failed to find files: ${findFilesResult.error}"
+                                )
+                        }
+                        
+                        val foundFiles = (findFilesResult.result as FindFilesResultData).files
+                        
+                        if (foundFiles.isEmpty()) {
+                                return ToolResult(
+                                        toolName = tool.name,
+                                        success = true,
+                                        result = GrepResultData(
+                                                searchPath = path,
+                                                pattern = pattern,
+                                                matches = emptyList(),
+                                                totalMatches = 0,
+                                                filesSearched = 0
+                                        ),
+                                        error = ""
+                                )
+                        }
+                        
+                        // 2. 创建正则表达式用于匹配
+                        val regex = if (caseInsensitive) {
+                                Regex(pattern, RegexOption.IGNORE_CASE)
+                        } else {
+                                Regex(pattern)
+                        }
+                        
+                        // 3. 遍历每个文件，搜索匹配的行
+                        val fileMatches = mutableListOf<GrepResultData.FileMatch>()
+                        var totalMatches = 0
+                        var filesSearched = 0
+                        
+                        for (filePath in foundFiles) {
+                                if (totalMatches >= maxResults) {
+                                        break
+                                }
+                                
+                                filesSearched++
+                                
+                                // 读取文件内容
+                                val readResult = readFileFull(
+                                        AITool(
+                                                name = "read_file_full",
+                                                parameters = listOf(ToolParameter("path", filePath))
+                                        )
+                                )
+                                
+                                if (!readResult.success) {
+                                        // 如果读取失败（可能是二进制文件或权限问题），跳过该文件
+                                        continue
+                                }
+                                
+                                val fileContent = (readResult.result as FileContentData).content
+                                val lines = fileContent.lines()
+                                val lineMatches = mutableListOf<GrepResultData.LineMatch>()
+                                
+                                // 搜索每一行
+                                lines.forEachIndexed { index, line ->
+                                        if (regex.containsMatchIn(line)) {
+                                                val lineNumber = index + 1
+                                                
+                                                // 获取上下文（前后几行）
+                                                val context = if (contextLines > 0) {
+                                                        val startIdx = maxOf(0, index - contextLines)
+                                                        val endIdx = minOf(lines.size - 1, index + contextLines)
+                                                        lines.subList(startIdx, endIdx + 1).joinToString("\n")
+                                                } else {
+                                                        null
+                                                }
+                                                
+                                                lineMatches.add(
+                                                        GrepResultData.LineMatch(
+                                                                lineNumber = lineNumber,
+                                                                lineContent = line.trim(),
+                                                                matchContext = context
+                                                        )
+                                                )
+                                                
+                                                totalMatches++
+                                                
+                                                if (totalMatches >= maxResults) {
+                                                        return@forEachIndexed
+                                                }
+                                        }
+                                }
+                                
+                                // 如果该文件有匹配，添加到结果中
+                                if (lineMatches.isNotEmpty()) {
+                                        fileMatches.add(
+                                                GrepResultData.FileMatch(
+                                                        filePath = filePath,
+                                                        lineMatches = lineMatches
+                                                )
+                                        )
+                                }
+                        }
+                        
+                        // 4. 返回结果
+                        ToolResult(
+                                toolName = tool.name,
+                                success = true,
+                                result = GrepResultData(
+                                        searchPath = path,
+                                        pattern = pattern,
+                                        matches = fileMatches.take(20), // 最多显示20个文件
+                                        totalMatches = totalMatches,
+                                        filesSearched = filesSearched
+                                ),
+                                error = ""
+                        )
+                        
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error performing grep search", e)
+                        ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Error performing grep search: ${e.message}"
                         )
                 }
         }

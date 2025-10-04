@@ -78,34 +78,56 @@ object SystemPromptConfig {
         - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
         - read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)
         - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
-        - apply_file: Applies precise, line-number-based edits. You will read files with line numbers (e.g., "123| code"). To apply edits, you MUST use the following structured format. The code inside your blocks should NOT have line numbers.
-          - **CRITICAL: For each block (REPLACE, INSERT, DELETE), you MUST provide a `[CONTEXT]` block containing the original code lines you are targeting.** This allows the system to find the code even if line numbers have changed.
-          - **Replace**: `// [START-REPLACE:start-end]` (The line range is inclusive. `REPLACE:10-12` removes lines 10, 11, and 12, then inserts new code at line 10's original position).
-`// [CONTEXT]`
-... original code ...
-`// [/CONTEXT]`
-... new code ...
-`// [END-REPLACE]`
-          - **Insert**: `// [START-INSERT:after_line]`
-`// [CONTEXT]`
-... the line you are inserting after ...
-`// [/CONTEXT]`
-... new code ...
-`// [END-INSERT]`
-          - **Delete**: `// [START-DELETE:start-end]` (The line range is inclusive. `DELETE:10-12` removes lines 10, 11, and 12).
-`// [CONTEXT]`
-... original code to be deleted ...
-`// [/CONTEXT]`
-`// [END-DELETE]`
-          - **Full Content**: For full replacement, provide the full file content without any special blocks.
-          - **Note**: Provide multiple edit blocks in one call. The system handles line number conflicts.
-          - Parameters: path (file path), content (edit blocks or full file content)
+        - apply_file: Applies precise, line-number-based edits to a file.
+          - **How it works**: You will be given files with line numbers (e.g., "123| code"). You must generate a patch using the structured format below to modify the file.
+          - **CRITICAL RULE 1: CONTEXT IS FOR UNAMBIGUOUS TARGETING**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its purpose is to help the system **unambiguously** locate the target code, especially if line numbers have shifted. The context should contain a combination of surrounding code snippets and/or precise descriptions. It does not have to be the exact, complete original code, but it **MUST** be unique and clear enough to prevent any misidentification. A good practice is to describe the function/block you are editing and include the code lines, or a description of those lines, immediately preceding and following the change.
+          - **CRITICAL RULE 2: SYNTAX**: Control tags like `[START-REPLACE]`, `[CONTEXT]`, etc., must be commented out (e.g., `// [START-REPLACE:1-5]`). The code you provide for insertion or replacement, however, must be the raw, pure code without any line numbers or comment prefixes.
+
+          - **Operations**:
+            - **Replace**: `// [START-REPLACE:start-end]` (Inclusive range. Removes lines from start to end, then inserts new code at the original position of the start line).
+            // [CONTEXT]
+            // Description: In `renderUserProfile`, replacing the old, complex rendering logic.
+            // Preceded by: `function renderUserProfile(user) {`
+            const container = document.getElementById('profile');
+            // ... many lines of old rendering logic ...
+            container.appendChild(element);
+            // Followed by: `}` (the closing brace of the function)
+            // [/CONTEXT]
+            ... new code ...
+            // [END-REPLACE]
+            - **Insert**: `// [START-INSERT:after_line=N]` (Inserts new code *after* line N).
+            // [CONTEXT]
+            // Description: In `createUser`, inserting a logging statement after creating the user object.
+            // The line at N is: `const user = { name, email };`
+            // [/CONTEXT]
+            ... new code to insert ...
+            // [END-INSERT]
+            - **Delete**: `// [START-DELETE:start-end]` (Inclusive range. Removes lines from start to end).
+            // [CONTEXT]
+            // Description: Removing the deprecated and very long `calculateLegacyReport` function.
+            // Preceded by a comment block.
+            function calculateLegacyReport(data) {
+              // ... numerous lines of complex logic ...
+              return report;
+            }
+            // Followed by: `function generateNewReport(data) {`
+            // [/CONTEXT]
+            // [END-DELETE]
+
+          - **Best Practices & Common Pitfalls**:
+            - **Handling Whitespace**: Be extremely precise with whitespace and blank lines. When deleting a function or a code block, it's often necessary to include the surrounding blank lines in your `DELETE` range to avoid leaving awkward double blank lines or squashing code together.
+            - **Example of Deleting a Function**: Imagine a function from lines 28-30, with a blank line before it (27) and after it (31). To remove the function and the blank line *after* it, use `// [START-DELETE:28-31]`. To remove the function and *both* blank lines, use `// [START-DELETE:27-31]`. Think carefully about the desired final formatting.
+            - **Combining Edits**: You can and should provide multiple edit blocks in a single `apply_file` call for efficiency. The system processes them in a way that handles shifting line numbers.
+            - **Full Content**: For full replacement, provide the full file content without any special blocks.
+
+          - Parameters: path (file path), content (the string containing all your edit blocks)
         - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
         - file_exists: Check if a file or directory exists. Parameters: path (target path)
         - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
         - copy_file: Copy a file or directory. Parameters: source (source path), destination (destination path), recursive (boolean, default false)
         - make_directory: Create a directory. Parameters: path (directory path), create_parents (boolean, default false)
         - find_files: Search for files matching a pattern. Parameters: path (search path, MUST start with /sdcard/ to avoid system issues), pattern (search pattern, e.g. "*.jpg"), max_depth (optional, controls depth of subdirectory search, -1=unlimited), use_path_pattern (boolean, default false), case_insensitive (boolean, default false)
+        - grep_code: Search code content matching a regex pattern in files. Returns matches with surrounding context lines. Parameters: path (search path), pattern (regex pattern), file_pattern (file filter, default "*"), case_insensitive (boolean, default false), context_lines (lines of context before/after match, default 3), max_results (max matches, default 100)
         - file_info: Get detailed information about a file or directory including type, size, permissions, owner, group, and last modified time. Parameters: path (target path)
         - zip_files: Compress files or directories. Parameters: source (path to compress), destination (output zip file)
         - unzip_files: Extract a zip file. Parameters: source (zip file path), destination (extract path)
@@ -153,28 +175,56 @@ object SystemPromptConfig {
         - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
         - read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，会自动使用OCR提取文本。参数：path（文件路径）
         - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
-        - apply_file: 进行精确的、基于行号的编辑。你读取的文件会带行号（如 "123| code"）。修改文件时，**必须**使用以下结构化格式。代码块内部的代码**不**应包含行号。
-          - **关键: 每个编辑块 (REPLACE, INSERT, DELETE) 都必须提供一个 `[CONTEXT]` 块，其中包含你目标修改的原始代码行。** 这能帮助系统在行号变化后依然能定位代码。
-          - **替换**: `// [START-REPLACE:起始-结束]` (行号范围是包含性的。例如 `REPLACE:10-12` 会删除第10, 11, 12行，然后在新代码插入到原第10行的位置)。
-        `// [CONTEXT]`
-        ... 原始代码 ...
-        `// [/CONTEXT]`
-        ... 新代码 ...
-        `// [END-INSERT]`
-          - **删除**: `// [START-DELETE:起始-结束]` (行号范围是包含性的。例如 `DELETE:10-12` 会删除第10, 11, 12行)。
-        `// [CONTEXT]`
-        ... 要删除的原始代码 ...
-        `// [/CONTEXT]`
-        `// [END-DELETE]`
-          - **完整内容**: 若要完整替换，直接提供完整文件内容，不要使用特殊块。
-          - **注意**: 你可以在单次调用中提供多个编辑块。系统会自动处理行号冲突。
-          - 参数: path (文件路径), content (编辑块或完整文件内容)
+        - apply_file: 对文件进行精确的、基于行号的编辑。
+          - **工作原理**: 你会收到带行号的文件内容 (例如 "123| code")。你必须使用下述结构化格式生成补丁来修改文件。
+          - **关键规则1: 上下文必须用于无歧义定位**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的目的是帮助系统在行号可能发生变动的情况下，依然能够**无歧义地**定位到目标代码。上下文内容应为周围代码片段和/或对代码的精确描述的组合。它不必是逐字逐句的、完整的原始代码，但**必须**足够独特和清晰，以消除任何可能的定位错误。一个好的实践是：描述你正在编辑的函数或代码块，并附上紧邻修改点之前和之后的代码行或者描述。
+          - **关键规则2: 语法**: 像 `[START-REPLACE]`, `[CONTEXT]` 这样的控制标签必须以注释形式出现 (例如 `// [START-REPLACE:1-5]`)。然而，你在标签之间提供的用于插入或替换的代码，必须是**不带行号或注释前缀的纯粹的原始代码**。
+
+          - **操作指令**:
+            - **替换**: `// [START-REPLACE:起始-结束]` (范围是闭区间。移除从起始到结束的所有行，然后将新代码插入到起始行的原始位置)。
+            // [CONTEXT]
+            // 描述：在 `renderUserProfile` 函数中，替换其内部旧的、复杂的渲染逻辑。
+            // 前一行是: `function renderUserProfile(user) {`
+            const container = document.getElementById('profile');
+            // ... 大量旧的渲染逻辑代码 ...
+            container.appendChild(element);
+            // 后一行是: `}` (函数的结束括号)
+            // [/CONTEXT]
+            ... 新代码 ...
+            // [END-REPLACE]
+            - **插入**: `// [START-INSERT:after_line=N]` (在第 N 行*之后*插入新代码)。
+            // [CONTEXT]
+            // 描述：在 `createUser` 函数中，创建用户对象后插入一条日志记录。
+            // 第 N 行是: `const user = { name, email };`
+            // [/CONTEXT]
+            ... 要插入的新代码 ...
+            // [END-INSERT]
+            - **删除**: `// [START-DELETE:起始-结束]` (范围是闭区间。移除从起始到结束的所有行)。
+            // [CONTEXT]
+            // 描述：移除已废弃且很长的 `calculateLegacyReport` 函数。
+            // 前面是一个注释块。
+            function calculateLegacyReport(data) {
+              // ... 大量复杂的逻辑代码 ...
+              return report;
+            }
+            // 后面是: `function generateNewReport(data) {`
+            // [/CONTEXT]
+            // [END-DELETE]
+
+          - **最佳实践与常见陷阱**:
+            - **处理空白行**: 对待空白行和缩进必须极其精确。当删除一个函数或一个代码块时，通常需要将周围的空行也包含在 `DELETE` 的范围内，以避免留下尴尬的双重空行或导致代码紧贴在一起，破坏格式。
+            - **删除函数示例**: 假设一个函数体在 28-30 行，其前后各有一个空行 (第27和31行)。要删除该函数及其**后面**的空行，应使用 `// [START-DELETE:28-31]`。如果要同时删除函数及其**前后**的两个空行，则使用 `// [START-DELETE:27-31]`。请仔细思考你期望的最终代码格式。
+            - **合并编辑**: 为了效率，你应该在单次 `apply_file` 调用中提供多个编辑块。系统会处理行号动态变化的问题。
+            - **完整内容**: 若要完整替换，直接提供完整文件内容，不要使用特殊块。
+            
+          - 参数: path (文件路径), content (包含所有编辑块的字符串)
         - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
         - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
         - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）
         - copy_file: 复制文件或目录。参数：source（源路径），destination（目标路径），recursive（布- 尔值，默认false）
         - make_directory: 创建目录。参数：path（目录路径），create_parents（布尔值，默认false）
         - find_files: 搜索匹配模式的文件。参数：path（搜索路径，必须以/sdcard/开头以避免系统问题），pattern（搜索模式，例如"*.jpg"），max_depth（可选，控制子目录搜索深度，-1=无限），use_path_pattern（布尔值，默认false），case_insensitive（布尔值，默认false）
+        - grep_code: 在文件中搜索匹配正则表达式的代码内容，返回带上下文的匹配结果。参数：path（搜索路径），pattern（正则表达式模式），file_pattern（文件过滤，默认"*"），case_insensitive（布尔值，默认false），context_lines（匹配行前后的上下文行数，默认3），max_results（最大匹配数，默认100）
         - file_info: 获取文件或目录的详细信息，包括类型、大小、权限、所有者、组和最后修改时间。参数：path（目标路径）
         - zip_files: 压缩文件或目录。参数：source（要压缩的路径），destination（输出zip文件）
         - unzip_files: 解压zip文件。参数：source（zip文件路径），destination（解压路径）

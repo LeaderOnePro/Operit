@@ -31,6 +31,8 @@
 ### 高级文件操作
 
 -   `find(path: string, pattern: string): Promise<FindFilesResultData>`: 在指定目录下根据模式（pattern）查找文件。
+-   `grep(path: string, pattern: string, options?: object): Promise<GrepResultData>`: 在文件中搜索匹配正则表达式的代码内容。返回带行号和上下文的匹配结果。
+    -   **`options`** 对象可以包含 `file_pattern`（文件过滤，如 `"*.kt"`）, `case_insensitive`（忽略大小写）, `context_lines`（匹配行前后的上下文行数，默认3）, `max_results`（最大匹配数，默认100）等参数。
 -   `zip(source: string, destination: string): Promise<FileOperationData>`: 将指定的文件或目录压缩成一个 zip 文件。
 -   `unzip(source: string, destination: string): Promise<FileOperationData>`: 将一个 zip 压缩包解压到指定目录。
 -   `download(url: string, destination: string): Promise<FileOperationData>`: 从给定的 URL 下载文件并保存到本地。
@@ -84,6 +86,36 @@ async function downloadAndUnzip() {
         complete({ success: true, message: "文件已下载并解压。" });
     } catch (error) {
         complete({ success: false, message: `处理失败: ${error.message}` });
+    }
+}
+```
+
+**示例: 搜索代码**
+```typescript
+async function searchCodeExample() {
+    const projectPath = "/sdcard/MyProject";
+    
+    try {
+        // 在所有 Kotlin 文件中搜索包含 "ViewModel" 的代码
+        const result = await Tools.Files.grep(projectPath, "ViewModel", {
+            file_pattern: "*.kt",
+            case_insensitive: false,
+            max_results: 50
+        });
+        
+        console.log(`找到 ${result.totalMatches} 个匹配项，分布在 ${result.matches.length} 个文件中`);
+        
+        // 处理搜索结果
+        result.matches.forEach(fileMatch => {
+            console.log(`文件: ${fileMatch.filePath}`);
+            fileMatch.lineMatches.forEach(line => {
+                console.log(`  ${line.lineNumber}: ${line.lineContent}`);
+            });
+        });
+        
+        complete({ success: true, result });
+    } catch (error) {
+        complete({ success: false, message: `搜索失败: ${error.message}` });
     }
 }
 ``` 
