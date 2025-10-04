@@ -118,6 +118,30 @@ data class CreateReactionRequest(
     val content: String
 )
 
+@Serializable
+data class GitHubRelease(
+    val id: Long,
+    val tag_name: String,
+    val name: String?,
+    val body: String?,
+    val html_url: String,
+    val published_at: String,
+    val created_at: String,
+    val prerelease: Boolean = false,
+    val draft: Boolean = false,
+    val assets: List<GitHubReleaseAsset> = emptyList()
+)
+
+@Serializable
+data class GitHubReleaseAsset(
+    val id: Long,
+    val name: String,
+    val browser_download_url: String,
+    val size: Long,
+    val download_count: Int,
+    val content_type: String
+)
+
 /**
  * GitHub API服务类
  * 提供GitHub OAuth认证、用户信息、仓库操作等功能
@@ -734,6 +758,49 @@ class GitHubApiService(private val context: Context) {
                 if (responseBody != null) {
                     val repository = json.decodeFromString<GitHubRepository>(responseBody)
                     Result.success(repository)
+                } else {
+                    Result.failure(Exception("Empty response body"))
+                }
+            } else {
+                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * 获取仓库的Releases
+     */
+    suspend fun getRepositoryReleases(
+        owner: String,
+        repo: String,
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<List<GitHubRelease>> = withContext(Dispatchers.IO) {
+        try {
+            val url = HttpUrl.Builder()
+                .scheme("https")
+                .host("api.github.com")
+                .addPathSegment("repos")
+                .addPathSegment(owner)
+                .addPathSegment(repo)
+                .addPathSegment("releases")
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("per_page", perPage.toString())
+                .build()
+            
+            val request = Request.Builder()
+                .url(url)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string()
+                if (responseBody != null) {
+                    val releases = json.decodeFromString<List<GitHubRelease>>(responseBody)
+                    Result.success(releases)
                 } else {
                     Result.failure(Exception("Empty response body"))
                 }

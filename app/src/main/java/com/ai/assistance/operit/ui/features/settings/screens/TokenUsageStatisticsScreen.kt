@@ -21,9 +21,9 @@ import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import com.ai.assistance.operit.util.TokenCacheManager
 
-private const val DEFAULT_INPUT_PRICE = 4.0
-private const val DEFAULT_OUTPUT_PRICE = 12.0
-private const val DEFAULT_CACHED_INPUT_PRICE = 0.5
+private const val DEFAULT_INPUT_PRICE = 2.0
+private const val DEFAULT_OUTPUT_PRICE = 3.0
+private const val DEFAULT_CACHED_INPUT_PRICE = 0.2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +53,7 @@ fun TokenUsageStatisticsScreen(
                 tokensMap.keys.forEach { model ->
                     if (!modelPricing.containsKey(model)) {
                         // Default pricing in RMB
-                        modelPricing[model] = Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE) // ¥4/1M input, ¥12/1M output, ¥0.5/1M cached input
+                        modelPricing[model] = Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE) // ¥2/1M input, ¥3/1M output, ¥0.2/1M cached input
                     }
                 }
             }

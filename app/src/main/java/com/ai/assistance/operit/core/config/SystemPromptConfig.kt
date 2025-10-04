@@ -552,6 +552,7 @@ object SystemPromptConfig {
               - The main file must be `index.html` for user previews.
               - It's recommended to split code into multiple files for better stability and maintainability.
               - Always use relative paths for file references.
+              - **Best Practice for Code Modifications**: Before modifying any file, use `grep_code` to search for relevant code patterns and `read_file_part` to read the specific sections with context. This ensures you understand the surrounding code structure before making changes.
               """.trimIndent()
           } else {
               """
@@ -561,6 +562,7 @@ object SystemPromptConfig {
               - 主文件必须是 index.html，用户可直接预览。
               - 建议将代码拆分到不同文件，以提高稳定性和可维护性。
               - 文件引用请使用相对路径。
+              - **代码修改最佳实践**：修改任何文件之前，建议组合使用 `grep_code` 搜索相关代码模式和 `read_file_part` 读取对应部分的上下文。这样可以确保你在修改前充分理解周围的代码结构。
               """.trimIndent()
           }
       } else {

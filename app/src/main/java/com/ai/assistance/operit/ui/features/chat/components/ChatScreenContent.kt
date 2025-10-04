@@ -263,15 +263,30 @@ fun ChatScreenContent(
             onSelectCharacter = onSwitchCharacter
         )
 
-        // 历史选择器作为浮动层，使用AnimatedVisibility保持动画效果
+        // 遮罩层 - 独立的淡入淡出效果，覆盖整个屏幕
         AnimatedVisibility(
                 visible = showChatHistorySelector,
-                enter =
-                        slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) +
-                                fadeIn(animationSpec = tween(300)),
-                exit =
-                        slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) +
-                                fadeOut(animationSpec = tween(300)),
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300)),
+                modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                    modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures {
+                                    actualViewModel.toggleChatHistorySelector()
+                                }
+                            }
+                            .background(Color.Black.copy(alpha = 0.3f))
+            )
+        }
+
+        // 历史选择器面板 - 滑入滑出效果
+        AnimatedVisibility(
+                visible = showChatHistorySelector,
+                enter = slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)),
+                exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)),
                 modifier = Modifier.align(Alignment.TopStart)
         ) {
             ChatHistorySelectorPanel(
@@ -479,96 +494,80 @@ fun ChatHistorySelectorPanel(
         currentChatId: String,
         showChatHistorySelector: Boolean
 ) {
-    // 添加一个覆盖整个屏幕的半透明点击区域，用于关闭历史选择器
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 透明遮罩层，点击右侧空白处关闭历史选择器 - 修改为不拦截滑动事件
-        Box(
-                modifier =
-                        Modifier.fillMaxSize()
-                                // 使用pointerInput替代clickable，以便只处理点击事件而不拦截滑动
-                                .pointerInput(Unit) {
-                                    detectTapGestures {
-                                        actualViewModel.toggleChatHistorySelector()
-                                    }
-                                }
-                                .background(Color.Black.copy(alpha = 0.1f))
+    // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
+    Box(
+            modifier =
+                    Modifier.width(280.dp)
+                            .fillMaxHeight()
+                            .background(
+                                    color =
+                                            MaterialTheme.colorScheme.surface.copy(
+                                                    alpha = 0.95f
+                                            ),
+                                    shape = RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
+                            )
+    ) {
+        // 直接使用ChatHistorySelector
+        ChatHistorySelector(
+                modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+                onNewChat = {
+                    actualViewModel.createNewChat()
+                    // 创建新对话后自动收起侧边框
+                    actualViewModel.showChatHistorySelector(false)
+                },
+                onSelectChat = { chatId ->
+                    actualViewModel.switchChat(chatId)
+                    // 切换聊天后也自动收起侧边框
+                    actualViewModel.showChatHistorySelector(false)
+                },
+                onDeleteChat = { chatId -> actualViewModel.deleteChatHistory(chatId) },
+                onUpdateChatTitle = { chatId, newTitle ->
+                    actualViewModel.updateChatTitle(chatId, newTitle)
+                },
+                onCreateGroup = { groupName -> actualViewModel.createGroup(groupName) },
+                onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
+                    actualViewModel.updateChatOrderAndGroup(
+                            reorderedHistories,
+                            movedItem,
+                            targetGroup
+                    )
+                },
+                onUpdateGroupName = { oldName, newName ->
+                    actualViewModel.updateGroupName(oldName, newName)
+                },
+                onDeleteGroup = { groupName, deleteChats ->
+                    actualViewModel.deleteGroup(groupName, deleteChats)
+                },
+                chatHistories = chatHistories,
+                currentId = currentChatId
         )
 
-        // 历史选择器面板
-        Box(
+        // 在右侧添加浮动返回按钮
+        OutlinedButton(
+                onClick = { actualViewModel.toggleChatHistorySelector() },
                 modifier =
-                        Modifier.width(280.dp)
-                                .fillMaxHeight()
-                                .background(
-                                        color =
-                                                MaterialTheme.colorScheme.surface.copy(
-                                                        alpha = 0.95f
-                                                ),
-                                        shape = RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
-                                )
+                        Modifier.align(Alignment.TopEnd)
+                                .padding(top = 16.dp, end = 8.dp)
+                                .height(28.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                colors =
+                        ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                shape = RoundedCornerShape(4.dp)
         ) {
-            // 直接使用ChatHistorySelector
-            ChatHistorySelector(
-                    modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-                    onNewChat = {
-                        actualViewModel.createNewChat()
-                        // 创建新对话后自动收起侧边框
-                        actualViewModel.showChatHistorySelector(false)
-                    },
-                    onSelectChat = { chatId ->
-                        actualViewModel.switchChat(chatId)
-                        // 切换聊天后也自动收起侧边框
-                        actualViewModel.showChatHistorySelector(false)
-                    },
-                    onDeleteChat = { chatId -> actualViewModel.deleteChatHistory(chatId) },
-                    onUpdateChatTitle = { chatId, newTitle ->
-                        actualViewModel.updateChatTitle(chatId, newTitle)
-                    },
-                    onCreateGroup = { groupName -> actualViewModel.createGroup(groupName) },
-                    onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
-                        actualViewModel.updateChatOrderAndGroup(
-                                reorderedHistories,
-                                movedItem,
-                                targetGroup
-                        )
-                    },
-                    onUpdateGroupName = { oldName, newName ->
-                        actualViewModel.updateGroupName(oldName, newName)
-                    },
-                    onDeleteGroup = { groupName, deleteChats ->
-                        actualViewModel.deleteGroup(groupName, deleteChats)
-                    },
-                    chatHistories = chatHistories,
-                    currentId = currentChatId
-            )
-
-            // 在右侧添加浮动返回按钮
-            OutlinedButton(
-                    onClick = { actualViewModel.toggleChatHistorySelector() },
-                    modifier =
-                            Modifier.align(Alignment.TopEnd)
-                                    .padding(top = 16.dp, end = 8.dp)
-                                    .height(28.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                    colors =
-                            ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.primary
-                            ),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
-                    shape = RoundedCornerShape(4.dp)
+            Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text("返回", style = MaterialTheme.typography.bodySmall)
-                }
+                Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                )
+                Text("返回", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

@@ -32,6 +32,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import com.ai.assistance.operit.util.FileUtils
+import com.ai.assistance.operit.util.SyntaxCheckUtil
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -2210,6 +2211,9 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                 details = "Successfully created new file with AI code: $path"
                                         )
 
+                                // 执行语法检查
+                                val syntaxCheckResult = performSyntaxCheck(path, aiGeneratedCode)
+
                                 emit(
                                         ToolResult(
                                                 toolName = tool.name,
@@ -2217,7 +2221,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                 result =
                                                         FileApplyResultData(
                                                                 operation = operationData,
-                                                                aiDiffInstructions = aiGeneratedCode
+                                                                aiDiffInstructions = aiGeneratedCode,
+                                                                syntaxCheckResult = syntaxCheckResult
                                                         ),
                                                 error = ""
                                         )
@@ -2334,6 +2339,9 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 details = "Successfully applied AI code to file: $path"
                         )
 
+                // 执行语法检查
+                val syntaxCheckResult = performSyntaxCheck(path, mergedContent)
+
                 emit(
                         ToolResult(
                                 toolName = tool.name,
@@ -2341,7 +2349,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 result =
                                         FileApplyResultData(
                                                 operation = operationData,
-                                                aiDiffInstructions = aiInstructions
+                                                aiDiffInstructions = aiInstructions,
+                                                syntaxCheckResult = syntaxCheckResult
                                         ),
                                 error = ""
                         )
@@ -2775,6 +2784,22 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 result = StringResultData(""),
                                 error = "Error performing grep search: ${e.message}"
                         )
+                }
+        }
+
+        /**
+         * 执行语法检查
+         * @param filePath 文件路径
+         * @param content 文件内容
+         * @return 语法检查结果的字符串表示，如果不支持该文件类型则返回null
+         */
+        protected fun performSyntaxCheck(filePath: String, content: String): String? {
+                return try {
+                        val result = SyntaxCheckUtil.checkSyntax(filePath, content)
+                        result?.toString()
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error performing syntax check", e)
+                        "Syntax check failed: ${e.message}"
                 }
         }
 
