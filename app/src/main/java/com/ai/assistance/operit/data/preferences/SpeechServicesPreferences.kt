@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
@@ -39,6 +40,7 @@ class SpeechServicesPreferences(private val context: Context) {
         // TTS Preference Keys
         val TTS_SERVICE_TYPE = stringPreferencesKey("tts_service_type")
         val TTS_HTTP_CONFIG = stringPreferencesKey("tts_http_config")
+        val TTS_CLEANER_REGEXS = stringSetPreferencesKey("tts_cleaner_regexs")
 
         // STT Preference Keys
         val STT_SERVICE_TYPE = stringPreferencesKey("stt_service_type")
@@ -80,6 +82,10 @@ class SpeechServicesPreferences(private val context: Context) {
         }
     }
 
+    val ttsCleanerRegexsFlow: Flow<List<String>> = dataStore.data.map { prefs ->
+        (prefs[TTS_CLEANER_REGEXS] ?: emptySet()).toList()
+    }
+
     // --- STT Flows ---
     val sttServiceTypeFlow: Flow<SpeechServiceFactory.SpeechServiceType> = dataStore.data.map { prefs ->
         SpeechServiceFactory.SpeechServiceType.valueOf(
@@ -90,11 +96,16 @@ class SpeechServicesPreferences(private val context: Context) {
     // --- Save TTS Settings ---
     suspend fun saveTtsSettings(
         serviceType: VoiceServiceFactory.VoiceServiceType,
-        httpConfig: TtsHttpConfig? = null
+        httpConfig: TtsHttpConfig? = null,
+        cleanerRegexs: List<String>? = null
     ) {
         dataStore.edit { prefs ->
             prefs[TTS_SERVICE_TYPE] = serviceType.name
             
+            cleanerRegexs?.let {
+                prefs[TTS_CLEANER_REGEXS] = it.filter { regex -> regex.isNotBlank() }.toSet()
+            }
+
             // 根据服务类型保存相应的配置
             when (serviceType) {
                 VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
@@ -107,6 +118,13 @@ class SpeechServicesPreferences(private val context: Context) {
                     httpConfig?.let { prefs[TTS_HTTP_CONFIG] = Json.encodeToString(it) }
                 }
             }
+        }
+    }
+
+    /** 只保存 TTS 清理正则列表 */
+    suspend fun saveTtsCleanerRegexs(regexs: List<String>) {
+        dataStore.edit { prefs ->
+            prefs[TTS_CLEANER_REGEXS] = regexs.filter { it.isNotBlank() }.toSet()
         }
     }
 

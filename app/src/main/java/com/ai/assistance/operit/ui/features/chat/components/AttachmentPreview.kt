@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ScreenshotMonitor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +70,7 @@ fun AttachmentPreview(
 private fun AttachmentItem(attachment: AttachmentInfo, onRemove: () -> Unit, onInsert: () -> Unit) {
     val icon =
             when {
+                attachment.fileName.startsWith("camera_") -> Icons.Default.PhotoCamera
                 attachment.mimeType.startsWith("image/") -> Icons.Default.Image
                 attachment.filePath.startsWith("screen_") -> Icons.Default.ScreenshotMonitor
                 else -> Icons.Default.Description

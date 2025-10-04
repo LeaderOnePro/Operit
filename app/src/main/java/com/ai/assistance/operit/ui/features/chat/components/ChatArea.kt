@@ -353,7 +353,7 @@ private fun MessageItem(
                     )
                 },
                 onClick = {
-                    onSpeakMessage?.invoke(WaifuMessageProcessor.cleanContentForWaifu(message.content))
+                    onSpeakMessage?.invoke(message.content)
                     showContextMenu = false
                 },
                 leadingIcon = {

@@ -39,8 +39,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
+import com.ai.assistance.operit.util.TtsCleaner
+import android.net.Uri
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -67,6 +70,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 添加语音服务
     private var voiceService: VoiceService? = null
+    private val speechServicesPreferences = SpeechServicesPreferences(context)
 
     // 添加语音播放状态
     private val _isPlaying = MutableStateFlow(false)
@@ -1061,6 +1065,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /** Handles a photo taken by the camera */
+    fun handleTakenPhoto(uri: Uri) {
+        viewModelScope.launch {
+            attachmentManager.handleTakenPhoto(uri)
+        }
+    }
+
     /** 确保AI服务可用，如果当前实例为空则创建一个默认实例 */
     fun ensureAiServiceAvailable() {
         if (enhancedAiService == null) {
@@ -1451,7 +1462,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     delay(500)
                 }
 
-                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(message)
+                val cleanerRegexs = speechServicesPreferences.ttsCleanerRegexsFlow.first()
+                val cleanedText = TtsCleaner.clean(message, cleanerRegexs)
+                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(cleanedText)
 
                 val success = voiceService?.speak(
                     text = cleanMessage,

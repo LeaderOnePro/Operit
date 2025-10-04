@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import android.provider.DocumentsContract
+import java.io.File
 
 /**
  * Manages attachment operations for the chat feature Handles adding, removing, and referencing
@@ -58,6 +59,40 @@ class AttachmentManager(private val context: Context, private val toolHandler: A
 
         return attachmentRef.toString()
     }
+
+    /** Handles a photo taken by the camera */
+    suspend fun handleTakenPhoto(uri: Uri) =
+            withContext(Dispatchers.IO) {
+                try {
+                    val fileName = "camera_${System.currentTimeMillis()}.jpg"
+                    val tempFile = createTempFileFromUri(uri, fileName)
+
+                    if (tempFile != null) {
+                        Log.d(TAG, "成功从相机URI创建临时文件: ${tempFile.absolutePath}")
+
+                        val attachmentInfo =
+                                AttachmentInfo(
+                                        filePath = tempFile.absolutePath,
+                                        fileName = fileName,
+                                        mimeType = "image/jpeg",
+                                        fileSize = tempFile.length()
+                                )
+
+                        val currentList = _attachments.value
+                        if (!currentList.any { it.filePath == tempFile.absolutePath }) {
+                            _attachments.value = currentList + attachmentInfo
+                        }
+
+                        _toastEvent.emit("已添加照片附件: $fileName")
+                    } else {
+                        Log.e(TAG, "无法从相机URI创建临时文件")
+                        _toastEvent.emit("无法处理拍摄的照片，请重试")
+                    }
+                } catch (e: Exception) {
+                    _toastEvent.emit("添加照片附件失败: ${e.message}")
+                    Log.e(TAG, "添加照片附件错误", e)
+                }
+            }
 
     /** Handles a file or image attachment selected by the user 确保在IO线程执行所有文件操作 */
     suspend fun handleAttachment(filePath: String) =

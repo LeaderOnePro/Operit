@@ -49,6 +49,7 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.util.ChatUtils
 import androidx.compose.ui.res.stringResource
+import android.net.Uri
 
 @Composable
 fun ChatInputSection(
@@ -67,6 +68,7 @@ fun ChatInputSection(
     onAttachScreenContent: () -> Unit = {},
     onAttachNotifications: () -> Unit = {},
     onAttachLocation: () -> Unit = {},
+    onTakePhoto: (Uri) -> Unit,
     hasBackgroundImage: Boolean = false,
     chatInputTransparent: Boolean = false,
     modifier: Modifier = Modifier,
@@ -499,6 +501,7 @@ fun ChatInputSection(
                 onAttachScreenContent = onAttachScreenContent,
                 onAttachNotifications = onAttachNotifications,
                 onAttachLocation = onAttachLocation,
+                onTakePhoto = onTakePhoto,
                 userQuery = userMessage,
                 onDismiss = { setShowAttachmentPanel(false) }
             )

@@ -16,11 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MicExternalOn
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,6 +60,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import com.ai.assistance.operit.api.voice.SiliconFlowVoiceProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,12 +75,11 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { SpeechServicesPreferences(context) }
-    
-    var showSaveSuccessMessage by remember { mutableStateOf(false) }
 
     // --- State for TTS Settings ---
     val ttsServiceType by prefs.ttsServiceTypeFlow.collectAsState(initial = VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS)
     val httpConfig by prefs.ttsHttpConfigFlow.collectAsState(initial = SpeechServicesPreferences.DEFAULT_HTTP_TTS_PRESET)
+    val ttsCleanerRegexs by prefs.ttsCleanerRegexsFlow.collectAsState(initial = emptyList())
 
     var ttsServiceTypeInput by remember(ttsServiceType) { mutableStateOf(ttsServiceType) }
     var ttsUrlTemplateInput by remember(httpConfig) { mutableStateOf(httpConfig.urlTemplate) }
@@ -84,86 +91,78 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
     var ttsVoiceIdInput by remember(httpConfig) { mutableStateOf(httpConfig.voiceId) }
     var ttsJsonError by remember { mutableStateOf<String?>(null) }
     var httpMethodDropdownExpanded by remember { mutableStateOf(false) }
+    val ttsCleanerRegexsState = remember { mutableStateListOf<String>() }
 
     // --- State for STT Settings ---
     val sttServiceType by prefs.sttServiceTypeFlow.collectAsState(initial = SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN)
     var sttServiceTypeInput by remember(sttServiceType) { mutableStateOf(sttServiceType) }
 
-    // 验证配置是否有效
-    fun isConfigurationValid(): Boolean {
-        return when (ttsServiceTypeInput) {
-            VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
-                val basicValid = ttsJsonError == null && ttsUrlTemplateInput.isNotBlank()
-                if (ttsHttpMethodInput == "POST") {
-                    basicValid && ttsRequestBodyInput.isNotBlank() && ttsContentTypeInput.isNotBlank()
-                } else {
-                    basicValid
-                }
-            }
-            VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
-                ttsApiKeyInput.isNotBlank() && ttsVoiceIdInput.isNotBlank()
-            }
-            VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> true
+    // 同步 DataStore 的数据到 State
+    LaunchedEffect(ttsCleanerRegexs) {
+        if (ttsCleanerRegexs != ttsCleanerRegexsState.toList()) {
+            ttsCleanerRegexsState.clear()
+            ttsCleanerRegexsState.addAll(ttsCleanerRegexs)
         }
     }
 
-    // 保存设置的函数
-    fun saveSettings() {
-        val headersMap = try {
-            Json.decodeFromString<Map<String, String>>(ttsHeadersInput)
-        } catch (e: Exception) {
-            ttsJsonError = "无效的 JSON 格式"
-            return
-        }
-        
-        ttsJsonError = null
-        
-        scope.launch {
-            when (ttsServiceTypeInput) {
-                VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
-                    prefs.saveTtsSettings(
-                        serviceType = ttsServiceTypeInput,
-                        httpConfig = SpeechServicesPreferences.TtsHttpConfig(
-                            urlTemplate = ttsUrlTemplateInput,
-                            apiKey = ttsApiKeyInput,
-                            headers = headersMap,
-                            httpMethod = ttsHttpMethodInput,
-                            requestBody = ttsRequestBodyInput,
-                            contentType = ttsContentTypeInput
-                        )
-                    )
-                }
-                VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
-                    prefs.saveTtsSettings(
-                        serviceType = ttsServiceTypeInput,
-                        httpConfig = SpeechServicesPreferences.TtsHttpConfig(
-                            urlTemplate = "",
-                            apiKey = ttsApiKeyInput,
-                            headers = emptyMap(),
-                            httpMethod = "",
-                            requestBody = "",
-                            contentType = "",
-                            voiceId = ttsVoiceIdInput
-                        )
-                    )
-                }
-                VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> {
-                    prefs.saveTtsSettings(serviceType = ttsServiceTypeInput)
+    // 自动保存设置
+    LaunchedEffect(Unit) {
+        // TTS Cleaner Regexes - 自动保存
+        snapshotFlow { ttsCleanerRegexsState.toList() }
+            .debounce(500)
+            .distinctUntilChanged()
+            .onEach { list ->
+                if (list != ttsCleanerRegexs) {
+                    prefs.saveTtsCleanerRegexs(list)
                 }
             }
-            
-            prefs.saveSttSettings(
-                serviceType = sttServiceTypeInput
+            .launchIn(scope)
+
+        // 其他 TTS 和 STT 设置 - 自动保存
+        snapshotFlow {
+            Triple(
+                ttsServiceTypeInput,
+                SpeechServicesPreferences.TtsHttpConfig(
+                    urlTemplate = ttsUrlTemplateInput,
+                    apiKey = ttsApiKeyInput,
+                    headers = runCatching { Json.decodeFromString<Map<String, String>>(ttsHeadersInput) }.getOrDefault(emptyMap()),
+                    httpMethod = ttsHttpMethodInput,
+                    requestBody = ttsRequestBodyInput,
+                    contentType = ttsContentTypeInput,
+                    voiceId = ttsVoiceIdInput
+                ),
+                sttServiceTypeInput
             )
-            
-            VoiceServiceFactory.resetInstance()
-            SpeechServiceFactory.resetInstance()
-            
-            showSaveSuccessMessage = true
-            delay(3000)
-            showSaveSuccessMessage = false
         }
+            .debounce(500)
+            .distinctUntilChanged()
+            .onEach { (serviceType, httpConfigData, sttService) ->
+                var settingsChanged = false
+
+                if (serviceType != ttsServiceType) {
+                    settingsChanged = true
+                }
+                if (httpConfigData != httpConfig) {
+                    settingsChanged = true
+                }
+                if (sttService != sttServiceType) {
+                    prefs.saveSttSettings(sttService)
+                    settingsChanged = true
+                }
+
+                if (settingsChanged) {
+                    prefs.saveTtsSettings(
+                        serviceType = serviceType,
+                        httpConfig = httpConfigData,
+                        cleanerRegexs = ttsCleanerRegexsState.toList()
+                    )
+                    VoiceServiceFactory.resetInstance()
+                    SpeechServiceFactory.resetInstance()
+                }
+            }
+            .launchIn(scope)
     }
+
 
     CustomScaffold { paddingValues ->
         Box(modifier = Modifier
@@ -265,6 +264,110 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // TTS Cleaner Regex List
+                        Text(
+                            text = "TTS 清理正则列表",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        
+                        Text(
+                            text = "在朗读前，使用这些正则表达式移除匹配的文本。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Column {
+                            ttsCleanerRegexsState.forEachIndexed { index, regex ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = regex,
+                                        onValueChange = { ttsCleanerRegexsState[index] = it },
+                                        placeholder = { Text("例如：\\[.*?\\]") },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                    )
+                                    IconButton(onClick = { ttsCleanerRegexsState.removeAt(index) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "删除正则")
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { ttsCleanerRegexsState.add("") },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("添加")
+                                }
+                                
+                                var showTemplateMenu by remember { mutableStateOf(false) }
+                                OutlinedButton(
+                                    onClick = { showTemplateMenu = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("模板")
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                }
+                                
+                                DropdownMenu(
+                                    expanded = showTemplateMenu,
+                                    onDismissRequest = { showTemplateMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("删除 *xxxx*") },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\*[^*]+\\*")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("删除 **xxxx**") },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\*\\*[^*]+\\*\\*")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("删除 (xxx)") },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\([^)]+\\)")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("删除 （xxxx）") },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("（[^）]+）")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("删除 XML 标签") },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("<[^>]+>")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         AnimatedVisibility(visible = ttsServiceTypeInput == VoiceServiceFactory.VoiceServiceType.HTTP_TTS) {
                             Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -633,46 +736,6 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             )
                         }
                     }
-                }
-                
-                // 显示保存成功的消息
-                AnimatedVisibility(visible = showSaveSuccessMessage) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "设置已保存",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-                
-                // 保存按钮
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { saveSettings() },
-                    enabled = isConfigurationValid(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("保存设置")
                 }
                 
                 // 底部空间

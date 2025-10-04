@@ -71,9 +71,12 @@ import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.ui.common.WaveVisualizer
 import com.ai.assistance.operit.ui.floating.FloatContext
 import com.ai.assistance.operit.ui.floating.FloatingMode
+import com.ai.assistance.operit.util.TtsCleaner
+import com.ai.assistance.operit.util.WaifuMessageProcessor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -124,6 +127,10 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     val preferencesManager = remember { UserPreferencesManager(context) }
     val aiAvatarUri by preferencesManager.customAiAvatarUri.collectAsState(initial = null)
     val avatarShape = CircleShape
+    
+    // TTS Cleaner preferences
+    val speechServicesPrefs = remember { SpeechServicesPreferences(context) }
+    val ttsCleanerRegexs by speechServicesPrefs.ttsCleanerRegexsFlow.collectAsState(initial = emptyList())
 
     // 创建语音识别和TTS服务
     val speechService = remember {
@@ -136,6 +143,13 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     val volumeLevel by speechService.volumeLevelFlow.collectAsState()
 
     val voiceService = remember { VoiceServiceFactory.getInstance(context) }
+    
+    // 辅助函数：同时应用 TTS cleaner 和 waifu clean
+    // 注意：先执行 TTS Cleaner（处理用户自定义的 Markdown 等正则），再执行 WaifuMessageProcessor（清理 XML 标签和其他 Markdown）
+    val cleanTextForTts: (String) -> String = { text ->
+        val regexCleaned = TtsCleaner.clean(text, ttsCleanerRegexs)
+        WaifuMessageProcessor.cleanContentForWaifu(regexCleaned)
+    }
     
     val sendCurrentUtteranceAndContinue = {
         coroutineScope.launch {
@@ -181,7 +195,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                 )
             } else {
                 aiMessage = "无法开始录音，无法获取焦点"
-                voiceService.speak(aiMessage, rate = speed)
+                voiceService.speak(cleanTextForTts(aiMessage), rate = speed)
             }
         }
     }
@@ -217,7 +231,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                 aiMessage = "思考中..."
                             } else {
                                 aiMessage = "没有听清，请再试一次"
-                                voiceService.speak(aiMessage, rate = speed)
+                                voiceService.speak(cleanTextForTts(aiMessage), rate = speed)
                             }
                             accumulatedText = ""
                             latestPartialText = ""
@@ -281,7 +295,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                     } else {
                         Log.d(TAG, "Final text is blank.")
                         aiMessage = "没有听清，请再试一次"
-                        voiceService.speak(aiMessage, rate = speed)
+                        voiceService.speak(cleanTextForTts(aiMessage), rate = speed)
                     }
                     accumulatedText = ""
                     latestPartialText = ""
@@ -379,7 +393,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                     didSpeak = true
                                     // 第一句中断播放，后续句子加入队列
                                     voiceService.speak(
-                                            sentenceToSpeak,
+                                            cleanTextForTts(sentenceToSpeak),
                                             interrupt = isFirstSentence,
                                             rate = speed
                                     )
@@ -394,7 +408,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                         if (finalSentence.isNotBlank()) {
                             didSpeak = true
                             voiceService.speak(
-                                    finalSentence,
+                                    cleanTextForTts(finalSentence),
                                     interrupt = isFirstSentence,
                                     rate = speed
                             )
@@ -406,7 +420,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                 // 一次性使用TTS播放AI回复
                                 if (aiMessage.isNotBlank()) {
                                     didSpeak = true
-                                    voiceService.speak(aiMessage, rate = speed)
+                                    voiceService.speak(cleanTextForTts(aiMessage), rate = speed)
                                 }
                             }
                 }
@@ -535,7 +549,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                     showBottomControls = false
                                 } else {
                                     aiMessage = "无法开始录音，无法获取焦点"
-                                    voiceService.speak(aiMessage, rate = speed)
+                                    voiceService.speak(cleanTextForTts(aiMessage), rate = speed)
                                 }
                             }
                         }

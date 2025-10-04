@@ -509,6 +509,10 @@ fun AIChatScreen(
                                     // 添加当前位置附件
                                     actualViewModel.captureLocation()
                                 },
+                                onTakePhoto = { uri ->
+                                    // 处理拍摄的照片
+                                    actualViewModel.handleTakenPhoto(uri)
+                                },
                                 hasBackgroundImage = hasBackgroundImage,
                                 chatInputTransparent = chatInputTransparent,
                                 // 传递附件面板状态
