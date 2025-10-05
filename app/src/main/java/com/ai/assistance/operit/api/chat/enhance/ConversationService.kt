@@ -913,7 +913,7 @@ $toolList
                 contentBuilder.append(content)
             }
             
-            val result = contentBuilder.toString().trim()
+            val result = ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
             
             // 如果生成失败或内容为空，返回空字符串表示生成失败
             return if (result.isBlank()) {

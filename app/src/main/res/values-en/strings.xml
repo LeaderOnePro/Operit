@@ -1081,6 +1081,8 @@
     <string name="request_microphone_permission">Request Microphone Permission</string>
     <string name="recognition_result">Recognition Result</string>
     <string name="speech_recognition_result_placeholder">Speech recognition results will be displayed here</string>
+    <string name="copy_text">Copy Text</string>
+    <string name="no_text_to_copy">No text to copy</string>
     <string name="recognition_settings">Recognition Settings</string>
     <string name="recognition_engine">Recognition Engine</string>
     <string name="sherpa_ncnn_best">Sherpa-ncnn (Best)</string>
@@ -1689,6 +1691,81 @@
     <string name="stt_timeout">Recognition timeout</string>
     <string name="stt_result_saved">Recognition result saved</string>
     <string name="stt_save_failed">Failed to save result</string>
+    
+    <!-- Speech Services Settings -->
+    <string name="speech_services_tts_title">Text-to-Speech (TTS) Settings</string>
+    <string name="speech_services_tts_desc">Configure how text is converted to voice output</string>
+    <string name="speech_services_stt_title">Speech-to-Text (STT) Settings</string>
+    <string name="speech_services_stt_desc">Configure how speech is converted to text</string>
+    <string name="speech_services_service_type">Service Type</string>
+    <string name="speech_services_tts_engine">TTS Engine</string>
+    <string name="speech_services_stt_engine">STT Engine</string>
+    <string name="speech_services_dropdown_expand">Expand dropdown menu</string>
+    
+    <!-- TTS Service Types -->
+    <string name="speech_services_tts_type_simple">System TTS (Simple)</string>
+    <string name="speech_services_tts_type_http">HTTP API (Remote)</string>
+    <string name="speech_services_tts_type_siliconflow">SiliconFlow TTS</string>
+    
+    <!-- STT Service Types -->
+    <string name="speech_services_stt_type_sherpa">Sherpa NCNN (Local)</string>
+    
+    <!-- TTS Cleaner Regex -->
+    <string name="speech_services_tts_cleaner_title">TTS Cleaner Regex List</string>
+    <string name="speech_services_tts_cleaner_desc">Remove matched text using these regular expressions before speaking.</string>
+    <string name="speech_services_tts_cleaner_placeholder">e.g.: \\[.*?\\]</string>
+    <string name="speech_services_tts_cleaner_delete">Delete regex</string>
+    <string name="speech_services_tts_cleaner_add">Add</string>
+    <string name="speech_services_tts_cleaner_template">Templates</string>
+    <string name="speech_services_tts_cleaner_template_asterisk">Remove *xxxx*</string>
+    <string name="speech_services_tts_cleaner_template_double_asterisk">Remove **xxxx**</string>
+    <string name="speech_services_tts_cleaner_template_parenthesis">Remove (xxx)</string>
+    <string name="speech_services_tts_cleaner_template_chinese_parenthesis">Remove （xxxx）</string>
+    <string name="speech_services_tts_cleaner_template_xml">Remove XML tags</string>
+    
+    <!-- HTTP TTS Configuration -->
+    <string name="speech_services_http_tts_config">HTTP TTS Configuration</string>
+    <string name="speech_services_http_url_template">URL Template</string>
+    <string name="speech_services_http_url_placeholder">e.g.: https://api.example.com/tts?text={text}</string>
+    <string name="speech_services_http_api_key">API Key</string>
+    <string name="speech_services_http_api_key_placeholder">Optional, required by some services</string>
+    <string name="speech_services_http_headers">HTTP Headers (JSON)</string>
+    <string name="speech_services_http_headers_placeholder">{\"Content-Type\": \"application/json\"}</string>
+    <string name="speech_services_http_headers_error">Invalid JSON format</string>
+    <string name="speech_services_http_method">HTTP Method</string>
+    <string name="speech_services_http_method_select">Select HTTP method</string>
+    <string name="speech_services_http_content_type">Content-Type</string>
+    <string name="speech_services_http_content_type_placeholder">application/json</string>
+    <string name="speech_services_http_request_body">Request Body Template</string>
+    <string name="speech_services_http_request_body_placeholder">{\"text\": \"{text}\"}</string>
+    
+    <!-- SiliconFlow TTS Configuration -->
+    <string name="speech_services_siliconflow_config">SiliconFlow TTS Configuration</string>
+    <string name="speech_services_siliconflow_api_key">API Key</string>
+    <string name="speech_services_siliconflow_api_key_placeholder">Enter your SiliconFlow API key</string>
+    <string name="speech_services_siliconflow_voice_settings">Voice Settings</string>
+    <string name="speech_services_siliconflow_voice_select">Select preset voice</string>
+    <string name="speech_services_siliconflow_voice_select_icon">Select voice</string>
+    <string name="speech_services_siliconflow_voice_custom">Custom Voice</string>
+    <string name="speech_services_siliconflow_voice_id">Voice ID (Direct input)</string>
+    <string name="speech_services_siliconflow_voice_id_placeholder">e.g.: FunAudioLLM/CosyVoice2-0.5B:charles or custom voice ID</string>
+    <string name="speech_services_siliconflow_voice_id_hint">Supports system preset voices and user-uploaded custom voices</string>
+    
+    <!-- STT Configuration -->
+    <string name="speech_services_stt_info">Currently only supports local Sherpa-NCNN engine.</string>
+    
+    <!-- Save Actions -->
+    <string name="speech_services_save_button">Save Settings</string>
+    <string name="speech_services_saving">Saving...</string>
+    <string name="speech_services_save_success">Settings saved</string>
+    <string name="speech_services_save_error">Save failed: %1$s</string>
+    
+    <!-- Info Card -->
+    <string name="speech_services_info_title">About Speech Services</string>
+    <string name="speech_services_info_tts_title">Text-to-Speech (TTS)</string>
+    <string name="speech_services_info_tts_desc">TTS service converts text to speech. You can use the built-in system TTS engine or connect to a remote HTTP API.</string>
+    <string name="speech_services_info_stt_title">Speech-to-Text (STT)</string>
+    <string name="speech_services_info_stt_desc">STT service converts speech to text. Currently only supports the built-in Sherpa NCNN engine, which runs on local device without network connection.</string>
     
     <!-- UI Debugger -->
     <string name="ui_debugger_title">UI Debugger</string>

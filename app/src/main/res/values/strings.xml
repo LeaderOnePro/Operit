@@ -1114,6 +1114,8 @@
     <string name="request_microphone_permission">请求麦克风权限</string>
     <string name="recognition_result">识别结果</string>
     <string name="speech_recognition_result_placeholder">语音识别结果将显示在这里</string>
+    <string name="copy_text">复制文本</string>
+    <string name="no_text_to_copy">没有可复制的文本</string>
     <string name="recognition_settings">识别设置</string>
     <string name="recognition_engine">识别引擎</string>
     <string name="sherpa_ncnn_best">Sherpa-ncnn (最佳)</string>
@@ -1693,6 +1695,81 @@
     <string name="stt_timeout">识别超时</string>
     <string name="stt_result_saved">识别结果已保存</string>
     <string name="stt_save_failed">保存结果失败</string>
+    
+    <!-- Speech Services Settings -->
+    <string name="speech_services_tts_title">文本转语音 (TTS) 设置</string>
+    <string name="speech_services_tts_desc">配置如何将文本转换为语音输出</string>
+    <string name="speech_services_stt_title">语音转文本 (STT) 设置</string>
+    <string name="speech_services_stt_desc">配置如何将语音转换为文本</string>
+    <string name="speech_services_service_type">服务类型</string>
+    <string name="speech_services_tts_engine">TTS 引擎</string>
+    <string name="speech_services_stt_engine">STT 引擎</string>
+    <string name="speech_services_dropdown_expand">展开下拉菜单</string>
+    
+    <!-- TTS Service Types -->
+    <string name="speech_services_tts_type_simple">系统 TTS (简单)</string>
+    <string name="speech_services_tts_type_http">HTTP API (远程)</string>
+    <string name="speech_services_tts_type_siliconflow">硅基流动 TTS</string>
+    
+    <!-- STT Service Types -->
+    <string name="speech_services_stt_type_sherpa">Sherpa NCNN (本地)</string>
+    
+    <!-- TTS Cleaner Regex -->
+    <string name="speech_services_tts_cleaner_title">TTS 清理正则列表</string>
+    <string name="speech_services_tts_cleaner_desc">在朗读前，使用这些正则表达式移除匹配的文本。</string>
+    <string name="speech_services_tts_cleaner_placeholder">例如：\\[.*?\\]</string>
+    <string name="speech_services_tts_cleaner_delete">删除正则</string>
+    <string name="speech_services_tts_cleaner_add">添加</string>
+    <string name="speech_services_tts_cleaner_template">模板</string>
+    <string name="speech_services_tts_cleaner_template_asterisk">删除 *xxxx*</string>
+    <string name="speech_services_tts_cleaner_template_double_asterisk">删除 **xxxx**</string>
+    <string name="speech_services_tts_cleaner_template_parenthesis">删除 (xxx)</string>
+    <string name="speech_services_tts_cleaner_template_chinese_parenthesis">删除 （xxxx）</string>
+    <string name="speech_services_tts_cleaner_template_xml">删除 XML 标签</string>
+    
+    <!-- HTTP TTS Configuration -->
+    <string name="speech_services_http_tts_config">HTTP TTS 配置</string>
+    <string name="speech_services_http_url_template">URL 模板</string>
+    <string name="speech_services_http_url_placeholder">例如: https://api.example.com/tts?text={text}</string>
+    <string name="speech_services_http_api_key">API 密钥</string>
+    <string name="speech_services_http_api_key_placeholder">可选，某些服务需要</string>
+    <string name="speech_services_http_headers">HTTP 头部 (JSON)</string>
+    <string name="speech_services_http_headers_placeholder">{\"Content-Type\": \"application/json\"}</string>
+    <string name="speech_services_http_headers_error">无效的 JSON 格式</string>
+    <string name="speech_services_http_method">HTTP 方法</string>
+    <string name="speech_services_http_method_select">选择HTTP方法</string>
+    <string name="speech_services_http_content_type">Content-Type</string>
+    <string name="speech_services_http_content_type_placeholder">application/json</string>
+    <string name="speech_services_http_request_body">请求体模板</string>
+    <string name="speech_services_http_request_body_placeholder">{\"text\": \"{text}\"}</string>
+    
+    <!-- SiliconFlow TTS Configuration -->
+    <string name="speech_services_siliconflow_config">硅基流动 TTS 配置</string>
+    <string name="speech_services_siliconflow_api_key">API 密钥</string>
+    <string name="speech_services_siliconflow_api_key_placeholder">请输入您的硅基流动API密钥</string>
+    <string name="speech_services_siliconflow_voice_settings">音色设置</string>
+    <string name="speech_services_siliconflow_voice_select">选择预设音色</string>
+    <string name="speech_services_siliconflow_voice_select_icon">选择音色</string>
+    <string name="speech_services_siliconflow_voice_custom">自定义音色</string>
+    <string name="speech_services_siliconflow_voice_id">音色ID（可直接输入）</string>
+    <string name="speech_services_siliconflow_voice_id_placeholder">例如：FunAudioLLM/CosyVoice2-0.5B:charles 或用户自定义音色ID</string>
+    <string name="speech_services_siliconflow_voice_id_hint">支持系统预置音色和用户上传的自定义音色</string>
+    
+    <!-- STT Configuration -->
+    <string name="speech_services_stt_info">目前仅支持本地 Sherpa-NCNN 引擎。</string>
+    
+    <!-- Save Actions -->
+    <string name="speech_services_save_button">保存设置</string>
+    <string name="speech_services_saving">正在保存...</string>
+    <string name="speech_services_save_success">设置已保存</string>
+    <string name="speech_services_save_error">保存失败：%1$s</string>
+    
+    <!-- Info Card -->
+    <string name="speech_services_info_title">关于语音服务</string>
+    <string name="speech_services_info_tts_title">文本转语音 (TTS)</string>
+    <string name="speech_services_info_tts_desc">TTS 服务将文本转换为语音。您可以使用内置的系统 TTS 引擎或连接到远程 HTTP API。</string>
+    <string name="speech_services_info_stt_title">语音转文本 (STT)</string>
+    <string name="speech_services_info_stt_desc">STT 服务将语音转换为文本。目前仅支持内置的 Sherpa NCNN 引擎，该引擎在本地设备上运行，不需要网络连接。</string>
     
     <!-- UI Debugger -->
     <string name="ui_debugger_title">UI调试器</string>

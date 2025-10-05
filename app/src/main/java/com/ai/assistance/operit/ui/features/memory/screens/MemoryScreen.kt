@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.data.preferences.preferencesManager
+import com.ai.assistance.operit.ui.features.memory.screens.dialogs.BatchDeleteConfirmDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.DocumentViewDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.EditMemoryDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.LinkMemoryDialog
@@ -161,10 +162,10 @@ fun MemoryScreen() {
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 只有在框选模式下才显示“确认删除”按钮
+                    // 只有在框选模式下才显示"确认删除"按钮
                     if (uiState.isBoxSelectionMode) {
                         FloatingActionButton(
-                            onClick = { viewModel.deleteSelectedNodes() },
+                            onClick = { viewModel.showBatchDeleteConfirm() },
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             modifier = Modifier.size(48.dp)
                         ) {
@@ -341,6 +342,14 @@ fun MemoryScreen() {
                     onSave = { type, weight, description ->
                         viewModel.updateEdge(editingEdge, type, weight, description)
                     }
+                )
+            }
+
+            if (uiState.showBatchDeleteConfirm) {
+                BatchDeleteConfirmDialog(
+                    selectedCount = uiState.boxSelectedNodeIds.size,
+                    onDismiss = { viewModel.dismissBatchDeleteConfirm() },
+                    onConfirm = { viewModel.deleteSelectedNodes() }
                 )
             }
         }

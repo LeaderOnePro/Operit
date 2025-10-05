@@ -5,6 +5,7 @@ import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
 import kotlinx.coroutines.*
@@ -222,7 +223,8 @@ class TaskExecutor(
                 // onMessage(chunk)
             }
             
-            val result = resultBuilder.toString().trim()
+            // 删除 thinking 标签后再存储结果，避免传递给后续依赖任务
+            val result = ChatUtils.removeThinkingContent(resultBuilder.toString().trim())
             
             // 存储任务结果
             taskMutex.withLock {

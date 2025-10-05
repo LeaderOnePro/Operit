@@ -245,4 +245,44 @@ fun LinkMemoryDialog(
         },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text("取消") } }
     )
+}
+
+@Composable
+fun BatchDeleteConfirmDialog(
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("确认删除") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "确定要删除选中的 $selectedCount 个记忆节点吗？",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "此操作不可撤销，删除后将无法恢复这些记忆及其相关连接。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("确认删除")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 } 

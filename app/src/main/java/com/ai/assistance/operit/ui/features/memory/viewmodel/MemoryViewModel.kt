@@ -39,6 +39,7 @@ data class MemoryUiState(
         val isEditingEdge: Boolean = false,
         val isBoxSelectionMode: Boolean = false, // 新增：是否处于框选模式
         val boxSelectedNodeIds: Set<String> = emptySet(), // 新增：框选中的节点ID
+        val showBatchDeleteConfirm: Boolean = false, // 新增：是否显示批量删除确认对话框
 
         // --- 新增：文档相关状态 ---
         val selectedDocumentChunks: List<DocumentChunk> = emptyList(),
@@ -342,7 +343,22 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
         }
     }
 
-    /** 批量删除框选中的记忆 */
+    /** 显示批量删除确认对话框 */
+    fun showBatchDeleteConfirm() {
+        val selectedIds = _uiState.value.boxSelectedNodeIds
+        if (selectedIds.isEmpty()) {
+            android.util.Log.d("MemoryViewModel", "No nodes selected, aborting delete.")
+            return
+        }
+        _uiState.update { it.copy(showBatchDeleteConfirm = true) }
+    }
+
+    /** 隐藏批量删除确认对话框 */
+    fun dismissBatchDeleteConfirm() {
+        _uiState.update { it.copy(showBatchDeleteConfirm = false) }
+    }
+
+    /** 批量删除框选中的记忆（确认后执行） */
     fun deleteSelectedNodes() {
         viewModelScope.launch {
             val selectedIds = _uiState.value.boxSelectedNodeIds
@@ -352,7 +368,7 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
                 return@launch
             }
 
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, showBatchDeleteConfirm = false) }
             try {
                 android.util.Log.d("MemoryViewModel", "Calling repository.deleteMemoriesByUuids with IDs: $selectedIds")
                 repository.deleteMemoriesByUuids(selectedIds)

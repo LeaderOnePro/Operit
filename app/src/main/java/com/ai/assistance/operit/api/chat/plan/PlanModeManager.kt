@@ -6,6 +6,7 @@ import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
 import com.google.gson.Gson
@@ -216,7 +217,7 @@ class PlanModeManager(
                 planBuilder.append(chunk)
             }
             
-            val planResponse = planBuilder.toString().trim()
+            val planResponse = ChatUtils.removeThinkingContent(planBuilder.toString().trim())
             Log.d(TAG, "AI生成的执行计划: $planResponse")
             
             // 解析执行计划
