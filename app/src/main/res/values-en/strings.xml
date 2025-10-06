@@ -1340,6 +1340,8 @@
     <string name="theme_statusbar_color">Status Bar Color</string>
     <string name="theme_use_custom_statusbar_color">Custom Status Bar Color</string>
     <string name="theme_use_custom_statusbar_color_desc">When enabled, you can customize the status bar color</string>
+    <string name="theme_statusbar_hidden">Hide Status Bar</string>
+    <string name="theme_statusbar_hidden_desc">When enabled, the status bar will be completely hidden for more display space</string>
     <string name="theme_statusbar_transparent">Transparent Status Bar</string>
     <string name="theme_statusbar_transparent_desc">When enabled, the status bar will become transparent and blend with the background</string>
     <string name="theme_chat_history_selector_transparent">Transparent History Selector</string>
@@ -1353,6 +1355,9 @@
     <string name="theme_toolbar_transparent">Toolbar Settings</string>
     <string name="theme_toolbar_transparent_desc">Transparent Toolbar</string>
     <string name="theme_toolbar_transparent_desc_desc">When enabled, the toolbar will become transparent</string>
+    <string name="theme_appbar_color">App Bar Color</string>
+    <string name="theme_use_custom_appbar_color">Custom App Bar Color</string>
+    <string name="theme_use_custom_appbar_color_desc">When enabled, you can customize the app bar color</string>
 
     <!-- Toast Messages -->
     <string name="confirmation_code_copied">Confirmation code copied!</string>

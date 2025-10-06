@@ -140,6 +140,12 @@ fun ThemeSettingsScreen() {
     // Collect toolbar transparency setting
     val toolbarTransparent =
             preferencesManager.toolbarTransparent.collectAsState(initial = false).value
+    
+    // Collect AppBar custom color settings
+    val useCustomAppBarColor =
+            preferencesManager.useCustomAppBarColor.collectAsState(initial = false).value
+    val customAppBarColor =
+            preferencesManager.customAppBarColor.collectAsState(initial = null).value
 
     // Collect status bar color settings
     val useCustomStatusBarColor =
@@ -148,6 +154,8 @@ fun ThemeSettingsScreen() {
             preferencesManager.customStatusBarColor.collectAsState(initial = null).value
     val statusBarTransparent =
             preferencesManager.statusBarTransparent.collectAsState(initial = false).value
+    val statusBarHidden =
+            preferencesManager.statusBarHidden.collectAsState(initial = false).value
     val chatHeaderTransparent =
             preferencesManager.chatHeaderTransparent.collectAsState(initial = false).value
     val chatInputTransparent =
@@ -240,11 +248,16 @@ fun ThemeSettingsScreen() {
 
     // Toolbar transparency state
     var toolbarTransparentInput by remember { mutableStateOf(toolbarTransparent) }
+    
+    // AppBar custom color state
+    var useCustomAppBarColorInput by remember { mutableStateOf(useCustomAppBarColor) }
+    var customAppBarColorInput by remember { mutableStateOf(customAppBarColor ?: defaultPrimaryColor) }
 
     // Status bar color state
     var useCustomStatusBarColorInput by remember { mutableStateOf(useCustomStatusBarColor) }
     var customStatusBarColorInput by remember { mutableStateOf(customStatusBarColor ?: defaultPrimaryColor) }
     var statusBarTransparentInput by remember { mutableStateOf(statusBarTransparent) }
+    var statusBarHiddenInput by remember { mutableStateOf(statusBarHidden) }
     var chatHeaderTransparentInput by remember { mutableStateOf(chatHeaderTransparent) }
     var chatInputTransparentInput by remember { mutableStateOf(chatInputTransparent) }
     var chatHeaderOverlayModeInput by remember { mutableStateOf(chatHeaderOverlayMode) }
@@ -619,6 +632,7 @@ fun ThemeSettingsScreen() {
             useCustomStatusBarColor,
             customStatusBarColor,
             statusBarTransparent,
+            statusBarHidden,
             chatHeaderTransparent,
             chatInputTransparent,
             chatHeaderOverlayMode,
@@ -655,6 +669,7 @@ fun ThemeSettingsScreen() {
         useCustomStatusBarColorInput = useCustomStatusBarColor
         if (customStatusBarColor != null) customStatusBarColorInput = customStatusBarColor
         statusBarTransparentInput = statusBarTransparent
+        statusBarHiddenInput = statusBarHidden
         chatHeaderTransparentInput = chatHeaderTransparent
         chatInputTransparentInput = chatInputTransparent
         chatHeaderOverlayModeInput = chatHeaderOverlayMode
@@ -941,6 +956,36 @@ fun ThemeSettingsScreen() {
                         modifier = Modifier.padding(bottom = 8.dp)
                 )
 
+                // Status bar hidden switch
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(id = R.string.theme_statusbar_hidden),
+                                style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                                text = stringResource(id = R.string.theme_statusbar_hidden_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = statusBarHiddenInput,
+                            onCheckedChange = {
+                                statusBarHiddenInput = it
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(statusBarHidden = it)
+                                }
+                            }
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+
                 // Status bar transparent switch
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -950,16 +995,18 @@ fun ThemeSettingsScreen() {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                                 text = stringResource(id = R.string.theme_statusbar_transparent),
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (statusBarHiddenInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                                 text = stringResource(id = R.string.theme_statusbar_transparent_desc),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (statusBarHiddenInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
                             checked = statusBarTransparentInput,
+                            enabled = !statusBarHiddenInput,
                             onCheckedChange = {
                                 statusBarTransparentInput = it
                                 saveThemeSettingsWithCharacterCard {
@@ -981,17 +1028,17 @@ fun ThemeSettingsScreen() {
                         Text(
                                 text = stringResource(id = R.string.theme_use_custom_statusbar_color),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (statusBarTransparentInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+                                color = if (statusBarTransparentInput || statusBarHiddenInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                                 text = stringResource(id = R.string.theme_use_custom_statusbar_color_desc),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (statusBarTransparentInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (statusBarTransparentInput || statusBarHiddenInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
                             checked = useCustomStatusBarColorInput,
-                            enabled = !statusBarTransparentInput,
+                            enabled = !statusBarTransparentInput && !statusBarHiddenInput,
                             onCheckedChange = {
                                 useCustomStatusBarColorInput = it
                                 saveThemeSettingsWithCharacterCard {
@@ -1007,10 +1054,10 @@ fun ThemeSettingsScreen() {
                     ColorSelectionItem(
                             title = stringResource(id = R.string.theme_statusbar_color),
                             color = Color(customStatusBarColorInput),
-                            enabled = !statusBarTransparentInput,
+                            enabled = !statusBarTransparentInput && !statusBarHiddenInput,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
-                                if (!statusBarTransparentInput) {
+                                if (!statusBarTransparentInput && !statusBarHiddenInput) {
                                     currentColorPickerMode = "statusBar"
                                     showColorPicker = true
                                 }
@@ -1051,6 +1098,49 @@ fun ThemeSettingsScreen() {
                                 saveThemeSettingsWithCharacterCard {
                                     preferencesManager.saveThemeSettings(toolbarTransparent = it)
                                 }
+                            }
+                    )
+                }
+                
+                // Custom AppBar Color
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(id = R.string.theme_use_custom_appbar_color),
+                                style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                                text = stringResource(id = R.string.theme_use_custom_appbar_color_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = useCustomAppBarColorInput,
+                            enabled = !toolbarTransparentInput,
+                            onCheckedChange = {
+                                useCustomAppBarColorInput = it
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(useCustomAppBarColor = it)
+                                }
+                            }
+                    )
+                }
+                
+                // AppBar Color Picker
+                if (useCustomAppBarColorInput && !toolbarTransparentInput) {
+                    ColorSelectionItem(
+                            title = stringResource(id = R.string.theme_appbar_color),
+                            color = Color(customAppBarColorInput),
+                            enabled = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                currentColorPickerMode = "appBar"
+                                showColorPicker = true
                             }
                     )
                 }
@@ -2347,9 +2437,12 @@ fun ThemeSettingsScreen() {
                         videoBackgroundMutedInput = true
                         videoBackgroundLoopInput = true
                         toolbarTransparentInput = false
+                        useCustomAppBarColorInput = false
+                        customAppBarColorInput = defaultPrimaryColor
                         useCustomStatusBarColorInput = false
                         customStatusBarColorInput = defaultPrimaryColor
                         statusBarTransparentInput = false
+                        statusBarHiddenInput = false
                         chatHeaderTransparentInput = false
                         chatInputTransparentInput = false
                         chatHeaderOverlayModeInput = false
@@ -2399,6 +2492,7 @@ fun ThemeSettingsScreen() {
                     primaryColorInput = primaryColorInput,
                     secondaryColorInput = secondaryColorInput,
                     statusBarColorInput = customStatusBarColorInput,
+                    appBarColorInput = customAppBarColorInput,
                     historyIconColorInput = chatHeaderHistoryIconColorInput,
                     pipIconColorInput = chatHeaderPipIconColorInput,
                     recentColors = recentColors,
@@ -2406,11 +2500,13 @@ fun ThemeSettingsScreen() {
                         primaryColor,
                         secondaryColor,
                         statusBarColor,
+                        appBarColor,
                         historyIconColor,
                         pipIconColor ->
                         primaryColor?.let { primaryColorInput = it }
                         secondaryColor?.let { secondaryColorInput = it }
                         statusBarColor?.let { customStatusBarColorInput = it }
+                        appBarColor?.let { customAppBarColorInput = it }
                         historyIconColor?.let { chatHeaderHistoryIconColorInput = it }
                         pipIconColor?.let { chatHeaderPipIconColorInput = it }
 
@@ -2419,6 +2515,7 @@ fun ThemeSettingsScreen() {
                                 primaryColor
                                         ?: secondaryColor
                                         ?: statusBarColor
+                                        ?: appBarColor
                                         ?: historyIconColor
                                         ?: pipIconColor
                         newColor?.let { scope.launch { preferencesManager.addRecentColor(it) } }
@@ -2442,6 +2539,12 @@ fun ThemeSettingsScreen() {
                                         statusBarColor?.let {
                                             preferencesManager.saveThemeSettings(
                                                     customStatusBarColor = it
+                                            )
+                                        }
+                                "appBar" ->
+                                        appBarColor?.let {
+                                            preferencesManager.saveThemeSettings(
+                                                    customAppBarColor = it
                                             )
                                         }
                                 "historyIcon" ->

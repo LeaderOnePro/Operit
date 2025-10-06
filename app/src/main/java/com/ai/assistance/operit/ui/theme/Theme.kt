@@ -56,6 +56,8 @@ import com.google.android.exoplayer2.ui.StyledPlayerView
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 private val DarkColorScheme =
         darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
@@ -119,6 +121,8 @@ fun OperitTheme(content: @Composable () -> Unit) {
             preferencesManager.customStatusBarColor.collectAsState(initial = null)
     val statusBarTransparent by
             preferencesManager.statusBarTransparent.collectAsState(initial = false)
+    val statusBarHidden by
+            preferencesManager.statusBarHidden.collectAsState(initial = false)
 
     // 获取背景模糊设置
     val useBackgroundBlur by preferencesManager.useBackgroundBlur.collectAsState(initial = false)
@@ -165,23 +169,34 @@ fun OperitTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            val insetsController = ViewCompat.getWindowInsetsController(view)
             
             // 始终保持沉浸式模式，让Compose处理状态栏背景
             WindowCompat.setDecorFitsSystemWindows(window, false)
 
-            // 状态栏颜色和图标颜色控制
-            val statusBarColor = when {
-                statusBarTransparent -> Color.Transparent.toArgb()
-                useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
-                else -> colorScheme.primary.toArgb()
-            }
-            window.statusBarColor = statusBarColor
+            // 隐藏或显示状态栏
+            if (statusBarHidden) {
+                // 隐藏状态栏
+                insetsController?.hide(WindowInsetsCompat.Type.statusBars())
+                insetsController?.systemBarsBehavior = 
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                // 显示状态栏
+                insetsController?.show(WindowInsetsCompat.Type.statusBars())
+                
+                // 状态栏颜色和图标颜色控制
+                val statusBarColor = when {
+                    statusBarTransparent -> Color.Transparent.toArgb()
+                    useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
+                    else -> colorScheme.primary.toArgb()
+                }
+                window.statusBarColor = statusBarColor
 
-            // 根据状态栏背景色动态设置状态栏图标颜色
-            // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
-            // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars =
-                !isColorLight(Color(statusBarColor))
+                // 根据状态栏背景色动态设置状态栏图标颜色
+                // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
+                // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
+                insetsController?.isAppearanceLightStatusBars = !isColorLight(Color(statusBarColor))
+            }
         }
     }
 
