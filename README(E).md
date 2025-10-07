@@ -30,13 +30,13 @@
 
 ## 🌟 Project Introduction
 
-**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, a **Memory Vault**, and supports highly customizable features like **User Personality** and **Character Cards**. It is more than just a chat interface; it is an **all-in-one assistant** deeply integrated with Android permissions and various tools. Now with a built-in **Ubuntu 24 VM**, it provides unprecedented functionality.
+**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, a **Memory Vault**, and supports highly customizable features like **User Personality** and **Character Cards**. It is more than just a chat interface; it is an **all-in-one assistant** deeply integrated with Android permissions and various tools. Now with a built-in **Ubuntu 24 Environment**, it provides unprecedented functionality.
 
 ## 🛠️ Rich Built-in Tools
 
 Operit comes with over 40 powerful built-in tools, enabling the AI assistant to interact deeply with your device:
 
-- **Built-in Ubuntu 24 VM**: Stably run various Linux commands and MCPs to achieve complex automation tasks.
+- **Built-in Ubuntu 24 Environment**: Stably run various Linux commands and MCPs to achieve complex automation tasks.
 - **File System Tools**: Read/write files, search files, compress/decompress, convert formats, etc.
 - **HTTP Tools**: Make web requests, access web pages, upload/download files, etc.
 - **System Operation Tools**: Manage system settings, install apps, control app execution, etc.
@@ -50,9 +50,9 @@ These built-in tools, combined with a rich plugin system, allow Operit to handle
 
 Operit AI introduces a revolutionary voice interaction feature. It's no longer just about simple voice commands; it's an intelligent partner capable of **natural, continuous conversations**. By combining powerful local and cloud-based voice technologies, you can communicate fluently with the AI, achieving comprehensive voice control for everything from casual chats and queries to executing complex tasks.
 
-### 🖥️ Built-in Ubuntu 24 VM
+### 🖥️ Built-in Ubuntu 24 Environment
 
-Operit AI includes a complete Ubuntu 24 virtual machine environment, meaning you can have a powerful, desktop-class Linux system on your phone. This provides unprecedented support for the **stable operation of MCPs (Method, Coder, and Plan)**, allowing you to execute complex code tasks and automation workflows securely and efficiently without worrying about compatibility or environmental issues.
+Operit AI includes a complete Ubuntu 24 environment, meaning you can have a powerful, desktop-class Linux system on your phone. This provides unprecedented support for the **stable operation of MCPs (Method, Coder, and Plan)**, allowing you to execute complex code tasks and automation workflows securely and efficiently without worrying about compatibility or environmental issues.
 
 ### 🎨 Powerful Theming and Personalization
 
