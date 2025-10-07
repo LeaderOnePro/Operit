@@ -361,5 +361,318 @@ class SyntaxCheckUtilTest {
         assertNotNull(result)
         assertFalse(result!!.hasErrors)
     }
+
+    // ==================== Template String Tests ====================
+
+    @Test
+    fun testJavaScript_TemplateString_SingleLine_ShouldReturnValid() {
+        val jsCode = """
+            const name = "World";
+            const message = `Hello, ${'$'}{name}!`;
+            console.log(message);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_MultiLine_ShouldReturnValid() {
+        val jsCode = """
+            const html = `
+                <div class="container">
+                    <h1>Title</h1>
+                    <p>Content</p>
+                </div>
+            `;
+            console.log(html);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_WithBracketsInside_ShouldReturnValid() {
+        val jsCode = """
+            const obj = {
+                template: `
+                    function test() {
+                        const arr = [1, 2, 3];
+                        return { value: arr[0] };
+                    }
+                `
+            };
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_WithQuotesInside_ShouldReturnValid() {
+        val jsCode = """
+            const template = `
+                <div class="container">
+                    <button onclick="handleClick('test')">Click</button>
+                    <span title='tooltip'>Hover me</span>
+                </div>
+            `;
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_Nested_ShouldReturnValid() {
+        val jsCode = """
+            const outer = `Outer: ${'$'}{`Inner template`}`;
+            console.log(outer);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_UnclosedMultiLine_ShouldDetectError() {
+        val jsCode = """
+            const incomplete = `
+                This is an unclosed
+                template string
+            ;
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertTrue(result!!.hasErrors)
+        assertTrue(result.errors.any { it.message.contains("Unclosed template string", ignoreCase = true) })
+    }
+
+    @Test
+    fun testJavaScript_MixedStringsAndTemplates_ShouldReturnValid() {
+        val jsCode = """
+            const regular = "normal string";
+            const template = `template ${'$'}{regular}`;
+            const single = 'single quote string';
+            const multiLine = `
+                Line 1
+                Line 2
+            `;
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_WithEscapedBacktick_ShouldReturnValid() {
+        val jsCode = """
+            const str = `This has an escaped backtick: \` inside`;
+            console.log(str);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_TemplateString_InComments_ShouldReturnValid() {
+        val jsCode = """
+            function test() {
+                // This comment has a backtick: `
+                /* Multi-line comment
+                   with template string syntax: `test`
+                */
+                const valid = "string";
+            }
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_ComplexTemplateWithExpressions_ShouldReturnValid() {
+        val jsCode = """
+            const data = {
+                items: [1, 2, 3],
+                render: () => `
+                    <ul>
+                        ${'$'}{data.items.map(item => `
+                            <li key="${'$'}{item}">
+                                Item ${'$'}{item}
+                            </li>
+                        `).join('')}
+                    </ul>
+                `
+            };
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    // ==================== String Escape Sequence Tests ====================
+
+    @Test
+    fun testJavaScript_EscapedQuotes_ShouldReturnValid() {
+        val jsCode = """
+            const str1 = "He said, \"Hello!\"";
+            const str2 = 'It\'s a beautiful day';
+            const str3 = "Backslash: \\";
+            console.log(str1, str2, str3);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_MultipleEscapes_ShouldReturnValid() {
+        val jsCode = """
+            const path = "C:\\Users\\Name\\Documents\\file.txt";
+            const regex = /\d+\.\d+/;
+            const escaped = "Line 1\nLine 2\tTabbed";
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_DoubleBackslashBeforeQuote_ShouldDetectUnclosedString() {
+        val jsCode = """
+            const str = "This ends with double backslash\\";
+            console.log(str);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        // Double backslash means the quote is NOT escaped, so string should be properly closed
+        assertFalse(result!!.hasErrors)
+    }
+
+    // ==================== Comment Edge Cases ====================
+
+    @Test
+    fun testJavaScript_CommentWithUnmatchedBrackets_ShouldReturnValid() {
+        val jsCode = """
+            function test() {
+                // Comment with unmatched: { [ (
+                /* Multi-line with unmatched:
+                   } ] )
+                */
+                const valid = {};
+            }
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_StringLikePatternsInComments_ShouldReturnValid() {
+        val jsCode = """
+            function test() {
+                // This "looks like" a 'string' but it's not
+                /* This also "has" 'quotes' */
+                const real = "actual string";
+            }
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_UnclosedMultiLineComment_ShouldDetectError() {
+        val jsCode = """
+            function test() {
+                /* This comment is never closed
+                const code = "inside comment";
+            }
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertTrue(result!!.hasErrors)
+        assertTrue(result.errors.any { it.message.contains("Unclosed multi-line comment", ignoreCase = true) })
+    }
+
+    // ==================== RegEx Pattern Tests ====================
+
+    @Test
+    fun testJavaScript_RegexPatterns_ShouldReturnValid() {
+        val jsCode = """
+            const pattern1 = /[a-z]+/g;
+            const pattern2 = /\d{2,4}/;
+            const pattern3 = /^test$/i;
+            const result = pattern1.test("hello");
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
+
+    @Test
+    fun testJavaScript_RegexWithBrackets_ShouldReturnValid() {
+        val jsCode = """
+            const pattern = /[\[\]{}()]/g;
+            const match = "{test}".match(pattern);
+        """.trimIndent()
+
+        val result = SyntaxCheckUtil.checkSyntax("test.js", jsCode)
+
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+        assertTrue(result.errors.isEmpty())
+    }
 }
 

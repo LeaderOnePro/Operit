@@ -126,43 +126,71 @@ object SyntaxCheckUtil {
         val stack = mutableListOf<Pair<Char, Pair<Int, Int>>>() // (bracket, (line, col))
         val bracketPairs = mapOf('(' to ')', '[' to ']', '{' to '}')
 
-        lines.forEachIndexed { lineIndex, line ->
-            var inString = false
-            var inComment = false
-            var stringChar = ' '
-            var col = 0
+        // 跨行保持的字符串状态
+        var inString = false
+        var stringChar = ' '
+        var inMultiLineComment = false
 
+        lines.forEachIndexed { lineIndex, line ->
+            var inSingleLineComment = false
             var i = 0
+
             while (i < line.length) {
                 val char = line[i]
-                col = i
 
-                // 检查是否在注释中
-                if (!inString && i < line.length - 1 && line[i] == '/' && line[i + 1] == '/') {
-                    inComment = true
+                // 检查多行注释的开始和结束
+                if (!inString && !inSingleLineComment && i < line.length - 1) {
+                    if (line[i] == '/' && line[i + 1] == '*') {
+                        inMultiLineComment = true
+                        i += 2
+                        continue
+                    }
+                    if (inMultiLineComment && line[i] == '*' && line[i + 1] == '/') {
+                        inMultiLineComment = false
+                        i += 2
+                        continue
+                    }
+                }
+
+                // 检查单行注释
+                if (!inString && !inMultiLineComment && i < line.length - 1 && line[i] == '/' && line[i + 1] == '/') {
+                    inSingleLineComment = true
                     break
                 }
 
                 // 检查是否在字符串中
-                if ((char == '"' || char == '\'' || char == '`') && (i == 0 || line[i - 1] != '\\')) {
-                    if (!inString) {
-                        inString = true
-                        stringChar = char
-                    } else if (char == stringChar) {
-                        inString = false
+                if (!inMultiLineComment && !inSingleLineComment && (char == '"' || char == '\'' || char == '`')) {
+                    // 检查是否是转义字符
+                    var isEscaped = false
+                    var escapeCount = 0
+                    var j = i - 1
+                    while (j >= 0 && line[j] == '\\') {
+                        escapeCount++
+                        j--
+                    }
+                    // 如果有奇数个反斜杠，则当前字符被转义
+                    isEscaped = escapeCount % 2 == 1
+
+                    if (!isEscaped) {
+                        if (!inString) {
+                            inString = true
+                            stringChar = char
+                        } else if (char == stringChar) {
+                            inString = false
+                        }
                     }
                 }
 
-                // 如果不在字符串或注释中，检查括号
-                if (!inString && !inComment) {
+                // 如果不在字符串、注释中，检查括号
+                if (!inString && !inSingleLineComment && !inMultiLineComment) {
                     if (char in bracketPairs.keys) {
-                        stack.add(char to (lineIndex + 1 to col + 1))
+                        stack.add(char to (lineIndex + 1 to i + 1))
                     } else if (char in bracketPairs.values) {
                         if (stack.isEmpty()) {
                             errors.add(
                                 SyntaxError(
                                     lineIndex + 1,
-                                    col + 1,
+                                    i + 1,
                                     "Unexpected closing bracket '$char'"
                                 )
                             )
@@ -174,7 +202,7 @@ object SyntaxCheckUtil {
                                 errors.add(
                                     SyntaxError(
                                         lineIndex + 1,
-                                        col + 1,
+                                        i + 1,
                                         "Mismatched bracket: expected '${bracketPairs[openBracket]}', found '$char'"
                                     )
                                 )
@@ -184,6 +212,12 @@ object SyntaxCheckUtil {
                 }
 
                 i++
+            }
+
+            // 单引号和双引号字符串不能跨行（在JavaScript中）
+            // 但反引号（模板字符串）可以跨行
+            if (inString && stringChar != '`') {
+                inString = false
             }
         }
 
@@ -197,53 +231,119 @@ object SyntaxCheckUtil {
                 )
             )
         }
+
+        // 检查未闭合的多行注释
+        if (inMultiLineComment) {
+            errors.add(
+                SyntaxError(
+                    lines.size,
+                    1,
+                    "Unclosed multi-line comment"
+                )
+            )
+        }
+
+        // 检查未闭合的模板字符串
+        if (inString && stringChar == '`') {
+            errors.add(
+                SyntaxError(
+                    lines.size,
+                    1,
+                    "Unclosed template string"
+                )
+            )
+        }
     }
 
     /**
      * 检查引号匹配
      */
     private fun checkQuoteMatching(lines: List<String>, errors: MutableList<SyntaxError>) {
+        var inString = false
+        var stringChar = ' '
+        var stringStartLine = -1
+        var stringStartCol = -1
+        var inMultiLineComment = false
+
         lines.forEachIndexed { lineIndex, line ->
+            var inSingleLineComment = false
             var i = 0
-            var inComment = false
 
             while (i < line.length) {
-                // 跳过注释
-                if (i < line.length - 1 && line[i] == '/' && line[i + 1] == '/') {
-                    inComment = true
+                // 检查多行注释的开始和结束
+                if (!inString && !inSingleLineComment && i < line.length - 1) {
+                    if (line[i] == '/' && line[i + 1] == '*') {
+                        inMultiLineComment = true
+                        i += 2
+                        continue
+                    }
+                    if (inMultiLineComment && line[i] == '*' && line[i + 1] == '/') {
+                        inMultiLineComment = false
+                        i += 2
+                        continue
+                    }
+                }
+
+                // 跳过单行注释
+                if (!inString && !inMultiLineComment && i < line.length - 1 && line[i] == '/' && line[i + 1] == '/') {
+                    inSingleLineComment = true
                     break
                 }
 
                 // 检查字符串
-                if (line[i] in listOf('"', '\'', '`') && (i == 0 || line[i - 1] != '\\')) {
-                    val quote = line[i]
-                    val startCol = i
-                    i++
-
-                    // 查找匹配的引号
-                    var found = false
-                    while (i < line.length) {
-                        if (line[i] == quote && line[i - 1] != '\\') {
-                            found = true
-                            break
-                        }
-                        i++
+                if (!inMultiLineComment && !inSingleLineComment && line[i] in listOf('"', '\'', '`')) {
+                    // 检查是否是转义字符
+                    var escapeCount = 0
+                    var j = i - 1
+                    while (j >= 0 && line[j] == '\\') {
+                        escapeCount++
+                        j--
                     }
+                    // 如果有奇数个反斜杠，则当前字符被转义
+                    val isEscaped = escapeCount % 2 == 1
 
-                    if (!found) {
-                        errors.add(
-                            SyntaxError(
-                                lineIndex + 1,
-                                startCol + 1,
-                                "Unclosed string literal",
-                                SyntaxError.Severity.WARNING
-                            )
-                        )
+                    if (!isEscaped) {
+                        if (!inString) {
+                            // 开始一个新字符串
+                            inString = true
+                            stringChar = line[i]
+                            stringStartLine = lineIndex + 1
+                            stringStartCol = i + 1
+                        } else if (line[i] == stringChar) {
+                            // 结束当前字符串
+                            inString = false
+                        }
                     }
                 }
 
                 i++
             }
+
+            // 单引号和双引号字符串不能跨行
+            // 如果行尾仍在字符串中且不是反引号，报告错误
+            if (inString && stringChar != '`') {
+                errors.add(
+                    SyntaxError(
+                        stringStartLine,
+                        stringStartCol,
+                        "Unclosed string literal (single/double quotes cannot span multiple lines)",
+                        SyntaxError.Severity.WARNING
+                    )
+                )
+                inString = false
+            }
+        }
+
+        // 检查是否有未闭合的模板字符串（反引号）
+        if (inString && stringChar == '`') {
+            errors.add(
+                SyntaxError(
+                    stringStartLine,
+                    stringStartCol,
+                    "Unclosed template string literal",
+                    SyntaxError.Severity.WARNING
+                )
+            )
         }
     }
 
