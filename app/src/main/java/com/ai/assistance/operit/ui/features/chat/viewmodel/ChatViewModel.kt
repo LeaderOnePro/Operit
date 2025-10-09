@@ -298,12 +298,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         context = context,
                         viewModelScope = viewModelScope,
                         onChatHistoryLoaded = { messages: List<ChatMessage> ->
-                            if (::floatingWindowDelegate.isInitialized &&
-                                            floatingWindowDelegate.isFloatingMode.value
-                            ) {
-                                floatingWindowDelegate.updateFloatingWindowMessages(messages)
-                            }
-
+                            // 移除了手动同步悬浮窗的逻辑，现在通过订阅chatHistory StateFlow自动同步
+                            
                             // 当聊天记录加载时，更新实际的上下文窗口大小
                             // 修复：直接使用从数据库加载的窗口大小，即使是0也不回退到最大值
                             val currentChat = chatHistories.value.find { it.id == currentChatId.value }
@@ -381,7 +377,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                             // 取消当前消息
                             cancelCurrentMessage()
                         },
-                        inputProcessingState = this.inputProcessingState
+                        inputProcessingState = this.inputProcessingState,
+                        chatHistoryFlow = chatHistoryDelegate.chatHistory // 传递聊天历史流用于自动同步
                 )
     }
 

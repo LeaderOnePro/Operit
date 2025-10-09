@@ -378,8 +378,31 @@ fun FloatingChatWindowMode(floatContext: FloatContext) {
                         if (!floatContext.showInputDialog) {
                                     val scrollState = rememberScrollState()
 
-                                    // Auto-scroll to bottom
+                                    // 用于追踪流式内容变化的状态
+                                    var streamUpdateTrigger by remember { mutableStateOf(0) }
+                                    
+                                    // 收集最后一条AI消息的流内容，触发滚动
                                     LaunchedEffect(floatContext.messages.size) {
+                                        val lastAiMessage = floatContext.messages.lastOrNull { it.sender == "ai" }
+                                        val stream = lastAiMessage?.contentStream
+                                        
+                                        if (stream != null) {
+                                            // 启动流收集，每次有新内容都触发滚动
+                                            launch {
+                                                try {
+                                                    stream.collect { _ ->
+                                                        // 每次流发出新内容，更新触发器
+                                                        streamUpdateTrigger++
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("FloatingChatWindow", "Stream collection error", e)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Auto-scroll to bottom - 监听消息数量和流更新触发器
+                                    LaunchedEffect(floatContext.messages.size, streamUpdateTrigger) {
                                         if (floatContext.messages.isNotEmpty()) {
                                             scrollState.animateScrollTo(scrollState.maxValue)
                                         }

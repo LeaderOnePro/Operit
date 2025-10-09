@@ -32,7 +32,8 @@ class FloatingWindowDelegate(
     private val onAttachmentRequested: (String) -> Unit,
     private val onAttachmentRemoveRequested: (String) -> Unit,
     private val onCancelMessageRequested: () -> Unit,
-    private val inputProcessingState: StateFlow<InputProcessingState>
+    private val inputProcessingState: StateFlow<InputProcessingState>,
+    private val chatHistoryFlow: StateFlow<List<ChatMessage>>? = null // 新增：聊天历史流
 ) {
     companion object {
         private const val TAG = "FloatingWindowDelegate"
@@ -57,6 +58,8 @@ class FloatingWindowDelegate(
                     }
                     // 设置消息收集
                     setupMessageCollection()
+                    // 订阅聊天历史更新
+                    setupChatHistoryCollection()
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
@@ -221,6 +224,33 @@ class FloatingWindowDelegate(
                 }
             }
         }
+    }
+
+    /** 设置聊天历史收集 - 订阅ChatHistoryDelegate的chatHistory流 */
+    private fun setupChatHistoryCollection() {
+        chatHistoryFlow?.let { flow ->
+            viewModelScope.launch {
+                try {
+                    // 先立即同步当前的消息历史（服务刚连接时）
+                    val currentMessages = flow.value
+                    if (currentMessages.isNotEmpty()) {
+                        Log.d(TAG, "悬浮窗服务连接，立即同步当前消息: ${currentMessages.size} 条")
+                        floatingService?.updateChatMessages(currentMessages)
+                    }
+                    
+                    // 然后订阅后续的更新
+                    flow.collect { messages ->
+                        // 只在悬浮窗模式激活时同步消息
+                        if (_isFloatingMode.value) {
+                            Log.d(TAG, "从ChatHistoryDelegate收到消息更新: ${messages.size} 条")
+                            floatingService?.updateChatMessages(messages)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "收集聊天历史时出错", e)
+                }
+            }
+        } ?: Log.w(TAG, "chatHistoryFlow为空，无法订阅聊天历史更新")
     }
 
     /** 更新悬浮窗消息 */
