@@ -24,7 +24,8 @@ fun CursorStyleChatMessage(
         initialThinkingExpanded: Boolean = false,
         overrideStream: Stream<String>? = null,
         onDeleteMessage: ((Int) -> Unit)? = null,
-        index: Int = -1
+        index: Int = -1,
+        enableDialogs: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     when (message.sender) {
         "user" -> {
@@ -39,7 +40,8 @@ fun CursorStyleChatMessage(
                     message = message,
                     backgroundColor = aiMessageColor,
                     textColor = aiTextColor,
-                    overrideStream = overrideStream
+                    overrideStream = overrideStream,
+                    enableDialogs = enableDialogs  // 传递弹窗启用状态
             )
         }
         "system" -> {
@@ -58,7 +60,8 @@ fun CursorStyleChatMessage(
                         if (index != -1) {
                             onDeleteMessage?.invoke(index)
                         }
-                    }
+                    },
+                    enableDialog = enableDialogs  // 传递弹窗启用状态
             )
         }
     }

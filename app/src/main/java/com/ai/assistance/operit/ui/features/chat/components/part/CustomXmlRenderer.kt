@@ -31,6 +31,7 @@ import com.ai.assistance.operit.ui.common.markdown.XmlContentRenderer
 class CustomXmlRenderer(
     private val showThinkingProcess: Boolean = true,
     private val showStatusTags: Boolean = true,
+    private val enableDialogs: Boolean = true,  // 新增参数：是否启用弹窗功能，默认启用
     private val fallback: XmlContentRenderer = DefaultXmlRenderer()
 ) : XmlContentRenderer {
     // 定义渲染器能够处理的内置标签集合
@@ -241,7 +242,8 @@ class CustomXmlRenderer(
                     toolName = toolName,
                     params = paramText,
                     textColor = textColor,
-                    modifier = modifier
+                    modifier = modifier,
+                    enableDialog = enableDialogs  // 传递弹窗启用状态
             )
         } else {
             // 使用简洁工具显示组件
@@ -249,7 +251,8 @@ class CustomXmlRenderer(
                     toolName = toolName,
                     params = paramsText,
                     textColor = textColor,
-                    modifier = modifier
+                    modifier = modifier,
+                    enableDialog = enableDialogs  // 传递弹窗启用状态
             )
         }
     }
@@ -295,7 +298,8 @@ class CustomXmlRenderer(
                     if (textToCopy.isNotBlank()) {
                         clipboardManager.setText(AnnotatedString(textToCopy))
                     }
-                }
+                },
+                enableDialog = enableDialogs  // 传递弹窗启用状态
         )
     }
 

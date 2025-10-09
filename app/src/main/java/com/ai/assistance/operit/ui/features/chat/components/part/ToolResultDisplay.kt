@@ -30,7 +30,8 @@ fun ToolResultDisplay(
         toolName: String,
         result: String,
         isSuccess: Boolean = true,
-        onCopyResult: () -> Unit = {}
+        onCopyResult: () -> Unit = {},
+        enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     val clipboardManager = LocalClipboardManager.current
     val hasContent = result.isNotBlank()
@@ -38,8 +39,8 @@ fun ToolResultDisplay(
     // 弹窗状态
     var showDetailDialog by remember { mutableStateOf(false) }
 
-    // 显示详细内容的弹窗
-    if (showDetailDialog) {
+    // 显示详细内容的弹窗 - 仅在启用弹窗时显示
+    if (showDetailDialog && enableDialog) {
         ToolResultDetailDialog(
                 toolName = toolName,
                 result = result,
@@ -57,8 +58,9 @@ fun ToolResultDisplay(
                     Modifier.fillMaxWidth()
                             .padding(start = 24.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable(enabled = hasContent) {
-                                if (hasContent) showDetailDialog = true
+                            .clickable(enabled = hasContent && enableDialog) {
+                                // 仅在启用弹窗时才允许点击打开详情
+                                if (hasContent && enableDialog) showDetailDialog = true
                             }
                             .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
