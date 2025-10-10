@@ -2115,8 +2115,22 @@
     <string name="settings_functional_prompts_subtitle">功能专用提示词模板</string>
     <string name="settings_context_length">上下文长度</string>
     <string name="settings_context_length_subtitle">模型记忆对话长度(k tokens)</string>
-    <string name="settings_summary_threshold">摘要Token阈值</string>
-    <string name="settings_summary_threshold_subtitle">触发聊天摘要的阈值(0.1-0.95)</string>
+    <string name="settings_summary_threshold">上下文使用比例阈值</string>
+    <string name="settings_summary_threshold_subtitle">当上下文使用超过此比例时触发总结(0.1-0.95)</string>
+    
+    <!-- 截断设置 -->
+    <string name="settings_truncation_title">文件和响应截断设置</string>
+    <string name="settings_max_file_size">文件读取最大字节数</string>
+    <string name="settings_max_file_size_subtitle">单个文件读取操作的最大字节数限制</string>
+    <string name="settings_part_size">分段读取行数</string>
+    <string name="settings_part_size_subtitle">分段读取文件时，每个部分的行数</string>
+    <string name="settings_max_text_result">文本结果最大长度</string>
+    <string name="settings_max_text_result_subtitle">通用文本结果的最大字符数限制</string>
+    <string name="settings_max_http_response">HTTP响应最大长度</string>
+    <string name="settings_max_http_response_subtitle">网络请求响应的最大字符数限制</string>
+    <string name="settings_reset_truncation">重置截断设置</string>
+    <string name="settings_reset_truncation_desc">重置所有截断设置为默认值</string>
+    
     <string name="settings_data_permissions">数据和权限</string>
     <string name="settings_tool_permissions_subtitle">工具权限和安全设置</string>
     <string name="settings_data_backup_subtitle">聊天记录备份管理</string>
@@ -2826,5 +2840,11 @@
     <!-- 手动更新记忆 -->
     <string name="manual_memory_update">手动更新记忆</string>
     <string name="manual_memory_update_desc">当AI在任务完成后忘记总结时，手动触发记忆保存，将本次对话的有价值内容存入长期记忆库。</string>
+
+    <!-- Context and Summary Settings Screen -->
+    <string name="screen_title_context_summary_settings">上下文和总结设置</string>
+    <string name="settings_context_title">上下文设置</string>
+    <string name="settings_summary_title">总结设置</string>
+    <string name="settings_context_summary_subtitle">管理上下文长度、总结和截断设置</string>
 
 </resources>

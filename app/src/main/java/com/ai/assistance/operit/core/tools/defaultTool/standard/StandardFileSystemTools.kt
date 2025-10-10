@@ -40,6 +40,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 
 /**
  * Collection of file system operation tools for the AI assistant These tools use Java File APIs for
@@ -48,12 +49,11 @@ import android.webkit.MimeTypeMap
 open class StandardFileSystemTools(protected val context: Context) {
         companion object {
                 private const val TAG = "FileSystemTools"
+        }
 
-                // Maximum allowed file size for operations
-                protected const val MAX_FILE_SIZE_BYTES = 32 * 1024 // 32k
-
-                // 每个部分的行数
-                protected const val PART_SIZE = 200
+        // ApiPreferences 实例，用于动态获取配置
+        protected val apiPreferences: ApiPreferences by lazy {
+                ApiPreferences.getInstance(context)
         }
 
         /** Adds line numbers to a string of content. */
@@ -509,7 +509,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
-        /** Read file content, truncated to MAX_FILE_SIZE_BYTES */
+        /** Read file content, truncated to configured max size */
         open suspend fun readFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
@@ -523,6 +523,9 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 try {
+                        // 从配置中获取最大文件大小
+                        val maxFileSizeBytes = apiPreferences.getMaxFileSizeBytes()
+                        
                         val file = File(path)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
@@ -553,9 +556,9 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                                 val contentData = fullResult.result as FileContentData
                                 var content = contentData.content
-                                val isTruncated = content.length > MAX_FILE_SIZE_BYTES
+                                val isTruncated = content.length > maxFileSizeBytes
                                 if (isTruncated) {
-                                        content = content.substring(0, MAX_FILE_SIZE_BYTES)
+                                        content = content.substring(0, maxFileSizeBytes)
                                 }
 
                                 var contentWithLineNumbers = addLineNumbers(content)
@@ -588,12 +591,12 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                         val content =
                                 file.bufferedReader().use {
-                                        val buffer = CharArray(MAX_FILE_SIZE_BYTES)
-                                        val charsRead = it.read(buffer, 0, MAX_FILE_SIZE_BYTES)
+                                        val buffer = CharArray(maxFileSizeBytes)
+                                        val charsRead = it.read(buffer, 0, maxFileSizeBytes)
                                         if (charsRead > 0) String(buffer, 0, charsRead) else ""
                                 }
 
-                        val truncated = file.length() > MAX_FILE_SIZE_BYTES
+                        val truncated = file.length() > maxFileSizeBytes
                         var finalContent = addLineNumbers(content)
                         if (truncated) {
                                 finalContent += "\n\n... (file content truncated) ..."
@@ -621,7 +624,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
-        /** 分段读取文件内容，每次读取指定部分（默认每部分200行） */
+        /** 分段读取文件内容，每次读取指定部分（默认每部分从配置中获取） */
         open suspend fun readFilePart(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val partIndex =
@@ -637,6 +640,9 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
+                        // 从配置中获取分段大小
+                        val partSize = apiPreferences.getPartSize()
+                        
                         val file = File(path)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
@@ -656,12 +662,12 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
                         }
 
-                        val totalParts = (totalLines + PART_SIZE - 1) / PART_SIZE
+                        val totalParts = (totalLines + partSize - 1) / partSize
                         val validPartIndex =
                                 partIndex.coerceIn(0, if (totalParts > 0) totalParts - 1 else 0)
 
-                        val startLine = validPartIndex * PART_SIZE // 0-indexed
-                        val endLine = minOf(startLine + PART_SIZE, totalLines) // exclusive
+                        val startLine = validPartIndex * partSize // 0-indexed
+                        val endLine = minOf(startLine + partSize, totalLines) // exclusive
 
                         val partContent = StringBuilder()
                         if (totalLines > 0) {

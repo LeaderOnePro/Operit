@@ -12,10 +12,12 @@ import com.ai.assistance.operit.core.tools.FilePartContentData
 import com.ai.assistance.operit.core.tools.FindFilesResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.defaultTool.accessbility.AccessibilityFileSystemTools
+import com.ai.assistance.operit.core.tools.defaultTool.standard.StandardFileSystemTools
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -28,14 +30,19 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.ai.assistance.operit.util.FileUtils
 
-/** 调试者级别的文件系统工具，继承无障碍级别，使用ADB命令实现 */
+/** 调试者级别的文件系统工具，继承无障碍版本 */
 open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTools(context) {
+
+    // ApiPreferences 实例，用于动态获取配置
+    /*private val apiPreferences: ApiPreferences by lazy {
+        ApiPreferences.getInstance(context)
+    }*/
 
     companion object {
         private const val TAG = "DebuggerFileSystemTools"
-
-        // Maximum allowed file size for operations
-        protected const val MAX_FILE_SIZE_BYTES = 32 * 1024 // 32k
+        
+        // 使用父类 StandardFileSystemTools 中定义的文件大小限制常量
+        // MAX_FILE_SIZE_BYTES 和 PART_SIZE 可直接通过 StandardFileSystemTools.MAX_FILE_SIZE_BYTES 访问
     }
 
     /** Adds line numbers to a string of content. */
@@ -470,9 +477,9 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
                 val contentData = fullResult.result as FileContentData
                 var content = contentData.content
-                val isTruncated = content.length > MAX_FILE_SIZE_BYTES
+                val isTruncated = content.length > apiPreferences.getMaxFileSizeBytes()
                 if (isTruncated) {
-                    content = content.substring(0, MAX_FILE_SIZE_BYTES)
+                    content = content.substring(0, apiPreferences.getMaxFileSizeBytes())
                 }
 
                 var contentWithLineNumbers = addLineNumbers(content)
@@ -501,9 +508,9 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             // Check file size to see if truncation is needed
             val sizeResult = AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
             val size = sizeResult.stdout.trim().toLongOrNull() ?: 0
-            val truncated = size > MAX_FILE_SIZE_BYTES
+            val truncated = size > apiPreferences.getMaxFileSizeBytes()
 
-            val readCommand = "head -c $MAX_FILE_SIZE_BYTES '$path'"
+            val readCommand = "head -c ${apiPreferences.getMaxFileSizeBytes()} '$path'"
             val readResult = AndroidShellExecutor.executeShellCommand(readCommand)
 
             if (!readResult.success) {
@@ -547,7 +554,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
     override suspend fun readFilePart(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val partIndex = tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
-        val partSize = 200
+        val partSize = apiPreferences.getPartSize()
 
         if (path.isBlank()) {
             return ToolResult(

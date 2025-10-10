@@ -146,15 +146,21 @@ class WorkspaceBackupManager(private val context: Context) {
         Log.d(TAG, "Target manifest for timestamp $targetTimestamp contains ${manifestFiles.size} files.")
 
         // 1. Delete files from workspace that are not in the target manifest
-        Log.d(TAG, "Step 1: Deleting files not present in the target manifest...")
+        // Safety: Only delete text-based files that were previously tracked, preserve untracked binary files
+        Log.d(TAG, "Step 1: Deleting tracked files not present in the target manifest...")
         workspaceDir.walkTopDown()
             .onEnter { dir -> dir.name != BACKUP_DIR_NAME }
             .filter { it.isFile }
             .forEach { currentFile ->
                 val relativePath = currentFile.relativeTo(workspaceDir).path
                 if (relativePath !in manifestRelativePaths) {
-                    Log.i(TAG, "Deleting file not in manifest: $relativePath")
-                    currentFile.delete()
+                    // Only delete text-based files to prevent accidental loss of untracked binary files
+                    if (FileUtils.isTextBasedFile(currentFile)) {
+                        Log.i(TAG, "Deleting tracked text file not in manifest: $relativePath")
+                        currentFile.delete()
+                    } else {
+                        Log.d(TAG, "Preserving untracked non-text file: $relativePath")
+                    }
                 }
             }
 

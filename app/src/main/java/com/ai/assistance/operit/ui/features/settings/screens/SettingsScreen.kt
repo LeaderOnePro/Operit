@@ -56,7 +56,8 @@ fun SettingsScreen(
         navigateToCustomHeadersSettings: () -> Unit,
         navigateToPersonaCardGeneration: () -> Unit,
         navigateToWaifuModeSettings: () -> Unit,
-        navigateToTokenUsageStatistics: () -> Unit
+        navigateToTokenUsageStatistics: () -> Unit,
+        navigateToContextSummarySettings: () -> Unit
 ) {
         val context = LocalContext.current
         val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -76,38 +77,19 @@ fun SettingsScreen(
         // Collect API settings as state
         val showFpsCounter = apiPreferences.showFpsCounterFlow.collectAsState(initial = ApiPreferences.DEFAULT_SHOW_FPS_COUNTER).value
         val keepScreenOn = apiPreferences.keepScreenOnFlow.collectAsState(initial = ApiPreferences.DEFAULT_KEEP_SCREEN_ON).value
-        val summaryTokenThreshold = apiPreferences.summaryTokenThresholdFlow.collectAsState(initial = ApiPreferences.DEFAULT_SUMMARY_TOKEN_THRESHOLD).value
-        val contextLength = apiPreferences.contextLengthFlow.collectAsState(initial = ApiPreferences.DEFAULT_CONTEXT_LENGTH).value
-        
-        // Collect Summary settings as state
-        val enableSummary = apiPreferences.enableSummaryFlow.collectAsState(initial = ApiPreferences.DEFAULT_ENABLE_SUMMARY).value
-        val enableSummaryByMessageCount = apiPreferences.enableSummaryByMessageCountFlow.collectAsState(initial = ApiPreferences.DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT).value
-        val summaryMessageCountThreshold = apiPreferences.summaryMessageCountThresholdFlow.collectAsState(initial = ApiPreferences.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD).value
 
         val hasBackgroundImage = userPreferences.useBackgroundImage.collectAsState(initial = false).value
 
         // Mutable state for editing
         var showFpsCounterInput by remember { mutableStateOf(showFpsCounter) }
         var keepScreenOnInput by remember { mutableStateOf(keepScreenOn) }
-        var summaryTokenThresholdInput by remember { mutableStateOf(summaryTokenThreshold) }
-        var contextLengthInput by remember { mutableStateOf(contextLength) }
-        
-        // Mutable state for Summary settings
-        var enableSummaryInput by remember { mutableStateOf(enableSummary) }
-        var enableSummaryByMessageCountInput by remember { mutableStateOf(enableSummaryByMessageCount) }
-        var summaryMessageCountThresholdInput by remember { mutableStateOf(summaryMessageCountThreshold) }
         
         var showSaveSuccessMessage by remember { mutableStateOf(false) }
 
         // Update local state when preferences change
-        LaunchedEffect(showFpsCounter, keepScreenOn, summaryTokenThreshold, contextLength, enableSummary, enableSummaryByMessageCount, summaryMessageCountThreshold) {
+        LaunchedEffect(showFpsCounter, keepScreenOn) {
                 showFpsCounterInput = showFpsCounter
                 keepScreenOnInput = keepScreenOn
-                summaryTokenThresholdInput = summaryTokenThreshold
-                contextLengthInput = contextLength
-                enableSummaryInput = enableSummary
-                enableSummaryByMessageCountInput = enableSummaryByMessageCount
-                summaryMessageCountThresholdInput = summaryMessageCountThreshold
         }
 
         val cardContainerColor = if (hasBackgroundImage) {
@@ -226,96 +208,11 @@ fun SettingsScreen(
                         icon = Icons.Default.Analytics,
                         containerColor = cardContainerColor
                 ) {
-                        // 上下文长度滑块
-                        CompactSlider(
-                                title = stringResource(id = R.string.settings_context_length),
-                                subtitle = stringResource(id = R.string.settings_context_length_subtitle),
-                                value = contextLengthInput,
-                                onValueChange = {
-                                        contextLengthInput = it
-                                        scope.launch {
-                                                apiPreferences.saveContextLength(it)
-                                                showSaveSuccessMessage = true
-                                        }
-                                },
-                                valueRange = 1f..1024f,
-                                steps = 1022,
-                                decimalFormatPattern = "#.#",
-                                unitText = "k",
-                                backgroundColor = componentBackgroundColor
-                        )
-
-                        // 总结令牌阈值滑块
-                        CompactSlider(
-                                title = stringResource(id = R.string.settings_summary_threshold),
-                                subtitle = stringResource(id = R.string.settings_summary_threshold_subtitle),
-                                value = summaryTokenThresholdInput,
-                                onValueChange = {
-                                        summaryTokenThresholdInput = it
-                                        scope.launch {
-                                                apiPreferences.saveSummaryTokenThreshold(it)
-                                                showSaveSuccessMessage = true
-                                        }
-                                },
-                                valueRange = 0.1f..0.95f,
-                                steps = 84,
-                                decimalFormatPattern = "#.##",
-                                backgroundColor = componentBackgroundColor
-                        )
-
-                        // 总结设置开关
-                        Column(
-                                modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(componentBackgroundColor)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                                CompactToggleWithDescription(
-                                        title = stringResource(id = R.string.settings_enable_summary),
-                                        description = stringResource(id = R.string.settings_enable_summary_desc),
-                                        checked = enableSummaryInput,
-                                        onCheckedChange = {
-                                                enableSummaryInput = it
-                                                scope.launch {
-                                                        apiPreferences.saveEnableSummary(it)
-                                                        showSaveSuccessMessage = true
-                                                }
-                                        }
-                                )
-                                Divider(modifier = Modifier.padding(vertical = 4.dp))
-                                CompactToggleWithDescription(
-                                        title = stringResource(id = R.string.settings_enable_summary_by_message_count),
-                                        description = stringResource(id = R.string.settings_enable_summary_by_message_count_desc),
-                                        checked = enableSummaryByMessageCountInput,
-                                        onCheckedChange = {
-                                                enableSummaryByMessageCountInput = it
-                                                scope.launch {
-                                                        apiPreferences.saveEnableSummaryByMessageCount(it)
-                                                        showSaveSuccessMessage = true
-                                                }
-                                        }
-                                )
-                        }
-
-                        // 消息条数阈值滑块
-                        CompactSlider(
-                                title = stringResource(id = R.string.settings_summary_message_count_threshold),
-                                subtitle = stringResource(id = R.string.settings_summary_message_count_threshold_subtitle),
-                                value = summaryMessageCountThresholdInput.toFloat(),
-                                onValueChange = {
-                                        summaryMessageCountThresholdInput = it.toInt()
-                                        scope.launch {
-                                                apiPreferences.saveSummaryMessageCountThreshold(it.toInt())
-                                                showSaveSuccessMessage = true
-                                        }
-                                },
-                                valueRange = 1f..20f,
-                                steps = 19,
-                                decimalFormatPattern = "#",
-                                unitText = "条",
-                                backgroundColor = componentBackgroundColor
+                        CompactSettingsItem(
+                                title = stringResource(id = R.string.settings_section_context_summary),
+                                subtitle = stringResource(id = R.string.settings_context_summary_subtitle),
+                                icon = Icons.Default.Tune,
+                                onClick = navigateToContextSummarySettings
                         )
                 }
 

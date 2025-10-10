@@ -8,6 +8,7 @@ import com.ai.assistance.operit.data.mcp.plugins.MCPBridgeClient
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
 
@@ -20,16 +21,23 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
         ToolExecutor {
     companion object {
         private const val TAG = "MCPToolExecutor"
-        private const val MAX_RESULT_LENGTH = 2000 // 最大返回长度，约2000个token
+    }
+
+    // ApiPreferences 实例，用于动态获取配置
+    private val apiPreferences: ApiPreferences by lazy {
+        ApiPreferences.getInstance(context)
     }
 
     /** 截断过长的结果字符串 */
-    private fun truncateResult(result: String): String {
-        if (result.length <= MAX_RESULT_LENGTH) {
+    private suspend fun truncateResult(result: String): String {
+        // 从配置中获取最大结果长度
+        val maxResultLength = apiPreferences.getMaxTextResultLength()
+        
+        if (result.length <= maxResultLength) {
             return result
         }
-        val truncated = result.substring(0, MAX_RESULT_LENGTH)
-        val remainingLength = result.length - MAX_RESULT_LENGTH
+        val truncated = result.substring(0, maxResultLength)
+        val remainingLength = result.length - maxResultLength
         return "$truncated\n\n[... 结果过长，已截断 $remainingLength 个字符。建议使用文件操作或分页查询。]"
     }
 
@@ -256,7 +264,7 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
                             // 成功：提取 result 字段并解析 content 数组
                             val resultData = response.optJSONObject("result")
                             val extractedContent = extractContentFromResult(resultData)
-                            val truncatedResult = truncateResult(extractedContent)
+                            val truncatedResult = kotlinx.coroutines.runBlocking { truncateResult(extractedContent) }
                             Log.d(TAG, "MCP工具调用成功: $serverName:$actualToolName")
                             ToolResult(
                                     toolName = tool.name,

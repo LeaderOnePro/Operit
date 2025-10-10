@@ -26,6 +26,7 @@ import com.ai.assistance.operit.ui.features.packages.screens.MCPManageScreen
 import com.ai.assistance.operit.ui.features.packages.screens.MCPPublishScreen
 import com.ai.assistance.operit.ui.features.packages.screens.MCPPluginDetailScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ChatHistorySettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.ContextSummarySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.FunctionalConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.LanguageSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ModelConfigScreen
@@ -303,7 +304,8 @@ sealed class Screen(
                     navigateToCustomHeadersSettings = { navigateTo(CustomHeadersSettings) },
                     navigateToPersonaCardGeneration = { navigateTo(PersonaCardGeneration) },
                     navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
-                    navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) }
+                    navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) },
+                    navigateToContextSummarySettings = { navigateTo(ContextSummarySettings) }
             )
         }
     }
@@ -693,6 +695,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             TokenUsageStatisticsScreen(onBackPressed = onGoBack)
+        }
+    }
+
+    data object ContextSummarySettings :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_context_summary_settings) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            ContextSummarySettingsScreen(onBackPressed = onGoBack)
         }
     }
 
