@@ -33,6 +33,157 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
         return "$truncated\n\n[... 结果过长，已截断 $remainingLength 个字符。建议使用文件操作或分页查询。]"
     }
 
+    /**
+     * 从 MCP 结果中提取内容
+     * 
+     * 解析 content 数组，智能识别并提取不同类型的内容：
+     * - text: 直接提取文本，如果是 JSON 字符串则尝试格式化
+     * - image: 显示图像信息
+     * - resource: 提取资源内容或显示资源信息
+     * 
+     * @param resultData MCP 返回的 result 对象
+     * @return 提取后的文本内容
+     */
+    private fun extractContentFromResult(resultData: JSONObject?): String {
+        if (resultData == null) {
+            return "{}"
+        }
+
+        // 提取 content 数组中的内容
+        val contentArray = resultData.optJSONArray("content")
+        val contentText =
+                if (contentArray != null && contentArray.length() > 0) {
+                    val extractedText = StringBuilder()
+                    for (i in 0 until contentArray.length()) {
+                        val contentItem = contentArray.optJSONObject(i) ?: continue
+                        val contentType = contentItem.optString("type", "text")
+
+                        when (contentType) {
+                            "text" -> {
+                                val text = contentItem.optString("text", "")
+                                val processedText =
+                                        if (isJsonString(text)) {
+                                            try {
+                                                formatJson(text)
+                                            } catch (e: Exception) {
+                                                text
+                                            }
+                                        } else {
+                                            text
+                                        }
+                                extractedText.append(processedText)
+                            }
+                            "image" -> {
+                                val mimeType = contentItem.optString("mimeType", "image/png")
+                                val data = contentItem.optString("data", "")
+                                val dataSize = data.length
+                                extractedText.append("[图像: $mimeType, 大小: $dataSize bytes]")
+                            }
+                            "resource" -> {
+                                val resource = contentItem.optJSONObject("resource")
+                                if (resource != null) {
+                                    val uri = resource.optString("uri", "")
+                                    val text = resource.optString("text")
+                                    if (text != null && text.isNotEmpty()) {
+                                        extractedText.append(text)
+                                    } else {
+                                        extractedText.append("[资源: $uri]")
+                                    }
+                                }
+                            }
+                            else -> {
+                                extractedText.append("[未知内容类型 '$contentType': ${contentItem}]")
+                            }
+                        }
+
+                        if (i < contentArray.length() - 1) {
+                            extractedText.append("\n")
+                        }
+                    }
+                    extractedText.toString()
+                } else {
+                    ""
+                }
+
+        // 提取元数据 (resultData 中除了 "content" 之外的所有字段)
+        val metadata = JSONObject()
+        val keys = resultData.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key != "content") {
+                metadata.put(key, resultData.get(key))
+            }
+        }
+
+        val metadataText = if (metadata.length() > 0) metadata.toString() else ""
+
+        // 组合元数据和内容
+        return when {
+            metadataText.isNotEmpty() && contentText.isNotEmpty() -> {
+                "$metadataText\n\n$contentText"
+            }
+            metadataText.isNotEmpty() -> metadataText
+            contentText.isNotEmpty() -> contentText
+            else -> resultData.toString() // fallback to original data if both are empty
+        }
+    }
+
+    /**
+     * 判断字符串是否为 JSON 格式
+     * 
+     * @param text 待判断的字符串
+     * @return 如果是 JSON 返回 true
+     */
+    private fun isJsonString(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        
+        // 检查是否以 JSON 对象或数组的标志开头和结尾
+        val isJsonObject = trimmed.startsWith("{") && trimmed.endsWith("}")
+        val isJsonArray = trimmed.startsWith("[") && trimmed.endsWith("]")
+        
+        if (!isJsonObject && !isJsonArray) return false
+        
+        // 尝试解析以确认
+        return try {
+            if (isJsonObject) {
+                JSONObject(trimmed)
+            } else {
+                org.json.JSONArray(trimmed)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 格式化 JSON 字符串为单行紧凑格式
+     * 
+     * @param jsonString JSON 字符串
+     * @return 紧凑格式的 JSON 字符串
+     */
+    private fun formatJson(jsonString: String): String {
+        val trimmed = jsonString.trim()
+        
+        return try {
+            if (trimmed.startsWith("{")) {
+                // JSON 对象
+                val jsonObject = JSONObject(trimmed)
+                jsonObject.toString()
+            } else if (trimmed.startsWith("[")) {
+                // JSON 数组
+                val jsonArray = org.json.JSONArray(trimmed)
+                jsonArray.toString()
+            } else {
+                jsonString
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "JSON 格式化失败: ${e.message}")
+            jsonString
+        }
+    }
+
     override fun invoke(tool: AITool): ToolResult {
         // 从工具名称中提取服务器名称和工具名称
         // 格式：服务器名称:工具名称
@@ -102,10 +253,10 @@ class MCPToolExecutor(private val context: Context, private val mcpManager: MCPM
                         val success = response.optBoolean("success", false)
                         
                         if (success) {
-                            // 成功：提取 result 字段
+                            // 成功：提取 result 字段并解析 content 数组
                             val resultData = response.optJSONObject("result")
-                            val resultString = resultData?.toString() ?: "{}"
-                            val truncatedResult = truncateResult(resultString)
+                            val extractedContent = extractContentFromResult(resultData)
+                            val truncatedResult = truncateResult(extractedContent)
                             Log.d(TAG, "MCP工具调用成功: $serverName:$actualToolName")
                             ToolResult(
                                     toolName = tool.name,

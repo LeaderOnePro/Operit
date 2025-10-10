@@ -7,7 +7,6 @@ import android.webkit.WebView
 import androidx.annotation.Keep
 import androidx.core.content.ContextCompat
 import com.ai.assistance.operit.core.tools.AIToolHandler
-import com.ai.assistance.operit.core.tools.BinaryResultData
 import com.ai.assistance.operit.core.tools.BooleanResultData
 import com.ai.assistance.operit.core.tools.IntResultData
 import com.ai.assistance.operit.core.tools.StringResultData
@@ -29,8 +28,8 @@ import kotlinx.serialization.builtins.serializer
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Rect
 import android.util.Base64
+import com.ai.assistance.operit.core.tools.BinaryResultData
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -66,6 +65,7 @@ class JsEngine(private val context: Context) {
         private const val TAG = "JsEngine"
         private const val TIMEOUT_SECONDS = 180L // 超时时间：3分钟
         private const val PRE_TIMEOUT_SECONDS = 175L // 提前5秒触发JavaScript端的超时保护
+        private const val ASYNC_PROMISE_TIMEOUT_SECONDS = 170L // Promise异步超时：170秒，比主超时稍短
         private const val BINARY_DATA_THRESHOLD = 32 * 1024 // 32KB
         private const val BINARY_HANDLE_PREFIX = "@binary_handle:"
     }
@@ -524,14 +524,14 @@ class JsEngine(private val context: Context) {
                     // 创建一个超时保护，确保非常长时间运行的Promise最终会被处理
                     const asyncTimeout = setTimeout(() => {
                         if (!window._hasCompleted) {
-                            console.log("Async Promise timeout reached after 45 seconds");
+                            console.log("Async Promise timeout reached after $ASYNC_PROMISE_TIMEOUT_SECONDS seconds");
                             // 尝试安全地完成执行
                             try {
                                 window._hasCompleted = true;
                                 // 创建超时结果
                                 const timeoutResult = {
                                     warning: "Operation timeout", 
-                                    result: "Promise did not resolve within the time limit"
+                                    result: "Promise did not resolve within the time limit ($ASYNC_PROMISE_TIMEOUT_SECONDS seconds)"
                                 };
                                 
                                 NativeInterface.setResult(JSON.stringify(timeoutResult));
@@ -540,7 +540,7 @@ class JsEngine(private val context: Context) {
                                 console.error("Error during timeout handling:", e);
                             }
                         }
-                    }, 45000); // 45秒后超时，比主超时稍短
+                    }, ${ASYNC_PROMISE_TIMEOUT_SECONDS * 1000}); // 比主超时稍短
                     
                     possiblePromise
                         .then(result => {
