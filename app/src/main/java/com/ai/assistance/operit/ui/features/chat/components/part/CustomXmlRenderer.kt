@@ -36,15 +36,15 @@ class CustomXmlRenderer(
 ) : XmlContentRenderer {
     // 定义渲染器能够处理的内置标签集合
     private val builtInTags =
-            setOf("think", "tool", "status", "plan_item", "plan_update", "tool_result", "html", "mood")
+            setOf("think", "thinking", "tool", "status", "tool_result", "html", "mood")
 
     @Composable
     override fun RenderXmlContent(xmlContent: String, modifier: Modifier, textColor: Color) {
         val trimmedContent = xmlContent.trim()
         val tagName = extractTagName(trimmedContent)
 
-        // 根据设置决定是否渲染 think 标签
-        if (tagName == "think" && !showThinkingProcess) {
+        // 根据设置决定是否渲染 think 和 thinking 标签
+        if ((tagName == "think" || tagName == "thinking") && !showThinkingProcess) {
             return
         }
 
@@ -67,7 +67,7 @@ class CustomXmlRenderer(
 
         // 根据新规则处理未闭合的标签
         if (!isXmlFullyClosed(trimmedContent)) {
-            if (tagName in builtInTags && tagName != "tool" && tagName != "think") {
+            if (tagName in builtInTags && tagName != "tool" && tagName != "think" && tagName != "thinking") {
                 // 是内置标签但未闭合，则不显示任何内容，等待其闭合
                 return
             } else if (!(tagName in builtInTags)) {
@@ -80,11 +80,10 @@ class CustomXmlRenderer(
         // 标签已正确闭合，根据标签名分发到对应的渲染函数
         when (tagName) {
             "think" -> renderThinkContent(trimmedContent, modifier, textColor)
+            "thinking" -> renderThinkContent(trimmedContent, modifier, textColor)
             "tool" -> renderToolRequest(trimmedContent, modifier, textColor)
             "tool_result" -> renderToolResult(trimmedContent, modifier, textColor)
             "status" -> renderStatus(trimmedContent, modifier, textColor)
-            "plan_item" -> renderPlanItem(trimmedContent, modifier, textColor)
-            "plan_update" -> renderPlanUpdate(trimmedContent, modifier, textColor)
             "html" -> renderHtmlContent(trimmedContent, modifier, textColor)
             "mood" -> renderMoodTag(trimmedContent, modifier, textColor)
             else -> fallback.RenderXmlContent(xmlContent, modifier, textColor)
@@ -146,11 +145,13 @@ class CustomXmlRenderer(
         return params
     }
 
-    /** 渲染 <think> 标签内容 */
+    /** 渲染 <think> 和 <thinking> 标签内容 */
     @Composable
     private fun renderThinkContent(content: String, modifier: Modifier, textColor: Color) {
-        val startTag = "<think>"
-        val endTag = "</think>"
+        // 检测使用的是哪个标签
+        val isThinkingTag = content.contains("<thinking")
+        val startTag = if (isThinkingTag) "<thinking>" else "<think>"
+        val endTag = if (isThinkingTag) "</thinking>" else "</think>"
         val startIndex = content.indexOf(startTag) + startTag.length
 
         // 提取思考内容，即使没有结束标签
@@ -372,58 +373,6 @@ class CustomXmlRenderer(
                     maxLines = if (statusType == "warning") 1 else Int.MAX_VALUE
             )
         }
-    }
-
-    /** 渲染计划项标签 <plan_item id="..." status="...">...</plan_item> */
-    @Composable
-    private fun renderPlanItem(content: String, modifier: Modifier, textColor: Color) {
-        // 提取计划ID和状态
-        val idRegex = "id=\"([^\"]+)\"".toRegex()
-        val statusRegex = "status=\"([^\"]+)\"".toRegex()
-
-        val idMatch = idRegex.find(content)
-        val statusMatch = statusRegex.find(content)
-
-        val planId = idMatch?.groupValues?.get(1) ?: "unknown"
-        val planStatus = statusMatch?.groupValues?.get(1)?.lowercase() ?: "todo"
-
-        // 提取计划内容
-        val planContent = extractContentFromXml(content, "plan_item")
-
-        // 使用CustomSimplePlanDisplay显示计划项
-        CustomSimplePlanDisplay(
-                id = planId,
-                status = planStatus,
-                content = planContent,
-                isUpdate = false,
-                modifier = modifier
-        )
-    }
-
-    /** 渲染计划更新标签 <plan_update id="..." status="...">...</plan_update> */
-    @Composable
-    private fun renderPlanUpdate(content: String, modifier: Modifier, textColor: Color) {
-        // 提取计划ID和状态
-        val idRegex = "id=\"([^\"]+)\"".toRegex()
-        val statusRegex = "status=\"([^\"]+)\"".toRegex()
-
-        val idMatch = idRegex.find(content)
-        val statusMatch = statusRegex.find(content)
-
-        val planId = idMatch?.groupValues?.get(1) ?: "unknown"
-        val planStatus = statusMatch?.groupValues?.get(1)?.lowercase() ?: "info"
-
-        // 提取更新内容
-        val updateContent = extractContentFromXml(content, "plan_update")
-
-        // 使用CustomSimplePlanDisplay显示计划更新
-        CustomSimplePlanDisplay(
-                id = planId,
-                status = planStatus,
-                content = updateContent,
-                isUpdate = true,
-                modifier = modifier
-        )
     }
 
     /** 渲染 <html> 标签内容 - 使用WebView渲染，支持完整的HTML/CSS功能 */

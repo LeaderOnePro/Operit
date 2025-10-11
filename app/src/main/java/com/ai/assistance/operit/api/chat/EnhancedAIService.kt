@@ -48,6 +48,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
 
 /**
  * Enhanced AI service that provides advanced conversational capabilities by integrating various
@@ -217,7 +218,7 @@ class EnhancedAIService private constructor(private val context: Context) {
     private val multiServiceManager = MultiServiceManager(context)
 
     // 添加ConversationService实例
-    private val conversationService = ConversationService(context)
+    private val conversationService = ConversationService(context, CustomEmojiRepository.getInstance(context))
 
     // 添加FileBindingService实例
     private val fileBindingService = FileBindingService(context)

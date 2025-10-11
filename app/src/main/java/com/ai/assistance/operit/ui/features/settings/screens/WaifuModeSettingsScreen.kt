@@ -18,11 +18,13 @@ import androidx.compose.ui.graphics.Color
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import kotlinx.coroutines.launch
+import com.ai.assistance.operit.ui.components.CustomScaffold
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WaifuModeSettingsScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToCustomEmoji: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -46,7 +48,7 @@ fun WaifuModeSettingsScreen(
         }
     }
 
-    Scaffold(
+    CustomScaffold(
 
     ) { paddingValues ->
         Column(
@@ -341,6 +343,45 @@ fun WaifuModeSettingsScreen(
                                 }
                             )
                         }
+                    }
+                }
+                
+                // 管理自定义表情入口
+                Card(
+                    onClick = onNavigateToCustomEmoji,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.manage_custom_emoji),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.custom_emoji_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                        
+                        Icon(
+                            Icons.Default.ArrowForward,
+                            contentDescription = stringResource(R.string.manage_custom_emoji),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }

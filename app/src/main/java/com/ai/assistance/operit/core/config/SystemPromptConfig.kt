@@ -276,8 +276,6 @@ object SystemPromptConfig {
 
         FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
 
-        PLANNING_MODE_SECTION
-
         $TOOL_USAGE_GUIDELINES_EN
 
         $PACKAGE_SYSTEM_GUIDELINES_EN
@@ -286,35 +284,6 @@ object SystemPromptConfig {
 
         $AVAILABLE_TOOLS_EN
         """.trimIndent()
-
-    /** Planning mode prompt section that will be inserted when planning feature is enabled */
-    val PLANNING_MODE_PROMPT =
-          """
-      PLANNING MODE GUIDELINES
-      Use plan items to track and manage complex multi-step tasks:
-
-      PLAN ITEM SYNTAX:
-      - Create: <plan_item id="auto-generated" status="todo">Task description</plan_item>
-      - Start: <plan_update id="item-id" status="in_progress"></plan_update>
-      - Complete: <plan_update id="item-id" status="completed">Optional message</plan_update>
-      - Fail: <plan_update id="item-id" status="failed">Reason</plan_update>
-      - Cancel: <plan_update id="item-id" status="cancelled">Reason</plan_update>
-
-      EXECUTION RULES:
-      - Execute plan items IN SEQUENCE only
-      - Start with the FIRST task, mark as "in_progress"
-      - ALWAYS send "in_progress" update BEFORE executing each plan item - no exceptions
-      - Complete current task before moving to next
-      - For failed tasks, either retry or explain reason for moving on
-
-      STATUS MANAGEMENT IN PLANNING MODE:
-      - Global task completion status (<status type="complete"></status>) should ONLY be used after all plan items are completed
-      - Use <status type="wait_for_user_need"></status> when user input is needed
-      - Always maintain plan item tags when using wait_for_user_need
-      - Tool calls, global task completion status, and waiting for user input status remain mutually exclusive - only use one at the end of each response
-
-      Update plan item status after each tool execution. Plan updates are displayed to users in a collapsible section.
-  """.trimIndent()
 
     /** Guidance for the AI on how to "think" using tags. */
     val THINKING_GUIDANCE_PROMPT =
@@ -343,8 +312,6 @@ object SystemPromptConfig {
         
         公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
         
-        PLANNING_MODE_SECTION
-        
         $TOOL_USAGE_GUIDELINES_CN
         
         $PACKAGE_SYSTEM_GUIDELINES_CN
@@ -352,35 +319,6 @@ object SystemPromptConfig {
         ACTIVE_PACKAGES_SECTION
         
         $AVAILABLE_TOOLS_CN
-    """.trimIndent()
-
-  /** 中文版本规划模式提示 */
-  val PLANNING_MODE_PROMPT_CN =
-          """
-        规划模式指南
-        使用计划项来跟踪和管理复杂的多步骤任务：
-        
-        计划项语法：
-        - 创建：<plan_item id="auto-generated" status="todo">任务描述</plan_item>
-        - 开始：<plan_update id="item-id" status="in_progress"></plan_update>
-        - 完成：<plan_update id="item-id" status="completed">可选消息</plan_update>
-        - 失败：<plan_update id="item-id" status="failed">原因</plan_update>
-        - 取消：<plan_update id="item-id" status="cancelled">原因</plan_update>
-        
-        执行规则：
-        - 只按顺序执行计划项
-        - 从第一个任务开始，标记为"in_progress"
-        - 在执行每个计划项之前必须发送"in_progress"更新 - 没有例外
-        - 完成当前任务后再进行下一个
-        - 对于失败的任务，要么重试，要么解释继续的原因
-        
-        计划模式中的状态管理：
-        - 全局任务完成标记<status type="complete"></status>只应在所有计划项完成后使用
-        - 在需要用户输入时使用<status type="wait_for_user_need"></status>
-        - 使用wait_for_user_need时始终维护计划项标签
-        - 工具调用、全局任务完成标记和等待用户输入标记仍然互斥，每次响应末尾只能使用其中一种
-        
-        每次工具执行后更新计划项状态。计划更新显示在用户可折叠的部分中。
     """.trimIndent()
 
     /** 中文版本的思考引导提示 */
@@ -447,20 +385,18 @@ object SystemPromptConfig {
   }
 
   /**
-   * Generates the system prompt with dynamic package information and planning mode if enabled
+   * Generates the system prompt with dynamic package information
    *
    * @param packageManager The PackageManager instance to get package information from
    * @param workspacePath The current workspace path, if available.
-   * @param enablePlanning Whether planning mode is enabled
    * @param useEnglish Whether to use English or Chinese version
    * @param thinkingGuidance Whether thinking guidance is enabled
    * @param customSystemPromptTemplate Custom system prompt template (empty means use built-in)
-   * @return The complete system prompt with package information and planning details if enabled
+   * @return The complete system prompt with package information
    */
   fun getSystemPrompt(
           packageManager: PackageManager,
           workspacePath: String? = null,
-          enablePlanning: Boolean = false,
           useEnglish: Boolean = false,
           thinkingGuidance: Boolean = false,
           customSystemPromptTemplate: String = ""
@@ -505,7 +441,6 @@ object SystemPromptConfig {
     } else {
         if (useEnglish) SYSTEM_PROMPT_TEMPLATE else SYSTEM_PROMPT_TEMPLATE_CN
     }
-    val planningPromptToUse = if (useEnglish) PLANNING_MODE_PROMPT else PLANNING_MODE_PROMPT_CN
     val thinkingGuidancePromptToUse = if (useEnglish) THINKING_GUIDANCE_PROMPT else THINKING_GUIDANCE_PROMPT_CN
 
     // Generate workspace guidelines
@@ -515,14 +450,6 @@ object SystemPromptConfig {
     var prompt = templateToUse
         .replace("ACTIVE_PACKAGES_SECTION", packagesSection.toString())
         .replace("WEB_WORKSPACE_GUIDELINES_SECTION", workspaceGuidelines)
-
-    // Add planning mode section if enabled
-    prompt =
-            if (enablePlanning) {
-              prompt.replace("PLANNING_MODE_SECTION", planningPromptToUse)
-            } else {
-              prompt.replace("PLANNING_MODE_SECTION", "")
-            }
             
     // Add thinking guidance section if enabled
     prompt =
@@ -581,27 +508,24 @@ object SystemPromptConfig {
   }
 
   /**
-   * Generates the system prompt with dynamic package information, planning mode, and custom prompts
+   * Generates the system prompt with dynamic package information and custom prompts
    *
    * @param packageManager The PackageManager instance to get package information from
    * @param workspacePath The current workspace path, if available.
-   * @param enablePlanning Whether planning mode is enabled
    * @param customIntroPrompt Custom introduction prompt text
    * @param thinkingGuidance Whether thinking guidance is enabled
    * @param customSystemPromptTemplate Custom system prompt template (empty means use built-in)
-   * @return The complete system prompt with custom prompts, package information and planning
-   * details
+   * @return The complete system prompt with custom prompts and package information
    */
   fun getSystemPromptWithCustomPrompts(
           packageManager: PackageManager,
           workspacePath: String?,
-          enablePlanning: Boolean = false,
           customIntroPrompt: String,
           thinkingGuidance: Boolean = false,
           customSystemPromptTemplate: String = ""
   ): String {
     // Get the base system prompt
-    val basePrompt = getSystemPrompt(packageManager, workspacePath, enablePlanning, false, thinkingGuidance, customSystemPromptTemplate)
+    val basePrompt = getSystemPrompt(packageManager, workspacePath, false, thinkingGuidance, customSystemPromptTemplate)
 
     // Apply custom prompts
     return applyCustomPrompts(basePrompt, customIntroPrompt)
@@ -609,6 +533,6 @@ object SystemPromptConfig {
 
   /** Original method for backward compatibility */
   fun getSystemPrompt(packageManager: PackageManager): String {
-    return getSystemPrompt(packageManager, null, false)
+    return getSystemPrompt(packageManager, null, false, false)
   }
 }

@@ -36,10 +36,14 @@ import org.json.JSONObject
 import com.ai.assistance.operit.core.tools.ComputerDesktopActionResultData
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
 
 
 /** 处理会话相关功能的服务类，包括会话总结、偏好处理和对话切割准备 */
-class ConversationService(private val context: Context) {
+class ConversationService(
+    private val context: Context,
+    private val customEmojiRepository: CustomEmojiRepository
+    ) {
 
     companion object {
         private const val TAG = "ConversationService"
@@ -167,9 +171,6 @@ class ConversationService(private val context: Context) {
                 val activeProfile = preferencesManager.getUserPreferencesFlow().first()
                 val preferencesText = buildPreferencesText(activeProfile)
 
-                // Check if planning is enabled
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-
                 // 根据功能类型获取对应的提示词
                 val activeCard = characterCardManager.activeCharacterCardFlow.first()
                 val systemTagId =
@@ -194,7 +195,6 @@ class ConversationService(private val context: Context) {
                         SystemPromptConfig.getSystemPromptWithCustomPrompts(
                         packageManager,
                         workspacePath,
-                        planningEnabled,
                         introPrompt,
                                 thinkingGuidance,
                                 finalCustomSystemPromptTemplate
@@ -656,7 +656,21 @@ class ConversationService(private val context: Context) {
         }
         
         if (waifuEnableEmoticons) {
-            waifuRules.add("**表达情绪规则：你必须在每个句末判断句中包含的情绪或增强语气，并使用<emotion>标签在句末插入情绪状态。后续会根据情绪生成表情包。可用情绪包括：crying, like_you, happy, surprised, miss_you, speechless, angry, confused, sad。例如：<emotion>happy</emotion>、<emotion>miss_you</emotion>等。如果没有这些情绪则不插入。**")
+            // 动态获取当前可用的表情分组
+            val availableCategories = try {
+                customEmojiRepository.getAllCategories().first()
+            } catch (e: Exception) {
+                android.util.Log.e("ConversationService", "获取表情分组失败", e)
+                emptyList()
+            }
+            
+            if (availableCategories.isNotEmpty()) {
+                val emotionListText = availableCategories.joinToString(", ")
+                waifuRules.add("**表达情绪规则：你必须在每个句末判断句中包含的情绪或增强语气，并使用<emotion>标签在句末插入情绪状态。后续会根据情绪生成表情包。可用情绪包括：$emotionListText。例如：<emotion>happy</emotion>、<emotion>miss_you</emotion>等。如果没有这些情绪则不插入。**")
+            } else {
+                // 如果没有自定义表情，则不添加情绪规则，或明确告知没有可用表情
+                waifuRules.add("**当前没有可用的自定义表情，请不要使用<emotion>标签。**")
+            }
         }
         
         if (waifuEnableSelfie) {

@@ -567,6 +567,27 @@ sealed class Screen(
             onGestureConsumed: (Boolean) -> Unit
         ) {
             com.ai.assistance.operit.ui.features.settings.screens.WaifuModeSettingsScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToCustomEmoji = { navigateTo(CustomEmojiManagement) }
+            )
+        }
+    }
+    
+    // 自定义表情管理页面
+    data object CustomEmojiManagement :
+        Screen(parentScreen = WaifuModeSettings, navItem = NavItem.Settings, titleRes = R.string.manage_custom_emoji) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            com.ai.assistance.operit.ui.features.settings.screens.CustomEmojiManagementScreen(
                 onNavigateBack = onGoBack
             )
         }

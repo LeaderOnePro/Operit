@@ -22,6 +22,7 @@ import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.initAndroidPermissionPreferences
 import com.ai.assistance.operit.data.preferences.initUserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
 import com.ai.assistance.operit.services.EmbeddingService
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.language.LanguageFactory
@@ -29,6 +30,7 @@ import com.ai.assistance.operit.util.GlobalExceptionHandler
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.util.SerializationSetup
 import com.ai.assistance.operit.util.TextSegmenter
+import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +106,11 @@ class OperitApplication : Application() {
             CharacterCardManager.getInstance(applicationContext).initializeIfNeeded()
         }
 
+        // 初始化自定义表情
+        applicationScope.launch {
+            CustomEmojiRepository.getInstance(applicationContext).initializeBuiltinEmojis()
+        }
+
         // 在最早时机初始化并应用语言设置
         initializeAppLanguage()
 
@@ -118,6 +125,9 @@ class OperitApplication : Application() {
 
         // 初始化TextSegmenter
         applicationScope.launch { TextSegmenter.initialize(applicationContext) }
+        
+        // Initialize WaifuMessageProcessor
+        WaifuMessageProcessor.initialize(applicationContext)
 
         // 预加载数据库
         applicationScope.launch {

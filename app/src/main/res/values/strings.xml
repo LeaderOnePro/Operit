@@ -2847,4 +2847,21 @@
     <string name="settings_summary_title">总结设置</string>
     <string name="settings_context_summary_subtitle">管理上下文长度、总结和截断设置</string>
 
+    <!-- Custom Emoji Management -->
+    <string name="manage_custom_emoji">管理自定义表情</string>
+    <string name="add_emoji">添加表情</string>
+    <string name="delete_emoji">删除表情</string>
+    <string name="create_category">新建类别</string>
+    <string name="delete_category">删除类别</string>
+    <string name="category_name">类别名称</string>
+    <string name="category_name_hint">只能包含小写字母、数字和下划线</string>
+    <string name="select_category">选择类别</string>
+    <string name="confirm_delete_category">确认删除类别"%1$s"及其所有表情吗？</string>
+    <string name="confirm_delete_emoji">确认删除此表情吗？</string>
+    <string name="custom_emoji_desc">添加您喜欢的表情图片，AI将在Waifu模式中使用它们</string>
+    <string name="emoji_added_success">成功添加 %1$d 个表情</string>
+    <string name="emoji_deleted_success">表情已删除</string>
+    <string name="category_created">类别已创建</string>
+    <string name="invalid_category_name">类别名称只能包含小写字母、数字和下划线</string>
+
 </resources>
