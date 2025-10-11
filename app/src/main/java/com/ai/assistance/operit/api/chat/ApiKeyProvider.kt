@@ -21,7 +21,7 @@ interface ApiKeyProvider {
  */
 class SingleApiKeyProvider(private val apiKey: String) : ApiKeyProvider {
     override suspend fun getApiKey(): String {
-        Log.d("ApiKeyProvider", "Using single API key: sk-...${apiKey.takeLast(4)}")
+        Log.d("ApiKeyProvider", "Using single API key: ${apiKey.take(4)}...${apiKey.takeLast(4)}")
         return apiKey
     }
 }

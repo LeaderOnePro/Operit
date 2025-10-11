@@ -2407,6 +2407,7 @@
     <string name="provider_siliconflow">硅基流动</string>
     <string name="provider_openrouter">OpenRouter (多模型聚合)</string>
     <string name="provider_infiniai">无问芯穹</string>
+    <string name="provider_alipay_bailing">支付宝百灵大模型</string>
     <string name="provider_lmstudio">LM Studio</string>
     <string name="provider_other">其他提供商</string>
     <string name="select_api_provider_title">选择API提供商</string>

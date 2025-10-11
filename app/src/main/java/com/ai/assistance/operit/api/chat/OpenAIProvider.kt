@@ -379,8 +379,9 @@ open class OpenAIProvider(
                                         return@forEach
                                     }
 
-                                    if (line.startsWith("data: ")) {
-                                        val data = line.substring(6).trim()
+                                    // 兼容 "data:" 和 "data: " 两种格式
+                                    if (line.startsWith("data:")) {
+                                        val data = line.substring(5).trim() // 跳过 "data:"
                                         if (data != "[DONE]") {
                                             chunkCount++
                                             // 每10个块或500ms记录一次日志
@@ -402,6 +403,7 @@ open class OpenAIProvider(
                                                     // 处理delta格式（流式响应）
                                                     val delta = choice.optJSONObject("delta")
                                                     if (delta != null) {
+                                                        Log.d("AIService", "【调试】收到delta: $delta")
                                                         // 检查是否有思考内容
                                                         val reasoningContent =
                                                                 delta.optString(
@@ -410,6 +412,7 @@ open class OpenAIProvider(
                                                                 )
                                                         val regularContent =
                                                                 delta.optString("content", "")
+                                                        Log.d("AIService", "【调试】解析内容 - reasoning: '$reasoningContent', regular: '$regularContent'")
 
                                                         // 处理思考内容
                                                         if (reasoningContent.isNotEmpty() &&

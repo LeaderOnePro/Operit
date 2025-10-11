@@ -72,6 +72,7 @@ fun ModelApiSettingsSection(
             ApiProviderType.SILICONFLOW -> "yi-1.5-34b"
             ApiProviderType.OPENROUTER -> "google/gemini-pro"
             ApiProviderType.INFINIAI -> "infini-mini"
+            ApiProviderType.ALIPAY_BAILING -> "Ling-1T"
             ApiProviderType.LMSTUDIO -> "meta-llama-3.1-8b-instruct"
             ApiProviderType.OTHER -> ""
         }
@@ -107,6 +108,7 @@ fun ModelApiSettingsSection(
             ApiProviderType.SILICONFLOW -> "https://api.siliconflow.cn/v1/chat/completions"
             ApiProviderType.OPENROUTER -> "https://openrouter.ai/api/v1/chat/completions"
             ApiProviderType.INFINIAI -> "https://cloud.infini-ai.com/maas/v1/chat/completions"
+            ApiProviderType.ALIPAY_BAILING -> "https://api.tbox.cn/api/llm/v1/chat/completions"
             ApiProviderType.LMSTUDIO -> "http://localhost:1234/v1/chat/completions"
             ApiProviderType.OTHER -> ""
         }
@@ -751,6 +753,7 @@ private fun getProviderDisplayName(provider: ApiProviderType, context: android.c
         ApiProviderType.SILICONFLOW -> context.getString(R.string.provider_siliconflow)
         ApiProviderType.OPENROUTER -> context.getString(R.string.provider_openrouter)
         ApiProviderType.INFINIAI -> context.getString(R.string.provider_infiniai)
+        ApiProviderType.ALIPAY_BAILING -> context.getString(R.string.provider_alipay_bailing)
         ApiProviderType.LMSTUDIO -> context.getString(R.string.provider_lmstudio)
         ApiProviderType.OTHER -> context.getString(R.string.provider_other)
     }
@@ -901,7 +904,8 @@ private fun getProviderColor(provider: ApiProviderType): androidx.compose.ui.gra
         ApiProviderType.SILICONFLOW -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
         ApiProviderType.OPENROUTER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
         ApiProviderType.INFINIAI -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-        ApiProviderType.LMSTUDIO -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
-        ApiProviderType.OTHER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        ApiProviderType.ALIPAY_BAILING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+        ApiProviderType.LMSTUDIO -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        ApiProviderType.OTHER -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
     }
 }
