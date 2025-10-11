@@ -62,6 +62,18 @@ class TokenCacheManager {
     }
     
     /**
+     * 使用API返回的实际token数据更新计数
+     * 用于Gemini等支持服务端缓存统计的API
+     * 
+     * @param actualInput 实际的输入token数量（不包括缓存）
+     * @param cachedInput 缓存命中的token数量
+     */
+    fun updateActualTokens(actualInput: Int, cachedInput: Int) {
+        _currentInputTokenCount = actualInput
+        _cachedInputTokenCount = cachedInput
+    }
+    
+    /**
      * 计算输入token数量，利用缓存优化重复计算
      * 
      * @param message 当前用户消息

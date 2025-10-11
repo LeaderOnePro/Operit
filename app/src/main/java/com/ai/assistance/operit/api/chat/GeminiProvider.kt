@@ -137,15 +137,40 @@ class GeminiProvider(
             tokenCount += ChatUtils.estimateTokenCount(content)
         }
 
-        // Add current user message
-        val userContentObject = JSONObject().apply {
-            put("role", "user")
-            put("parts", JSONArray().apply {
-                put(JSONObject().apply { put("text", message) })
-            })
+        // Add current user message (with duplicate prevention like OpenAIProvider)
+        val lastMessageRole = if (contentsArray.length() > 0) {
+            contentsArray.getJSONObject(contentsArray.length() - 1).getString("role")
+        } else null
+
+        if (lastMessageRole != "user") {
+            // Last message is not user, safe to add
+            val userContentObject = JSONObject().apply {
+                put("role", "user")
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", message) })
+                })
+            }
+            contentsArray.put(userContentObject)
+            tokenCount += ChatUtils.estimateTokenCount(message)
+        } else {
+            // Last message is already user, check if it's the same message
+            val lastMessage = contentsArray.getJSONObject(contentsArray.length() - 1)
+            val lastParts = lastMessage.getJSONArray("parts")
+            val lastText = if (lastParts.length() > 0) {
+                lastParts.getJSONObject(0).optString("text", "")
+            } else ""
+            
+            if (lastText != message) {
+                // Different message, combine them
+                val combinedText = "$lastText\n$message"
+                lastParts.getJSONObject(0).put("text", combinedText)
+                tokenCount += ChatUtils.estimateTokenCount(message)
+                logDebug("合并连续的user消息")
+            } else {
+                // Same message, skip adding (already in history)
+                logDebug("跳过重复的user消息")
+            }
         }
-        contentsArray.put(userContentObject)
-        tokenCount += ChatUtils.estimateTokenCount(message)
 
         return Pair(Pair(contentsArray, systemInstruction), tokenCount)
     }
@@ -766,6 +791,29 @@ class GeminiProvider(
                             tokenCacheManager.totalInputTokenCount,
                             tokenCacheManager.cachedInputTokenCount,
                             tokenCacheManager.outputTokenCount
+                    )
+                }
+            }
+
+            // 提取实际的token使用数据
+            val usageMetadata = json.optJSONObject("usageMetadata")
+            if (usageMetadata != null) {
+                val promptTokenCount = usageMetadata.optInt("promptTokenCount", 0)
+                val cachedContentTokenCount = usageMetadata.optInt("cachedContentTokenCount", 0)
+                val candidatesTokenCount = usageMetadata.optInt("candidatesTokenCount", 0)
+                
+                if (promptTokenCount > 0) {
+                    // 更新实际的token计数
+                    val actualInputTokens = promptTokenCount - cachedContentTokenCount
+                    tokenCacheManager.updateActualTokens(actualInputTokens, cachedContentTokenCount)
+                    
+                    logDebug("API实际Token使用: 输入=$actualInputTokens, 缓存=$cachedContentTokenCount, 输出=$candidatesTokenCount")
+                    
+                    // 更新回调，使用实际的token统计
+                    onTokensUpdated(
+                        promptTokenCount,
+                        cachedContentTokenCount,
+                        candidatesTokenCount
                     )
                 }
             }
