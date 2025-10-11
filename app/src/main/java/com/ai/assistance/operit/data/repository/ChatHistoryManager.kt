@@ -484,19 +484,33 @@ class ChatHistoryManager private constructor(private val context: Context) {
     }
 
     // 创建新对话
-    suspend fun createNewChat(group: String? = null): ChatHistory {
+    suspend fun createNewChat(group: String? = null, inheritGroupFromChatId: String? = null): ChatHistory {
         val dateTime = LocalDateTime.now()
         val formattedTime =
                 "${dateTime.hour}:${dateTime.minute.toString().padStart(2, '0')}:${dateTime.second.toString().padStart(2, '0')}"
 
         val localizedContext = LocaleUtils.getLocalizedContext(context)
+        
+        // 确定新对话的分组
+        val finalGroup = when {
+            // 如果显式指定了分组，使用指定的分组
+            group != null -> group
+            // 如果要继承分组，尝试从指定的对话获取分组
+            inheritGroupFromChatId != null -> {
+                chatDao.getChatById(inheritGroupFromChatId)?.group
+                    ?: localizedContext.getString(R.string.ungrouped)
+            }
+            // 默认使用未分组
+            else -> localizedContext.getString(R.string.ungrouped)
+        }
+        
         val newHistory =
                 ChatHistory(
                         title = "${localizedContext.getString(R.string.new_conversation)} $formattedTime",
                         messages = listOf<ChatMessage>(),
                         inputTokens = 0,
                         outputTokens = 0,
-                        group = group ?: localizedContext.getString(R.string.ungrouped) // 默认分组
+                        group = finalGroup
                 )
 
         // 保存新聊天

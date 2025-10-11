@@ -124,7 +124,11 @@ class ChatHistoryDelegate(
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize) // 使用获取到的完整统计数据
 
-            val newChat = chatHistoryManager.createNewChat()
+            // 获取当前对话ID，以便继承分组
+            val currentChatId = _currentChatId.value
+            
+            // 创建新对话，如果有当前对话则继承其分组
+            val newChat = chatHistoryManager.createNewChat(inheritGroupFromChatId = currentChatId)
             _currentChatId.value = newChat.id
             
             // --- 新增：检查并添加开场白 ---

@@ -403,7 +403,6 @@ open class OpenAIProvider(
                                                     // 处理delta格式（流式响应）
                                                     val delta = choice.optJSONObject("delta")
                                                     if (delta != null) {
-                                                        Log.d("AIService", "【调试】收到delta: $delta")
                                                         // 检查是否有思考内容
                                                         val reasoningContent =
                                                                 delta.optString(
@@ -412,7 +411,6 @@ open class OpenAIProvider(
                                                                 )
                                                         val regularContent =
                                                                 delta.optString("content", "")
-                                                        Log.d("AIService", "【调试】解析内容 - reasoning: '$reasoningContent', regular: '$regularContent'")
 
                                                         // 处理思考内容
                                                         if (reasoningContent.isNotEmpty() &&

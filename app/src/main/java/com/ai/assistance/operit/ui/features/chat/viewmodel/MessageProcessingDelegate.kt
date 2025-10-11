@@ -109,8 +109,8 @@ class MessageProcessingDelegate(
         _inputProcessingState.value = EnhancedInputProcessingState.Processing("正在处理消息...")
 
         viewModelScope.launch(Dispatchers.IO) {
-            // 检查这是否是聊天中的第一条用户消息
-            val isFirstMessage = getChatHistory().none { it.sender == "user" || it.sender == "ai" }
+            // 检查这是否是聊天中的第一条用户消息（忽略AI的开场白）
+            val isFirstMessage = getChatHistory().none { it.sender == "user" }
             if (isFirstMessage && chatId != null) {
                 val newTitle =
                     when {

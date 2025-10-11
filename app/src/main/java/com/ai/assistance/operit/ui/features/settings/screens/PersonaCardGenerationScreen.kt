@@ -73,8 +73,10 @@ private object LocalCharacterToolExecutor {
                 "name" -> currentCard.copy(name = content)
                 "description" -> currentCard.copy(description = content)
                 "characterSetting" -> currentCard.copy(characterSetting = content)
+                "openingStatement" -> currentCard.copy(openingStatement = content)
                 "otherContent" -> currentCard.copy(otherContent = content)
                 "advancedCustomPrompt" -> currentCard.copy(advancedCustomPrompt = content)
+                "marks" -> currentCard.copy(marks = content)
                 else -> {
                     return com.ai.assistance.operit.data.model.ToolResult(
                         toolName = TOOL_NAME,
@@ -161,40 +163,75 @@ fun PersonaCardGenerationScreen(
     var editName by remember { mutableStateOf("") }
     var editDescription by remember { mutableStateOf("") }
     var editCharacterSetting by remember { mutableStateOf("") }
+    var editOpeningStatement by remember { mutableStateOf("") }
     var editOtherContent by remember { mutableStateOf("") }
     var editAdvancedCustomPrompt by remember { mutableStateOf("") }
+    var editMarks by remember { mutableStateOf("") }
 
-    // 初始化数据
+    // 1. 一次性初始化：加载所有卡片和标签，并确定初始活跃卡片ID
     LaunchedEffect(Unit) {
-        if (chatMessages.isEmpty()) {
-            chatMessages.add(
-                CharacterChatMessage("assistant", characterAssistantIntro)
-        )
-        }
-        
         withContext(Dispatchers.IO) {
             characterCardManager.initializeIfNeeded()
-            allCharacterCards = characterCardManager.getAllCharacterCards()
+            val cards = characterCardManager.getAllCharacterCards()
+            allCharacterCards = cards
             allTags = tagManager.getAllTags()
 
-            activeCardId = characterCardManager.activeCharacterCardIdFlow.first()
-            activeCard = characterCardManager.getCharacterCard(activeCardId)
+            var currentId = characterCardManager.activeCharacterCardIdFlow.first()
 
-            // 如果没有活跃卡，并且列表不为空，则设置第一个为活跃
-            if (activeCard == null && allCharacterCards.isNotEmpty()) {
-                val firstCardId = allCharacterCards.first().id
+            // 如果记录的活跃ID无效（例如卡被删除），则默认使用第一张卡
+            if (characterCardManager.getCharacterCard(currentId) == null && cards.isNotEmpty()) {
+                val firstCardId = cards.first().id
                 characterCardManager.setActiveCharacterCard(firstCardId)
-                activeCardId = firstCardId
-                activeCard = characterCardManager.getCharacterCard(firstCardId)
+                currentId = firstCardId
+            }
+
+            // 在主线程更新 activeCardId 以触发后续的 Effect
+            withContext(Dispatchers.Main) {
+                activeCardId = currentId
             }
         }
-        
-        activeCard?.let { card ->
-            editName = card.name
-            editDescription = card.description
-            editCharacterSetting = card.characterSetting
-            editOtherContent = card.otherContent
-            editAdvancedCustomPrompt = card.advancedCustomPrompt
+    }
+
+    // 2. 响应式效果：当 activeCardId 变化时（初始化或切换），加载卡片详情并重置对话
+    LaunchedEffect(activeCardId) {
+        if (activeCardId.isBlank()) {
+            // 没有活跃卡片的情况
+            activeCard = null
+            editName = ""; editDescription = ""; editCharacterSetting = ""; editOpeningStatement = ""
+            editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
+            chatMessages.clear()
+            chatMessages.add(CharacterChatMessage("assistant", "请在侧边栏选择或创建一个角色卡以开始。"))
+            return@LaunchedEffect
+        }
+
+        withContext(Dispatchers.IO) {
+            val card = characterCardManager.getCharacterCard(activeCardId)
+            withContext(Dispatchers.Main) {
+                activeCard = card
+
+                // 更新编辑器内容
+                card?.let {
+                    editName = it.name
+                    editDescription = it.description
+                    editCharacterSetting = it.characterSetting
+                    editOpeningStatement = it.openingStatement
+                    editOtherContent = it.otherContent
+                    editAdvancedCustomPrompt = it.advancedCustomPrompt
+                    editMarks = it.marks
+                } ?: run {
+                    // 如果卡片加载失败，则清空编辑器
+                    editName = ""; editDescription = ""; editCharacterSetting = ""; editOpeningStatement = ""
+                    editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
+                }
+
+                // 为新卡片重置聊天记录
+                chatMessages.clear()
+                chatMessages.add(CharacterChatMessage("assistant",
+                    "🎭 欢迎使用角色卡生成助手！\n\n" +
+                    "我们现在来编辑 '${card?.name ?: "新角色"}' 吧！\n" +
+                    "请告诉我你想创建什么角色，或者想修改哪个部分？"
+                ))
+            }
         }
     }
 
@@ -209,31 +246,87 @@ fun PersonaCardGenerationScreen(
                     editName = card.name
                     editDescription = card.description
                     editCharacterSetting = card.characterSetting
+                    editOpeningStatement = card.openingStatement
                     editOtherContent = card.otherContent
                     editAdvancedCustomPrompt = card.advancedCustomPrompt
+                    editMarks = card.marks
                 }
             }
         }
     }
 
+    // 构建稳定的系统提示词
+    fun buildSystemPrompt(): String {
+        return """
+            你是"角色卡生成助手"。请严格按照以下流程进行角色卡生成：
+            
+            [生成流程]
+            1) 角色名称：询问并确认角色名称
+            2) 角色描述：简短的角色描述
+            3) 角色设定：详细的角色设定，包括身份、外貌、性格等
+            4) 开场白：角色的第一句话或开场白，用于开始对话时的问候语
+            5) 其他内容：背景故事、特殊能力等补充信息
+            6) 高级自定义：特殊的提示词或交互方式
+            7) 备注：不会被拼接到提示词的备注信息，用于记录创作想法或注意事项
+            
+            [重要规则]
+            - 全程语气要活泼可爱喵~
+            - 严格按照 1→2→3→4→5→6→7 的顺序进行，不要跳跃
+            - 每轮对话只能处理一个步骤，完成后进入下一步
+            - 如果用户输入了角色设定，对其进行适当优化与丰富
+            - 如果用户说"随便/你看着写"，就帮用户体贴地生成设定内容
+            - 生成或补充完后，用一小段话总结当前进度
+            - 对于下一个步骤提几个最关键、最具体的小问题
+            - 不要重复问已经确认过的内容
+            
+            [完成条件]
+            - 当所有7个步骤都完成时，输出："🎉 角色卡生成完成！所有信息都已保存。"
+            - 完成后不再询问任何问题，等待用户的新指令
+            
+            [工具调用]
+            - 每轮对话如果得到了新的角色信息，必须调用工具保存
+            - field 取值："name" | "description" | "characterSetting" | "openingStatement" | "otherContent" | "advancedCustomPrompt" | "marks"
+            - 工具调用格式为: <tool name="save_character_info"><param name="field">字段名</param><param name="content">内容</param></tool>
+            - 例如，如果角色名称确认是“奶糖”，则必须在回答的末尾调用: <tool name="save_character_info"><param name="field">name</param><param name="content">奶糖</param></tool>
+        """.trimIndent()
+    }
+    
+    // 检查是否所有字段都已完成
+    fun isCharacterCardComplete(): Boolean {
+        return activeCard?.let { card ->
+            listOf(
+                card.name,
+                card.description, 
+                card.characterSetting,
+                card.openingStatement,
+                card.otherContent,
+                card.advancedCustomPrompt,
+                card.marks
+            ).all { it.isNotBlank() }
+        } ?: false
+    }
+
     // 通过默认底层 AIService 发送消息
     suspend fun requestFromDefaultService(
-        fullPrompt: String,
-        historyPairs: List<Pair<String, String>>
+        prompt: String,
+        historyPairs: List<Pair<String, String>>,
+        systemPrompt: String? = null
     ): com.ai.assistance.operit.util.stream.Stream<String> = withContext(Dispatchers.IO) {
         val aiService = com.ai.assistance.operit.api.chat.EnhancedAIService
             .getInstance(context)
             .getAIServiceForFunction(FunctionType.CHAT)
         val functionalConfigManager = com.ai.assistance.operit.data.preferences.FunctionalConfigManager(context)
         functionalConfigManager.initializeIfNeeded()
-        val configId = functionalConfigManager.getConfigIdForFunction(FunctionType.CHAT)
-        val modelParameters = com.ai.assistance.operit.data.preferences.ModelConfigManager(context)
-            .getModelParametersForConfig(configId)
+
+        val fullHistory = mutableListOf<Pair<String, String>>()
+        if (systemPrompt != null) {
+            fullHistory.add("system" to systemPrompt)
+        }
+        fullHistory.addAll(historyPairs)
+
         aiService.sendMessage(
-            message = fullPrompt,
-            chatHistory = historyPairs,
-            modelParameters = modelParameters,
-            enableThinking = false
+            message = prompt,
+            chatHistory = fullHistory
         )
     }
 
@@ -286,57 +379,23 @@ fun PersonaCardGenerationScreen(
             chatMessages.add(CharacterChatMessage("user", input))
             isGenerating = true
 
-            val guidancePrefix = """
-                你是"角色卡生成助手"。请在每次回复中自行判断当前进度并进入还没完成的步骤，遵循以下多步流程：
-                [步骤]
-                1) 角色名称：询问并确认角色名称
-                2) 角色描述：简短的角色描述
-                3) 角色设定：详细的角色设定，包括身份、外貌、性格等
-                4) 其他内容：背景故事、特殊能力等补充信息
-                5) 高级自定义：特殊的提示词或交互方式
-                [规则]
-                - 全程语气要活泼可爱喵~
-                - 每轮对话如果用户输入了角色设定就对其进行适当优化与丰富，然后用一小段话总结当前的进度
-                - 如果用户说"随便/你看着写"，就帮用户体贴地生成设定内容，合理细节并输出生成的内容
-                - 生成或者补充完之后判断现在到哪一步或者还有什么需要补充的，然后对于下一个步骤提几个最关键、最具体的小问题
-                - 不要重复问已经确认过的内容，也不要一下子把所有问题都问完，慢慢来更贴心
-                [工具调用]
-                - 每轮对话必须进行判断，如果本轮对话得到了新的角色信息，你必须调用一次工具保存信息
-                - field 取值限定为："name" | "description" | "characterSetting" | "otherContent" | "advancedCustomPrompt"
-                - content 该部分对应的优化丰富后的设定文本，不要带有其他多余内容
-                - 请勿在对话可见内容中展示任何工具调用，仅在内部使用
-                - 工具调用XML示例：
-                  <tool name="save_character_info"><param name="field">name</param><param name="content">角色名称</param></tool>
-            """.trimIndent()
+            // 检查是否已完成，如果已完成则直接结束
+            if (isCharacterCardComplete()) {
+                chatMessages.add(CharacterChatMessage("assistant", "🎉 角色卡生成完成！所有信息都已保存。"))
+                isGenerating = false
+                scope.launch { listState.animateScrollToItem(chatMessages.lastIndex) }
+                return@launch
+            }
 
+            // 构建稳定的上下文
+            val systemPrompt = buildSystemPrompt()
+            // val characterStatus = buildCharacterStatus() // REMOVED: 不再每次都发送状态
+            
             val historyPairs = withContext(Dispatchers.Default) {
                 chatMessages.map { it.role to it.content }
             }
 
-            val characterJson = withContext(Dispatchers.IO) {
-                activeCard?.let { card ->
-                    JSONObject().apply {
-                        put("name", card.name)
-                        put("description", card.description)
-                        put("characterSetting", card.characterSetting)
-                        put("otherContent", card.otherContent)
-                        put("advancedCustomPrompt", card.advancedCustomPrompt)
-                    }.toString()
-                } ?: "{}"
-            }
-
-            val stream = run {
-                val fullPrompt = buildString {
-                    append(guidancePrefix)
-                    append('\n')
-                    append("[当前角色卡信息] ")
-                    append(characterJson)
-                    append('\n')
-                    append("[用户输入] ")
-                    append(input)
-                }
-                requestFromDefaultService(fullPrompt, historyPairs)
-            }
+            val stream = requestFromDefaultService(input, historyPairs, systemPrompt)
 
             // 提前插入占位的"生成中…"助手消息
             chatMessages.add(CharacterChatMessage("assistant", "生成中…"))
@@ -423,7 +482,7 @@ fun PersonaCardGenerationScreen(
                                         expanded = false
                                         scope.launch {
                                             characterCardManager.setActiveCharacterCard(card.id)
-                                            refreshData()
+                                            activeCardId = card.id // 更新ID以触发Effect
                                         }
                                     }
                                 )
@@ -586,6 +645,26 @@ fun PersonaCardGenerationScreen(
                     
                     Spacer(Modifier.height(8.dp))
                     
+                    // 开场白
+                    OutlinedTextField(
+                        value = editOpeningStatement,
+                        onValueChange = { newValue ->
+                            editOpeningStatement = newValue
+                            scope.launch {
+                                activeCard?.let { card ->
+                                    withContext(Dispatchers.IO) {
+                                        characterCardManager.updateCharacterCard(card.copy(openingStatement = newValue))
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("开场白") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
                     // 其他内容
                             OutlinedTextField(
                         value = editOtherContent,
@@ -622,6 +701,26 @@ fun PersonaCardGenerationScreen(
                         label = { Text("高级自定义提示词") },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // 备注信息
+                    OutlinedTextField(
+                        value = editMarks,
+                        onValueChange = { newValue ->
+                            editMarks = newValue
+                            scope.launch {
+                                activeCard?.let { card ->
+                                    withContext(Dispatchers.IO) {
+                                        characterCardManager.updateCharacterCard(card.copy(marks = newValue))
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("备注信息（不会被拼接到提示词）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4
                     )
                 }
             }
