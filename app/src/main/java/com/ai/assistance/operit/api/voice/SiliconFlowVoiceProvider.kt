@@ -81,12 +81,10 @@ class SiliconFlowVoiceProvider(
     override suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
             if (apiKey.isBlank()) {
-                Log.e(TAG, "API密钥未设置")
-                return@withContext false
+                throw TtsException("API密钥未设置，请在设置中填写。")
             }
             if (voiceId.isBlank()) {
-                Log.e(TAG, "音色ID未设置")
-                return@withContext false
+                throw TtsException("音色ID未设置，请选择一个有效音色。")
             }
             
             _isInitialized.value = true
@@ -94,7 +92,9 @@ class SiliconFlowVoiceProvider(
             true
         } catch (e: Exception) {
             Log.e(TAG, "硅基流动TTS初始化失败", e)
-            false
+            _isInitialized.value = false
+            if (e is TtsException) throw e
+            throw TtsException("初始化硅基流动TTS服务时发生意外错误", cause = e)
         }
     }
 
@@ -105,12 +105,12 @@ class SiliconFlowVoiceProvider(
         pitch: Float,
         extraParams: Map<String, String>
     ): Boolean = withContext(Dispatchers.IO) {
+        if (!isInitialized) {
+            Log.e(TAG, "TTS未初始化")
+            return@withContext false
+        }
+        
         try {
-            if (!isInitialized) {
-                Log.e(TAG, "TTS未初始化")
-                return@withContext false
-            }
-
             if (interrupt && isSpeaking) {
                 stop()
             }
@@ -161,16 +161,22 @@ class SiliconFlowVoiceProvider(
                     playAudioFile(tempFile)
                 }
                 
-                true
+                return@withContext true
             } else {
-                Log.e(TAG, "TTS请求失败，响应码: $responseCode")
+                val errorBody = connection.errorStream?.bufferedReader()?.readText()
+                Log.e(TAG, "TTS请求失败，响应码: $responseCode, Body: $errorBody")
                 _isSpeaking.value = false
-                false
+                throw TtsException(
+                    message = "TTS request failed with code $responseCode",
+                    httpStatusCode = responseCode,
+                    errorBody = errorBody
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "TTS speak失败", e)
             _isSpeaking.value = false
-            false
+            if (e is TtsException) throw e
+            throw TtsException("TTS speak failed", cause = e)
         }
     }
 

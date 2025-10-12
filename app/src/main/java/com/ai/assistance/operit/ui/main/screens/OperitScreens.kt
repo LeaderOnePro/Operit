@@ -507,7 +507,10 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            SpeechServicesSettingsScreen(onBackPressed = onGoBack)
+            SpeechServicesSettingsScreen(
+                onBackPressed = onGoBack,
+                onNavigateToTextToSpeech = { navigateTo(TextToSpeech) }
+            )
         }
     }
     

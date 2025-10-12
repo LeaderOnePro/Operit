@@ -1768,6 +1768,7 @@
     <string name="speech_services_saving">正在保存...</string>
     <string name="speech_services_save_success">设置已保存</string>
     <string name="speech_services_save_error">保存失败：%1$s</string>
+    <string name="speech_services_test_tts">测试 TTS 功能</string>
     
     <!-- Info Card -->
     <string name="speech_services_info_title">关于语音服务</string>

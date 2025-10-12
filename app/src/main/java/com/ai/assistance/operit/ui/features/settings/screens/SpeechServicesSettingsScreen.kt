@@ -67,7 +67,10 @@ import androidx.compose.runtime.mutableStateListOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
+fun SpeechServicesSettingsScreen(
+    onBackPressed: () -> Unit,
+    onNavigateToTextToSpeech: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { SpeechServicesPreferences(context) }
@@ -759,6 +762,21 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             } else {
                                 Text(stringResource(R.string.speech_services_save_button))
                             }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedButton(
+                            onClick = onNavigateToTextToSpeech,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VolumeUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.speech_services_test_tts))
                         }
                         
                         // 显示保存消息
