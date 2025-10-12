@@ -128,6 +128,23 @@ fun OperitTheme(content: @Composable () -> Unit) {
     val useBackgroundBlur by preferencesManager.useBackgroundBlur.collectAsState(initial = false)
     val backgroundBlurRadius by preferencesManager.backgroundBlurRadius.collectAsState(initial = 10f)
 
+    // 获取字体设置
+    val useCustomFont by preferencesManager.useCustomFont.collectAsState(initial = false)
+    val fontType by preferencesManager.fontType.collectAsState(initial = UserPreferencesManager.FONT_TYPE_SYSTEM)
+    val systemFontName by preferencesManager.systemFontName.collectAsState(initial = UserPreferencesManager.SYSTEM_FONT_DEFAULT)
+    val customFontPath by preferencesManager.customFontPath.collectAsState(initial = null)
+
+    // 创建自定义 Typography
+    val customTypography = remember(useCustomFont, fontType, systemFontName, customFontPath) {
+        createCustomTypography(
+            context = context,
+            useCustomFont = useCustomFont,
+            fontType = fontType,
+            systemFontName = systemFontName,
+            customFontPath = customFontPath
+        )
+    }
+
     // 确定是否使用暗色主题
     val systemDarkTheme = isSystemInDarkTheme()
     val darkTheme =
@@ -447,13 +464,13 @@ fun OperitTheme(content: @Composable () -> Unit) {
                                         surfaceContainerLowest =
                                                 colorScheme.surfaceContainerLowest.copy(alpha = 1f)
                                 ),
-                        typography = Typography,
+                        typography = customTypography,
                         content = content
                 )
             }
         } else {
             // 不使用背景图片时，直接应用主题
-            MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+            MaterialTheme(colorScheme = colorScheme, typography = customTypography, content = content)
         }
     }
 }

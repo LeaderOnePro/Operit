@@ -101,6 +101,12 @@ class UserPreferencesManager(private val context: Context) {
         private val USE_BACKGROUND_BLUR = booleanPreferencesKey("use_background_blur")
         private val BACKGROUND_BLUR_RADIUS = floatPreferencesKey("background_blur_radius")
 
+        // 字体设置
+        private val USE_CUSTOM_FONT = booleanPreferencesKey("use_custom_font")
+        private val FONT_TYPE = stringPreferencesKey("font_type")  // "system" or "file"
+        private val SYSTEM_FONT_NAME = stringPreferencesKey("system_font_name")
+        private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+
         // Chat style preference
         private val CHAT_STYLE = stringPreferencesKey("chat_style")
 
@@ -154,6 +160,17 @@ class UserPreferencesManager(private val context: Context) {
         const val ON_COLOR_MODE_AUTO = "auto"
         const val ON_COLOR_MODE_LIGHT = "light"
         const val ON_COLOR_MODE_DARK = "dark"
+
+        // 字体类型常量
+        const val FONT_TYPE_SYSTEM = "system"
+        const val FONT_TYPE_FILE = "file"
+        
+        // 系统字体名称常量
+        const val SYSTEM_FONT_DEFAULT = "default"
+        const val SYSTEM_FONT_SERIF = "serif"
+        const val SYSTEM_FONT_SANS_SERIF = "sans-serif"
+        const val SYSTEM_FONT_MONOSPACE = "monospace"
+        const val SYSTEM_FONT_CURSIVE = "cursive"
     }
 
     // 获取应用语言设置
@@ -407,6 +424,27 @@ class UserPreferencesManager(private val context: Context) {
             preferences[KEY_SHOW_INPUT_PROCESSING_STATUS] ?: true
         }
 
+    // 字体设置相关Flow
+    val useCustomFont: Flow<Boolean> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[USE_CUSTOM_FONT] ?: false
+        }
+
+    val fontType: Flow<String> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[FONT_TYPE] ?: FONT_TYPE_SYSTEM
+        }
+
+    val systemFontName: Flow<String> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[SYSTEM_FONT_NAME] ?: SYSTEM_FONT_DEFAULT
+        }
+
+    val customFontPath: Flow<String?> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[CUSTOM_FONT_PATH]
+        }
+
     // 获取最近使用颜色
     val recentColorsFlow: Flow<List<Int>> =
         context.userPreferencesDataStore.data.map { preferences ->
@@ -521,7 +559,11 @@ class UserPreferencesManager(private val context: Context) {
             customChatTitle: String? = null,
             showInputProcessingStatus: Boolean? = null,
             globalUserAvatarUri: String? = null,
-            globalUserName: String? = null
+            globalUserName: String? = null,
+            useCustomFont: Boolean? = null,
+            fontType: String? = null,
+            systemFontName: String? = null,
+            customFontPath: String? = null
     ) {
         context.userPreferencesDataStore.edit { preferences ->
             themeMode?.let { preferences[THEME_MODE] = it }
@@ -569,6 +611,11 @@ class UserPreferencesManager(private val context: Context) {
             globalUserAvatarUri?.let { preferences[KEY_GLOBAL_USER_AVATAR_URI] = it }
             // 全局用户名称单独保存，不跟随角色卡主题
             globalUserName?.let { preferences[KEY_GLOBAL_USER_NAME] = it }
+            // 字体设置
+            useCustomFont?.let { preferences[USE_CUSTOM_FONT] = it }
+            fontType?.let { preferences[FONT_TYPE] = it }
+            systemFontName?.let { preferences[SYSTEM_FONT_NAME] = it }
+            customFontPath?.let { preferences[CUSTOM_FONT_PATH] = it }
         }
     }
 
@@ -614,6 +661,11 @@ class UserPreferencesManager(private val context: Context) {
             preferences.remove(KEY_GLOBAL_USER_AVATAR_URI)
             // 重置全局用户名称
             preferences.remove(KEY_GLOBAL_USER_NAME)
+            // 重置字体设置
+            preferences.remove(USE_CUSTOM_FONT)
+            preferences.remove(FONT_TYPE)
+            preferences.remove(SYSTEM_FONT_NAME)
+            preferences.remove(CUSTOM_FONT_PATH)
         }
     }
 
@@ -860,7 +912,7 @@ class UserPreferencesManager(private val context: Context) {
         return listOf(
             THEME_MODE, BACKGROUND_IMAGE_URI, BACKGROUND_MEDIA_TYPE, APP_BAR_CONTENT_COLOR_MODE,
             CHAT_STYLE, KEY_CUSTOM_USER_AVATAR_URI, KEY_CUSTOM_AI_AVATAR_URI, KEY_AVATAR_SHAPE,
-            KEY_ON_COLOR_MODE, KEY_CUSTOM_CHAT_TITLE
+            KEY_ON_COLOR_MODE, KEY_CUSTOM_CHAT_TITLE, FONT_TYPE, SYSTEM_FONT_NAME, CUSTOM_FONT_PATH
             // 注意：KEY_GLOBAL_USER_AVATAR_URI 和 KEY_GLOBAL_USER_NAME 不包含在内，因为全局设置不跟随角色卡主题切换
         )
     }
@@ -871,7 +923,7 @@ class UserPreferencesManager(private val context: Context) {
             VIDEO_BACKGROUND_LOOP, TOOLBAR_TRANSPARENT, USE_CUSTOM_APP_BAR_COLOR, USE_CUSTOM_STATUS_BAR_COLOR,
             STATUS_BAR_TRANSPARENT, STATUS_BAR_HIDDEN, CHAT_HEADER_TRANSPARENT, CHAT_INPUT_TRANSPARENT,
             FORCE_APP_BAR_CONTENT_COLOR_ENABLED, CHAT_HEADER_OVERLAY_MODE, USE_BACKGROUND_BLUR,
-            KEY_SHOW_THINKING_PROCESS, KEY_SHOW_STATUS_TAGS, KEY_SHOW_INPUT_PROCESSING_STATUS
+            KEY_SHOW_THINKING_PROCESS, KEY_SHOW_STATUS_TAGS, KEY_SHOW_INPUT_PROCESSING_STATUS, USE_CUSTOM_FONT
         )
     }
 
