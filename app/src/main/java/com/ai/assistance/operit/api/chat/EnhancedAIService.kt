@@ -857,12 +857,6 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             val (parallelInvocations, serialInvocations) = permittedInvocations.partition { parallelizableToolNames.contains(it.tool.name) }
 
-            // 调试日志：查看拆分结果
-            try {
-                Log.d(TAG, "并行工具(${parallelInvocations.size}): ${parallelInvocations.map { it.tool.name }}")
-                Log.d(TAG, "串行工具(${serialInvocations.size}): ${serialInvocations.map { it.tool.name }}")
-            } catch (_: Exception) { /* best-effort logging */ }
-
             // 先并行收集安全工具的结果（仅聚合，避免并发改写roundManager）
             val parallelJobs = parallelInvocations.map { invocation ->
                 toolProcessingScope.async {
