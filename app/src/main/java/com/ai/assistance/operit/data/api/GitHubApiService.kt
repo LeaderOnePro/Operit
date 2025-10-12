@@ -247,11 +247,15 @@ class GitHubApiService(private val context: Context) {
      */
     suspend fun getUser(username: String): Result<GitHubUser> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url("$GITHUB_API_BASE/users/$username")
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -292,11 +296,15 @@ class GitHubApiService(private val context: Context) {
                 .addQueryParameter("per_page", perPage.toString())
                 .build()
             
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(url)
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -347,11 +355,15 @@ class GitHubApiService(private val context: Context) {
                 }
                 .build()
             
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(url)
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -567,12 +579,16 @@ class GitHubApiService(private val context: Context) {
                 .addQueryParameter("per_page", perPage.toString())
                 .build()
             
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(url)
                 .addHeader("Accept", "application/vnd.github+json")
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -641,12 +657,16 @@ class GitHubApiService(private val context: Context) {
         issueNumber: Int
     ): Result<List<GitHubReaction>> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url("$GITHUB_API_BASE/repos/$owner/$repo/issues/$issueNumber/reactions")
                 .addHeader("Accept", "application/vnd.github+json")
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -747,11 +767,15 @@ class GitHubApiService(private val context: Context) {
         repo: String
     ): Result<GitHubRepository> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url("$GITHUB_API_BASE/repos/$owner/$repo")
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()
@@ -790,11 +814,15 @@ class GitHubApiService(private val context: Context) {
                 .addQueryParameter("per_page", perPage.toString())
                 .build()
             
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(url)
-                .build()
             
-            val response = client.newCall(request).execute()
+            // 如果用户已登录，添加认证头以提高API配额
+            authPreferences.getAuthorizationHeader()?.let { authHeader ->
+                requestBuilder.addHeader("Authorization", authHeader)
+            }
+            
+            val response = client.newCall(requestBuilder.build()).execute()
             
             if (response.isSuccessful) {
                 val responseBody = response.body?.string()

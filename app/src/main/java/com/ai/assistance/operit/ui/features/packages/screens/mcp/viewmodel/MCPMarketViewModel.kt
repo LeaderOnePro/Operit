@@ -67,6 +67,10 @@ class MCPMarketViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // 新增：用于表示是否因为未登录而触发速率限制
+    private val _isRateLimitError = MutableStateFlow(false)
+    val isRateLimitError: StateFlow<Boolean> = _isRateLimitError.asStateFlow()
+
     // 安装进度状态
     private val _installingPlugins = MutableStateFlow<Set<String>>(emptySet())
     val installingPlugins: StateFlow<Set<String>> = _installingPlugins.asStateFlow()
@@ -139,6 +143,9 @@ class MCPMarketViewModel(
     // 草稿保存
     private val sharedPrefs: SharedPreferences = context.getSharedPreferences("mcp_publish_draft", Context.MODE_PRIVATE)
     
+    // 用户头像URL持久化缓存
+    private val avatarCachePrefs: SharedPreferences = context.getSharedPreferences("github_avatar_cache", Context.MODE_PRIVATE)
+    
     // 发布草稿数据类
     data class PublishDraft(
         val title: String = "",
@@ -161,6 +168,9 @@ class MCPMarketViewModel(
         )
 
     init {
+        // 加载持久化的头像缓存
+        loadAvatarCacheFromPrefs()
+        
         viewModelScope.launch {
             GitHubAuthBus.authCode.collect { code ->
                 code?.let {
@@ -206,6 +216,8 @@ class MCPMarketViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            _isRateLimitError.value = false // 重置状态
+            _issueReactions.value = emptyMap() // 刷新时清除旧的Reactions缓存
 
             try {
                 val result = githubApiService.getRepositoryIssues(
@@ -221,7 +233,13 @@ class MCPMarketViewModel(
                         _mcpIssues.value = issues
                     },
                     onFailure = { error ->
-                        _errorMessage.value = "加载MCP市场数据失败: ${error.message}"
+                        val errorMessage = error.message ?: ""
+                        if (errorMessage.contains("HTTP 403") && !githubAuth.isLoggedIn()) {
+                            _errorMessage.value = "API请求超限，请登录GitHub后重试"
+                            _isRateLimitError.value = true
+                        } else {
+                            _errorMessage.value = "加载MCP市场数据失败: $errorMessage"
+                        }
                         Log.e(TAG, "Failed to load MCP market data", error)
                     }
                 )
@@ -1102,7 +1120,61 @@ class MCPMarketViewModel(
     }
 
     /**
-     * 缓存用户头像URL
+     * 从SharedPreferences加载头像缓存
+     */
+    private fun loadAvatarCacheFromPrefs() {
+        try {
+            val cachedAvatars = avatarCachePrefs.all.mapNotNull { (key, value) ->
+                if (value is String) key to value else null
+            }.toMap()
+            
+            if (cachedAvatars.isNotEmpty()) {
+                _userAvatarCache.value = cachedAvatars
+                Log.d(TAG, "Loaded ${cachedAvatars.size} avatar URLs from persistent cache")
+            }
+            
+            // 如果缓存过大（超过500个），清理一半
+            if (cachedAvatars.size > 500) {
+                cleanupAvatarCache()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load avatar cache from preferences", e)
+        }
+    }
+    
+    /**
+     * 清理头像缓存（保留最近的一半）
+     */
+    private fun cleanupAvatarCache() {
+        try {
+            val allEntries = avatarCachePrefs.all
+            if (allEntries.size > 500) {
+                val editor = avatarCachePrefs.edit()
+                // 简单策略：删除前一半的键
+                allEntries.keys.take(allEntries.size / 2).forEach { key ->
+                    editor.remove(key)
+                }
+                editor.apply()
+                Log.d(TAG, "Cleaned up avatar cache, removed ${allEntries.size / 2} entries")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cleanup avatar cache", e)
+        }
+    }
+    
+    /**
+     * 保存头像URL到持久化缓存
+     */
+    private fun saveAvatarToPrefs(username: String, avatarUrl: String) {
+        try {
+            avatarCachePrefs.edit().putString(username, avatarUrl).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save avatar to preferences", e)
+        }
+    }
+    
+    /**
+     * 缓存用户头像URL（带持久化）
      */
     fun fetchUserAvatar(username: String) {
         if (username.isBlank() || _userAvatarCache.value.containsKey(username)) {
@@ -1117,6 +1189,10 @@ class MCPMarketViewModel(
                         val currentCache = _userAvatarCache.value.toMutableMap()
                         currentCache[username] = user.avatarUrl
                         _userAvatarCache.value = currentCache
+                        
+                        // 持久化保存
+                        saveAvatarToPrefs(username, user.avatarUrl)
+                        Log.d(TAG, "Cached and persisted avatar for user: $username")
                     },
                     onFailure = { error ->
                         Log.w(TAG, "Failed to fetch avatar for user $username: ${error.message}")
@@ -1132,9 +1208,15 @@ class MCPMarketViewModel(
     /**
      * 获取Issue的reactions
      */
-    fun loadIssueReactions(issueNumber: Int) {
+    fun loadIssueReactions(issueNumber: Int, force: Boolean = false) {
         if (issueNumber in _isLoadingReactions.value) {
             return // 正在加载中，避免重复请求
+        }
+        
+        // 如果不是强制刷新，并且缓存中已有数据，则直接返回
+        if (!force && _issueReactions.value.containsKey(issueNumber)) {
+            Log.d(TAG, "Reactions for issue #$issueNumber already in cache.")
+            return
         }
 
         viewModelScope.launch {

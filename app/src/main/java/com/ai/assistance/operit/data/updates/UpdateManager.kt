@@ -114,7 +114,8 @@ class UpdateManager private constructor(private val context: Context) {
                             Pair("AAswordman", "Operit") // 默认值
                         }
 
-                val releaseInfo = GithubReleaseUtil.fetchLatestReleaseInfo(repoOwner, repoName)
+                val githubReleaseUtil = GithubReleaseUtil(context)
+                val releaseInfo = githubReleaseUtil.fetchLatestReleaseInfo(repoOwner, repoName)
 
                 if (releaseInfo != null) {
                     if (compareVersions(releaseInfo.version, currentVersion) > 0) {

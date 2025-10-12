@@ -473,7 +473,8 @@ class GeminiProvider(
     private fun determineBaseUrl(endpoint: String): String {
         return try {
             val url = URL(endpoint)
-            "${url.protocol}://${url.host}"
+            val port = if (url.port != -1) ":${url.port}" else ""
+            "${url.protocol}://${url.host}${port}"
         } catch (e: Exception) {
             logError("解析API端点失败", e)
             "https://generativelanguage.googleapis.com"

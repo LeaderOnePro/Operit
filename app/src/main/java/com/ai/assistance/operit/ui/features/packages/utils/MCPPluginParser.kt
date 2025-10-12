@@ -5,6 +5,8 @@ import com.ai.assistance.operit.data.api.GitHubIssue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.JsonNames
 
 /**
  * MCP 插件信息解析工具类
@@ -15,6 +17,7 @@ object MCPPluginParser {
     @Serializable
     data class MCPMetadata(
         val repositoryUrl: String,
+        @JsonNames("installCommand") // 兼容旧的 installCommand
         val installConfig: String, // 改为安装配置
         val category: String,
         val tags: String,

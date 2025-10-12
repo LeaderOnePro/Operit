@@ -41,8 +41,9 @@ object OperitTerminalManager {
         }
     }
 
-    suspend fun fetchLatestReleaseInfo(): ReleaseInfo? = withContext(Dispatchers.IO) {
-        val releaseInfo = GithubReleaseUtil.fetchLatestReleaseInfo(REPO_OWNER, REPO_NAME)
+    suspend fun fetchLatestReleaseInfo(context: Context): ReleaseInfo? = withContext(Dispatchers.IO) {
+        val githubReleaseUtil = GithubReleaseUtil(context)
+        val releaseInfo = githubReleaseUtil.fetchLatestReleaseInfo(REPO_OWNER, REPO_NAME)
         releaseInfo?.let {
             ReleaseInfo(it.version, it.downloadUrl, it.releaseNotes)
         }
