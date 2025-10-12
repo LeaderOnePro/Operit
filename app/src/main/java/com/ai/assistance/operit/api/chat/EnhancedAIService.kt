@@ -839,26 +839,53 @@ class EnhancedAIService private constructor(private val context: Context) {
                 }
             }
             
+            // 最小改动的并行调度：对安全工具并行，其余保持串行
+            // 明确允许并行的安全工具白名单（只读/信息类）
+            val parallelizableToolNames = setOf(
+                "list_files",
+                "read_file",
+                "read_file_part",
+                "read_file_full",
+                "file_exists",
+                "find_files",
+                "file_info",
+                "grep_code",
+                "query_knowledge_library",
+                "calculate",
+                "ffmpeg_info"
+            )
+
+            val (parallelInvocations, serialInvocations) = permittedInvocations.partition { parallelizableToolNames.contains(it.tool.name) }
+
+            // 先并行收集安全工具的结果（仅聚合，避免并发改写roundManager）
+            val parallelJobs = parallelInvocations.map { invocation ->
+                toolProcessingScope.async {
+                    val executor = toolHandler.getToolExecutor(invocation.tool.name)
+                    if (executor == null) {
+                        val toolName = invocation.tool.name
+                        val errorMessage = buildToolNotAvailableErrorMessage(toolName)
+                        Pair(invocation, listOf(ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage)))
+                    } else {
+                        val collected = mutableListOf<ToolResult>()
+                        ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
+                            collected.add(result)
+                        }
+                        Pair(invocation, collected)
+                    }
+                }
+            }
+
+            val parallelCollected: List<Pair<ToolInvocation, List<ToolResult>>> = if (parallelJobs.isNotEmpty()) parallelJobs.awaitAll() else emptyList()
+
+            // 按原有串行方式处理需要串行的工具（保留逐步输出）
+            val serialAggregatedPairs = mutableListOf<Pair<ToolInvocation, ToolResult>>()
             val executionResults = mutableListOf<ToolResult>()
-            for (invocation in permittedInvocations) {
+
+            for (invocation in serialInvocations) {
                 val executor = toolHandler.getToolExecutor(invocation.tool.name)
                 if (executor == null) {
                     val toolName = invocation.tool.name
-                    val errorMessage = when {
-                        toolName.contains('.') && !toolName.contains(':') -> {
-                            val parts = toolName.split('.', limit = 2)
-                            "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
-                        }
-                        toolName.contains(':') -> {
-                            val parts = toolName.split(':', limit = 2)
-                            val packName = parts[0]
-                            val packageManager = toolHandler.getOrCreatePackageManager()
-                            val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
-                            if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
-                            else "工具包 '$packName' 不存在。"
-                        }
-                        else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
-                    }
+                    val errorMessage = buildToolNotAvailableErrorMessage(toolName)
 
                     val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
                     context.roundManager.appendContent(notAvailableContent)
@@ -881,16 +908,39 @@ class EnhancedAIService private constructor(private val context: Context) {
                     val combinedResultString = collectedResults.joinToString("\n") { res ->
                         if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
                     }
-                    executionResults.add(ToolResult(
-                            toolName = invocation.tool.name,
-                            success = lastResult.success,
-                            result = StringResultData(combinedResultString),
-                            error = lastResult.error
-                    ))
+                    val aggregated = ToolResult(
+                        toolName = invocation.tool.name,
+                        success = lastResult.success,
+                        result = StringResultData(combinedResultString),
+                        error = lastResult.error
+                    )
+                    executionResults.add(aggregated)
+                    serialAggregatedPairs.add(invocation to aggregated)
                 }
             }
 
-            val allToolResults = permissionDeniedResults + executionResults
+            // 将并行结果也聚合为每个调用一个汇总ToolResult，并按原始顺序合并
+            val parallelAggregatedPairs: List<Pair<ToolInvocation, ToolResult>> = parallelCollected.map { (invocation, collectedResults) ->
+                if (collectedResults.isNotEmpty()) {
+                    val lastResult = collectedResults.last()
+                    val combinedResultString = collectedResults.joinToString("\n") { res ->
+                        if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
+                    }
+                    invocation to ToolResult(
+                        toolName = invocation.tool.name,
+                        success = lastResult.success,
+                        result = StringResultData(combinedResultString),
+                        error = lastResult.error
+                    )
+                } else {
+                    invocation to ToolResult(toolName = invocation.tool.name, success = false, result = StringResultData(""), error = "No result")
+                }
+            }
+
+            val aggregatedMap = (parallelAggregatedPairs + serialAggregatedPairs).associate { it.first to it.second }
+            val orderedAggregated = permittedInvocations.mapNotNull { aggregatedMap[it] }
+
+            val allToolResults = permissionDeniedResults + orderedAggregated
 
             if (allToolResults.isNotEmpty()) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
@@ -919,6 +969,26 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         Log.d(TAG, "工具调用处理耗时: ${System.currentTimeMillis() - startTime}ms")
+    }
+
+    /**
+     * 构建工具不可用的错误信息，统一逻辑避免重复
+     */
+    private fun buildToolNotAvailableErrorMessage(toolName: String): String {
+        return when {
+            toolName.contains('.') && !toolName.contains(':') -> {
+                val parts = toolName.split('.', limit = 2)
+                "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
+            }
+            toolName.contains(':') -> {
+                val parts = toolName.split(':', limit = 2)
+                val packName = parts[0]
+                val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
+                if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
+                else "工具包 '$packName' 不存在。"
+            }
+            else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+        }
     }
 
     /** Process tool execution result - simplified version without callbacks */
@@ -961,8 +1031,9 @@ class EnhancedAIService private constructor(private val context: Context) {
         // Get current conversation history is now just the context's history
         val currentChatHistory = context.conversationHistory
 
-        // Append tool result to current round
+        // Append tool result to current round，并立刻向UI输出，确保并行路径也能看到工具结果
         context.roundManager.appendContent(toolResultMessage)
+        try { collector.emit(toolResultMessage) } catch (_: Exception) {}
 
         // Start new round - ensure tool execution response will be shown in a new message
         context.roundManager.startNewRound()
