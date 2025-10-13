@@ -1254,6 +1254,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     ) {
         floatingWindowDelegate.launchInMode(mode, colorScheme, typography)
     }
+    
+    /**
+     * 从Widget启动悬浮窗到指定模式（使用默认主题）
+     */
+    fun launchFloatingWindowInMode(mode: FloatingMode) {
+        launchFloatingModeIn(mode, null, null)
+    }
 
     fun launchFloatingWindowWithPermissionCheck(
             launcher: ActivityResultLauncher<String>,
@@ -1270,7 +1277,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             val intent =
                     Intent(
                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            android.net.Uri.parse("package:${context.packageName}")
+                            Uri.parse("package:${context.packageName}")
                     )
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)

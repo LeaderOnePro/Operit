@@ -2861,4 +2861,7 @@
     <string name="category_created">类别已创建</string>
     <string name="invalid_category_name">类别名称只能包含小写字母、数字和下划线</string>
 
+    <!-- Voice Assistant Widget -->
+    <string name="voice_assistant_widget_description">快速启动 Operit 语音助手</string>
+
 </resources>

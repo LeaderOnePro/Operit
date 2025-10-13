@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.annotation.RequiresApi
 import android.util.Log
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -56,6 +57,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.sample
 import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.widget.WidgetLaunchManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -893,12 +895,36 @@ fun AIChatScreen(
         // If floating mode is on but no permission, turn it off
         if (isFloatingMode && !canDrawOverlays.value) {
             actualViewModel.toggleFloatingMode()
-            android.widget.Toast.makeText(
+            Toast.makeText(
                             context,
                             "未获得悬浮窗权限，已关闭悬浮窗模式",
-                            android.widget.Toast.LENGTH_SHORT
+                            Toast.LENGTH_SHORT
                     )
                     .show()
+        }
+    }
+    
+    // 检查是否有来自Widget的待处理启动请求
+    LaunchedEffect(Unit) {
+        WidgetLaunchManager.pendingLaunchRequest.collect { mode ->
+            if (mode != null) {
+                Log.d("AIChatScreen", "检测到Widget启动请求，模式: $mode")
+                // 清除待处理请求
+                WidgetLaunchManager.clearPendingLaunch()
+                
+                // 检查悬浮窗权限
+                if (Settings.canDrawOverlays(context)) {
+                    // 启动悬浮窗到指定模式
+                    actualViewModel.launchFloatingWindowInMode(mode)
+                } else {
+                    // 没有权限，显示提示
+                    Toast.makeText(
+                        context,
+                        "需要悬浮窗权限才能启动语音助手",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 }

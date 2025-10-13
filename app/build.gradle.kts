@@ -370,4 +370,8 @@ dependencies {
 
     // Accompanist
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
+
+    // Glance for Widgets (Compose for Widgets)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 }

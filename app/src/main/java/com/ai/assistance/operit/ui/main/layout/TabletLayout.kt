@@ -69,12 +69,12 @@ fun TabletLayout(
                                                 androidx.compose.ui.platform.LocalConfiguration
                                                         .current
                                                         .screenWidthDp
-                                                        .dp - tabletSidebarWidth
+                                                        .dp - tabletSidebarWidth + 1.dp // 增加1dp解决右侧白线问题
                                         else
                                                 androidx.compose.ui.platform.LocalConfiguration
                                                         .current
                                                         .screenWidthDp
-                                                        .dp - collapsedTabletSidebarWidth,
+                                                        .dp - collapsedTabletSidebarWidth + 1.dp, // 增加1dp解决右侧白线问题
                                 animationSpec = tween(durationMillis = 280),
                                 label = "contentWidth"
                         )

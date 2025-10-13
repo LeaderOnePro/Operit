@@ -51,6 +51,8 @@ import android.content.ClipData
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.GitHubAuthBus
 import android.content.Intent
+import com.ai.assistance.operit.ui.floating.FloatingMode
+import com.ai.assistance.operit.widget.WidgetLaunchManager
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -161,6 +163,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        setIntent(intent) // 重要：更新当前Intent
         Log.d(TAG, "onNewIntent: Received intent")
         intent?.data?.let { uri ->
             if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
@@ -174,6 +177,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        
+        // 处理从Widget启动的请求
+        handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -186,6 +192,20 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val error = uri.getQueryParameter("error")
                     Log.e(TAG, "GitHub OAuth error from onCreate: $error")
+                }
+            }
+        }
+        
+        // 处理从Widget启动的请求
+        if (intent?.getBooleanExtra("LAUNCH_VOICE_ASSISTANT", false) == true) {
+            val modeName = intent.getStringExtra("INITIAL_MODE")
+            if (modeName != null) {
+                try {
+                    val mode = FloatingMode.valueOf(modeName)
+                    Log.d(TAG, "Widget请求启动语音助手，模式: $mode")
+                    WidgetLaunchManager.setPendingLaunch(mode)
+                } catch (e: IllegalArgumentException) {
+                    Log.e(TAG, "无效的悬浮窗模式: $modeName", e)
                 }
             }
         }
