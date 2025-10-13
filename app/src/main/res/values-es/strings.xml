@@ -580,8 +580,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">Centro de pruebas de herramientas</string>
     <string name="tool_test_center_desc">Probar la disponibilidad y funcionalidad de las herramientas de IA</string>
-    <string name="tool_format_converter">Conversor de formato universal</string>
-    <string name="tool_format_converter_desc">Soporte para conversión entre múltiples formatos de archivo, conveniente y rápido</string>
     <string name="tool_file_manager">Gestor de archivos</string>
     <string name="tool_file_manager_desc">Navegar y gestionar archivos del dispositivo con soporte para varias operaciones</string>
     <string name="tool_tts">Texto a voz</string>

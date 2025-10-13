@@ -176,164 +176,106 @@ open class StandardFileSystemTools(protected val context: Context) {
                         "doc", "docx" -> {
                                 Log.d(
                                         TAG,
-                                        "Detected Word document, attempting to convert to text before reading"
+                                        "Detected Word document, attempting to extract text"
                                 )
                                 val tempFilePath =
                                         "${path}_converted_${System.currentTimeMillis()}.txt"
                                 try {
-                                        val fileConverterTool =
-                                                AITool(
-                                                        name = "convert_file",
-                                                        parameters =
-                                                                listOf(
-                                                                        ToolParameter(
-                                                                                "source_path",
-                                                                                path
-                                                                        ),
-                                                                        ToolParameter(
-                                                                                "target_path",
-                                                                                tempFilePath
-                                                                        )
-                                                                )
-                                                )
-                                        val toolHandler = AIToolHandler.getInstance(context)
-                                        val conversionResult =
-                                                toolHandler.executeTool(fileConverterTool)
+                                        val sourceFile = File(path)
+                                        val tempFile = File(tempFilePath)
+                                        val success = com.ai.assistance.operit.util.DocumentConversionUtil
+                                                .extractTextFromWord(sourceFile, tempFile, fileExt)
 
-                                        if (conversionResult.success) {
+                                        if (success && tempFile.exists()) {
                                                 Log.d(
                                                         TAG,
-                                                        "Successfully converted Word document to text"
+                                                        "Successfully extracted text from Word document"
                                                 )
-                                                val tempFile = File(tempFilePath)
-                                                if (tempFile.exists()) {
-                                                        val content = tempFile.readText()
-                                                        tempFile.delete() // Clean up
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = true,
-                                                                result =
-                                                                        FileContentData(
-                                                                                path = path,
-                                                                                content = content,
-                                                                                size =
-                                                                                        content.length
-                                                                                                .toLong()
-                                                                        ),
-                                                                error = ""
-                                                        )
-                                                } else {
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = false,
-                                                                result = StringResultData(""),
-                                                                error =
-                                                                        "Conversion produced no output."
-                                                        )
-                                                }
+                                                val content = tempFile.readText()
+                                                tempFile.delete() // Clean up
+                                                ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result =
+                                                                FileContentData(
+                                                                        path = path,
+                                                                        content = content,
+                                                                        size = content.length.toLong(),
+                                                                ),
+                                                        error = ""
+                                                )
                                         } else {
                                                 Log.w(
                                                         TAG,
-                                                        "Word conversion failed: ${conversionResult.error}, falling back to raw content"
+                                                        "Word text extraction failed, returning error"
                                                 )
                                                 ToolResult(
                                                         toolName = tool.name,
                                                         success = false,
                                                         result = StringResultData(""),
-                                                        error =
-                                                                "Failed to convert Word document: ${conversionResult.error}"
+                                                        error = "Failed to extract text from Word document"
                                                 )
                                         }
                                 } catch (e: Exception) {
-                                        Log.e(TAG, "Error during Word document conversion", e)
+                                        Log.e(TAG, "Error during Word document text extraction", e)
                                         ToolResult(
                                                 toolName = tool.name,
                                                 success = false,
                                                 result = StringResultData(""),
-                                                error =
-                                                        "Error converting Word document: ${e.message}"
+                                                error = "Error extracting text from Word document: ${e.message}"
                                         )
                                 }
                         }
                         "pdf" -> {
                                 Log.d(
                                         TAG,
-                                        "Detected PDF document, attempting to convert to text before reading"
+                                        "Detected PDF document, attempting to extract text"
                                 )
                                 val tempFilePath =
                                         "${path}_converted_${System.currentTimeMillis()}.txt"
                                 try {
-                                        val fileConverterTool =
-                                                AITool(
-                                                        name = "convert_file",
-                                                        parameters =
-                                                                listOf(
-                                                                        ToolParameter(
-                                                                                "source_path",
-                                                                                path
-                                                                        ),
-                                                                        ToolParameter(
-                                                                                "target_path",
-                                                                                tempFilePath
-                                                                        )
-                                                                )
-                                                )
-                                        val toolHandler = AIToolHandler.getInstance(context)
-                                        val conversionResult =
-                                                toolHandler.executeTool(fileConverterTool)
+                                        val sourceFile = File(path)
+                                        val tempFile = File(tempFilePath)
+                                        val success = com.ai.assistance.operit.util.DocumentConversionUtil
+                                                .extractTextFromPdf(context, sourceFile, tempFile)
 
-                                        if (conversionResult.success) {
+                                        if (success && tempFile.exists()) {
                                                 Log.d(
                                                         TAG,
-                                                        "Successfully converted PDF document to text"
+                                                        "Successfully extracted text from PDF document"
                                                 )
-                                                val tempFile = File(tempFilePath)
-                                                if (tempFile.exists()) {
-                                                        val content = tempFile.readText()
-                                                        tempFile.delete() // Clean up
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = true,
-                                                                result =
-                                                                        FileContentData(
-                                                                                path = path,
-                                                                                content = content,
-                                                                                size =
-                                                                                        content.length
-                                                                                                .toLong()
-                                                                        ),
-                                                                error = ""
-                                                        )
-                                                } else {
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = false,
-                                                                result = StringResultData(""),
-                                                                error =
-                                                                        "Conversion produced no output."
-                                                        )
-                                                }
+                                                val content = tempFile.readText()
+                                                tempFile.delete() // Clean up
+                                                ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result =
+                                                                FileContentData(
+                                                                        path = path,
+                                                                        content = content,
+                                                                        size = content.length.toLong(),
+                                                                ),
+                                                        error = ""
+                                                )
                                         } else {
                                                 Log.w(
                                                         TAG,
-                                                        "PDF conversion failed: ${conversionResult.error}, falling back to raw content"
+                                                        "PDF text extraction failed, returning error"
                                                 )
                                                 ToolResult(
                                                         toolName = tool.name,
                                                         success = false,
                                                         result = StringResultData(""),
-                                                        error =
-                                                                "Failed to convert PDF document: ${conversionResult.error}"
+                                                        error = "Failed to extract text from PDF document"
                                                 )
                                         }
                                 } catch (e: Exception) {
-                                        Log.e(TAG, "Error during PDF document conversion", e)
+                                        Log.e(TAG, "Error during PDF document text extraction", e)
                                         ToolResult(
                                                 toolName = tool.name,
                                                 success = false,
                                                 result = StringResultData(""),
-                                                error =
-                                                        "Error converting PDF document: ${e.message}"
+                                                error = "Error extracting text from PDF document: ${e.message}"
                                         )
                                 }
                         }

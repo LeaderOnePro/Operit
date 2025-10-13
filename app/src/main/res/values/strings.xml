@@ -331,6 +331,9 @@
     <string name="tools_completed">工具执行完成</string>
     <string name="tools_failed">工具执行失败: %1$s</string>
     <string name="tool_result">工具执行结果</string>
+    <string name="disable_tools">禁用工具</string>
+    <string name="disable_tools_desc">禁用后，AI将无法调用任何工具，只能进行纯文本对话</string>
+    <string name="tools_disabled">工具已禁用</string>
     <string name="processing_input">正在处理输入...</string>
     <string name="references">参考资料:</string>
     <string name="tool_weather">天气查询</string>
@@ -1284,8 +1287,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">工具测试中心</string>
     <string name="tool_test_center_desc">测试AI工具的可用性和功能状态</string>
-    <string name="tool_format_converter">万能格式转换</string>
-    <string name="tool_format_converter_desc">支持多种文件格式之间的转换，方便快捷</string>
     <string name="tool_file_manager">文件管理器</string>
     <string name="tool_file_manager_desc">浏览和管理设备文件，支持多种操作</string>
     <string name="tool_tts">文本转语音</string>
@@ -1447,13 +1448,6 @@
     <string name="permission_group_other_denied">其他未授权权限</string>
     <string name="permission_group_other">其他权限</string>
     
-    <!-- Format Converter -->
-    <string name="format_converter_no_file_path">无法获取文件路径</string>
-    <string name="format_converter_select_file_error">选择文件失败: %s</string>
-    <string name="format_converter_complete_selection">请完成所有必要的选择</string>
-    <string name="format_converter_failed">转换失败，请重试</string>
-    <string name="format_converter_open_file_error">无法打开文件: %s</string>
-    <string name="format_converter_select_format">选择转换格式</string>
     <string name="target_format">目标格式</string>
     <string name="start_conversion">开始转换</string>
     <string name="conversion_success">转换成功</string>
@@ -1970,7 +1964,6 @@
     <string name="move_file_test">移动文件</string>
     <string name="zip_files_test">压缩文件</string>
     <string name="unzip_files_test">解压文件</string>
-    <string name="convert_file_test">格式转换</string>
     <string name="list_apps_test">列出应用</string>
     <string name="get_notifications_test">获取通知</string>
     <string name="device_location_test">设备位置</string>
@@ -2006,7 +1999,6 @@
     <string name="move_file_test_desc">移动并重命名文件</string>
     <string name="zip_files_test_desc">压缩测试目录</string>
     <string name="unzip_files_test_desc">解压测试文件</string>
-    <string name="convert_file_test_desc">将PNG转换为JPG</string>
     <string name="list_apps_test_desc">获取用户安装的应用列表</string>
     <string name="get_notifications_test_desc">获取最新的5条通知</string>
     <string name="device_location_test_desc">获取低精度设备位置</string>
@@ -2525,7 +2517,6 @@
     <string name="screen_title_theme_settings">主题设置</string>
     <string name="screen_title_chat_history_settings">聊天记录管理</string>
     <string name="screen_title_language_settings">语言设置</string>
-    <string name="screen_title_format_converter">万能格式转换</string>
     <string name="screen_title_file_manager">文件管理器</string>
     <string name="screen_title_terminal">命令终端</string>
     <string name="screen_title_terminal_auto_config">终端自动配置</string>

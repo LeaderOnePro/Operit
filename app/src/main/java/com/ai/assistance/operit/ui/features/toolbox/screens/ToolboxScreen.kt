@@ -80,7 +80,6 @@ data class Tool(
 @Composable
 fun ToolboxScreen(
         navController: NavController,
-        onFormatConverterSelected: () -> Unit,
         onFileManagerSelected: () -> Unit,
         onTerminalSelected: () -> Unit,
         onAppPermissionsSelected: () -> Unit,
@@ -116,13 +115,6 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_test_center_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onToolTesterSelected
-                        ),
-                        Tool(
-                                name = stringResource(R.string.tool_format_converter),
-                                icon = Icons.Rounded.Transform,
-                                description = stringResource(R.string.tool_format_converter_desc),
-                                category = ToolCategory.FILE_MANAGEMENT,
-                                onClick = onFormatConverterSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_file_manager),
@@ -435,16 +427,6 @@ fun ToolCard(tool: Tool) {
         }
 }
 
-/** 显示格式转换工具屏幕 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FormatConverterToolScreen(navController: NavController) {
-        CustomScaffold() { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) {
-                        FormatConverterScreen(navController = navController)
-                }
-        }
-}
 
 /** 显示文件管理器工具屏幕 */
 @OptIn(ExperimentalMaterial3Api::class)

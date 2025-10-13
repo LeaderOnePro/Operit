@@ -20,7 +20,6 @@ class JsToolManager
 private constructor(private val context: Context, private val packageManager: PackageManager) {
     companion object {
         private const val TAG = "JsToolManager"
-        private const val SCRIPT_TIMEOUT_MS = 180000L // 180 seconds timeout (3 minutes)
 
         @Volatile private var INSTANCE: JsToolManager? = null
 
@@ -127,7 +126,7 @@ private constructor(private val context: Context, private val packageManager: Pa
 
             // Execute the script with timeout
             try {
-                withTimeout(SCRIPT_TIMEOUT_MS) {
+                withTimeout(JsTimeoutConfig.SCRIPT_TIMEOUT_MS) {
                     Log.d(TAG, "Starting script execution for function: $functionName")
 
                     val startTime = System.currentTimeMillis()
@@ -201,7 +200,7 @@ private constructor(private val context: Context, private val packageManager: Pa
                                 toolName = tool.name,
                                 success = false,
                                 result = StringResultData(""),
-                                error = "Script execution timed out after ${SCRIPT_TIMEOUT_MS}ms"
+                                error = "Script execution timed out after ${JsTimeoutConfig.SCRIPT_TIMEOUT_MS}ms"
                         )
                 )
             } catch (e: Exception) {

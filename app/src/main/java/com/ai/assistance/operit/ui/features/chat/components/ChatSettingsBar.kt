@@ -87,6 +87,8 @@ fun ChatSettingsBar(
         onNavigateToModelPrompts: () -> Unit,
     isAutoReadEnabled: Boolean,
     onToggleAutoRead: () -> Unit,
+    enableTools: Boolean,
+    onToggleTools: () -> Unit,
     onManualMemoryUpdate: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -194,6 +196,14 @@ fun ChatSettingsBar(
                         imageVector = Icons.Rounded.VolumeUp,
                         contentDescription = stringResource(R.string.auto_read_active),
                         tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                AnimatedVisibility(visible = !enableTools) {
+                    Icon(
+                        imageVector = Icons.Outlined.Block,
+                        contentDescription = stringResource(R.string.tools_disabled),
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -393,6 +403,36 @@ fun ChatSettingsBar(
                                 onInfoClick = {
                                         infoPopupContent =
                                                 context.getString(R.string.ai_planning_mode) to context.getString(R.string.ai_planning_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            Divider(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                thickness = 0.5.dp,
+                                    color =
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                    alpha = 0.2f
+                                            )
+                            )
+
+                            // 禁用工具
+                            SettingItem(
+                                title = stringResource(R.string.disable_tools),
+                                    icon =
+                                            if (!enableTools) Icons.Outlined.Block
+                                            else Icons.Outlined.Build,
+                                    iconTint =
+                                            if (!enableTools) MaterialTheme.colorScheme.error
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    ),
+                                isChecked = !enableTools,
+                                onToggle = onToggleTools,
+                                onInfoClick = {
+                                        infoPopupContent =
+                                                context.getString(R.string.disable_tools) to context.getString(R.string.disable_tools_desc)
                                     showMenu = false
                                 }
                             )

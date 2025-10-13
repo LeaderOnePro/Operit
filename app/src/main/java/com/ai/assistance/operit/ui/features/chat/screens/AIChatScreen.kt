@@ -153,6 +153,7 @@ fun AIChatScreen(
     val enableThinkingGuidance by
             actualViewModel.enableThinkingGuidance.collectAsState() // 收集思考引导状态
     val enableMemoryAttachment by actualViewModel.enableMemoryAttachment.collectAsState()
+    val enableTools by actualViewModel.enableTools.collectAsState()
     val summaryTokenThreshold by actualViewModel.summaryTokenThreshold.collectAsState()
     val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
     val showChatHistorySelector by actualViewModel.showChatHistorySelector.collectAsState()
@@ -521,6 +522,7 @@ fun AIChatScreen(
                                     actualViewModel.updateAttachmentPanelState(newState)
                                 },
                                 showInputProcessingStatus = showInputProcessingStatus,
+                                enableTools = enableTools,
                                 replyToMessage = replyToMessage,
                                 onClearReply = { actualViewModel.clearReplyToMessage() }
                         )
@@ -657,6 +659,8 @@ fun AIChatScreen(
                                 onNavigateToModelPrompts = onNavigateToModelPrompts,
                                 isAutoReadEnabled = isAutoReadEnabled,
                                 onToggleAutoRead = { actualViewModel.toggleAutoRead() },
+                                enableTools = enableTools,
+                                onToggleTools = { actualViewModel.toggleTools() },
                                 onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() }
                         )
                     }

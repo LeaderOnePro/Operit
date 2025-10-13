@@ -8,11 +8,7 @@ fun getJsToolsDefinition(): String {
             // 文件系统操作
             Files: {
                 list: (path) => toolCall("list_files", { path }),
-                read: (path) => toolCall("read_file", { path }),
-                // 分段读取文件内容
-                readPart: (path, partIndex) => toolCall("read_file_part", { path, partIndex }),
-                // 读取完整文件内容
-                readFull: (path) => toolCall("read_file_full", { path }),
+                read: (path) => toolCall("read_file_full", { path }),
                 write: (path, content, append) => {
                     const params = { path, content };
                     if (append !== undefined) params.append = append ? "true" : "false";
@@ -58,19 +54,6 @@ fun getJsToolsDefinition(): String {
                     return toolCall("share_file", params);
                 },
                 download: (url, destination) => toolCall("download_file", { url, destination }),
-                convert: (sourcePath, targetPath, options = {}) => {
-                    const params = {
-                        source_path: sourcePath,
-                        target_path: targetPath,
-                        ...options
-                    };
-                    return toolCall("convert_file", params);
-                },
-                // 获取支持的文件转换格式
-                getSupportedConversions: (formatType = null) => {
-                    const params = formatType ? { format_type: formatType } : {};
-                    return toolCall("get_supported_conversions", params);
-                }
             },
             // 网络操作
             Net: {

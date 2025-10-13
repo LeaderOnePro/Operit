@@ -82,6 +82,9 @@ class ApiPreferences private constructor(private val context: Context) {
         val WAIFU_ENABLE_SELFIE = booleanPreferencesKey("waifu_enable_selfie") // 是否启用自拍功能
         val WAIFU_SELFIE_PROMPT = stringPreferencesKey("waifu_selfie_prompt") // 自拍功能的外貌提示词
 
+        // Key for Tools Enable/Disable
+        val ENABLE_TOOLS = booleanPreferencesKey("enable_tools")
+
         // Keys for Summary Settings
         val ENABLE_SUMMARY = booleanPreferencesKey("enable_summary")
         val ENABLE_SUMMARY_BY_MESSAGE_COUNT = booleanPreferencesKey("enable_summary_by_message_count")
@@ -127,6 +130,9 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_WAIFU_ENABLE_EMOTICONS = false // 默认不启用表情包
         const val DEFAULT_WAIFU_ENABLE_SELFIE = false // 默认不启用自拍功能
         const val DEFAULT_WAIFU_SELFIE_PROMPT = "kipfel vrchat, long hair, Matcha color hair, purple eyes, sweater vest, black skirt, black necktie, collared shirt, long sleeves, black headwear, beanie, pleated skirt, hair bun, white shirt, hair ribbon, hairclip, hair between eyes, black footwear, blush, hair ornament, cat hat, very long hair, sweater, animal ear headwear, bag, bandaid on leg, socks" // 默认外貌提示词
+
+        // Default value for Tools Enable/Disable
+        const val DEFAULT_ENABLE_TOOLS = true
 
         // Default values for Summary Settings
         const val DEFAULT_ENABLE_SUMMARY = true
@@ -253,6 +259,12 @@ class ApiPreferences private constructor(private val context: Context) {
     val waifuSelfiePromptFlow: Flow<String> =
         context.apiDataStore.data.map { preferences ->
             preferences[WAIFU_SELFIE_PROMPT] ?: DEFAULT_WAIFU_SELFIE_PROMPT
+        }
+
+    // Flow for Tools Enable/Disable
+    val enableToolsFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_TOOLS] ?: DEFAULT_ENABLE_TOOLS
         }
 
     // Flows for Summary Settings
@@ -405,6 +417,13 @@ class ApiPreferences private constructor(private val context: Context) {
     suspend fun saveWaifuSelfiePrompt(selfiePrompt: String) {
         context.apiDataStore.edit { preferences ->
             preferences[WAIFU_SELFIE_PROMPT] = selfiePrompt
+        }
+    }
+
+    // Save Tools Enable/Disable setting
+    suspend fun saveEnableTools(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_TOOLS] = isEnabled
         }
     }
 

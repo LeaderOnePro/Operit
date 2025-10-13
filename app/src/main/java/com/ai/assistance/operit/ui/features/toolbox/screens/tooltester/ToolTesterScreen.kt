@@ -316,7 +316,6 @@ private fun getFinalToolTestGroups(context: android.content.Context): List<ToolG
             ToolTest("move_file", context.getString(R.string.move_file_test), context.getString(R.string.move_file_test_desc), listOf(ToolParameter("source", testFileCopy), ToolParameter("destination", "$testBaseDir/moved_file.txt"))),
             ToolTest("zip_files", context.getString(R.string.zip_files_test), context.getString(R.string.zip_files_test_desc), listOf(ToolParameter("source", testBaseDir), ToolParameter("destination", testZip))),
             ToolTest("unzip_files", context.getString(R.string.unzip_files_test), context.getString(R.string.unzip_files_test_desc), listOf(ToolParameter("source", testZip), ToolParameter("destination", testUnzipDir))),
-            ToolTest("convert_file", context.getString(R.string.convert_file_test), context.getString(R.string.convert_file_test_desc), listOf(ToolParameter("source_path", testImage), ToolParameter("target_path", "$testBaseDir/converted.jpg")))
         )),
         ToolGroup(context.getString(R.string.system_group), false, false, listOf(
             ToolTest("list_installed_apps", context.getString(R.string.list_apps_test), context.getString(R.string.list_apps_test_desc), listOf(ToolParameter("include_system_apps", "false"))),

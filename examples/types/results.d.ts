@@ -178,31 +178,6 @@ export interface GrepResultData {
     toString(): string;
 }
 
-/**
- * File conversion result data
- */
-export interface FileConversionResultData {
-    sourcePath: string;
-    targetPath: string;
-    sourceFormat: string;
-    targetFormat: string;
-    conversionType: string;  // "document", "image", "audio", "video", "archive", "extract"
-    quality?: string;
-    fileSize: number;
-    duration: number;
-    metadata: Record<string, string>; // Contains extra info like error details, password status for encrypted archives
-    toString(): string;
-}
-
-/**
- * File format conversion support data
- */
-export interface FileFormatConversionsResultData {
-    formatType?: string;
-    conversions: Record<string, string[]>;
-    fileTypes: Record<string, string[]>;
-    toString(): string;
-}
 
 // ============================================================================
 // HTTP and Network Types
@@ -615,13 +590,6 @@ export interface UIActionResult extends BaseResult {
 
 
 
-export interface FileConversionResult extends BaseResult {
-    data: FileConversionResultData;
-}
-
-export interface FileFormatConversionsResult extends BaseResult {
-    data: FileFormatConversionsResultData;
-}
 
 export interface ADBResult extends BaseResult {
     data: ADBResultData;

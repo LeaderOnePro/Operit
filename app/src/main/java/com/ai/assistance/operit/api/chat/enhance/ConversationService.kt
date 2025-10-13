@@ -190,6 +190,9 @@ class ConversationService(
                 // 获取自定义系统提示模板
                 val finalCustomSystemPromptTemplate = customSystemPromptTemplate ?: apiPreferences.customSystemPromptTemplateFlow.first()
 
+                // 获取工具启用状态
+                val enableTools = apiPreferences.enableToolsFlow.first()
+
                 // 获取系统提示词，现在传入workspacePath
                 val systemPrompt =
                         SystemPromptConfig.getSystemPromptWithCustomPrompts(
@@ -197,7 +200,8 @@ class ConversationService(
                         workspacePath,
                         introPrompt,
                                 thinkingGuidance,
-                                finalCustomSystemPromptTemplate
+                                finalCustomSystemPromptTemplate,
+                                enableTools
                 )
 
                 // 构建waifu特殊规则

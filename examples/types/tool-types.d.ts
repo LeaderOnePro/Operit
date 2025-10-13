@@ -25,7 +25,7 @@ import {
 export type FileToolName = 'list_files' | 'read_file' | 'read_file_part' | 'read_file_full' | 'write_file' | 'delete_file' | 'file_exists' |
     'move_file' | 'copy_file' | 'make_directory' | 'find_files' | 'file_info' |
     'zip_files' | 'unzip_files' | 'open_file' | 'share_file' | 'download_file' |
-    'convert_file' | 'get_supported_conversions' | 'apply_file';
+    'apply_file';
 
 /**
  * Network tool names
@@ -101,8 +101,6 @@ export interface ToolResultMap {
     'open_file': FileOperationData;
     'share_file': FileOperationData;
     'download_file': FileOperationData;
-    'convert_file': FileConversionResultData;
-    'get_supported_conversions': FileFormatConversionsResultData;
     'apply_file': FileApplyResultData;
 
     // Network operations

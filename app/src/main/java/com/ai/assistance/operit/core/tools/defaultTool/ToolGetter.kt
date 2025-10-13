@@ -139,14 +139,6 @@ object ToolGetter {
         return StandardFFmpegToolExecutor(context)
     }
 
-    /**
-     * 获取文件转换工具执行器
-     * @param context 应用上下文
-     * @return 文件转换工具执行器实现（只有标准版本）
-     */
-    fun getFileConverterToolExecutor(context: Context): FileConverterToolExecutor {
-        return FileConverterToolExecutor(context)
-    }
 
     /**
      * 获取FFmpeg信息工具执行器

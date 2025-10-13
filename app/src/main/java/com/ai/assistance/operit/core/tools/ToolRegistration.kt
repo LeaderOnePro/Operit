@@ -835,29 +835,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
-    // 文件格式转换工具
-    val fileConverterTool = ToolGetter.getFileConverterToolExecutor(context)
-
-    // 文件格式转换
-    handler.registerTool(
-            name = "convert_file",
-            category = ToolCategory.FILE_WRITE,
-            dangerCheck = { true }, // 总是危险操作，因为会创建新文件
-            descriptionGenerator = { tool ->
-                val sourcePath = tool.parameters.find { it.name == "source_path" }?.value ?: ""
-                val targetPath = tool.parameters.find { it.name == "target_path" }?.value ?: ""
-                "转换文件格式: $sourcePath → $targetPath"
-            },
-            executor = { tool -> fileConverterTool.invoke(tool) }
-    )
-
-    // 获取支持的文件转换格式
-    handler.registerTool(
-            name = "get_supported_conversions",
-            category = ToolCategory.FILE_READ,
-            descriptionGenerator = { _ -> "获取支持的文件转换格式" },
-            executor = { tool -> fileConverterTool.invoke(tool) }
-    )
 
     // UI自动化工具
     val automationTools = com.ai.assistance.operit.core.tools.automatic.AutomationTools(context, handler)

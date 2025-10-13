@@ -43,7 +43,6 @@ import com.ai.assistance.operit.ui.features.settings.screens.TokenUsageStatistic
 import com.ai.assistance.operit.ui.features.token.TokenConfigWebViewScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.AppPermissionsToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.FileManagerToolScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.FormatConverterToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.LogcatToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.ShellExecutorToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.StreamMarkdownDemoScreen
@@ -247,7 +246,6 @@ sealed class Screen(
         ) {
             ToolboxScreen(
                     navController = navController,
-                    onFormatConverterSelected = { navigateTo(FormatConverter) },
                     onFileManagerSelected = { navigateTo(FileManager) },
                     onTerminalSelected = { navigateTo(Terminal) },
                     onAppPermissionsSelected = { navigateTo(AppPermissions) },
@@ -740,22 +738,6 @@ sealed class Screen(
     }
 
     // Toolbox secondary screens
-    data object FormatConverter :
-            Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_format_converter) {
-        @Composable
-        override fun Content(
-                navController: NavController,
-                navigateTo: ScreenNavigationHandler,
-                updateNavItem: NavItemChangeHandler,
-                onGoBack: () -> Unit,
-                hasBackgroundImage: Boolean,
-                onLoading: (Boolean) -> Unit,
-                onError: (String) -> Unit,
-                onGestureConsumed: (Boolean) -> Unit
-        ) {
-            FormatConverterToolScreen(navController = navController)
-        }
-    }
 
     data object FileManager :
             Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_file_manager) {

@@ -4,7 +4,7 @@
 
 ## 概述
 
-所有文件系统相关的功能都封装在全局的 `Tools.Files` 命名空间下。这个模块涵盖了从基本的读写、移动、删除，到更高级的压缩、下载和文件转换等操作。
+所有文件系统相关的功能都封装在全局的 `Tools.Files` 命名空间下。这个模块涵盖了从基本的读写、移动、删除，到更高级的压缩、下载等操作。
 
 ---
 
@@ -42,14 +42,6 @@
 
 -   `open(path: string): Promise<FileOperationData>`: 请求系统使用默认的应用打开指定文件。
 -   `share(path: string): Promise<FileOperationData>`: 调用系统的分享菜单来分享指定文件。
-
-### 文件格式转换
-
--   `convert(sourcePath: string, targetPath: string, options?: object): Promise<FileConversionResultData>`:
-    转换文件格式。这是一个强大的功能，底层可能调用 FFmpeg 或其他库。
-    -   **`options`** 对象可以包含 `quality`, `video_codec`, `audio_codec`, `resolution`, `bitrate` 等参数。
--   `getSupportedConversions(formatType?: string): Promise<FileFormatConversionsResultData>`:
-    获取当前环境支持的文件格式转换类型。可以按 `image`, `audio`, `video`, `document` 等进行过滤。
 
 **示例: 读写文件**
 ```typescript

@@ -30,6 +30,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.util.Base64
 import com.ai.assistance.operit.core.tools.BinaryResultData
+import com.ai.assistance.operit.core.tools.javascript.JsTimeoutConfig
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -63,9 +64,6 @@ import kotlinx.serialization.json.jsonPrimitive
 class JsEngine(private val context: Context) {
     companion object {
         private const val TAG = "JsEngine"
-        private const val TIMEOUT_SECONDS = 180L // 超时时间：3分钟
-        private const val PRE_TIMEOUT_SECONDS = 175L // 提前5秒触发JavaScript端的超时保护
-        private const val ASYNC_PROMISE_TIMEOUT_SECONDS = 170L // Promise异步超时：170秒，比主超时稍短
         private const val BINARY_DATA_THRESHOLD = 32 * 1024 // 32KB
         private const val BINARY_HANDLE_PREFIX = "@binary_handle:"
     }
@@ -524,14 +522,14 @@ class JsEngine(private val context: Context) {
                     // 创建一个超时保护，确保非常长时间运行的Promise最终会被处理
                     const asyncTimeout = setTimeout(() => {
                         if (!window._hasCompleted) {
-                            console.log("Async Promise timeout reached after $ASYNC_PROMISE_TIMEOUT_SECONDS seconds");
+                            console.log("Async Promise timeout reached after ${JsTimeoutConfig.ASYNC_PROMISE_TIMEOUT_SECONDS} seconds");
                             // 尝试安全地完成执行
                             try {
                                 window._hasCompleted = true;
                                 // 创建超时结果
                                 const timeoutResult = {
                                     warning: "Operation timeout", 
-                                    result: "Promise did not resolve within the time limit ($ASYNC_PROMISE_TIMEOUT_SECONDS seconds)"
+                                    result: "Promise did not resolve within the time limit (${JsTimeoutConfig.ASYNC_PROMISE_TIMEOUT_SECONDS} seconds)"
                                 };
                                 
                                 NativeInterface.setResult(JSON.stringify(timeoutResult));
@@ -540,7 +538,7 @@ class JsEngine(private val context: Context) {
                                 console.error("Error during timeout handling:", e);
                             }
                         }
-                    }, ${ASYNC_PROMISE_TIMEOUT_SECONDS * 1000}); // 比主超时稍短
+                    }, ${JsTimeoutConfig.ASYNC_PROMISE_TIMEOUT_SECONDS * 1000}); // 比主超时稍短
                     
                     possiblePromise
                         .then(result => {
@@ -680,16 +678,16 @@ class JsEngine(private val context: Context) {
             // 设置安全超时机制
             window._safetyTimeout = setTimeout(function() {
                 if (!window._hasCompleted) {
-                    console.log("Safety timeout warning at " + (${TIMEOUT_SECONDS-5}) + " seconds");
+                    console.log("Safety timeout warning at " + (${JsTimeoutConfig.PRE_TIMEOUT_SECONDS}) + " seconds");
                     // 不立即结束，而是添加另一个最终超时
                     setTimeout(function() {
                         if (!window._hasCompleted) {
                             window._hasCompleted = true;
-                            NativeInterface.setResult("Script execution timed out after ${TIMEOUT_SECONDS} seconds");
+                            NativeInterface.setResult("Script execution timed out after ${JsTimeoutConfig.MAIN_TIMEOUT_SECONDS} seconds");
                         }
                     }, 5000); // 再等5秒
                 }
-            }, ${(TIMEOUT_SECONDS-5) * 1000});
+            }, ${JsTimeoutConfig.PRE_TIMEOUT_SECONDS * 1000});
             
             // 执行用户脚本
             try {
@@ -831,11 +829,11 @@ class JsEngine(private val context: Context) {
                             }
                         }
                     },
-                    PRE_TIMEOUT_SECONDS * 1000
+                    JsTimeoutConfig.PRE_TIMEOUT_SECONDS * 1000
             )
 
             try {
-                val result = future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                val result = future.get(JsTimeoutConfig.MAIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 preTimeoutTimer.cancel()
                 result
             } catch (e: Exception) {

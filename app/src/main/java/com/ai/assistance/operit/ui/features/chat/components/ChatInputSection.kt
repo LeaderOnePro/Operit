@@ -75,6 +75,7 @@ fun ChatInputSection(
     externalAttachmentPanelState: Boolean? = null,
     onAttachmentPanelStateChange: ((Boolean) -> Unit)? = null,
     showInputProcessingStatus: Boolean = true,
+    enableTools: Boolean = true, // 工具是否启用
     replyToMessage: ChatMessage? = null, // 回复目标消息
     onClearReply: (() -> Unit)? = null // 清除回复状态的回调
 ) {
@@ -271,6 +272,7 @@ fun ChatInputSection(
                     }
                 }
             }
+
 
             // Attachment chips row - only show if there are attachments
             if (attachments.isNotEmpty()) {

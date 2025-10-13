@@ -1232,8 +1232,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">Tool Test Center</string>
     <string name="tool_test_center_desc">Test the availability and functionality of AI tools</string>
-    <string name="tool_format_converter">Universal Format Converter</string>
-    <string name="tool_format_converter_desc">Support conversion between multiple file formats, convenient and fast</string>
     <string name="tool_file_manager">File Manager</string>
     <string name="tool_file_manager_desc">Browse and manage device files with various operations support</string>
     <string name="tool_tts">Text-to-Speech</string>
@@ -1447,13 +1445,6 @@
     <string name="permission_group_other_denied">Other denied permissions</string>
     <string name="permission_group_other">Other permissions</string>
     
-    <!-- Format Converter -->
-    <string name="format_converter_no_file_path">Cannot get file path</string>
-    <string name="format_converter_select_file_error">File selection failed: %s</string>
-    <string name="format_converter_complete_selection">Please complete all necessary selections</string>
-    <string name="format_converter_failed">Conversion failed, please try again</string>
-    <string name="format_converter_open_file_error">Cannot open file: %s</string>
-    <string name="format_converter_select_format">Select conversion format</string>
     <string name="target_format">Target format</string>
     <string name="start_conversion">Start conversion</string>
     <string name="conversion_success">Conversion successful</string>
@@ -1956,7 +1947,6 @@
     <string name="move_file_test">Move File</string>
     <string name="zip_files_test">Zip Files</string>
     <string name="unzip_files_test">Unzip Files</string>
-    <string name="convert_file_test">Convert File</string>
     <string name="list_apps_test">List Apps</string>
     <string name="get_notifications_test">Get Notifications</string>
     <string name="device_location_test">Device Location</string>
@@ -1992,7 +1982,6 @@
     <string name="move_file_test_desc">Move and rename file</string>
     <string name="zip_files_test_desc">Compress test directory</string>
     <string name="unzip_files_test_desc">Extract test files</string>
-    <string name="convert_file_test_desc">Convert PNG to JPG</string>
     <string name="list_apps_test_desc">Get user installed app list</string>
     <string name="get_notifications_test_desc">Get latest 5 notifications</string>
     <string name="device_location_test_desc">Get low-precision device location</string>
@@ -2518,7 +2507,6 @@
     <string name="screen_title_theme_settings">Theme Settings</string>
     <string name="screen_title_chat_history_settings">Chat History Management</string>
     <string name="screen_title_language_settings">Language Settings</string>
-    <string name="screen_title_format_converter">Universal Format Converter</string>
     <string name="screen_title_file_manager">File Manager</string>
     <string name="screen_title_terminal">Command Terminal</string>
     <string name="screen_title_terminal_auto_config">Terminal Auto Configuration</string>

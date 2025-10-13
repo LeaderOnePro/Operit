@@ -4,8 +4,8 @@
 
 import {
     DirectoryListingData, FileContentData, FileOperationData, FileExistsData,
-    FindFilesResultData, FileInfoData, FileConversionResultData, FileFormatConversionsResultData,
-    FilePartContentData, FileApplyResultData, GrepResultData
+    FindFilesResultData, FileInfoData,
+    FileApplyResultData, GrepResultData
 } from './results';
 import { FFmpegVideoCodec, FFmpegAudioCodec, FFmpegResolution, FFmpegBitrate } from './ffmpeg';
 
@@ -20,23 +20,10 @@ export namespace Files {
     function list(path: string): Promise<DirectoryListingData>;
 
     /**
-     * Read file contents
+     * Read file contents (always reads complete file)
      * @param path - Path to file
      */
     function read(path: string): Promise<FileContentData>;
-
-    /**
-     * Read file contents by parts
-     * @param path - Path to file
-     * @param partIndex - Index of the part to read
-     */
-    function readPart(path: string, partIndex: number): Promise<FilePartContentData>;
-
-    /**
-     * Read complete file contents
-     * @param path - Path to file
-     */
-    function readFull(path: string): Promise<FileContentData>;
 
     /**
      * Write content to file
@@ -154,25 +141,4 @@ export namespace Files {
      */
     function download(url: string, destination: string): Promise<FileOperationData>;
 
-    /**
-     * Convert a file
-     * @param source_path - Source file path
-     * @param target_path - Target file path
-     * @param options - Conversion options
-     */
-    function convert(source_path: string, target_path: string, options?: {
-        quality?: 'low' | 'medium' | 'high' | 'lossless';
-        video_codec?: FFmpegVideoCodec;
-        audio_codec?: FFmpegAudioCodec;
-        resolution?: FFmpegResolution;
-        bitrate?: FFmpegBitrate;
-        extra_params?: string;
-        password?: string;
-    }): Promise<FileConversionResultData>;
-
-    /**
-     * Get supported conversions for a file
-     * @param format_type - Optional file type filter (e.g., "image", "audio", "video", "document", "archive")
-     */
-    function getSupportedConversions(format_type?: string): Promise<FileFormatConversionsResultData>;
 } 

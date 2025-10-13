@@ -72,6 +72,9 @@ class ApiConfigDelegate(
     private val _summaryMessageCountThreshold = MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD)
     val summaryMessageCountThreshold: StateFlow<Int> = _summaryMessageCountThreshold.asStateFlow()
 
+    private val _enableTools = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_TOOLS)
+    val enableTools: StateFlow<Boolean> = _enableTools.asStateFlow()
+
     // 为了兼容现有代码，添加API密钥状态流
     private val _apiKey = MutableStateFlow("")
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
@@ -199,6 +202,13 @@ class ApiConfigDelegate(
         viewModelScope.launch {
             apiPreferences.summaryMessageCountThresholdFlow.collect { threshold ->
                 _summaryMessageCountThreshold.value = threshold
+            }
+        }
+
+        // Collect enable tools setting
+        viewModelScope.launch {
+            apiPreferences.enableToolsFlow.collect { enabled ->
+                _enableTools.value = enabled
             }
         }
     }
@@ -357,6 +367,15 @@ class ApiConfigDelegate(
         viewModelScope.launch {
             apiPreferences.saveSummaryMessageCountThreshold(threshold)
             _summaryMessageCountThreshold.value = threshold
+        }
+    }
+
+    /** 切换工具启用/禁用 */
+    fun toggleTools() {
+        viewModelScope.launch {
+            val newValue = !_enableTools.value
+            apiPreferences.saveEnableTools(newValue)
+            _enableTools.value = newValue
         }
     }
 }
