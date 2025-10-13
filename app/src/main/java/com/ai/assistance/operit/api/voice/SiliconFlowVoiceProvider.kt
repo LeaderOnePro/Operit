@@ -23,7 +23,8 @@ import java.net.URL
 class SiliconFlowVoiceProvider(
     private val context: Context,
     private val apiKey: String,
-    initialVoiceId: String
+    initialVoiceId: String,
+    private val initialModelName: String = ""
 ) : VoiceService {
     companion object {
         private const val TAG = "SiliconFlowVoiceProvider"
@@ -34,28 +35,18 @@ class SiliconFlowVoiceProvider(
         private const val GAIN = 0
 
         // 可用音色列表 - 根据硅基流动官方文档
+        // 注意：现在只列出音色名称，模型在设置中独立配置
         val AVAILABLE_VOICES = listOf(
-            // FunAudioLLM/CosyVoice2-0.5B 模型音色
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:alex", "Alex - 沉稳男声", "zh-CN", "MALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:benjamin", "Benjamin - 低沉男声", "zh-CN", "MALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:charles", "Charles - 磁性男声", "zh-CN", "MALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:david", "David - 欢快男声", "zh-CN", "MALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:anna", "Anna - 沉稳女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:bella", "Bella - 激情女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:claire", "Claire - 温柔女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("FunAudioLLM/CosyVoice2-0.5B:diana", "Diana - 欢快女声", "zh-CN", "FEMALE"),
-            
-            // fishaudio/fish-speech-1.4 模型音色
-            VoiceService.Voice("fishaudio/fish-speech-1.4:alex", "Alex - Fish模型沉稳男声", "zh-CN", "MALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:benjamin", "Benjamin - Fish模型低沉男声", "zh-CN", "MALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:charles", "Charles - Fish模型磁性男声", "zh-CN", "MALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:david", "David - Fish模型欢快男声", "zh-CN", "MALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:anna", "Anna - Fish模型沉稳女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:bella", "Bella - Fish模型激情女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:claire", "Claire - Fish模型温柔女声", "zh-CN", "FEMALE"),
-            VoiceService.Voice("fishaudio/fish-speech-1.4:diana", "Diana - Fish模型欢快女声", "zh-CN", "FEMALE")
+            VoiceService.Voice("alex", "Alex - 沉稳男声", "zh-CN", "MALE"),
+            VoiceService.Voice("benjamin", "Benjamin - 低沉男声", "zh-CN", "MALE"),
+            VoiceService.Voice("charles", "Charles - 磁性男声", "zh-CN", "MALE"),
+            VoiceService.Voice("david", "David - 欢快男声", "zh-CN", "MALE"),
+            VoiceService.Voice("anna", "Anna - 沉稳女声", "zh-CN", "FEMALE"),
+            VoiceService.Voice("bella", "Bella - 激情女声", "zh-CN", "FEMALE"),
+            VoiceService.Voice("claire", "Claire - 温柔女声", "zh-CN", "FEMALE"),
+            VoiceService.Voice("diana", "Diana - 欢快女声", "zh-CN", "FEMALE")
         )
-        val DEFAULT_VOICE_ID = "FunAudioLLM/CosyVoice2-0.5B:charles"
+        val DEFAULT_VOICE_ID = "charles"
     }
 
     // 当前音色
@@ -117,20 +108,68 @@ class SiliconFlowVoiceProvider(
 
             _isSpeaking.value = true
 
-            val model = voiceId.substringBeforeLast(':')
+            // 从 extraParams 获取自定义的 model 和 voice，如果没有则使用配置或默认值
+            val customModel = extraParams["model"]
+            val customVoice = extraParams["voice"]
+            
+            val (model, voice) = when {
+                // 优先使用 extraParams 中的自定义值
+                customModel != null && customVoice != null -> {
+                    customModel to customVoice
+                }
+                customModel != null -> {
+                    // 只指定了model，使用voiceId作为voice
+                    customModel to voiceId
+                }
+                customVoice != null -> {
+                    // 只指定了voice，使用配置的model或默认model
+                    val modelName = initialModelName.ifBlank { "FunAudioLLM/CosyVoice2-0.5B" }
+                    modelName to customVoice
+                }
+                else -> {
+                    // 使用配置的model（或默认）和voiceId
+                    val modelName = initialModelName.ifBlank { "FunAudioLLM/CosyVoice2-0.5B" }
+                    modelName to voiceId
+                }
+            }
 
+            // 清理 voice 字符串，去除可能的空白字符
+            val cleanVoice = voice.trim()
+            
             // 构建请求体
             val requestBody = buildString {
                 append("{")
                 append("\"model\":\"$model\",")
                 append("\"input\":\"${text.replace("\"", "\\\"")}\",")
-                append("\"voice\":\"$voiceId\",")
+                
+                // 根据官方文档：
+                // 1. 系统预定义音色（如 alex, bella）需要格式为 "model:voice"
+                // 2. 用户自定义音色（以 speech: 开头）直接使用完整的 voice ID
+                // 两种情况都使用 voice 字段
+                val voiceValue = if (cleanVoice.startsWith("speech:")) {
+                    // 自定义音色，直接使用完整 ID
+                    cleanVoice
+                } else {
+                    // 预置音色，需要加上模型前缀
+                    if (cleanVoice.contains(":")) {
+                        // 如果已经包含冒号，说明已经是完整格式
+                        cleanVoice
+                    } else {
+                        // 否则添加模型前缀
+                        "$model:$cleanVoice"
+                    }
+                }
+                append("\"voice\":\"$voiceValue\",")
+                
                 append("\"response_format\":\"$RESPONSE_FORMAT\",")
                 append("\"sample_rate\":$SAMPLE_RATE,")
                 append("\"speed\":$SPEED,")
                 append("\"gain\":$GAIN")
                 append("}")
             }
+
+            Log.d(TAG, "TTS请求参数 - model: $model, voice: $voice")
+            Log.d(TAG, "TTS请求体: $requestBody")
 
             // 发送HTTP请求
             val url = URL(API_URL)
@@ -260,10 +299,13 @@ class SiliconFlowVoiceProvider(
     }
 
     override suspend fun setVoice(voiceId: String): Boolean {
-        if (AVAILABLE_VOICES.any { it.id == voiceId }) {
+        // 支持系统预置音色和用户自定义音色（以speech:开头）
+        if (AVAILABLE_VOICES.any { it.id == voiceId } || voiceId.startsWith("speech:")) {
             this.voiceId = voiceId
+            Log.d(TAG, "设置音色: $voiceId")
             return true
         }
+        Log.w(TAG, "不支持的音色ID: $voiceId")
         return false
     }
 } 

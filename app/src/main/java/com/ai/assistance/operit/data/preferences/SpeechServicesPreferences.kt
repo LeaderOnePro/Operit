@@ -33,7 +33,8 @@ class SpeechServicesPreferences(private val context: Context) {
         val httpMethod: String = "GET", // HTTP方法：GET 或 POST
         val requestBody: String = "", // POST请求的body模板，支持占位符如{text}
         val contentType: String = "application/json", // POST请求的Content-Type
-        val voiceId: String = "" // 特定于TTS提供商的音色ID
+        val voiceId: String = "", // 特定于TTS提供商的音色ID
+        val modelName: String = "" // TTS模型名称（用于SiliconFlow等）
     )
 
     companion object {
@@ -58,7 +59,8 @@ class SpeechServicesPreferences(private val context: Context) {
             httpMethod = "GET",
             requestBody = "",
             contentType = "application/json",
-            voiceId = ""
+            voiceId = "",
+            modelName = ""
         )
     }
 

@@ -1752,13 +1752,17 @@
     <string name="speech_services_siliconflow_config">硅基流动 TTS 配置</string>
     <string name="speech_services_siliconflow_api_key">API 密钥</string>
     <string name="speech_services_siliconflow_api_key_placeholder">请输入您的硅基流动API密钥</string>
+    <string name="speech_services_siliconflow_model_settings">模型设置</string>
+    <string name="speech_services_siliconflow_model_name">TTS 模型</string>
+    <string name="speech_services_siliconflow_model_name_placeholder">例如：FunAudioLLM/CosyVoice2-0.5B</string>
+    <string name="speech_services_siliconflow_model_name_hint">留空使用默认模型 FunAudioLLM/CosyVoice2-0.5B，支持 fishaudio/fish-speech-1.4 等模型</string>
     <string name="speech_services_siliconflow_voice_settings">音色设置</string>
     <string name="speech_services_siliconflow_voice_select">选择预设音色</string>
     <string name="speech_services_siliconflow_voice_select_icon">选择音色</string>
     <string name="speech_services_siliconflow_voice_custom">自定义音色</string>
-    <string name="speech_services_siliconflow_voice_id">音色ID（可直接输入）</string>
-    <string name="speech_services_siliconflow_voice_id_placeholder">例如：FunAudioLLM/CosyVoice2-0.5B:charles 或用户自定义音色ID</string>
-    <string name="speech_services_siliconflow_voice_id_hint">支持系统预置音色和用户上传的自定义音色</string>
+    <string name="speech_services_siliconflow_voice_id">音色 ID</string>
+    <string name="speech_services_siliconflow_voice_id_placeholder">例如：charles 或 speech:kll:32w2b3aj5b:orvmnmpjkqchqalegwvi</string>
+    <string name="speech_services_siliconflow_voice_id_hint">预设音色（alex/benjamin/charles等）或自定义音色（speech:开头的URI）</string>
     
     <!-- STT Configuration -->
     <string name="speech_services_stt_info">目前仅支持本地 Sherpa-NCNN 引擎。</string>

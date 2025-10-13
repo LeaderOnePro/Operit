@@ -2,7 +2,7 @@
 METADATA
 {
     "name": "daily_life",
-    "description": "日常生活工具集合，提供丰富的日常功能接口，包括日期时间查询、设备状态监测、天气搜索、提醒闹钟设置、短信电话通讯等。通过系统Intent实现各类日常任务，支持用户便捷地完成日常交互需求。",
+    "description": "日常生活工具集合，提供丰富的日常功能接口，包括日期时间查询、设备状态监测、天气搜索、提醒闹钟设置、短信电话通讯、手电筒控制、音量调节等。通过系统Intent和UI模拟实现各类日常任务，支持用户便捷地完成日常交互需求。",
     "enabledByDefault": true,
     "tools": [
         {
@@ -120,6 +120,36 @@ METADATA
                     "name": "location",
                     "description": "要查询天气的位置（城市名称或'current'表示当前位置）",
                     "type": "string",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "toggle_flashlight",
+            "description": "打开或关闭手电筒",
+            "parameters": [
+                {
+                    "name": "state",
+                    "description": "手电筒状态：'on'表示打开，'off'表示关闭",
+                    "type": "string",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "adjust_volume",
+            "description": "调节设备音量，通过模拟按键点击实现",
+            "parameters": [
+                {
+                    "name": "action",
+                    "description": "音量调节动作：'up'增加音量，'down'减小音量，'mute'静音",
+                    "type": "string",
+                    "required": true
+                },
+                {
+                    "name": "count",
+                    "description": "按键次数，默认为1次",
+                    "type": "number",
                     "required": false
                 }
             ]
@@ -571,6 +601,135 @@ const dailyLife = (function () {
     }
 
     /**
+     * Toggle flashlight on or off
+     * @param params - Parameters with flashlight state
+     */
+    async function toggle_flashlight(params: { state: string }): Promise<any> {
+        try {
+            if (!params.state) {
+                throw new Error("Flashlight state is required");
+            }
+
+            // Normalize state to lowercase
+            const state = params.state.toLowerCase();
+
+            if (state !== 'on' && state !== 'off') {
+                throw new Error("Invalid state. Must be 'on' or 'off'");
+            }
+
+            console.log(`${state === 'on' ? '打开' : '关闭'}手电筒...`);
+
+            // Convert state to numeric value (1 for on, 0 for off)
+            const stateValue = state === 'on' ? '1' : '0';
+
+            // Set FlashState using Tools.System.setSetting
+            const flashStateResult = await Tools.System.setSetting('FlashState', stateValue, 'system');
+            console.log(`FlashState 设置结果: ${JSON.stringify(flashStateResult)}`);
+
+            // Set back_flashlight_state using Tools.System.setSetting
+            const backFlashlightResult = await Tools.System.setSetting('back_flashlight_state', stateValue, 'system');
+            console.log(`back_flashlight_state 设置结果: ${JSON.stringify(backFlashlightResult)}`);
+
+            return {
+                success: true,
+                message: `手电筒已${state === 'on' ? '打开' : '关闭'}`,
+                state: state,
+                flash_state_result: flashStateResult,
+                back_flashlight_result: backFlashlightResult
+            };
+        } catch (error) {
+            console.error(`手电筒操作失败: ${error.message}`);
+            return {
+                success: false,
+                message: `手电筒操作失败: ${error.message}`,
+                state: params.state
+            };
+        }
+    }
+
+    /**
+     * Adjust device volume using simulated key presses
+     * @param params - Parameters with volume action and count
+     */
+    async function adjust_volume(params: { action: string; count?: number | string }): Promise<any> {
+        try {
+            if (!params.action) {
+                throw new Error("Volume action is required");
+            }
+
+            // Normalize action to lowercase
+            const action = params.action.toLowerCase();
+
+            if (action !== 'up' && action !== 'down' && action !== 'mute') {
+                throw new Error("Invalid action. Must be 'up', 'down', or 'mute'");
+            }
+
+            // Parse count parameter
+            let count = 1;
+            if (params.count !== undefined) {
+                count = typeof params.count === 'string' ? Number(params.count) : params.count;
+                if (isNaN(count) || count < 1 || count > 20) {
+                    throw new Error("Count must be a number between 1 and 20");
+                }
+            }
+
+            console.log(`调节音量: ${action === 'up' ? '增加' : action === 'down' ? '减小' : '静音'}, 次数: ${count}`);
+
+            // Map action to Android key code string
+            let keyCode: string;
+            let actionName: string;
+
+            switch (action) {
+                case 'up':
+                    keyCode = 'KEYCODE_VOLUME_UP';
+                    actionName = '增加';
+                    break;
+                case 'down':
+                    keyCode = 'KEYCODE_VOLUME_DOWN';
+                    actionName = '减小';
+                    break;
+                case 'mute':
+                    keyCode = 'KEYCODE_VOLUME_MUTE';
+                    actionName = '静音';
+                    count = 1; // Mute should only be pressed once
+                    break;
+                default:
+                    throw new Error("Invalid action");
+            }
+
+            // Simulate key presses using Tools.UI.pressKey
+            const results: any[] = [];
+            for (let i = 0; i < count; i++) {
+                const result = await Tools.UI.pressKey(keyCode);
+                results.push(result);
+                console.log(`第 ${i + 1} 次按键结果: ${JSON.stringify(result)}`);
+
+                // Add a small delay between key presses to make them more natural
+                if (i < count - 1) {
+                    await sleep(100);
+                }
+            }
+
+            return {
+                success: true,
+                message: `音量${actionName}操作完成，共执行 ${count} 次`,
+                action: action,
+                key_code: keyCode,
+                count: count,
+                results: results
+            };
+        } catch (error) {
+            console.error(`音量调节失败: ${error.message}`);
+            return {
+                success: false,
+                message: `音量调节失败: ${error.message}`,
+                action: params.action,
+                count: params.count || 1
+            };
+        }
+    }
+
+    /**
      * 等待指定的毫秒数
      * @param ms 等待的毫秒数
      */
@@ -831,6 +990,18 @@ const dailyLife = (function () {
             "拨打电话成功",
             "拨打电话失败"
         ),
+        toggle_flashlight: async (params) => await daily_wrap(
+            toggle_flashlight,
+            params,
+            "手电筒操作成功",
+            "手电筒操作失败"
+        ),
+        adjust_volume: async (params) => await daily_wrap(
+            adjust_volume,
+            params,
+            "音量调节成功",
+            "音量调节失败"
+        ),
         main: async (params) => await daily_wrap(
             main,
             params,
@@ -848,4 +1019,6 @@ exports.set_reminder = dailyLife.set_reminder;
 exports.set_alarm = dailyLife.set_alarm;
 exports.send_message = dailyLife.send_message;
 exports.make_phone_call = dailyLife.make_phone_call;
+exports.toggle_flashlight = dailyLife.toggle_flashlight;
+exports.adjust_volume = dailyLife.adjust_volume;
 exports.main = dailyLife.main;

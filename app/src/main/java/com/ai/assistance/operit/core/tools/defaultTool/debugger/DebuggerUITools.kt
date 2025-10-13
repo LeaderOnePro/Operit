@@ -347,10 +347,7 @@ open class DebuggerUITools(context: Context) : AccessibilityUITools(context) {
 
     /** 使用Shell命令实现按键操作 */
     override suspend fun pressKey(tool: AITool): ToolResult {
-        if (UIHierarchyManager.isAccessibilityServiceEnabled(context)) {
-            Log.d(TAG, "无障碍服务已启用，使用无障碍按键")
-            return super.pressKey(tool)
-        }
+        //直接用shell
 
         val keyCode = tool.parameters.find { it.name == "key_code" }?.value
 

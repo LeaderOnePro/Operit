@@ -88,6 +88,7 @@ fun SpeechServicesSettingsScreen(
     var ttsRequestBodyInput by remember(httpConfig) { mutableStateOf(httpConfig.requestBody) }
     var ttsContentTypeInput by remember(httpConfig) { mutableStateOf(httpConfig.contentType) }
     var ttsVoiceIdInput by remember(httpConfig) { mutableStateOf(httpConfig.voiceId) }
+    var ttsModelNameInput by remember(httpConfig) { mutableStateOf(httpConfig.modelName) }
     var ttsJsonError by remember { mutableStateOf<String?>(null) }
     var httpMethodDropdownExpanded by remember { mutableStateOf(false) }
     val ttsCleanerRegexsState = remember { mutableStateListOf<String>() }
@@ -132,7 +133,8 @@ fun SpeechServicesSettingsScreen(
                     httpMethod = ttsHttpMethodInput,
                     requestBody = ttsRequestBodyInput,
                     contentType = ttsContentTypeInput,
-                    voiceId = ttsVoiceIdInput
+                    voiceId = ttsVoiceIdInput,
+                    modelName = ttsModelNameInput
                 )
                 
                 // 保存 TTS 设置
@@ -505,7 +507,34 @@ fun SpeechServicesSettingsScreen(
                                     singleLine = true
                                 )
 
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // 模型设置
+                                Text(
+                                    text = stringResource(R.string.speech_services_siliconflow_model_settings),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+
                                 Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedTextField(
+                                    value = ttsModelNameInput,
+                                    onValueChange = { ttsModelNameInput = it },
+                                    label = { Text(stringResource(R.string.speech_services_siliconflow_model_name)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_siliconflow_model_name_placeholder)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    supportingText = {
+                                        Text(
+                                            text = stringResource(R.string.speech_services_siliconflow_model_name_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
 
                                 // 音色选择
                                 var voiceDropdownExpanded by remember { mutableStateOf(false) }
