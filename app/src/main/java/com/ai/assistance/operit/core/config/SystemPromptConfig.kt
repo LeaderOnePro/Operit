@@ -71,7 +71,6 @@ object SystemPromptConfig {
     private const val AVAILABLE_TOOLS_EN = """
         Available tools:
         - sleep: Demonstration tool that pauses briefly. Parameters: duration_ms (milliseconds, default 1000, max 10000)
-        - device_info: Returns detailed device information including model, OS version, memory, storage, network status, and more. No parameters needed.
         - use_package: Activate a package for use in the current session. Parameters: package_name (name of the package to activate)
 
         File System Tools:
@@ -150,25 +149,10 @@ object SystemPromptConfig {
         - http_request: Send HTTP request. Parameters: url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
         - multipart_request: Upload files. Parameters: url, method (POST/PUT), headers, form_data, files (file array)
         - manage_cookies: Manage cookies. Parameters: action (get/set/clear), domain, cookies
-        - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)
-
-        System Operation Tools:
-        These tools require user authorization:
-        - get_system_setting: Get the value of a system setting. Parameters: setting (setting name), namespace (namespace: system/secure/global, default system)
-        - modify_system_setting: Modify the value of a system setting. Parameters: setting (setting name), value (setting value), namespace (namespace: system/secure/global, default system)
-        - install_app: Install an application. Parameters: apk_path (APK file path)
-        - uninstall_app: Uninstall an application. Parameters: package_name (app package name), keep_data (whether to keep data, default false)
-        - list_installed_apps: Get a list of installed applications. Parameters: include_system_apps (whether to include system apps, default false)
-        - start_app: Launch an application. Parameters: package_name (app package name), activity (optional activity name)
-        - stop_app: Stop a running application. Parameters: package_name (app package name)
-
-        These tools can be used freely:
-        - get_notifications: Get device notifications. Parameters: limit (maximum number of notifications to return, default 10), include_ongoing (whether to include ongoing notifications, default false)
-        - get_device_location: Get current device location. Parameters: high_accuracy (whether to use high accuracy mode, default false), timeout (timeout in seconds, default 10)"""
+        - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)"""
     private const val AVAILABLE_TOOLS_CN = """
         可用工具：
         - sleep: 演示工具，短暂暂停。参数：duration_ms（毫秒，默认1000，最大10000）
-        - device_info: 返回详细的设备信息，包括型号、操作系统版本、内存、存储、网络状态等。无需参数。
         - use_package: 在当前会话中激活包。参数：package_name（要激活的包名）
 
         文件系统工具：
@@ -247,20 +231,7 @@ object SystemPromptConfig {
         - http_request: 发送HTTP请求。参数：url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
         - multipart_request: 上传文件。参数：url, method (POST/PUT), headers, form_data, files (文件数组)
         - manage_cookies: 管理cookies。参数：action (get/set/clear), domain, cookies
-        - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)
-        
-        系统操作工具：
-        这些工具需要用户授权：
-        - get_system_setting: 获取系统设置的值。参数：setting（设置名称），namespace（命名空间：system/secure/global，默认system）
-        - modify_system_setting: 修改系统设置的值。参数：setting（设置名称），value（设置值），namespace（命名空间：system/secure/global，默认system）
-        - install_app: 安装应用程序。参数：apk_path（APK文件路径）
-        - uninstall_app: 卸载应用程序。参数：package_name（应用包名），keep_data（是否保留数据，默认false）
-        - list_installed_apps: 获取已安装应用程序列表。参数：include_system_apps（是否包含系统应用，默认false）
-        - start_app: 启动应用程序。参数：package_name（应用包名），activity（可选活动名称）
-        - stop_app: 停止正在运行的应用程序。参数：package_name（应用包名）
-        这些工具可以随意使用：
-        - get_notifications: 获取设备通知内容。参数：limit（最大返回条数，默认10），include_ongoing（是否包含常驻通知，默认false）
-        - get_device_location: 获取设备当前位置信息。参数：high_accuracy（是否使用高精度模式，默认false），timeout（超时时间（秒），默认10）"""
+        - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)"""
 
 
     /** Base system prompt template used by the enhanced AI service */

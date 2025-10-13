@@ -75,18 +75,35 @@ fun getJsToolsDefinition(): String {
             // 网络操作
             Net: {
                 httpGet: (url) => toolCall("http_request", { url, method: "GET" }),
-                httpPost: (url, data) => toolCall("http_request", { url, method: "POST", data }),
+                httpPost: (url, body) => {
+                    const params = { url, method: "POST", body };
+                    if (typeof body === 'object') {
+                        params.body = JSON.stringify(body);
+                    }
+                    return toolCall("http_request", params);
+                },
                 visit: (url) => toolCall("visit_web", { url }),
                 // 新增增强版HTTP请求
-                http: (options) => toolCall("http_request", options),
+                http: (options) => {
+                    const params = { ...options };
+                    if (params.body !== undefined && typeof params.body === 'object') {
+                        params.body = JSON.stringify(params.body);
+                    }
+                    if (params.headers !== undefined && typeof params.headers === 'object') {
+                        params.headers = JSON.stringify(params.headers);
+                    }
+                    return toolCall("http_request", params);
+                },
                 // 新增文件上传
-                uploadFile: (url, files, formData = {}, options = {}) => {
+                uploadFile: (options) => {
                     const params = {
-                        url,
-                        files: Array.isArray(files) ? JSON.stringify(files) : files,
-                        form_data: JSON.stringify(formData),
-                        ...options
+                        ...options,
+                        files: JSON.stringify(options.files || []),
+                        form_data: JSON.stringify(options.form_data || {})
                     };
+                    if (options.headers !== undefined && typeof options.headers === 'object') {
+                        params.headers = JSON.stringify(options.headers);
+                    }
                     return toolCall("multipart_request", params);
                 },
                 // 新增Cookie管理
@@ -99,8 +116,8 @@ fun getJsToolsDefinition(): String {
             // 系统操作
             System: {
                 sleep: (milliseconds) => toolCall("sleep", { duration_ms: parseInt(milliseconds) }),
-                getSetting: (key, namespace) => toolCall("get_system_setting", { key, namespace }),
-                setSetting: (key, value, namespace) => toolCall("modify_system_setting", { key, value, namespace }),
+                getSetting: (setting, namespace) => toolCall("get_system_setting", { setting, namespace }),
+                setSetting: (setting, value, namespace) => toolCall("modify_system_setting", { setting, value, namespace }),
                 getDeviceInfo: () => toolCall("device_info"),
                 // 使用工具包
                 usePackage: (packageName) => toolCall("use_package", { package_name: packageName }),

@@ -19,7 +19,7 @@ export namespace Net {
      * @param url - URL to request
      * @param data - Data to post
      */
-    function httpPost(url: string, data: string | object): Promise<HttpResponseData>;
+    function httpPost(url: string, body: string | object): Promise<HttpResponseData>;
 
     /**
      * Visit a webpage and extract its content
@@ -35,9 +35,10 @@ export namespace Net {
         url: string;
         method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
         headers?: Record<string, string>;
-        data?: string | object;
-        timeout?: number;
-        followRedirects?: boolean;
+        body?: string | object;
+        connect_timeout?: number;
+        read_timeout?: number;
+        follow_redirects?: boolean;
         responseType?: 'text' | 'json' | 'arraybuffer' | 'blob';
         validateStatus?: boolean;
     }): Promise<HttpResponseData>;
@@ -49,11 +50,14 @@ export namespace Net {
     function uploadFile(options: {
         url: string;
         method?: 'POST' | 'PUT';
-        filePath: string;
-        fileFieldName?: string;
-        mimeType?: string;
-        formFields?: Record<string, string>;
         headers?: Record<string, string>;
+        form_data?: Record<string, string>;
+        files: {
+            field_name: string;
+            file_path: string;
+            content_type?: string;
+            file_name?: string;
+        }[];
     }): Promise<HttpResponseData>;
 
     /**
@@ -77,7 +81,7 @@ export namespace Net {
          * Clear cookies for a domain
          * @param domain - Domain to clear cookies for
          */
-        clear(domain: string): Promise<HttpResponseData>;
+        clear(domain?: string): Promise<HttpResponseData>;
     }
 
     /**

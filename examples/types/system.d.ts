@@ -40,6 +40,24 @@ export namespace System {
     function getDeviceInfo(): Promise<DeviceInfoResultData>;
 
     /**
+     * Use a tool package
+     * @param packageName - Package name
+     */
+    function usePackage(packageName: string): Promise<any>;
+
+    /**
+     * Install an application
+     * @param path - Path to the APK file
+     */
+    function installApp(path: string): Promise<AppOperationData>;
+
+    /**
+     * Uninstall an application
+     * @param packageName - Package name of the app to uninstall
+     */
+    function uninstallApp(packageName: string): Promise<AppOperationData>;
+
+    /**
      * Stop a running app
      * @param packageName - Package name
      */
@@ -103,7 +121,7 @@ export namespace System {
          * @param sessionName The name for the session.
          * @returns Promise resolving to the session creation result.
          */
-        function create(sessionName: string): Promise<TerminalSessionCreationResultData>;
+        function create(sessionName?: string): Promise<TerminalSessionCreationResultData>;
 
         /**
          * Execute a command in a terminal session.

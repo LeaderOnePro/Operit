@@ -43,7 +43,7 @@ export namespace Files {
      * @param path - Path to file
      * @param content - Content to write
      */
-    function write(path: string, content: string): Promise<FileOperationData>;
+    function write(path: string, content: string, append?: boolean): Promise<FileOperationData>;
 
     /**
      * Write base64 encoded content to a binary file
@@ -56,7 +56,7 @@ export namespace Files {
      * Delete a file or directory
      * @param path - Path to file or directory
      */
-    function deleteFile(path: string): Promise<FileOperationData>;
+    function deleteFile(path: string, recursive?: boolean): Promise<FileOperationData>;
 
     /**
      * Check if file exists
@@ -76,20 +76,20 @@ export namespace Files {
      * @param source - Source path
      * @param destination - Destination path
      */
-    function copy(source: string, destination: string): Promise<FileOperationData>;
+    function copy(source: string, destination: string, recursive?: boolean): Promise<FileOperationData>;
 
     /**
      * Create a directory
      * @param path - Directory path
      */
-    function mkdir(path: string): Promise<FileOperationData>;
+    function mkdir(path: string, create_parents?: boolean): Promise<FileOperationData>;
 
     /**
      * Find files matching a pattern
      * @param path - Base directory
      * @param pattern - Search pattern
      */
-    function find(path: string, pattern: string): Promise<FindFilesResultData>;
+    function find(path: string, pattern: string, options?: Record<string, any>): Promise<FindFilesResultData>;
 
     /**
      * Search code content matching a regex pattern in files
@@ -145,7 +145,7 @@ export namespace Files {
      * Share a file with other apps
      * @param path - File path
      */
-    function share(path: string): Promise<FileOperationData>;
+    function share(path: string, title?: string): Promise<FileOperationData>;
 
     /**
      * Download a file from URL
@@ -156,11 +156,11 @@ export namespace Files {
 
     /**
      * Convert a file
-     * @param sourcePath - Source file path
-     * @param targetPath - Target file path
+     * @param source_path - Source file path
+     * @param target_path - Target file path
      * @param options - Conversion options
      */
-    function convert(sourcePath: string, targetPath: string, options?: {
+    function convert(source_path: string, target_path: string, options?: {
         quality?: 'low' | 'medium' | 'high' | 'lossless';
         video_codec?: FFmpegVideoCodec;
         audio_codec?: FFmpegAudioCodec;
@@ -172,7 +172,7 @@ export namespace Files {
 
     /**
      * Get supported conversions for a file
-     * @param formatType - Optional file type filter (e.g., "image", "audio", "video", "document", "archive")
+     * @param format_type - Optional file type filter (e.g., "image", "audio", "video", "document", "archive")
      */
-    function getSupportedConversions(formatType?: string): Promise<FileFormatConversionsResultData>;
+    function getSupportedConversions(format_type?: string): Promise<FileFormatConversionsResultData>;
 } 
