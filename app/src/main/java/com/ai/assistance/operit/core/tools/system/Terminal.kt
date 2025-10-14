@@ -54,12 +54,10 @@ class Terminal private constructor(private val context: Context) {
     val terminalState: StateFlow<TerminalState> = terminalManager.terminalState
     val sessions = terminalManager.sessions
     val currentSessionId = terminalManager.currentSessionId
-    val commandHistory: Flow<List<CommandHistoryItem>> = terminalManager.commandHistory
     val currentDirectory = terminalManager.currentDirectory
     val isInteractiveMode = terminalManager.isInteractiveMode
     val interactivePrompt = terminalManager.interactivePrompt
     val isFullscreen = terminalManager.isFullscreen
-    val screenContent = terminalManager.screenContent
 
     /**
      * 初始化终端管理器
