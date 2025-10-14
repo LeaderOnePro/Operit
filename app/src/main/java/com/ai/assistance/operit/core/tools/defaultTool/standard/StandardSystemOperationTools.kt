@@ -61,12 +61,29 @@ open class StandardSystemOperationTools(private val context: Context) {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(context)) {
-            return ToolResult(
-                toolName = tool.name,
-                success = false,
-                result = StringResultData(""),
-                error = "没有修改系统设置的权限. 请授予 WRITE_SETTINGS 权限."
-            )
+            // 自动打开系统设置页面引导用户授权
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "没有修改系统设置的权限。已为您打开设置页面，请授予 WRITE_SETTINGS 权限后重试。"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "打开设置页面失败", e)
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "没有修改系统设置的权限，且无法打开设置页面: ${e.message}"
+                )
+            }
         }
 
         return try {

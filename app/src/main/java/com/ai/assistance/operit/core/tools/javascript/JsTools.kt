@@ -7,53 +7,102 @@ fun getJsToolsDefinition(): String {
         var Tools = {
             // 文件系统操作
             Files: {
-                list: (path) => toolCall("list_files", { path }),
-                read: (path) => toolCall("read_file_full", { path }),
-                write: (path, content, append) => {
+                list: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("list_files", params);
+                },
+                read: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("read_file_full", params);
+                },
+                write: (path, content, append, environment) => {
                     const params = { path, content };
                     if (append !== undefined) params.append = append ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("write_file", params);
                 },
-                writeBinary: (path, base64Content) => {
-                    return toolCall("write_file_binary", { path, base64Content });
+                writeBinary: (path, base64Content, environment) => {
+                    const params = { path, base64Content };
+                    if (environment) params.environment = environment;
+                    return toolCall("write_file_binary", params);
                 },
-                deleteFile: (path, recursive) => {
+                deleteFile: (path, recursive, environment) => {
                     const params = { path };
                     if (recursive !== undefined) params.recursive = recursive ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("delete_file", params);
                 },
-                exists: (path) => toolCall("file_exists", { path }),
-                move: (source, destination) => toolCall("move_file", { source, destination }),
-                copy: (source, destination, recursive) => {
+                exists: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("file_exists", params);
+                },
+                move: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("move_file", params);
+                },
+                copy: (source, destination, recursive, environment) => {
                     const params = { source, destination };
                     if (recursive !== undefined) params.recursive = recursive ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("copy_file", params);
                 },
-                mkdir: (path, create_parents) => {
+                mkdir: (path, create_parents, environment) => {
                     const params = { path };
                     if (create_parents !== undefined) params.create_parents = create_parents ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("make_directory", params);
                 },
-                find: (path, pattern, options = {}) => {
+                find: (path, pattern, options = {}, environment) => {
                     const params = { path, pattern, ...options };
+                    if (environment) params.environment = environment;
                     return toolCall("find_files", params);
                 },
                 grep: (path, pattern, options = {}) => {
                     const params = { path, pattern, ...options };
+                    // environment can be included in options
                     return toolCall("grep_code", params);
                 },
-                info: (path) => toolCall("file_info", { path }),
+                info: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("file_info", params);
+                },
                 // 智能应用文件绑定
-                apply: (path, content) => toolCall("apply_file", { path, content }),
-                zip: (source, destination) => toolCall("zip_files", { source, destination }),
-                unzip: (source, destination) => toolCall("unzip_files", { source, destination }),
-                open: (path) => toolCall("open_file", { path }),
-                share: (path, title) => {
+                apply: (path, content, environment) => {
+                    const params = { path, content };
+                    if (environment) params.environment = environment;
+                    return toolCall("apply_file", params);
+                },
+                zip: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("zip_files", params);
+                },
+                unzip: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("unzip_files", params);
+                },
+                open: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("open_file", params);
+                },
+                share: (path, title, environment) => {
                     const params = { path };
                     if (title) params.title = title;
+                    if (environment) params.environment = environment;
                     return toolCall("share_file", params);
                 },
-                download: (url, destination) => toolCall("download_file", { url, destination }),
+                download: (url, destination, environment) => {
+                    const params = { url, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("download_file", params);
+                },
             },
             // 网络操作
             Net: {

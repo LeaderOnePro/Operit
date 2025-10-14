@@ -33,6 +33,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import com.ai.assistance.operit.util.FileUtils
 import com.ai.assistance.operit.util.SyntaxCheckUtil
+import com.ai.assistance.operit.util.PathMapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -79,6 +80,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** List files in a directory */
         open suspend fun listFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -89,8 +91,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val directory = File(path)
+                        val directory = File(actualPath)
 
                         if (!directory.exists()) {
                                 return ToolResult(
@@ -383,6 +387,8 @@ open class StandardFileSystemTools(protected val context: Context) {
          */
         open suspend fun readFileFull(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -392,8 +398,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -454,6 +462,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Read file content, truncated to configured max size */
         open suspend fun readFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -464,11 +473,13 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 try {
                         // 从配置中获取最大文件大小
                         val maxFileSizeBytes = apiPreferences.getMaxFileSizeBytes()
                         
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -569,6 +580,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** 分段读取文件内容，每次读取指定部分（默认每部分从配置中获取） */
         open suspend fun readFilePart(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val partIndex =
                         tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
 
@@ -581,11 +593,13 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
                         // 从配置中获取分段大小
                         val partSize = apiPreferences.getPartSize()
                         
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -662,6 +676,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Write content to a file */
         open suspend fun writeFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val content = tool.parameters.find { it.name == "content" }?.value ?: ""
                 val append =
                         tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
@@ -681,8 +696,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -787,6 +804,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Write base64 encoded content to a binary file */
         open suspend fun writeFileBinary(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val base64Content = tool.parameters.find { it.name == "base64Content" }?.value ?: ""
 
                 if (path.isBlank()) {
@@ -819,8 +837,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -907,8 +927,11 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Delete a file or directory */
         open suspend fun deleteFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -944,7 +967,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -1042,6 +1065,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Check if a file or directory exists */
         open suspend fun fileExists(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1052,8 +1076,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         val exists = file.exists()
 
                         if (!exists) {
@@ -1101,6 +1127,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun moveFile(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1136,8 +1166,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destFile = File(destPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destFile = File(actualDestPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1288,8 +1318,12 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun copyFile(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1308,8 +1342,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destFile = File(destPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destFile = File(actualDestPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1443,9 +1477,12 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Create a directory */
         open suspend fun makeDirectory(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val createParents =
                         tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean()
                                 ?: false
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1463,7 +1500,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val directory = File(path)
+                        val directory = File(actualPath)
 
                         // Check if directory already exists
                         if (directory.exists()) {
@@ -1556,7 +1593,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Search for files matching a pattern */
         open suspend fun findFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank() || pattern.isBlank()) {
                         return ToolResult(
@@ -1573,7 +1613,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val rootDir = File(path)
+                        val rootDir = File(actualPath)
 
                         if (!rootDir.exists() || !rootDir.isDirectory) {
                                 return ToolResult(
@@ -1724,6 +1764,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Get file information */
         open suspend fun fileInfo(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1746,7 +1789,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -1847,6 +1890,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun zipFiles(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
 
                 if (sourcePath.isBlank() || zipPath.isBlank()) {
                         return ToolResult(
@@ -1858,8 +1905,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destZipFile = File(zipPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destZipFile = File(actualZipPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1968,6 +2015,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun unzipFiles(tool: AITool): ToolResult {
                 val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (zipPath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1979,8 +2030,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val zipFile = File(zipPath)
-                        val destDir = File(destPath)
+                        val zipFile = File(actualZipPath)
+                        val destDir = File(actualDestPath)
 
                         if (!zipFile.exists()) {
                                 return ToolResult(
@@ -2073,7 +2124,10 @@ open class StandardFileSystemTools(protected val context: Context) {
          */
         open fun applyFile(tool: AITool): Flow<ToolResult> = flow {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val aiGeneratedCode = tool.parameters.find { it.name == "content" }?.value ?: ""
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         emit(
@@ -2114,7 +2168,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 // 1. 检查文件是否存在
                 val fileExistsResult =
                         fileExists(
-                                AITool(name = "file_exists", parameters = listOf(ToolParameter("path", path)))
+                                AITool(name = "file_exists", parameters = listOf(
+                                        ToolParameter("path", path),
+                                        ToolParameter("environment", environment ?: "")
+                                ))
                         )
 
                 // 如果文件不存在，直接写入内容而不是合并
@@ -2144,7 +2201,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                                         "content",
                                                                         aiGeneratedCode
                                                                 ),
-                                                                ToolParameter("append", "false")
+                                                                ToolParameter("append", "false"),
+                                                                ToolParameter("environment", environment ?: "")
                                                         )
                                         )
                                 )
@@ -2184,7 +2242,10 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                 // 2. 读取原始文件内容
                 val readResult =
-                        readFileFull(AITool(name = "read_file_full", parameters = listOf(ToolParameter("path", path))))
+                        readFileFull(AITool(name = "read_file_full", parameters = listOf(
+                                ToolParameter("path", path),
+                                ToolParameter("environment", environment ?: "")
+                        )))
 
                 if (!readResult.success) {
                         emit(
@@ -2254,7 +2315,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                 listOf(
                                                         ToolParameter("path", path),
                                                         ToolParameter("content", mergedContent),
-                                                        ToolParameter("append", "false")
+                                                        ToolParameter("append", "false"),
+                                                        ToolParameter("environment", environment ?: "")
                                                 )
                                 )
                         )
@@ -2327,6 +2389,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun downloadFile(tool: AITool): ToolResult {
                 val url = tool.parameters.find { it.name == "url" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (url.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -2361,7 +2426,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val destFile = File(destPath)
+                        val destFile = File(actualDestPath)
 
                         // Create parent directory if needed
                         val destParent = destFile.parentFile
@@ -2472,6 +2537,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Open file with system default app */
         open suspend fun openFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2489,7 +2557,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -2569,11 +2637,14 @@ open class StandardFileSystemTools(protected val context: Context) {
          */
         open suspend fun grepCode(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
                 val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value ?: "*"
                 val caseInsensitive = tool.parameters.find { it.name == "case_insensitive" }?.value?.toBoolean() ?: false
                 val contextLines = tool.parameters.find { it.name == "context_lines" }?.value?.toIntOrNull() ?: 3
                 val maxResults = tool.parameters.find { it.name == "max_results" }?.value?.toIntOrNull() ?: 100
+                
+                val actualPath = PathMapper.resolvePath(context, path, environment)
                 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2599,10 +2670,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 AITool(
                                         name = "find_files",
                                         parameters = listOf(
-                                                ToolParameter("path", path),
+                                                ToolParameter("path", actualPath),
                                                 ToolParameter("pattern", filePattern),
                                                 ToolParameter("use_path_pattern", "false"),
-                                                ToolParameter("case_insensitive", "false")
+                                                ToolParameter("case_insensitive", "false"),
+                                                ToolParameter("environment", environment ?: "")
                                         )
                                 )
                         )
@@ -2754,7 +2826,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Share file via system share dialog */
         open suspend fun shareFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val title = tool.parameters.find { it.name == "title" }?.value ?: "Share File"
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2772,7 +2847,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,

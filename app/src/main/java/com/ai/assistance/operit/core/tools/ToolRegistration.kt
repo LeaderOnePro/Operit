@@ -230,7 +230,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "列出目录内容: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "列出目录内容: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.listFiles(tool) }
@@ -243,7 +245,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "读取文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "读取文件: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.readFile(tool) } }
     )
@@ -254,8 +258,10 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val partIndex = tool.parameters.find { it.name == "partIndex" }?.value ?: "0"
-                "分段读取文件 (部分 $partIndex): $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "分段读取文件 (部分 $partIndex): $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.readFilePart(tool) }
@@ -268,7 +274,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "读取完整文件内容: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "读取完整文件内容: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.readFileFull(tool) } }
     )
@@ -280,8 +288,11 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val append = tool.parameters.find { it.name == "append" }?.value == "true"
-                if (append) "追加内容到文件: $path" else "写入内容到文件: $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val operation = if (append) "追加内容到文件" else "写入内容到文件"
+                "$operation: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.writeFile(tool) }
@@ -295,7 +306,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
         dangerCheck = { true }, // 总是危险操作
         descriptionGenerator = { tool ->
             val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-            "将Base64内容写入二进制文件: $path"
+            val environment = tool.parameters.find { it.name == "environment" }?.value
+            val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+            "将Base64内容写入二进制文件: $path$envInfo"
         },
         executor = { tool ->
             kotlinx.coroutines.runBlocking { fileSystemTools.writeFileBinary(tool) }
@@ -309,8 +322,11 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive = tool.parameters.find { it.name == "recursive" }?.value == "true"
-                if (recursive) "递归删除: $path" else "删除文件: $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val operation = if (recursive) "递归删除" else "删除文件"
+                "$operation: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.deleteFile(tool) }
@@ -444,7 +460,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "检查文件存在: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "检查文件存在: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.fileExists(tool) }
@@ -459,7 +477,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "移动文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "移动文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.moveFile(tool) } }
     )
@@ -471,7 +491,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "复制文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "复制文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.copyFile(tool) } }
     )
@@ -482,7 +504,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_WRITE,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "创建目录: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "创建目录: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.makeDirectory(tool) }
@@ -496,7 +520,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: "*"
-                "搜索文件: 在 $path 中查找 $pattern"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "搜索文件: 在 $path 中查找 $pattern$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.findFiles(tool) }
@@ -509,7 +535,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "获取文件信息: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "获取文件信息: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.fileInfo(tool) } }
     )
@@ -521,7 +549,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "智能合并AI代码到文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "智能合并AI代码到文件: $path$envInfo"
             },
             executor =
                     object : ToolExecutor {
@@ -544,7 +574,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "压缩文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "压缩文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.zipFiles(tool) } }
     )
@@ -556,7 +588,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "解压文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "解压文件: $source -> $destination$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.unzipFiles(tool) }
@@ -569,7 +603,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "打开文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "打开文件: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.openFile(tool) } }
     )
@@ -580,7 +616,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_WRITE,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "分享文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "分享文件: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.shareFile(tool) }
@@ -595,10 +633,13 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
                 val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val baseDescription = "在 $path 中搜索代码: '$pattern'$envInfo"
                 if (filePattern != null && filePattern != "*") {
-                    "在 $path 中搜索代码: '$pattern' (文件类型: $filePattern)"
+                    "$baseDescription (文件类型: $filePattern)"
                 } else {
-                    "在 $path 中搜索代码: '$pattern'"
+                    baseDescription
                 }
             },
             executor = { tool ->
@@ -613,7 +654,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val url = tool.parameters.find { it.name == "url" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "下载文件: $url -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "下载文件: $url -> $destination$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.downloadFile(tool) }

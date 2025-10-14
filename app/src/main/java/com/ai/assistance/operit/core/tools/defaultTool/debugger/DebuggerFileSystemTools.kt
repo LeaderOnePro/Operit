@@ -67,6 +67,11 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** List files in a directory */
     override suspend fun listFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.listFiles(tool)
+        }
+
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -365,6 +370,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
      * This function does not enforce a size limit.
      */
     override suspend fun readFileFull(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFileFull(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         if (path.isBlank()) {
             return ToolResult(
@@ -456,6 +465,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Read file content */
     override suspend fun readFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -552,6 +565,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 分段读取文件内容 */
     override suspend fun readFilePart(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFilePart(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val partIndex = tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
         val partSize = apiPreferences.getPartSize()
@@ -662,6 +679,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Write content to a file */
     override suspend fun writeFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.writeFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val content = tool.parameters.find { it.name == "content" }?.value ?: ""
         val append = tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
@@ -826,6 +847,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Delete a file or directory */
     override suspend fun deleteFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.deleteFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
 
@@ -911,6 +936,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Check if a file or directory exists */
     override suspend fun fileExists(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.fileExists(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -986,6 +1015,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Move or rename a file or directory */
     override suspend fun moveFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.moveFile(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1070,6 +1103,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Copy a file or directory */
     override suspend fun copyFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.copyFile(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
         val recursive =
@@ -1217,6 +1254,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Create a directory */
     override suspend fun makeDirectory(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.makeDirectory(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val createParents =
                 tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean() ?: false
@@ -1286,6 +1327,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Search for files matching a pattern */
     override suspend fun findFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.findFiles(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
 
@@ -1371,6 +1416,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Get file information */
     override suspend fun fileInfo(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.fileInfo(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -1524,6 +1573,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Zip files or directories */
     override suspend fun zipFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.zipFiles(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1732,6 +1785,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Unzip a zip file */
     override suspend fun unzipFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.unzipFiles(tool)
+        }
         val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1879,6 +1936,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 打开文件 使用系统默认应用打开文件 */
     override suspend fun openFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.openFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -1974,6 +2035,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 分享文件 调用系统分享功能 */
     override suspend fun shareFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.shareFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val title = tool.parameters.find { it.name == "title" }?.value ?: "分享文件"
 
@@ -2071,6 +2136,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 下载文件 从网络URL下载文件到指定路径 */
     override suspend fun downloadFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.downloadFile(tool)
+        }
         val url = tool.parameters.find { it.name == "url" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 

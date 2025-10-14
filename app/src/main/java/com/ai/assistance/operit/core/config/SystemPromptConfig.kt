@@ -74,6 +74,10 @@ Available tools:
 - use_package: Activate a package for use in the current session. Parameters: package_name (name of the package to activate)
 
 File System Tools:
+**IMPORTANT: All file tools support an optional 'environment' parameter:**
+- environment (optional): Specifies the execution environment. Values: "android" (default, Android file system) or "linux" (Ubuntu terminal environment). 
+  - When "linux" is specified, paths use Linux format (e.g., "/home/user/file.txt", "/etc/hosts") and are automatically mapped to the actual location in the Android filesystem.
+
 - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
 - read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
@@ -125,7 +129,7 @@ File System Tools:
 - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
 - copy_file: Copy a file or directory. Parameters: source (source path), destination (destination path), recursive (boolean, default false)
 - make_directory: Create a directory. Parameters: path (directory path), create_parents (boolean, default false)
-- find_files: Search for files matching a pattern. Parameters: path (search path, MUST start with /sdcard/ to avoid system issues), pattern (search pattern, e.g. "*.jpg"), max_depth (optional, controls depth of subdirectory search, -1=unlimited), use_path_pattern (boolean, default false), case_insensitive (boolean, default false)
+- find_files: Search for files matching a pattern. Parameters: path (search path, for Android use /sdcard/..., for Linux use /home/... or /etc/...), pattern (search pattern, e.g. "*.jpg"), max_depth (optional, controls depth of subdirectory search, -1=unlimited), use_path_pattern (boolean, default false), case_insensitive (boolean, default false)
 - grep_code: Search code content matching a regex pattern in files. Returns matches with surrounding context lines. Parameters: path (search path), pattern (regex pattern), file_pattern (file filter, default "*"), case_insensitive (boolean, default false), context_lines (lines of context before/after match, default 3), max_results (max matches, default 100)
 - file_info: Get detailed information about a file or directory including type, size, permissions, owner, group, and last modified time. Parameters: path (target path)
 - zip_files: Compress files or directories. Parameters: source (path to compress), destination (output zip file)
@@ -145,6 +149,10 @@ HTTP Tools:
 - use_package: 在当前会话中激活包。参数：package_name（要激活的包名）
 
 文件系统工具：
+**重要：所有文件工具都支持可选的'environment'参数：**
+- environment（可选）：指定执行环境。取值："android"（默认，Android文件系统）或"linux"（Ubuntu终端环境）。
+  - 当指定"linux"时，路径使用Linux格式（如"/home/user/file.txt"、"/etc/hosts"），系统会自动映射到Android文件系统中的实际位置。
+
 - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
 - read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，会自动使用OCR提取文本。参数：path（文件路径）
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
@@ -196,7 +204,7 @@ HTTP Tools:
 - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）
 - copy_file: 复制文件或目录。参数：source（源路径），destination（目标路径），recursive（布尔值，默认false）
 - make_directory: 创建目录。参数：path（目录路径），create_parents（布尔值，默认false）
-- find_files: 搜索匹配模式的文件。参数：path（搜索路径，必须以/sdcard/开头以避免系统问题），pattern（搜索模式，例如"*.jpg"），max_depth（可选，控制子目录搜索深度，-1=无限），use_path_pattern（布尔值，默认false），case_insensitive（布尔值，默认false）
+- find_files: 搜索匹配模式的文件。参数：path（搜索路径，Android用/sdcard/...，Linux用/home/...或/etc/...），pattern（搜索模式，例如"*.jpg"），max_depth（可选，控制子目录搜索深度，-1=无限），use_path_pattern（布尔值，默认false），case_insensitive（布尔值，默认false）
 - grep_code: 在文件中搜索匹配正则表达式的代码内容，返回带上下文的匹配结果。参数：path（搜索路径），pattern（正则表达式模式），file_pattern（文件过滤，默认"*"），case_insensitive（布尔值，默认false），context_lines（匹配行前后的上下文行数，默认3），max_results（最大匹配数，默认100）
 - file_info: 获取文件或目录的详细信息，包括类型、大小、权限、所有者、组和最后修改时间。参数：path（目标路径）
 - zip_files: 压缩文件或目录。参数：source（要压缩的路径），destination（输出zip文件）

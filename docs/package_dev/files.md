@@ -6,6 +6,26 @@
 
 所有文件系统相关的功能都封装在全局的 `Tools.Files` 命名空间下。这个模块涵盖了从基本的读写、移动、删除，到更高级的压缩、下载等操作。
 
+### Environment 参数
+
+**重要**：所有文件操作函数都支持可选的 `environment` 参数，用于指定执行环境：
+
+- `"android"` (默认): Android文件系统环境，路径使用Android格式（如 `/sdcard/Download`）
+- `"linux"`: Ubuntu终端环境，路径使用Linux格式（如 `/home/user/file.txt`, `/etc/hosts`）
+
+当使用 `"linux"` 环境时，系统会自动将Linux路径映射到Android文件系统中的实际位置：
+- Ubuntu根目录位于：`/data/data/<应用包名>/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu`
+- 例如：`/home/user/test.txt` 会被映射到 `{filesDir}/usr/var/lib/proot-distro/installed-rootfs/ubuntu/home/user/test.txt`
+
+**使用示例**：
+```typescript
+// 在Android环境读取文件
+await Tools.Files.read("/sdcard/test.txt", "android");
+
+// 在Linux环境读取文件
+await Tools.Files.read("/home/user/config.txt", "linux");
+```
+
 ---
 
 ## `Tools.Files` 命名空间详解
