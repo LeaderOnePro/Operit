@@ -95,13 +95,24 @@ class ClaudeProvider(
         }
 
         // 处理用户和助手消息
-        val standardizedHistory =
+        val historyWithoutSystem =
                 ChatUtils.mapChatHistoryToStandardRoles(chatHistory).filter {
                     it.first != "system"
                 }
+        
+        val mergedHistory = mutableListOf<Pair<String, String>>()
+        for ((role, content) in historyWithoutSystem) {
+            if (mergedHistory.isNotEmpty() && mergedHistory.last().first == role) {
+                val lastMessage = mergedHistory.last()
+                mergedHistory[mergedHistory.size - 1] =
+                    Pair(role, lastMessage.second + "\n" + content)
+            } else {
+                mergedHistory.add(Pair(role, content))
+            }
+        }
 
         // 添加历史消息
-        for ((role, content) in standardizedHistory) {
+        for ((role, content) in mergedHistory) {
             val messageObject = JSONObject()
             val claudeRole = if (role == "assistant") "assistant" else "user"
             messageObject.put("role", claudeRole)

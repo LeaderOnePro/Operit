@@ -118,21 +118,30 @@ class GeminiProvider(
         }
 
         // Process the rest of the history
-        var lastRole: String? = null
-        for ((role, content) in standardizedHistory) {
-            if (role == "system") continue // Skip system message as it's handled
-            if (role == lastRole) {
-                logDebug("跳过连续相同角色消息: $role")
-                continue
+        val historyWithoutSystem = standardizedHistory.filter { it.first != "system" }
+        val mergedHistory = mutableListOf<Pair<String, String>>()
+        for ((role, content) in historyWithoutSystem) {
+            if (mergedHistory.isNotEmpty() && mergedHistory.last().first == role) {
+                val lastMessage = mergedHistory.last()
+                mergedHistory[mergedHistory.size - 1] =
+                    Pair(role, lastMessage.second + "\n" + content)
+                logDebug("合并连续的 $role 消息")
+            } else {
+                mergedHistory.add(Pair(role, content))
             }
-            lastRole = role
+        }
 
-            val contentObject = JSONObject().apply {
-                put("role", if (role == "assistant") "model" else role)
-                put("parts", JSONArray().apply {
-                    put(JSONObject().apply { put("text", content) })
-                })
-            }
+        for ((role, content) in mergedHistory) {
+            val contentObject =
+                JSONObject().apply {
+                    put("role", if (role == "assistant") "model" else role)
+                    put(
+                        "parts",
+                        JSONArray().apply {
+                            put(JSONObject().apply { put("text", content) })
+                        }
+                    )
+                }
             contentsArray.put(contentObject)
             tokenCount += ChatUtils.estimateTokenCount(content)
         }

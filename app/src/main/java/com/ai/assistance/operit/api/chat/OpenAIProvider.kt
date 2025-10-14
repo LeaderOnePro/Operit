@@ -204,18 +204,23 @@ open class OpenAIProvider(
         // 添加聊天历史
         if (chatHistory.isNotEmpty()) {
             val standardizedHistory = ChatUtils.mapChatHistoryToStandardRoles(chatHistory)
-            val filteredHistory = mutableListOf<Pair<String, String>>()
-            var lastRole: String? = null
+            val mergedHistory = mutableListOf<Pair<String, String>>()
 
             for ((role, content) in standardizedHistory) {
-                if (role == lastRole && role != "system") {
-                    continue
+                if (mergedHistory.isNotEmpty() &&
+                                role == mergedHistory.last().first &&
+                                role != "system"
+                ) {
+                    val lastMessage = mergedHistory.last()
+                    mergedHistory[mergedHistory.size - 1] =
+                            Pair(lastMessage.first, lastMessage.second + "\n" + content)
+                    Log.d("AIService", "合并连续的 $role 消息")
+                } else {
+                    mergedHistory.add(Pair(role, content))
                 }
-                filteredHistory.add(Pair(role, content))
-                lastRole = role
             }
 
-            for ((role, content) in filteredHistory) {
+            for ((role, content) in mergedHistory) {
                 val historyMessage = JSONObject()
                 historyMessage.put("role", role)
                 historyMessage.put("content", content)
