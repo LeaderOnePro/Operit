@@ -35,6 +35,17 @@ import java.util.UUID
  */
 class MemoryRepository(private val context: Context, profileId: String) {
 
+    companion object {
+        /** Represents a strong link, e.g., "A is a B". */
+        const val STRONG_LINK = 1.0f
+
+        /** Represents a medium-strength link, e.g., "A is related to B". */
+        const val MEDIUM_LINK = 0.7f
+
+        /** Represents a weak link, e.g., "A is sometimes associated with B". */
+        const val WEAK_LINK = 0.3f
+    }
+
     private val store = ObjectBoxManager.get(context, profileId)
     private val memoryBox: Box<Memory> = store.boxFor()
     private val tagBox = store.boxFor<MemoryTag>()
@@ -63,9 +74,10 @@ class MemoryRepository(private val context: Context, profileId: String) {
      * @param title 文档记忆的标题。
      * @param filePath 文档的路径。
      * @param fileContent 文档的文本内容。
+     * @param folderPath 文件夹路径。
      * @return 创建的Memory对象。
      */
-    suspend fun createMemoryFromDocument(documentName: String, originalPath: String, text: String): Memory = withContext(Dispatchers.IO) {
+    suspend fun createMemoryFromDocument(documentName: String, originalPath: String, text: String, folderPath: String = ""): Memory = withContext(Dispatchers.IO) {
         // 1. 为文档本身生成嵌入
         val documentEmbedding = EmbeddingService.generateEmbedding(documentName)?.vector ?: FloatArray(100)
 
@@ -78,6 +90,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             this.embedding = Embedding(documentEmbedding)
             this.isDocumentNode = true
             this.documentPath = originalPath
+            this.folderPath = folderPath
         }
         memoryBox.put(documentMemory)
 
@@ -142,6 +155,16 @@ class MemoryRepository(private val context: Context, profileId: String) {
         documentMemory
     }
 
+    /**
+     * 生成带有元数据（可信度、重要性）的文本，用于embedding。
+     */
+    private fun generateTextForEmbedding(memory: Memory): String {
+        // 将credibility和importance格式化为两位小数
+        val credibilityStr = String.format("%.2f", memory.credibility)
+        val importanceStr = String.format("%.2f", memory.importance)
+        return "credibility: ${credibilityStr}, importance: ${importanceStr}, content: ${memory.content}"
+    }
+
     // --- Memory CRUD Operations ---
 
     /**
@@ -152,9 +175,13 @@ class MemoryRepository(private val context: Context, profileId: String) {
     suspend fun saveMemory(memory: Memory): Long = withContext(Dispatchers.IO){
         // Generate embedding before saving
         if (memory.content.isNotBlank()) {
-            memory.embedding = EmbeddingService.generateEmbedding(memory.content)
+            val textForEmbedding = generateTextForEmbedding(memory)
+            memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding)
         }
-        memoryBox.put(memory)
+        val id = memoryBox.put(memory)
+        // After saving to DB, ensure it's also added to the live vector index
+        addMemoryToIndex(memory)
+        id
     }
 
     /**
@@ -182,6 +209,15 @@ class MemoryRepository(private val context: Context, profileId: String) {
      */
     suspend fun findMemoryByTitle(title: String): Memory? = withContext(Dispatchers.IO) {
         memoryBox.query(Memory_.title.equal(title)).build().findFirst()
+    }
+
+    /**
+     * Finds all memories with the exact title (case-sensitive).
+     * @param title The title of the memories to find.
+     * @return A list of found Memory objects.
+     */
+    suspend fun findMemoriesByTitle(title: String): List<Memory> = withContext(Dispatchers.IO) {
+        memoryBox.query(Memory_.title.equal(title)).build().find()
     }
 
     /**
@@ -293,17 +329,22 @@ class MemoryRepository(private val context: Context, profileId: String) {
      * @param source The source memory.
      * @param target The target memory.
      * @param type The type of the link (e.g., "causes", "explains").
-     * @param weight The strength of the link.
+     * @param weight The strength of the link, ideally between 0.0 and 1.0.
+     *               It's recommended to use the predefined constants like [STRONG_LINK],
+     *               [MEDIUM_LINK], or [WEAK_LINK] for consistency. The value will be
+     *               automatically clamped to the [0.0, 1.0] range.
      * @param description A description of the link.
      */
     suspend fun linkMemories(
             source: Memory,
             target: Memory,
             type: String,
-            weight: Float = 1.0f,
+            weight: Float = MEDIUM_LINK,
             description: String = ""
     ) = withContext(Dispatchers.IO) {
-        val link = MemoryLink(type = type, weight = weight, description = description)
+        // Coerce the weight to be within the valid range [0.0, 1.0] to ensure data integrity.
+        val sanitizedWeight = weight.coerceIn(0.0f, 1.0f)
+        val link = MemoryLink(type = type, weight = sanitizedWeight, description = description)
         link.source.target = source
         link.target.target = target
 
@@ -347,7 +388,9 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
         keywordResults.forEachIndexed { index, memory ->
             val rank = index + 1
-            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (1.0 / (k + rank))
+            val baseScore = 1.0 / (k + rank)
+            // 应用重要性权重
+            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
         }
 
         // 2. Reverse Containment Search (Query contains Memory Title)
@@ -357,7 +400,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
         reverseContainmentResults.forEachIndexed { index, memory ->
             val rank = index + 1
             // Use the same RRF formula to add to the score
-            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (1.0 / (k + rank))
+            val baseScore = 1.0 / (k + rank)
+            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
         }
 
         // 3. Semantic search (for conceptual matches)
@@ -374,6 +418,9 @@ class MemoryRepository(private val context: Context, profileId: String) {
                                                     queryEmbedding,
                                                     memoryEmbedding
                                             )
+                                    // 在这里，我们直接将相似度作为分数基础，而不是使用排名
+                                    // 因为相似度本身就是一种连续的分数
+                                    // Pair(memory, similarity * memory.importance)
                                     Pair(memory, similarity)
                                 }
                             }
@@ -382,11 +429,52 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
             semanticResults.forEachIndexed { index, memory ->
                 val rank = index + 1
-                scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (1.0 / (k + rank))
+                val baseScore = 1.0 / (k + rank)
+                scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
             }
         }
 
-        // 4. Fuse results using RRF and return sorted list
+        // 4. Graph-based expansion: Boost scores of connected memories based on edge weights
+        // Take top-scoring memories as "seed nodes" and propagate scores through edges
+        val topSeeds = scores.entries.sortedByDescending { it.value }.take(10).map { it.key }
+        android.util.Log.d("MemoryRepo", "Graph expansion: Using ${topSeeds.size} seed nodes")
+        var expandedCount = 0
+        
+        topSeeds.forEach { seedId ->
+            val seedMemory = allMemories.find { it.id == seedId } ?: return@forEach
+            val seedScore = scores[seedId] ?: 0.0
+            
+            // 重置关系缓存以获取最新连接
+            seedMemory.links.reset()
+            seedMemory.backlinks.reset()
+            
+            // Propagate score through outgoing links
+            seedMemory.links.forEach { link ->
+                val targetMemory = link.target.target
+                if (targetMemory != null) {
+                    // 边权重越高，传播的分数越多
+                    val propagatedScore = seedScore * link.weight * 0.3 // 30% of seed score weighted by edge
+                    scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
+                    expandedCount++
+                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${seedMemory.title}' to '${targetMemory.title}' (weight: ${link.weight})")
+                }
+            }
+            
+            // Propagate score through incoming links (backlinks)
+            seedMemory.backlinks.forEach { link ->
+                val sourceMemory = link.source.target
+                if (sourceMemory != null) {
+                    // 边权重越高，传播的分数越多
+                    val propagatedScore = seedScore * link.weight * 0.3 // 30% of seed score weighted by edge
+                    scores[sourceMemory.id] = scores.getOrDefault(sourceMemory.id, 0.0) + propagatedScore
+                    expandedCount++
+                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${sourceMemory.title}' to '${seedMemory.title}' (weight: ${link.weight})")
+                }
+            }
+        }
+        android.util.Log.d("MemoryRepo", "Graph expansion completed: ${expandedCount} edges traversed")
+
+        // 5. Fuse results using RRF and return sorted list
         if (scores.isEmpty()) {
             return@withContext emptyList()
         }
@@ -396,7 +484,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val sortedMemories = memoryBox.get(sortedMemoryIds)
 
         // 7. Semantic Deduplication
-        deduplicateBySemantics(sortedMemories)
+        // deduplicateBySemantics(sortedMemories)
+        sortedMemories
     }
 
     /**
@@ -522,51 +611,6 @@ class MemoryRepository(private val context: Context, profileId: String) {
     }
 
     /**
-     * Deduplicates a list of memories based on semantic similarity. If two memories are very
-     * similar, only the first one in the list (higher rank) is kept.
-     */
-    private fun deduplicateBySemantics(sortedMemories: List<Memory>): List<Memory> {
-        if (sortedMemories.size < 2) {
-            return sortedMemories
-        }
-
-        val deduplicatedList = mutableListOf<Memory>()
-        val memoriesToProcess = sortedMemories.toMutableList()
-
-        while (memoriesToProcess.isNotEmpty()) {
-            val current = memoriesToProcess.removeAt(0)
-            deduplicatedList.add(current)
-
-            // Remove other memories that are too similar to the 'current' one
-            memoriesToProcess.removeAll { other ->
-                val similarity =
-                        if (current.embedding != null && other.embedding != null) {
-                            EmbeddingService.cosineSimilarity(
-                                    current.embedding!!,
-                                    other.embedding!!
-                            )
-                        } else {
-                            0f
-                        }
-                // Use a slightly lower threshold for de-duping search results
-                val isSimilar = similarity > 0.90f
-                if (isSimilar) {
-                    android.util.Log.d(
-                            "MemoryRepo",
-                            "Deduplicating '${other.title}' (similar to '${current.title}', similarity: $similarity)"
-                    )
-                }
-                isSimilar
-            }
-        }
-        android.util.Log.d(
-                "MemoryRepo",
-                "Deduplication complete. Initial: ${sortedMemories.size}, Final: ${deduplicatedList.size}"
-        )
-        return deduplicatedList
-    }
-
-    /**
      * Builds a Graph object from a given list of memories. This is used to display a subset of the
      * entire memory graph, e.g., after a search.
      * @param memories The list of memories to include in the graph.
@@ -588,7 +632,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 "MemoryRepo",
                 "Initial memories: ${memories.size}, Expanded memories: ${expandedMemories.size}"
         )
-        buildGraphFromMemories(expandedMemories.toList())
+        buildGraphFromMemories(expandedMemories.toList(), null)
     }
 
     /** Retrieves a single memory by its UUID. */
@@ -598,17 +642,140 @@ class MemoryRepository(private val context: Context, profileId: String) {
             }
 
     /**
+     * 获取所有唯一的文件夹路径。
+     * @return 所有唯一的文件夹路径列表。
+     */
+    suspend fun getAllFolderPaths(): List<String> = withContext(Dispatchers.IO) {
+        memoryBox.all
+            .map { it.folderPath ?: "未分类" }
+            .distinct()
+            .sorted()
+    }
+
+    /**
+     * 按文件夹路径获取记忆（包括所有子文件夹）。
+     * @param folderPath 文件夹路径。
+     * @return 该文件夹及其所有子文件夹下的记忆列表。
+     */
+    suspend fun getMemoriesByFolderPath(folderPath: String): List<Memory> = withContext(Dispatchers.IO) {
+        if (folderPath == "未分类") {
+            // 查询 folderPath 为 null 或空字符串的记忆
+            memoryBox.all.filter { it.folderPath.isNullOrEmpty() }
+        } else {
+            // 包括当前文件夹及所有子文件夹的记忆
+            // 例如：选择 "技术" 会包含 "技术/编程"、"技术/编程/Java" 等
+            memoryBox.all.filter { memory ->
+                val path = memory.folderPath ?: ""
+                path == folderPath || path.startsWith("$folderPath/")
+            }
+        }
+    }
+
+    /**
+     * 获取指定文件夹的图谱（包括跨文件夹的边）。
+     * @param folderPath 文件夹路径。
+     * @return 该文件夹的图谱对象。
+     */
+    suspend fun getGraphForFolder(folderPath: String): Graph = withContext(Dispatchers.IO) {
+        val memories = getMemoriesByFolderPath(folderPath)
+        buildGraphFromMemories(memories, folderPath)
+    }
+
+    /**
+     * 重命名文件夹（更新该文件夹下所有记忆的 folderPath）。
+     * @param oldPath 旧的文件夹路径。
+     * @param newPath 新的文件夹路径。
+     * @return 是否成功。
+     */
+    suspend fun renameFolder(oldPath: String, newPath: String): Boolean = withContext(Dispatchers.IO) {
+        if (oldPath == newPath) return@withContext true
+        
+        try {
+            // 获取该文件夹及其所有子文件夹下的记忆
+            val memories = memoryBox.all.filter { memory ->
+                val path = memory.folderPath ?: ""
+                path == oldPath || path.startsWith("$oldPath/")
+            }
+            
+            // 批量更新路径
+            memories.forEach { memory ->
+                val currentPath = memory.folderPath ?: ""
+                memory.folderPath = if (currentPath == oldPath) {
+                    newPath
+                } else {
+                    currentPath.replaceFirst(oldPath, newPath)
+                }
+            }
+            
+            memoryBox.put(memories)
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("MemoryRepo", "Failed to rename folder", e)
+            false
+        }
+    }
+
+    /**
+     * 移动记忆到新文件夹。
+     * @param memoryIds 要移动的记忆ID列表。
+     * @param targetFolderPath 目标文件夹路径。
+     * @return 是否成功。
+     */
+    suspend fun moveMemoriesToFolder(memoryIds: List<Long>, targetFolderPath: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val memories = memoryIds.mapNotNull { findMemoryById(it) }
+            memories.forEach { it.folderPath = targetFolderPath }
+            memoryBox.put(memories)
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("MemoryRepo", "Failed to move memories", e)
+            false
+        }
+    }
+
+    /**
+     * 创建新文件夹（实际上是通过在该路径下创建一个占位记忆来实现）。
+     * @param folderPath 新文件夹的路径。
+     * @return 是否成功。
+     */
+    suspend fun createFolder(folderPath: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // 检查是否已存在该文件夹
+            val exists = memoryBox.all.any { (it.folderPath ?: "") == folderPath }
+            if (exists) return@withContext true
+            
+            // 创建一个占位记忆
+            val placeholder = Memory(
+                title = "文件夹说明",
+                content = "这是 $folderPath 文件夹的说明。",
+                uuid = UUID.randomUUID().toString(),
+                folderPath = folderPath
+            )
+            val embedding = EmbeddingService.generateEmbedding(placeholder.content)
+            if (embedding != null) {
+                placeholder.embedding = embedding
+            }
+            memoryBox.put(placeholder)
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("MemoryRepo", "Failed to create folder", e)
+            false
+        }
+    }
+
+    /**
      * 创建新记忆并自动生成embedding，保存到数据库并同步索引。
      */
-    suspend fun createMemory(title: String, content: String, contentType: String = "text/plain", source: String = "user_input"): Memory? = withContext(Dispatchers.IO) {
-        val embedding = EmbeddingService.generateEmbedding(content) ?: return@withContext null
+    suspend fun createMemory(title: String, content: String, contentType: String = "text/plain", source: String = "user_input", folderPath: String = ""): Memory? = withContext(Dispatchers.IO) {
         val memory = Memory(
             title = title,
             content = content,
             contentType = contentType,
             source = source,
-            embedding = embedding
+            folderPath = folderPath
         )
+        val textForEmbedding = generateTextForEmbedding(memory)
+        memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding) ?: return@withContext null
         saveMemory(memory)
         addMemoryToIndex(memory)
         memory
@@ -617,18 +784,158 @@ class MemoryRepository(private val context: Context, profileId: String) {
     /**
      * 更新已有记忆内容（title/content等），自动更新embedding和索引。
      */
-    suspend fun updateMemory(memory: Memory, newTitle: String, newContent: String, newContentType: String = memory.contentType): Memory? = withContext(Dispatchers.IO) {
-        val newEmbedding = EmbeddingService.generateEmbedding(newContent) ?: return@withContext null
-        val updated = memory.copy(
-            title = newTitle,
-            content = newContent,
-            contentType = newContentType,
-            embedding = newEmbedding,
-            updatedAt = java.util.Date()
-        )
-        saveMemory(updated)
-        addMemoryToIndex(updated)
-        updated
+    suspend fun updateMemory(
+        memory: Memory,
+        newTitle: String,
+        newContent: String,
+        newContentType: String = memory.contentType,
+        newSource: String = memory.source,
+        newCredibility: Float = memory.credibility,
+        newImportance: Float = memory.importance,
+        newFolderPath: String? = memory.folderPath,
+        newTags: List<String>? = null // 可选的要更新的标签列表
+    ): Memory? = withContext(Dispatchers.IO) {
+        val contentChanged = memory.content != newContent
+        val credibilityChanged = memory.credibility != newCredibility
+        val importanceChanged = memory.importance != newImportance
+
+        // 只有在影响embedding的因素变化时才重新生成
+        val needsReEmbedding = contentChanged || credibilityChanged || importanceChanged
+
+        // 更新记忆属性
+        memory.apply {
+            title = newTitle
+            content = newContent
+            contentType = newContentType
+            source = newSource
+            credibility = newCredibility
+            importance = newImportance
+            folderPath = newFolderPath
+        }
+
+        val newEmbedding = if (needsReEmbedding) {
+            val textForEmbedding = generateTextForEmbedding(memory)
+            EmbeddingService.generateEmbedding(textForEmbedding) ?: memory.embedding
+        } else {
+            memory.embedding
+        }
+        memory.embedding = newEmbedding
+
+        // 更新标签
+        if (newTags != null) {
+            memory.tags.clear() // 清除旧标签
+            newTags.forEach { tagName ->
+                // Find existing tag or create a new one
+                val tag = tagBox.query(MemoryTag_.name.equal(tagName, QueryBuilder.StringOrder.CASE_SENSITIVE))
+                    .build().findFirst() ?: MemoryTag(name = tagName).also { tagBox.put(it) }
+                memory.tags.add(tag)
+            }
+        }
+
+        // 更新记忆属性
+        memory.apply {
+            this.updatedAt = java.util.Date()
+        }
+
+        // 这里不再需要调用 saveMemory，因为 memory 对象已经被修改，
+        // 最后的 memoryBox.put(memory) 会保存所有更改。
+        memoryBox.put(memory)
+
+        if (needsReEmbedding) {
+            addMemoryToIndex(memory)
+        }
+        memory
+    }
+
+    /**
+     * Merges multiple source memories into a single new memory, redirecting all links.
+     */
+    suspend fun mergeMemories(
+        sourceTitles: List<String>,
+        newTitle: String,
+        newContent: String,
+        newTags: List<String>,
+        folderPath: String
+    ): Memory? = withContext(Dispatchers.IO) {
+        // Step 1: Find all unique source memories from the given titles.
+        // Using a Set ensures that we handle each memory object only once, even if titles are duplicated.
+        val sourceMemories = mutableSetOf<Memory>()
+        for (title in sourceTitles.distinct()) {
+            sourceMemories.addAll(findMemoriesByTitle(title))
+        }
+
+        // After finding all memories, check if we have enough to merge.
+        if (sourceMemories.size < 2) {
+            android.util.Log.w("MemoryRepo", "Merge requires at least two unique source memories to be found. Found: ${sourceMemories.size} from titles: ${sourceTitles.joinToString()}.")
+            return@withContext null
+        }
+
+        var newMemory: Memory? = null
+        try {
+            store.runInTx {
+                // 2. Create the new merged memory (without embedding yet)
+                val mergedMemory = Memory(
+                    title = newTitle,
+                    content = newContent,
+                    folderPath = folderPath,
+                    source = "merged_from_problem_library"
+                )
+                memoryBox.put(mergedMemory) // Save to get an ID
+
+                // 3. Add tags to the new memory
+                newTags.forEach { tagName ->
+                    val tag = tagBox.query(MemoryTag_.name.equal(tagName, QueryBuilder.StringOrder.CASE_SENSITIVE))
+                        .build().findFirst() ?: MemoryTag(name = tagName).also { tagBox.put(it) }
+                    mergedMemory.tags.add(tag)
+                }
+                memoryBox.put(mergedMemory)
+
+                // 4. Collect all unique links and redirect them
+                val allLinksToProcess = mutableSetOf<MemoryLink>()
+                val sourceIdsSet = sourceMemories.map { it.id }.toSet()
+
+                sourceMemories.forEach {
+                    it.links.reset()
+                    it.backlinks.reset()
+                    allLinksToProcess.addAll(it.links)
+                    allLinksToProcess.addAll(it.backlinks)
+                }
+
+                allLinksToProcess.forEach { link ->
+                    if (link.source.targetId in sourceIdsSet) {
+                        link.source.target = mergedMemory
+                    }
+                    if (link.target.targetId in sourceIdsSet) {
+                        link.target.target = mergedMemory
+                    }
+                }
+                linkBox.put(allLinksToProcess.toList())
+
+                // 5. Delete old source memories
+                memoryBox.removeByIds(sourceIdsSet.toList())
+
+                newMemory = mergedMemory
+            }
+
+            // After the transaction, handle non-transactional parts
+            newMemory?.let { memory ->
+                // Generate and save embedding for the new memory
+                val textForEmbedding = generateTextForEmbedding(memory)
+                memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding)
+                memoryBox.put(memory)
+
+                // Update vector index
+                addMemoryToIndex(memory)
+                for (mem in sourceMemories) {
+                    removeMemoryFromIndex(mem)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MemoryRepo", "Error during memory merge transaction.", e)
+            return@withContext null
+        }
+
+        newMemory
     }
 
     /**
@@ -733,14 +1040,16 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
     /** Fetches all memories and their links, and converts them into a Graph data structure. */
     suspend fun getMemoryGraph(): Graph = withContext(Dispatchers.IO) {
-        buildGraphFromMemories(memoryBox.all)
+        buildGraphFromMemories(memoryBox.all, null)
     }
 
     /**
      * Private helper to construct a graph from a specific list of memories. Ensures that edges are
      * only created if both source and target nodes are in the list.
+     * @param memories 要构建图谱的记忆列表
+     * @param currentFolderPath 当前选中的文件夹路径（用于判断跨文件夹连接），null表示显示全部
      */
-    private fun buildGraphFromMemories(memories: List<Memory>): Graph {
+    private fun buildGraphFromMemories(memories: List<Memory>, currentFolderPath: String? = null): Graph {
         val memoryUuids = memories.map { it.uuid }.toSet()
 
         val nodes =
@@ -766,21 +1075,35 @@ class MemoryRepository(private val context: Context, profileId: String) {
             // 关键：重置关系缓存，确保获取最新的连接信息
             memory.links.reset()
             memory.links.forEach { link ->
-                val sourceId = link.source.target?.uuid
-                val targetId = link.target.target?.uuid
+                val sourceMemory = link.source.target
+                val targetMemory = link.target.target
+                val sourceId = sourceMemory?.uuid
+                val targetId = targetMemory?.uuid
+                
                 // Only add edges if both source and target are in the filtered list
                 if (sourceId != null &&
                     targetId != null &&
                     sourceId in memoryUuids &&
                     targetId in memoryUuids
                 ) {
+                    // 检测是否为跨文件夹连接
+                    // 始终检测跨文件夹连接，无论是否选择了特定文件夹
+                    val isCrossFolder = if (sourceMemory != null && targetMemory != null) {
+                        val sourcePath = sourceMemory.folderPath ?: "未分类"
+                        val targetPath = targetMemory.folderPath ?: "未分类"
+                        sourcePath != targetPath
+                    } else {
+                        false
+                    }
+                    
                     edges.add(
                         Edge(
                             id = link.id,
                             sourceId = sourceId,
                             targetId = targetId,
                             label = link.type,
-                            weight = link.weight
+                            weight = link.weight,
+                            isCrossFolderLink = isCrossFolder
                         )
                     )
                 } else if (sourceId != null && targetId != null) {
@@ -795,5 +1118,19 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 "Built graph with ${nodes.size} nodes and ${edges.distinct().size} edges."
         )
         return Graph(nodes = nodes, edges = edges.distinct())
+    }
+
+    /**
+     * 删除文件夹：将所有属于 folderPath 的记忆移动到"未分类"
+     */
+    suspend fun deleteFolder(folderPath: String) {
+        withContext(Dispatchers.IO) {
+            val memories = memoryBox.query(Memory_.folderPath.equal(folderPath)).build().find()
+            memories.forEach { memory ->
+                memory.folderPath = "未分类"
+                memoryBox.put(memory)
+            }
+            android.util.Log.d("MemoryRepo", "Deleted folder '$folderPath', moved ${memories.size} memories to '未分类'")
+        }
     }
 }

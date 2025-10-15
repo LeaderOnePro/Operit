@@ -53,6 +53,7 @@ fun MemoryInfoDialog(
                     Text("内容:", style = MaterialTheme.typography.titleSmall)
                     Text(memory.content)
                     Divider()
+                    Text("文件夹: ${memory.folderPath?.ifEmpty { "未分类" }}", style = MaterialTheme.typography.bodySmall)
                     Text("UUID: ${memory.uuid}", style = MaterialTheme.typography.bodySmall)
                     Text("来源: ${memory.source}", style = MaterialTheme.typography.bodySmall)
                     Text(
@@ -90,45 +91,6 @@ fun MemoryInfoDialog(
                     OutlinedButton(onClick = onDismiss) { Text("关闭") }
                 }
             }
-    )
-}
-
-@Composable
-fun EditMemoryDialog(
-    memory: Memory?,
-    onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit
-) {
-    var title by remember { mutableStateOf(memory?.title ?: "") }
-    var content by remember { mutableStateOf(memory?.content ?: "") }
-    var contentType by remember { mutableStateOf(memory?.contentType ?: "text/plain") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (memory == null) "创建记忆" else "编辑记忆") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("标题") }
-                )
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text("内容") },
-                    minLines = 3
-                )
-                OutlinedTextField(
-                    value = contentType,
-                    onValueChange = { contentType = it },
-                    label = { Text("内容类型") }
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onSave(title, content, contentType) }) { Text("保存") }
-        },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("取消") } }
     )
 }
 

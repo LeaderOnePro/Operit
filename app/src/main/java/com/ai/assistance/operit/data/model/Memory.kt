@@ -4,6 +4,7 @@ import io.objectbox.annotation.Backlink
 import io.objectbox.annotation.Convert
 import io.objectbox.annotation.Entity
 import io.objectbox.annotation.Id
+import io.objectbox.annotation.Index
 import io.objectbox.relation.ToMany
 import io.objectbox.relation.ToOne
 import java.util.Date
@@ -34,6 +35,11 @@ data class Memory(
     var isDocumentNode: Boolean = false,
     // 新增：如果这是一个文档节点，则存储其区块索引文件的路径
     var chunkIndexFilePath: String? = null,
+
+    // 新增：文件夹路径，用于分类组织记忆（如 "工作/项目A" 或 "生活/健康"）
+    // 使用可空类型以兼容旧数据，null 视为"未分类"
+    @Index
+    var folderPath: String? = null,
 
     // 文本内容的向量嵌入
     @Convert(converter = EmbeddingConverter::class, dbType = ByteArray::class)
