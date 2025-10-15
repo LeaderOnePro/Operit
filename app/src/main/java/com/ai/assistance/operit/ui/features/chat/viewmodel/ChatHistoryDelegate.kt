@@ -465,6 +465,24 @@ class ChatHistoryDelegate(
                 val chatId = _currentChatId.value ?: return@withLock
                 val currentMessages = _chatHistory.value.toMutableList()
 
+                // 检查插入位置是否越界
+                if (insertPosition < 0 || insertPosition > currentMessages.size) {
+                    Log.e(TAG, "总结插入位置越界: insertPosition=$insertPosition, size=${currentMessages.size}，取消插入")
+                    return@withLock
+                }
+
+                // 检查上个消息是否为总结消息
+                if (insertPosition > 0 && currentMessages[insertPosition - 1].sender == "summary") {
+                    Log.e(TAG, "上个消息已是总结消息，取消插入以避免重复")
+                    return@withLock
+                }
+
+                // 检查下个消息是否为总结消息
+                if (insertPosition < currentMessages.size && currentMessages[insertPosition].sender == "summary") {
+                    Log.e(TAG, "下个消息已是总结消息，取消插入以避免重复")
+                    return@withLock
+                }
+
                 // 在预先计算好的位置插入总结消息
                 currentMessages.add(insertPosition, summaryMessage)
                 Log.d(TAG, "在预计算索引 $insertPosition 处添加总结消息，更新后总消息数量: ${currentMessages.size}")
