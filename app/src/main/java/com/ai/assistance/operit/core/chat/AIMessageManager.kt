@@ -95,7 +95,7 @@ object AIMessageManager {
             if (result.success && result.result is MemoryQueryResultData) {
                 val memoryData = result.result as MemoryQueryResultData
                 if (memoryData.memories.isNotEmpty()) {
-                    val instruction = "你不用刻意去针对memory进行回复，仅针对用户说的话回答即可"
+                    val instruction = "RAG Memory"
                     val memoryContent = memoryData.toString()
                     "<memory>${instruction}\n---\n${memoryContent}</memory>"
                 } else ""

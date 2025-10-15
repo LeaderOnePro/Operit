@@ -23,7 +23,7 @@ import com.ai.assistance.operit.data.preferences.initAndroidPermissionPreference
 import com.ai.assistance.operit.data.preferences.initUserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
-import com.ai.assistance.operit.services.EmbeddingService
+import com.ai.assistance.operit.services.OnnxEmbeddingService
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.language.LanguageFactory
 import com.ai.assistance.operit.util.GlobalExceptionHandler
@@ -76,8 +76,11 @@ class OperitApplication : Application() {
         // Initialize AIMessageManager
         AIMessageManager.initialize(this)
 
-        // Initialize Embedding Service as early as possible
-        EmbeddingService.initialize(this)
+        // Initialize Embedding Service asynchronously in background
+        // Using ONNX-based multilingual model for better Chinese support
+        applicationScope.launch {
+            OnnxEmbeddingService.initialize(this@OperitApplication)
+        }
 
         // Initialize ANR monitor
         // AnrMonitor.start() // This line was removed from the new_code, so it's removed here.

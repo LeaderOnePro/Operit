@@ -45,6 +45,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             val results = memoryRepository.searchMemories(query) // 改用更强大的混合搜索
             
             val formattedResult = buildResultData(results.take(5), query) // 取前5个结果
+            Log.d(TAG, "Memory query result for '$query':\n$formattedResult")
             ToolResult(toolName = tool.name, success = true, result = formattedResult)
         } catch (e: Exception) {
             Log.e(TAG, "Memory query failed", e)

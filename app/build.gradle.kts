@@ -233,6 +233,9 @@ dependencies {
     // 用于向量嵌入的TF Lite (如果需要自定义嵌入)
     implementation(libs.tensorflow.lite)
     implementation(libs.mediapipe.tasks.text)
+    
+    // ONNX Runtime for Android - 支持更强大的多语言Embedding模型
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
 
     // Room 数据库
     implementation(libs.room.runtime)

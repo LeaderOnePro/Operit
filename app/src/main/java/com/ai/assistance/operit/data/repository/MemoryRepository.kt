@@ -12,7 +12,7 @@ import com.ai.assistance.operit.data.model.DocumentChunk
 import com.ai.assistance.operit.data.model.DocumentChunk_
 import com.ai.assistance.operit.data.model.Embedding
 import com.ai.assistance.operit.data.model.ChunkReference
-import com.ai.assistance.operit.services.EmbeddingService
+import com.ai.assistance.operit.services.OnnxEmbeddingService
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Edge
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Graph
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Node
@@ -57,7 +57,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val indexFile = File(context.filesDir, "memory_hnsw_${profileId}.idx")
         val manager =
                 VectorIndexManager<IndexItem<Memory>, String>(
-                        dimensions = 100, // 实际embedding维度为100
+                        dimensions = 384, // ONNX模型的embedding维度为384
                         maxElements = 100_000,
                         indexFile = indexFile
                 )
@@ -79,7 +79,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
      */
     suspend fun createMemoryFromDocument(documentName: String, originalPath: String, text: String, folderPath: String = ""): Memory = withContext(Dispatchers.IO) {
         // 1. 为文档本身生成嵌入
-        val documentEmbedding = EmbeddingService.generateEmbedding(documentName)?.vector ?: FloatArray(100)
+        val documentEmbedding = OnnxEmbeddingService.generateEmbedding(documentName)?.vector ?: FloatArray(384)
 
         // 2. 创建一个初始的Memory对象并立即保存以获得ID
         val documentMemory = Memory(
@@ -101,7 +101,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         }
         documentMemory.chunkIndexFilePath = indexFile.absolutePath
         val chunkIndexManager = VectorIndexManager<IndexItem<ChunkReference>, String>(
-            dimensions = 100, // Or your model's embedding dimension
+            dimensions = 384, // ONNX模型的embedding维度
             maxElements = 20000,
             indexFile = indexFile
         )
@@ -127,7 +127,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             chunkBox.put(chunks)
 
             // 然后为所有块生成嵌入
-            val embeddings = chunks.map { EmbeddingService.generateEmbedding(it.content) }
+            val embeddings = chunks.map { OnnxEmbeddingService.generateEmbedding(it.content) }
 
             // 最后，用有效ID和嵌入更新块，并将它们添加到索引管理器中
             chunks.forEachIndexed { index, chunk ->
@@ -176,7 +176,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         // Generate embedding before saving
         if (memory.content.isNotBlank()) {
             val textForEmbedding = generateTextForEmbedding(memory)
-            memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding)
+            memory.embedding = OnnxEmbeddingService.generateEmbedding(textForEmbedding)
         }
         val id = memoryBox.put(memory)
         // After saving to DB, ensure it's also added to the live vector index
@@ -386,99 +386,155 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 Memory_.content.contains(query, QueryBuilder.StringOrder.CASE_INSENSITIVE)
         val keywordResults = memoryBox.query(titleCondition.or(contentCondition)).build().find()
 
+        android.util.Log.d("MemoryRepo", "--- Keyword Search Results: ${keywordResults.size} ---")
         keywordResults.forEachIndexed { index, memory ->
             val rank = index + 1
             val baseScore = 1.0 / (k + rank)
-            // 应用重要性权重
-            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
+            val keywordWeight = 10.0 // Boost keyword search importance
+            val weightedScore = baseScore * memory.importance * keywordWeight
+            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
+            android.util.Log.d("MemoryRepo", "  [Keyword] Score for '${memory.title}': rank=$rank, baseScore=${String.format("%.4f", baseScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
         }
 
         // 2. Reverse Containment Search (Query contains Memory Title)
         // This is crucial for finding "长安大学" within the query "长安大学在西安".
         val reverseContainmentResults =
                 allMemories.filter { memory -> query.contains(memory.title, ignoreCase = true) }
+        
+        android.util.Log.d("MemoryRepo", "--- Reverse Containment Search Results: ${reverseContainmentResults.size} ---")
         reverseContainmentResults.forEachIndexed { index, memory ->
             val rank = index + 1
             // Use the same RRF formula to add to the score
             val baseScore = 1.0 / (k + rank)
-            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
+            val revContainWeight = 10.0 // Also boost this signal
+            val weightedScore = baseScore * memory.importance * revContainWeight
+            scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
+            android.util.Log.d("MemoryRepo", "  [RevContain] Score for '${memory.title}': rank=$rank, baseScore=${String.format("%.4f", baseScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
         }
 
         // 3. Semantic search (for conceptual matches)
-        val queryEmbedding = EmbeddingService.generateEmbedding(query)
+        val queryEmbedding = OnnxEmbeddingService.generateEmbedding(query)
         if (queryEmbedding != null) {
             val allMemoriesWithEmbedding = allMemories.filter { it.embedding != null }
 
-            val semanticResults =
-                    allMemoriesWithEmbedding
-                            .mapNotNull { memory ->
+            val minSimilarityThreshold = 0.6f // 语义相似度阈值
+            
+            // Calculate ALL similarities for debugging
+            val allSimilarities = allMemoriesWithEmbedding
+                .map { memory ->
                                 memory.embedding?.let { memoryEmbedding ->
-                                    val similarity =
-                                            EmbeddingService.cosineSimilarity(
+                        val similarity = OnnxEmbeddingService.cosineSimilarity(
                                                     queryEmbedding,
                                                     memoryEmbedding
                                             )
-                                    // 在这里，我们直接将相似度作为分数基础，而不是使用排名
-                                    // 因为相似度本身就是一种连续的分数
-                                    // Pair(memory, similarity * memory.importance)
-                                    Pair(memory, similarity)
-                                }
+                        Triple(memory, similarity, similarity >= minSimilarityThreshold)
+                    } ?: Triple(memory, 0f, false)
                             }
                             .sortedByDescending { it.second }
-                            .map { it.first } // We only need the ranked list of memories
+            
+            // Log top similarities regardless of threshold
+            android.util.Log.d("MemoryRepo", "--- All Semantic Similarities (Total: ${allSimilarities.size}) ---")
+            allSimilarities.take(10).forEach { (memory, similarity, aboveThreshold) ->
+                val marker = if (aboveThreshold) "✓" else "✗"
+                android.util.Log.d("MemoryRepo", "  $marker [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
+            }
+            
+            val semanticResultsWithScores = allSimilarities
+                .filter { it.third }
+                .map { Pair(it.first, it.second) }
 
-            semanticResults.forEachIndexed { index, memory ->
+            android.util.Log.d("MemoryRepo", "--- Top Semantic Search Results (Threshold: $minSimilarityThreshold): ${semanticResultsWithScores.size} ---")
+            semanticResultsWithScores.take(5).forEach { (memory, similarity) ->
+                android.util.Log.d("MemoryRepo", "  - [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
+            }
+
+            semanticResultsWithScores.forEachIndexed { index, (memory, similarity) ->
                 val rank = index + 1
-                val baseScore = 1.0 / (k + rank)
-                scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + (baseScore * memory.importance)
+                
+                // RRF score (retains ranking information but has low impact)
+                val rankScore = 1.0 / (k + rank)
+                
+                // Raw similarity score (high impact, directly reflects semantic relevance)
+                val semanticWeight = 0.5f 
+                val similarityScore = similarity * semanticWeight
+
+                // Combine them. Importance should only affect the rank score, not the raw similarity.
+                val weightedScore = (rankScore * Math.sqrt(memory.importance.toDouble())) + similarityScore
+                scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
+
+                android.util.Log.d("MemoryRepo", "  [Semantic] Score for '${memory.title}': rank=$rank, similarity=${String.format("%.4f", similarity)}, rankScore=${String.format("%.4f", rankScore)}, similarityScore=${String.format("%.4f", similarityScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
             }
         }
 
         // 4. Graph-based expansion: Boost scores of connected memories based on edge weights
         // Take top-scoring memories as "seed nodes" and propagate scores through edges
-        val topSeeds = scores.entries.sortedByDescending { it.value }.take(10).map { it.key }
-        android.util.Log.d("MemoryRepo", "Graph expansion: Using ${topSeeds.size} seed nodes")
-        var expandedCount = 0
-        
-        topSeeds.forEach { seedId ->
-            val seedMemory = allMemories.find { it.id == seedId } ?: return@forEach
-            val seedScore = scores[seedId] ?: 0.0
+        val topMemoriesForExpansion = scores.entries.sortedByDescending { it.value }.take(10)
+        android.util.Log.d("MemoryRepo", "Graph expansion: Using ${topMemoriesForExpansion.size} seed nodes")
+
+        var edgesTraversed = 0
+        val graphPropagationWeight = 0.1 // Reduced from 0.3 to prevent overpowering other scores
+
+        topMemoriesForExpansion.forEach { (sourceId, sourceScore) ->
+            val sourceMemory = allMemories.find { it.id == sourceId } ?: return@forEach
+            val sourceScore = scores[sourceId] ?: 0.0
             
             // 重置关系缓存以获取最新连接
-            seedMemory.links.reset()
-            seedMemory.backlinks.reset()
+            sourceMemory.links.reset()
+            sourceMemory.backlinks.reset()
             
             // Propagate score through outgoing links
-            seedMemory.links.forEach { link ->
+            sourceMemory.links.forEach { link ->
                 val targetMemory = link.target.target
                 if (targetMemory != null) {
                     // 边权重越高，传播的分数越多
-                    val propagatedScore = seedScore * link.weight * 0.3 // 30% of seed score weighted by edge
+                    val propagatedScore = sourceScore * link.weight * graphPropagationWeight
                     scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
-                    expandedCount++
-                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${seedMemory.title}' to '${targetMemory.title}' (weight: ${link.weight})")
+                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${sourceMemory.title}' to '${targetMemory.title}' (weight: ${link.weight})")
+                    edgesTraversed++
                 }
             }
             
             // Propagate score through incoming links (backlinks)
-            seedMemory.backlinks.forEach { link ->
-                val sourceMemory = link.source.target
-                if (sourceMemory != null) {
+            sourceMemory.backlinks.forEach { link ->
+                val targetMemory = link.source.target
+                if (targetMemory != null) {
                     // 边权重越高，传播的分数越多
-                    val propagatedScore = seedScore * link.weight * 0.3 // 30% of seed score weighted by edge
-                    scores[sourceMemory.id] = scores.getOrDefault(sourceMemory.id, 0.0) + propagatedScore
-                    expandedCount++
-                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${sourceMemory.title}' to '${seedMemory.title}' (weight: ${link.weight})")
+                    val propagatedScore = sourceScore * link.weight * graphPropagationWeight
+                    scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
+                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${targetMemory.title}' to '${sourceMemory.title}' (weight: ${link.weight})")
+                    edgesTraversed++
                 }
             }
         }
-        android.util.Log.d("MemoryRepo", "Graph expansion completed: ${expandedCount} edges traversed")
+        android.util.Log.d("MemoryRepo", "Graph expansion completed: ${edgesTraversed} edges traversed")
 
         // 5. Fuse results using RRF and return sorted list
         if (scores.isEmpty()) {
             return@withContext emptyList()
         }
-        val sortedMemoryIds = scores.entries.sortedByDescending { it.value }.map { it.key }
+        
+        // 添加相关性阈值过滤，避免返回不相关的记忆
+        val minScoreThreshold = 0.025 // 最低分数阈值，可根据实际效果调整
+        val filteredScores = scores.entries.filter { it.value >= minScoreThreshold }
+        
+        android.util.Log.d("MemoryRepo", "Score filtering: ${scores.size} total results, ${filteredScores.size} above threshold $minScoreThreshold")
+        
+        // --- 详细日志记录 ---
+        val sortedScoresForLogging = scores.entries.sortedByDescending { it.value }
+        sortedScoresForLogging.take(15).forEach { (id, score) ->
+            val memory = allMemories.find { it.id == id }
+            if (memory != null) {
+                android.util.Log.d("MemoryRepo", "  - [${memory.title}]: Final Score = ${String.format("%.4f", score)}")
+            }
+        }
+        // --- 日志记录结束 ---
+
+        if (filteredScores.isEmpty()) {
+            android.util.Log.d("MemoryRepo", "No memories above relevance threshold")
+            return@withContext emptyList()
+        }
+        
+        val sortedMemoryIds = filteredScores.sortedByDescending { it.value }.map { it.key }
 
         // Fetch the sorted entities from the database
         val sortedMemories = memoryBox.get(sortedMemoryIds)
@@ -525,12 +581,12 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val semanticResults = mutableListOf<DocumentChunk>()
         val documentMemory = memoryBox.get(memoryId)
         if (documentMemory?.chunkIndexFilePath != null && File(documentMemory.chunkIndexFilePath!!).exists()) {
-            val queryEmbedding = EmbeddingService.generateEmbedding(query)?.vector
+            val queryEmbedding = OnnxEmbeddingService.generateEmbedding(query)?.vector
             if (queryEmbedding != null) {
                 android.util.Log.d("MemoryRepo", "Generated query embedding successfully. Starting semantic search.")
                 try {
                     val chunkIndexManager = VectorIndexManager<IndexItem<ChunkReference>, String>(
-                        dimensions = 100,
+                        dimensions = 384,
                         maxElements = 20000,
                         indexFile = File(documentMemory.chunkIndexFilePath!!)
                     )
@@ -566,7 +622,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val memory = chunk.memory.target ?: return@withContext
 
         chunk.content = newContent
-        val newEmbeddingVector = EmbeddingService.generateEmbedding(newContent)?.vector ?: return@withContext // 重新生成向量并获取vector
+        val newEmbeddingVector = OnnxEmbeddingService.generateEmbedding(newContent)?.vector ?: return@withContext // 重新生成向量并获取vector
         chunk.embedding = Embedding(newEmbeddingVector)
         chunkBox.put(chunk)
 
@@ -575,7 +631,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         if (parentMemory?.chunkIndexFilePath != null) {
             val indexFile = File(parentMemory.chunkIndexFilePath!!)
             if (indexFile.exists()) {
-                val chunkIndexManager = VectorIndexManager<IndexItem<ChunkReference>, String>(100, 20_000, indexFile)
+                val chunkIndexManager = VectorIndexManager<IndexItem<ChunkReference>, String>(384, 20_000, indexFile)
                 chunkIndexManager.initIndex() // 加载
                 chunkIndexManager.addItem(IndexItem(chunk.id.toString(), newEmbeddingVector, ChunkReference(chunk.id)))
                 chunkIndexManager.save() // 保存更改
@@ -597,12 +653,12 @@ class MemoryRepository(private val context: Context, profileId: String) {
     /** 使用HNSW索引的高效语义检索。 */
     suspend fun searchMemoriesPrecise(query: String, similarityThreshold: Float = 0.95f): List<Memory> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
-        val queryEmbedding = EmbeddingService.generateEmbedding(query) ?: return@withContext emptyList()
+        val queryEmbedding = OnnxEmbeddingService.generateEmbedding(query) ?: return@withContext emptyList()
         // 取前100个最相近的记忆，再按阈值过滤
         val candidates = vectorIndexManager.findNearest(queryEmbedding.vector, 100)
         candidates.mapNotNull {
             val memory = it.value
-            if (memory.embedding != null && EmbeddingService.cosineSimilarity(queryEmbedding, memory.embedding!!) >= similarityThreshold) {
+            if (memory.embedding != null && OnnxEmbeddingService.cosineSimilarity(queryEmbedding, memory.embedding!!) >= similarityThreshold) {
                 memory
             } else {
                 null
@@ -751,7 +807,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 uuid = UUID.randomUUID().toString(),
                 folderPath = folderPath
             )
-            val embedding = EmbeddingService.generateEmbedding(placeholder.content)
+            val embedding = OnnxEmbeddingService.generateEmbedding(placeholder.content)
             if (embedding != null) {
                 placeholder.embedding = embedding
             }
@@ -761,7 +817,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             android.util.Log.e("MemoryRepo", "Failed to create folder", e)
             false
         }
-    }
+            }
 
     /**
      * 创建新记忆并自动生成embedding，保存到数据库并同步索引。
@@ -775,7 +831,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             folderPath = folderPath
         )
         val textForEmbedding = generateTextForEmbedding(memory)
-        memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding) ?: return@withContext null
+        memory.embedding = OnnxEmbeddingService.generateEmbedding(textForEmbedding) ?: return@withContext null
         saveMemory(memory)
         addMemoryToIndex(memory)
         memory
@@ -815,7 +871,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
         val newEmbedding = if (needsReEmbedding) {
             val textForEmbedding = generateTextForEmbedding(memory)
-            EmbeddingService.generateEmbedding(textForEmbedding) ?: memory.embedding
+            OnnxEmbeddingService.generateEmbedding(textForEmbedding) ?: memory.embedding
         } else {
             memory.embedding
         }
@@ -875,8 +931,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
             store.runInTx {
                 // 2. Create the new merged memory (without embedding yet)
                 val mergedMemory = Memory(
-                    title = newTitle,
-                    content = newContent,
+            title = newTitle,
+            content = newContent,
                     folderPath = folderPath,
                     source = "merged_from_problem_library"
                 )
@@ -921,7 +977,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             newMemory?.let { memory ->
                 // Generate and save embedding for the new memory
                 val textForEmbedding = generateTextForEmbedding(memory)
-                memory.embedding = EmbeddingService.generateEmbedding(textForEmbedding)
+                memory.embedding = OnnxEmbeddingService.generateEmbedding(textForEmbedding)
                 memoryBox.put(memory)
 
                 // Update vector index
