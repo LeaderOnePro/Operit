@@ -106,9 +106,6 @@ fun MCPConfigScreen(
     val installedPlugins =
             mcpRepository.installedPluginIds.collectAsState(initial = emptySet()).value
 
-    // 计算是否有任何服务器在运行
-    val isAnyServerRunning = serverStatus.values.any { it.active }
-
     // 部署状态
     val deploymentStatus by deployViewModel.deploymentStatus.collectAsState()
     val outputMessages by deployViewModel.outputMessages.collectAsState()
@@ -132,7 +129,8 @@ fun MCPConfigScreen(
             mcpRepository.refreshPluginList()
 
             // 只记录服务器状态，不再重复启动服务器(已由 Application 中的 initAndAutoStartPlugins 控制)
-            if (isAnyServerRunning) {
+            val anyServerRunning = serverStatus.values.any { it.active }
+            if (anyServerRunning) {
                 android.util.Log.d("MCPConfigScreen", "MCP服务器已在运行")
             } else {
                 android.util.Log.d("MCPConfigScreen", "MCP服务器未运行")
@@ -207,6 +205,17 @@ fun MCPConfigScreen(
     
     // 存储每个插件的工具信息
     var pluginToolsMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+
+    // 计算插件启动统计 - 只统计已启用的插件
+    val totalEnabledPlugins = remember(installedPlugins) {
+        installedPlugins.count { pluginId -> mcpLocalServer.isServerEnabled(pluginId) }
+    }
+    val successfulToolRequests = remember { mutableStateOf(0) }
+    
+    // 更新成功请求工具的插件数量
+    LaunchedEffect(pluginToolsMap) {
+        successfulToolRequests.value = pluginToolsMap.filter { it.value.isNotEmpty() }.size
+    }
 
     LaunchedEffect(installedPlugins, toolRefreshTrigger) {
         // 只有在安装了插件后才运行
@@ -979,13 +988,19 @@ fun MCPConfigScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .background(
-                                            color = if (isAnyServerRunning) Color.Green else Color.Red,
+                                            color = when {
+                                                totalEnabledPlugins == 0 -> Color.Gray
+                                                successfulToolRequests.value == totalEnabledPlugins -> Color.Green
+                                                successfulToolRequests.value > 0 -> Color(0xFFFFA500) // Orange
+                                                else -> Color.Red
+                                            },
                                             shape = RoundedCornerShape(4.dp)
                                         )
                                 )
                                 Text(
-                                    text = if (isAnyServerRunning) stringResource(R.string.running) else stringResource(R.string.not_running),
+                                    text = "${successfulToolRequests.value}/$totalEnabledPlugins",
                                     style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }

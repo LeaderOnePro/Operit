@@ -20,7 +20,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
+import com.ai.assistance.operit.services.OnnxEmbeddingService
 import java.util.*
 /**
  * 问题库管理类 - 提供分析对话内容并存储为结构化记忆图谱的功能。
@@ -58,6 +60,22 @@ object ProblemLibrary {
         }
     }
 
+    /**
+     * 自动为未分类的记忆分配文件夹路径
+     * 在后台异步执行，不阻塞主线程
+     */
+    fun autoCategorizeMemoriesAsync(context: Context, aiService: AIService) {
+        ensureInitialized(context)
+        
+        coroutineScope.launch {
+            try {
+                autoCategorizeMemories(context, aiService)
+            } catch (e: Exception) {
+                Log.e(TAG, "自动分类记忆失败", e)
+            }
+        }
+    }
+
     fun saveProblemAsync(
             context: Context,
             toolHandler: AIToolHandler,
@@ -85,6 +103,133 @@ object ProblemLibrary {
     private fun ensureInitialized(context: Context) {
         if (!isInitialized) {
             initialize(context)
+        }
+    }
+
+    /**
+     * 查询未分类记忆并批量调用 AI 进行分类
+     */
+    private suspend fun autoCategorizeMemories(context: Context, aiService: AIService) {
+        mutex.withLock {
+            val profileId = preferencesManager.activeProfileIdFlow.first()
+            val memoryRepository = MemoryRepository(context, profileId)
+            
+            // 使用 searchMemories("") 获取所有记忆，然后过滤未分类的
+            val allMemories = memoryRepository.searchMemories("")
+            val uncategorizedMemories = allMemories.filter { memory ->
+                memory.folderPath.isNullOrEmpty()
+            }
+            
+            if (uncategorizedMemories.isEmpty()) {
+                Log.d(TAG, "没有未分类的记忆，跳过自动分类")
+                return@withLock
+            }
+            
+            Log.d(TAG, "找到 ${uncategorizedMemories.size} 条未分类记忆，开始批量分类...")
+            
+            // 获取现有文件夹列表
+            val existingFolders = memoryRepository.getAllFolderPaths()
+            
+            // 分批处理（每批10条）
+            val batches = uncategorizedMemories.chunked(10)
+            batches.forEachIndexed { batchIndex: Int, batch: List<Memory> ->
+                try {
+                    Log.d(TAG, "处理第 ${batchIndex + 1} 批记忆（共 ${batch.size} 条）...")
+                    categorizeBatch(batch, existingFolders, memoryRepository, aiService)
+                } catch (e: Exception) {
+                    Log.e(TAG, "处理第 ${batchIndex + 1} 批记忆失败", e)
+                }
+            }
+            
+            Log.d(TAG, "自动分类完成")
+        }
+    }
+
+    /**
+     * 使用 AI 为一批记忆分类
+     */
+    private suspend fun categorizeBatch(
+        memories: List<Memory>,
+        existingFolders: List<String>,
+        repository: MemoryRepository,
+        aiService: AIService
+    ) {
+        val systemPrompt = """
+你是知识分类专家。根据记忆内容，为每条记忆分配合适的文件夹路径。
+
+已存在的文件夹：${existingFolders.joinToString(", ")}
+
+请为以下记忆分类，优先使用已有文件夹，必要时创建新文件夹。
+返回 JSON 数组：[{"title": "记忆标题", "folder": "文件夹路径"}]
+
+记忆列表：
+${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.take(100)}..." }}
+
+只返回 JSON 数组，不要其他内容。
+""".trimIndent()
+
+        val messages = listOf(Pair("system", systemPrompt), Pair("user", "请为以上记忆分类"))
+        val result = StringBuilder()
+        
+        withContext(Dispatchers.IO) {
+            val stream = aiService.sendMessage(message = "请为以上记忆分类", chatHistory = messages)
+            stream.collect { content -> result.append(content) }
+        }
+        
+        // 更新 token 统计
+        apiPreferences?.updateTokensForProviderModel(
+            aiService.providerModel,
+            aiService.inputTokenCount,
+            aiService.outputTokenCount,
+            aiService.cachedInputTokenCount
+        )
+        
+        // 解析 AI 返回的 JSON 并更新记忆
+        parseAndApplyCategorization(result.toString(), memories, repository)
+    }
+
+    /**
+     * 解析 AI 返回的分类结果并更新记忆
+     */
+    private suspend fun parseAndApplyCategorization(
+        jsonString: String,
+        memories: List<Memory>,
+        repository: MemoryRepository
+    ) {
+        try {
+            val cleanJson = jsonString.trim().let {
+                val startIndex = it.indexOf("[")
+                val endIndex = it.lastIndexOf("]")
+                if (startIndex >= 0 && endIndex > startIndex) it.substring(startIndex, endIndex + 1) else return
+            }
+            
+            val jsonArray = JSONArray(cleanJson)
+            val titleToFolderMap = mutableMapOf<String, String>()
+            
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val title = obj.getString("title")
+                val folder = obj.getString("folder")
+                titleToFolderMap[title] = folder
+            }
+            
+            // 为每个记忆更新分类和重新生成 embedding
+            memories.forEach { memory ->
+                val newFolder = titleToFolderMap[memory.title]
+                if (newFolder != null) {
+                    Log.d(TAG, "更新记忆 '${memory.title}' 的分类为: $newFolder")
+                    
+                    // 直接调用 updateMemory，它会自动重新生成 embedding
+                    repository.updateMemory(
+                        memory = memory,
+                        newTitle = memory.title,
+                        newContent = memory.content,
+                        newFolderPath = newFolder
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "解析分类结果失败: $jsonString", e)
         }
     }
 

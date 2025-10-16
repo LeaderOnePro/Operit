@@ -6,7 +6,11 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import com.ai.assistance.operit.data.model.Embedding
+import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.api.chat.library.ProblemLibrary
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -88,6 +92,17 @@ object OnnxEmbeddingService {
             
             isInitialized = true
             Log.d(TAG, "OnnxEmbeddingService initialized successfully with multilingual support.")
+            
+            // 触发自动分类（使用 ProblemLibrary）
+            try {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val enhancedAIService = EnhancedAIService.getInstance(context)
+                    val aiService = enhancedAIService.getBaseAIService()
+                    ProblemLibrary.autoCategorizeMemoriesAsync(context, aiService)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "触发自动分类失败", e)
+            }
             
             // Log model info
             ortSession?.let { session ->
