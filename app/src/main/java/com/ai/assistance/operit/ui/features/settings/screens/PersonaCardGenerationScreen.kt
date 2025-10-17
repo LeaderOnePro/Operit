@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -449,13 +450,33 @@ fun PersonaCardGenerationScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(windowInsets = WindowInsets(0, 0, 0, 0)) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
+                    // 关闭按钮
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clickable { scope.launch { drawerState.close() } }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "关闭",
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            )
+                        }
+                    }
+
                     Text("角色卡配置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
 
@@ -733,7 +754,7 @@ fun PersonaCardGenerationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "角色卡生成助手", 
+                    text = "将修改的角色卡", 
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
