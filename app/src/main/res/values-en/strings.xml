@@ -2572,7 +2572,6 @@
     <string name="other_content_prompt">Other Content (Prompt)</string>
     <string name="select_tags">Select Tags</string>
     <string name="system_tags_auto_added">System Tags (Auto-added)</string>
-    <string name="advanced_custom_prompt">Advanced Custom (Prompt)</string>
     <string name="notes_info_not_appended">Notes (Not appended to prompts)</string>
     <string name="notes_placeholder">Record character card source, author info, etc.</string>
     <string name="save">Save</string>
@@ -2623,7 +2622,6 @@
     <string name="settings_saved_message">Settings saved</string>
     
     <!-- Character Card Dialog -->
-    <string name="character_card_name">Name</string>
     <string name="character_card_description">Description</string>
     <string name="character_card_character_setting">Character Setting</string>
     <string name="character_card_character_setting_placeholder">Describe the character\'s personality traits...</string>
@@ -2654,7 +2652,6 @@
     <string name="character_card_add">Add</string>
 
     <!-- Crash Report Screen -->
-    <string name="delete_character_card">Delete Character Card</string>
     <string name="delete_character_card_confirm">Are you sure you want to delete character card "%1$s"? This action cannot be undone.</string>
     <string name="delete_tag">Delete Tag</string>
     <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
@@ -2882,5 +2879,34 @@
     
     <!-- Voice Assistant Widget -->
     <string name="voice_assistant_widget_description">Quick launch Operit voice assistant</string>
+
+    <!-- Persona Card Generation Screen -->
+    <string name="persona_card_generation_title">Character Card to Edit</string>
+    <string name="no_character_card">No Character Card</string>
+    <string name="character_card_config">Character Card Configuration</string>
+    <string name="current_character_card">Current Character Card</string>
+    <string name="create_new_character_card">+ Create New Card</string>
+    <string name="delete_current_character_card">Delete Current Card</string>
+    <string name="new_character_card">New Character Card</string>
+    <string name="character_card_name">Character Card Name</string>
+    <string name="character_card_name_example">e.g.: Xiaoxi-School Edition</string>
+    <string name="delete_character_card">Delete Character Card</string>
+    <string name="confirm_delete_character_card">Are you sure you want to delete the current character card? This action cannot be undone.</string>
+    <string name="current_character_card_content">Current Character Card Content</string>
+    <string name="character_name">Character Name</string>
+    <string name="character_description">Character Description</string>
+    <string name="character_setting">Character Setting</string>
+    <string name="opening_statement">Opening Statement</string>
+    <string name="other_content">Other Content</string>
+    <string name="advanced_custom_prompt">Advanced Custom Prompt</string>
+    <string name="character_marks">Notes (Not included in prompts)</string>
+    <string name="please_select_or_create_card">Please select or create a character card from the sidebar to begin.</string>
+    <string name="persona_generation_welcome">🎭 Welcome to the Character Card Generation Assistant!\n\nLet\'s edit \'%1$s\' together!\nPlease tell me what character you want to create or what aspect you\'d like to modify?</string>
+    <string name="new_character">New Character</string>
+    <string name="generating">Generating…</string>
+    <string name="send_failed">Send failed: %1$s</string>
+    <string name="currently_generating">Generating…</string>
+    <string name="describe_character_hint">Describe the character you want…</string>
+    <string name="character_card_complete">🎉 Character card generation complete! All information has been saved.</string>
 
 </resources>

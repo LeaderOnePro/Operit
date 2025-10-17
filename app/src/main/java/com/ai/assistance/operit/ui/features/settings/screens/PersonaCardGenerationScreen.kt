@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.*
@@ -14,17 +15,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.ai.assistance.operit.data.model.FunctionType
+import com.ai.assistance.operit.R
+import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.CharacterCard
+import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptTag
+import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.PromptTagManager
+import com.ai.assistance.operit.util.stream.Stream
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import android.util.Log
 
 // --- 本地最小工具执行器：仅处理 save_character_info ---
 private object LocalCharacterToolExecutor {
@@ -54,17 +60,17 @@ private object LocalCharacterToolExecutor {
         characterCardId: String,
         field: String,
         content: String
-    ): com.ai.assistance.operit.data.model.ToolResult {
+    ): ToolResult {
         return try {
             val manager = CharacterCardManager.getInstance(context)
             
             // 获取当前角色卡
             val currentCard = manager.getCharacterCard(characterCardId)
             if (currentCard == null) {
-                return com.ai.assistance.operit.data.model.ToolResult(
+                return ToolResult(
                     toolName = TOOL_NAME,
                     success = false,
-                    result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                    result = StringResultData(""),
                     error = "角色卡不存在"
                 )
             }
@@ -79,30 +85,30 @@ private object LocalCharacterToolExecutor {
                 "advancedCustomPrompt" -> currentCard.copy(advancedCustomPrompt = content)
                 "marks" -> currentCard.copy(marks = content)
                 else -> {
-                    return com.ai.assistance.operit.data.model.ToolResult(
+                    return ToolResult(
                         toolName = TOOL_NAME,
                         success = false,
-                        result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                        result = StringResultData(""),
                         error = "不支持的字段: $field"
                     )
                 }
             }
             
-            withContext(kotlinx.coroutines.Dispatchers.IO) { 
+            withContext(Dispatchers.IO) { 
                 manager.updateCharacterCard(updatedCard)
             }
             
-            com.ai.assistance.operit.data.model.ToolResult(
+            ToolResult(
                 toolName = TOOL_NAME,
                 success = true,
-                result = com.ai.assistance.operit.core.tools.StringResultData("ok"),
+                result = StringResultData("ok"),
                 error = null
             )
         } catch (e: Exception) {
-            com.ai.assistance.operit.data.model.ToolResult(
+            ToolResult(
                 toolName = TOOL_NAME,
                 success = false,
-                result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                result = StringResultData(""),
                 error = e.message
             )
         }
@@ -201,7 +207,7 @@ fun PersonaCardGenerationScreen(
             editName = ""; editDescription = ""; editCharacterSetting = ""; editOpeningStatement = ""
             editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
             chatMessages.clear()
-            chatMessages.add(CharacterChatMessage("assistant", "请在侧边栏选择或创建一个角色卡以开始。"))
+            chatMessages.add(CharacterChatMessage("assistant", context.getString(R.string.please_select_or_create_card)))
             return@LaunchedEffect
         }
 
@@ -228,9 +234,8 @@ fun PersonaCardGenerationScreen(
                 // 为新卡片重置聊天记录
                 chatMessages.clear()
                 chatMessages.add(CharacterChatMessage("assistant",
-                    "🎭 欢迎使用角色卡生成助手！\n\n" +
-                    "我们现在来编辑 '${card?.name ?: "新角色"}' 吧！\n" +
-                    "请告诉我你想创建什么角色，或者想修改哪个部分？"
+                    context.getString(R.string.persona_generation_welcome, 
+                        card?.name ?: context.getString(R.string.new_character))
                 ))
             }
         }
@@ -312,11 +317,11 @@ fun PersonaCardGenerationScreen(
         prompt: String,
         historyPairs: List<Pair<String, String>>,
         systemPrompt: String? = null
-    ): com.ai.assistance.operit.util.stream.Stream<String> = withContext(Dispatchers.IO) {
-        val aiService = com.ai.assistance.operit.api.chat.EnhancedAIService
+    ): Stream<String> = withContext(Dispatchers.IO) {
+        val aiService = EnhancedAIService
             .getInstance(context)
             .getAIServiceForFunction(FunctionType.CHAT)
-        val functionalConfigManager = com.ai.assistance.operit.data.preferences.FunctionalConfigManager(context)
+        val functionalConfigManager = FunctionalConfigManager(context)
         functionalConfigManager.initializeIfNeeded()
 
         val fullHistory = mutableListOf<Pair<String, String>>()
@@ -382,7 +387,7 @@ fun PersonaCardGenerationScreen(
 
             // 检查是否已完成，如果已完成则直接结束
             if (isCharacterCardComplete()) {
-                chatMessages.add(CharacterChatMessage("assistant", "🎉 角色卡生成完成！所有信息都已保存。"))
+                chatMessages.add(CharacterChatMessage("assistant", context.getString(R.string.character_card_complete)))
                 isGenerating = false
                 scope.launch { listState.animateScrollToItem(chatMessages.lastIndex) }
                 return@launch
@@ -399,7 +404,8 @@ fun PersonaCardGenerationScreen(
             val stream = requestFromDefaultService(input, historyPairs, systemPrompt)
 
             // 提前插入占位的"生成中…"助手消息
-            chatMessages.add(CharacterChatMessage("assistant", "生成中…"))
+            val generatingText = context.getString(R.string.generating)
+            chatMessages.add(CharacterChatMessage("assistant", generatingText))
             val assistantIndex = chatMessages.lastIndex
 
             val toolTagRegex = Regex("(?s)\\s*<tool\\b[\\s\\S]*?</tool>\\s*")
@@ -419,7 +425,7 @@ fun PersonaCardGenerationScreen(
                                 firstChunkReceived = true
                                 isGenerating = false
                             }
-                            val sanitized = (chatMessages[assistantIndex].content.replace("生成中…", "") + chunk)
+                            val sanitized = (chatMessages[assistantIndex].content.replace(generatingText, "") + chunk)
                                 .replace(toolTagRegex, "")
                                 .replace(toolResultRegex, "")
                                 .replace(statusRegex, "")
@@ -438,7 +444,7 @@ fun PersonaCardGenerationScreen(
                 chatMessages.add(
                     CharacterChatMessage(
                         role = "assistant",
-                        content = "发送失败：${e.message ?: "未知错误"}"
+                        content = context.getString(R.string.send_failed, e.message ?: "Unknown error")
                     )
                 )
             } finally {
@@ -461,32 +467,29 @@ fun PersonaCardGenerationScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
+                            .padding(bottom = 8.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clickable { scope.launch { drawerState.close() } }
+                        IconButton(
+                            onClick = { scope.launch { drawerState.close() } }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = "关闭",
-                                modifier = Modifier.align(Alignment.CenterEnd)
+                                contentDescription = context.getString(R.string.close)
                             )
                         }
                     }
 
-                    Text("角色卡配置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(context.getString(R.string.character_card_config), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
 
                     // 选择不同角色卡
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                         OutlinedTextField(
-                            value = activeCard?.name ?: "无角色卡",
+                            value = activeCard?.name ?: context.getString(R.string.no_character_card),
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("当前角色卡") },
+                            label = { Text(context.getString(R.string.current_character_card)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -509,7 +512,7 @@ fun PersonaCardGenerationScreen(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("+ 新建角色卡") },
+                                text = { Text(context.getString(R.string.create_new_character_card)) },
                                 onClick = {
                                     expanded = false
                                     showCreateDialog = true
@@ -525,7 +528,7 @@ fun PersonaCardGenerationScreen(
                             TextButton(onClick = { showDeleteConfirm = true }) {
                                 Icon(Icons.Filled.Delete, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
-                                Text("删除当前角色卡")
+                                Text(context.getString(R.string.delete_current_character_card))
                             }
                         }
                     }
@@ -534,21 +537,21 @@ fun PersonaCardGenerationScreen(
                     if (showCreateDialog) {
                         AlertDialog(
                             onDismissRequest = { showCreateDialog = false },
-                            title = { Text("新建角色卡") },
+                            title = { Text(context.getString(R.string.new_character_card)) },
                             text = {
                                 Column {
                                     OutlinedTextField(
                                         value = newCardName,
                                         onValueChange = { newCardName = it },
                                         singleLine = true,
-                                        label = { Text("角色卡名称") },
-                                        placeholder = { Text("例如：小昔-校园版") }
+                                        label = { Text(context.getString(R.string.character_card_name)) },
+                                        placeholder = { Text(context.getString(R.string.character_card_name_example)) }
                                     )
                                 }
                             },
                             confirmButton = {
                                 TextButton(onClick = {
-                                    val name = newCardName.trim().ifBlank { "新角色" }
+                                    val name = newCardName.trim().ifBlank { context.getString(R.string.new_character) }
                                     showCreateDialog = false
                                     newCardName = ""
                                     scope.launch {
@@ -568,10 +571,10 @@ fun PersonaCardGenerationScreen(
                                         }
                                         refreshData()
                                     }
-                                }) { Text("创建") }
+                                }) { Text(context.getString(R.string.create)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
+                                TextButton(onClick = { showCreateDialog = false }) { Text(context.getString(R.string.cancel)) }
                             }
                         )
                     }
@@ -579,8 +582,8 @@ fun PersonaCardGenerationScreen(
                     if (showDeleteConfirm) {
                         AlertDialog(
                             onDismissRequest = { showDeleteConfirm = false },
-                            title = { Text("删除角色卡") },
-                            text = { Text("确定删除当前角色卡吗？此操作不可撤销。") },
+                            title = { Text(context.getString(R.string.delete_character_card)) },
+                            text = { Text(context.getString(R.string.confirm_delete_character_card)) },
                             confirmButton = {
                                 TextButton(onClick = {
                                     showDeleteConfirm = false
@@ -594,16 +597,16 @@ fun PersonaCardGenerationScreen(
                                             refreshData()
                                         }
                                     }
-                                }) { Text("删除") }
+                                }) { Text(context.getString(R.string.delete)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                                TextButton(onClick = { showDeleteConfirm = false }) { Text(context.getString(R.string.cancel)) }
                             }
                         )
                     }
 
                     Spacer(Modifier.height(16.dp))
-                    Text("当前角色卡内容", style = MaterialTheme.typography.titleSmall)
+                    Text(context.getString(R.string.current_character_card_content), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
                     
                     // 角色名称
@@ -619,7 +622,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色名称") },
+                        label = { Text(context.getString(R.string.character_name)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 1
                     )
@@ -639,7 +642,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色描述") },
+                        label = { Text(context.getString(R.string.character_description)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -659,7 +662,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色设定") },
+                        label = { Text(context.getString(R.string.character_setting)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
                     )
@@ -679,7 +682,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("开场白") },
+                        label = { Text(context.getString(R.string.opening_statement)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 4
                     )
@@ -687,9 +690,9 @@ fun PersonaCardGenerationScreen(
                     Spacer(Modifier.height(8.dp))
                     
                     // 其他内容
-                            OutlinedTextField(
+                    OutlinedTextField(
                         value = editOtherContent,
-                                onValueChange = { newValue ->
+                        onValueChange = { newValue ->
                             editOtherContent = newValue
                             scope.launch {
                                 activeCard?.let { card ->
@@ -698,9 +701,9 @@ fun PersonaCardGenerationScreen(
                                     }
                                 }
                             }
-                                },
-                        label = { Text("其他内容") },
-                                modifier = Modifier.fillMaxWidth(),
+                        },
+                        label = { Text(context.getString(R.string.other_content)) },
+                        modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
                     )
                     
@@ -715,11 +718,11 @@ fun PersonaCardGenerationScreen(
                                 activeCard?.let { card ->
                                     withContext(Dispatchers.IO) {
                                         characterCardManager.updateCharacterCard(card.copy(advancedCustomPrompt = newValue))
-                        }
-                    }
+                                    }
+                                }
                             }
                         },
-                        label = { Text("高级自定义提示词") },
+                        label = { Text(context.getString(R.string.advanced_custom_prompt)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
                     )
@@ -739,7 +742,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("备注信息（不会被拼接到提示词）") },
+                        label = { Text(context.getString(R.string.character_marks)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 4
                     )
@@ -754,13 +757,13 @@ fun PersonaCardGenerationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "将修改的角色卡", 
+                    text = context.getString(R.string.persona_card_generation_title), 
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { scope.launch { drawerState.open() } }) {
-                    Text(activeCard?.name ?: "无角色卡")
+                    Text(activeCard?.name ?: context.getString(R.string.no_character_card))
                 }
             }
 
@@ -841,7 +844,7 @@ fun PersonaCardGenerationScreen(
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp),
-                        placeholder = { Text(if (isGenerating) "正在生成…" else "描述你想要的角色…") },
+                        placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
                         enabled = !isGenerating,
                         maxLines = 4
                     )
@@ -852,7 +855,7 @@ fun PersonaCardGenerationScreen(
                     ) {
                         Icon(
                             imageVector = if (isGenerating) Icons.Filled.HourglassBottom else Icons.Filled.Send,
-                            contentDescription = if (isGenerating) "生成中" else "发送"
+                            contentDescription = if (isGenerating) context.getString(R.string.generating) else context.getString(R.string.send)
                         )
                     }
                 }

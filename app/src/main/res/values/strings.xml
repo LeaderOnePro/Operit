@@ -2577,7 +2577,6 @@
     <string name="other_content_prompt">其他内容（引导词）</string>
     <string name="select_tags">选择标签</string>
     <string name="system_tags_auto_added">系统标签（自动加入）</string>
-    <string name="advanced_custom_prompt">高级自定义（引导词）</string>
     <string name="notes_info_not_appended">备注信息（不会被拼接到提示词中）</string>
     <string name="notes_placeholder">可以记录角色卡来源、作者信息等</string>
     <string name="save">保存</string>
@@ -2628,7 +2627,6 @@
     <string name="settings_saved_message">设置已保存</string>
     
     <!-- 角色卡对话框 -->
-    <string name="character_card_name">名称</string>
     <string name="character_card_description">描述</string>
     <string name="character_card_character_setting">角色设定</string>
     <string name="character_card_character_setting_placeholder">描述角色的性格特点...</string>
@@ -2659,7 +2657,6 @@
     <string name="character_card_add">添加</string>
     
     <!-- 权限请求 -->
-    <string name="delete_character_card">删除角色卡</string>
     <string name="delete_character_card_confirm">确定要删除角色卡「%1$s」吗？此操作不可撤销。</string>
     <string name="delete_tag">删除标签</string>
     <string name="delete_tag_confirm">确定要删除标签「%1$s」吗？此操作不可撤销。</string>
@@ -2875,5 +2872,34 @@
 
     <!-- Voice Assistant Widget -->
     <string name="voice_assistant_widget_description">快速启动 Operit 语音助手</string>
+
+    <!-- Persona Card Generation Screen -->
+    <string name="persona_card_generation_title">将修改的角色卡</string>
+    <string name="no_character_card">无角色卡</string>
+    <string name="character_card_config">角色卡配置</string>
+    <string name="current_character_card">当前角色卡</string>
+    <string name="create_new_character_card">+ 新建角色卡</string>
+    <string name="delete_current_character_card">删除当前角色卡</string>
+    <string name="new_character_card">新建角色卡</string>
+    <string name="character_card_name">角色卡名称</string>
+    <string name="character_card_name_example">例如：小昔-校园版</string>
+    <string name="delete_character_card">删除角色卡</string>
+    <string name="confirm_delete_character_card">确定删除当前角色卡吗？此操作不可撤销。</string>
+    <string name="current_character_card_content">当前角色卡内容</string>
+    <string name="character_name">角色名称</string>
+    <string name="character_description">角色描述</string>
+    <string name="character_setting">角色设定</string>
+    <string name="opening_statement">开场白</string>
+    <string name="other_content">其他内容</string>
+    <string name="advanced_custom_prompt">高级自定义提示词</string>
+    <string name="character_marks">备注信息（不会被拼接到提示词）</string>
+    <string name="please_select_or_create_card">请在侧边栏选择或创建一个角色卡以开始。</string>
+    <string name="persona_generation_welcome">🎭 欢迎使用角色卡生成助手！\n\n我们现在来编辑 \'%1$s\' 吧！\n请告诉我你想创建什么角色，或者想修改哪个部分？</string>
+    <string name="new_character">新角色</string>
+    <string name="generating">生成中…</string>
+    <string name="send_failed">发送失败：%1$s</string>
+    <string name="currently_generating">正在生成…</string>
+    <string name="describe_character_hint">描述你想要的角色…</string>
+    <string name="character_card_complete">🎉 角色卡生成完成！所有信息都已保存。</string>
 
 </resources>
