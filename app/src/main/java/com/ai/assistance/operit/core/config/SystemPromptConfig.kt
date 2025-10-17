@@ -73,9 +73,6 @@ Available tools:
 - sleep: Demonstration tool that pauses briefly. Parameters: duration_ms (milliseconds, default 1000, max 10000)
 - use_package: Activate a package for use in the current session. Parameters: package_name (name of the package to activate)
 
-Memory and Memory Library Tools:
-- query_memory: Searches the memory library for relevant memories. Use this when you need to recall past knowledge, look up specific information, or require context. To search for multiple keywords at once, separate them with '|'. Parameters: query (string, the keyword or question to search for)
-
 File System Tools:
 **IMPORTANT: All file tools support an optional 'environment' parameter:**
 - environment (optional): Specifies the execution environment. Values: "android" (default, Android file system) or "linux" (Ubuntu terminal environment). 
@@ -147,17 +144,17 @@ HTTP Tools:
 - manage_cookies: Manage cookies. Parameters: action (get/set/clear), domain, cookies
 - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)"""
     private const val MEMORY_TOOLS_EN = """
-    Memory and Memory Library Tools:
-    - query_memory: Searches the memory library for relevant memories. Use this when you need to recall past knowledge, look up specific information, or require context. To search for multiple keywords at once, separate them with '|'. Parameters: query (string, the keyword or question to search for)
-    """
+Memory and Memory Library Tools:
+- query_memory: Searches the memory library for relevant memories using hybrid search (keyword matching + semantic understanding). Use this when you need to recall past knowledge, look up specific information, or require context. To search for multiple keywords at once, separate them with '|' - each keyword will be independently matched semantically and the results will be combined with weighted scoring. Parameters: query (string, the keyword or question to search for)
+
+Note: The memory library and user personality profile are automatically updated by a separate system after you output the task completion marker. You don't need to worry about updating them manually.
+
+"""
 
     private const val AVAILABLE_TOOLS_CN = """
 可用工具：
 - sleep: 演示工具，短暂暂停。参数：duration_ms（毫秒，默认1000，最大10000）
 - use_package: 在当前会话中激活包。参数：package_name（要激活的包名）
-
-记忆与记忆库工具：
-- query_memory: 从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。要一次搜索多个关键词，请使用“|”分隔。参数：query (string, 搜索的关键词或问题)
 
 文件系统工具：
 **重要：所有文件工具都支持可选的'environment'参数：**
@@ -230,9 +227,12 @@ HTTP工具：
 - manage_cookies: 管理cookies。参数：action (get/set/clear), domain, cookies
 - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)"""
     private const val MEMORY_TOOLS_CN = """
-    记忆与记忆库工具：
-    - query_memory: 从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。要一次搜索多个关键词，请使用“|”分隔。参数：query (string, 搜索的关键词或问题)
-    """
+记忆与记忆库工具：
+- query_memory: 使用混合搜索（关键词匹配 + 语义理解）从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。要一次搜索多个关键词，请使用"|"分隔 - 每个关键词都会独立进行语义匹配，结果将通过加权评分合并。参数：query (string, 搜索的关键词或问题)
+
+注意：记忆库和用户性格档案会在你输出任务完成标志后由独立的系统自动更新，你无需手动更新它们。
+
+"""
 
 
     /** Base system prompt template used by the enhanced AI service */
@@ -435,8 +435,8 @@ HTTP工具：
             }
 
     // Determine the available tools string based on memory query setting
-    val availableToolsEn = if (enableMemoryQuery) AVAILABLE_TOOLS_EN else AVAILABLE_TOOLS_EN.replace(MEMORY_TOOLS_EN, "")
-    val availableToolsCn = if (enableMemoryQuery) AVAILABLE_TOOLS_CN else AVAILABLE_TOOLS_CN.replace(MEMORY_TOOLS_CN, "")
+    val availableToolsEn = if (enableMemoryQuery) MEMORY_TOOLS_EN + AVAILABLE_TOOLS_EN else AVAILABLE_TOOLS_EN
+    val availableToolsCn = if (enableMemoryQuery) MEMORY_TOOLS_CN + AVAILABLE_TOOLS_CN else AVAILABLE_TOOLS_CN
 
     // Handle tools disable/enable
     if (enableTools) {

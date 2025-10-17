@@ -78,13 +78,13 @@ fun ChatSettingsBar(
     onToggleThinkingGuidance: () -> Unit,
     maxWindowSizeInK: Float,
     onContextLengthChange: (Float) -> Unit,
-    enableMemoryAttachment: Boolean,
-        onToggleMemoryAttachment: () -> Unit,
-        summaryTokenThreshold: Float,
-        onSummaryTokenThresholdChange: (Float) -> Unit,
-        onNavigateToUserPreferences: () -> Unit,
-        onNavigateToModelConfig: () -> Unit,
-        onNavigateToModelPrompts: () -> Unit,
+    enableMemoryQuery: Boolean,
+    onToggleMemoryQuery: () -> Unit,
+    summaryTokenThreshold: Float,
+    onSummaryTokenThresholdChange: (Float) -> Unit,
+    onNavigateToUserPreferences: () -> Unit,
+    onNavigateToModelConfig: () -> Unit,
+    onNavigateToModelPrompts: () -> Unit,
     isAutoReadEnabled: Boolean,
     onToggleAutoRead: () -> Unit,
     enableTools: Boolean,
@@ -151,7 +151,7 @@ fun ChatSettingsBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                AnimatedVisibility(visible = enableMemoryAttachment) {
+                AnimatedVisibility(visible = enableMemoryQuery) {
                     Icon(
                         imageVector = Icons.Rounded.Link,
                         contentDescription = stringResource(R.string.memory_attachment_active),
@@ -293,17 +293,17 @@ fun ChatSettingsBar(
                             SettingItem(
                                 title = stringResource(R.string.memory_attachment),
                                     icon =
-                                            if (enableMemoryAttachment) Icons.Rounded.Link
+                                            if (enableMemoryQuery) Icons.Rounded.Link
                                             else Icons.Outlined.LinkOff,
                                     iconTint =
-                                            if (enableMemoryAttachment)
+                                            if (enableMemoryQuery)
                                                     MaterialTheme.colorScheme.primary
                                             else
                                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(
                                                             alpha = 0.7f
                                                     ),
-                                isChecked = enableMemoryAttachment,
-                                onToggle = onToggleMemoryAttachment,
+                                isChecked = enableMemoryQuery,
+                                onToggle = onToggleMemoryQuery,
                                 onInfoClick = {
                                         infoPopupContent =
                                                 context.getString(R.string.memory_attachment) to context.getString(R.string.memory_attachment_desc)

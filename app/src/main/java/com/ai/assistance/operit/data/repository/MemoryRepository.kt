@@ -456,65 +456,70 @@ class MemoryRepository(private val context: Context, profileId: String) {
         }
 
         // 3. Semantic search (for conceptual matches)
-        val queryEmbedding = OnnxEmbeddingService.generateEmbedding(query)
-        if (queryEmbedding != null) {
-            // 自动升级旧的100维向量到384维
-            allMemories.forEach { memory ->
-                if (memory.embedding != null && memory.embedding!!.vector.size == 100) {
-                    ensureEmbeddingUpToDate(memory)
-                }
-            }
-            
-            val allMemoriesWithEmbedding = allMemories.filter { it.embedding != null }
-
-            val minSimilarityThreshold = semanticThreshold // 语义相似度阈值（可配置）
-            
-            // Calculate ALL similarities for debugging
-            val allSimilarities = allMemoriesWithEmbedding
-                .map { memory ->
-                                memory.embedding?.let { memoryEmbedding ->
-                        val similarity = OnnxEmbeddingService.cosineSimilarity(
-                                                    queryEmbedding,
-                                                    memoryEmbedding
-                                            )
-                        Triple(memory, similarity, similarity >= minSimilarityThreshold)
-                    } ?: Triple(memory, 0f, false)
-                            }
-                            .sortedByDescending { it.second }
-            
-            // Log top similarities regardless of threshold
-            android.util.Log.d("MemoryRepo", "--- All Semantic Similarities (Total: ${allSimilarities.size}) ---")
-            allSimilarities.take(10).forEach { (memory, similarity, aboveThreshold) ->
-                val marker = if (aboveThreshold) "✓" else "✗"
-                android.util.Log.d("MemoryRepo", "  $marker [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
-            }
-            
-            val semanticResultsWithScores = allSimilarities
-                .filter { it.third }
-                .map { Pair(it.first, it.second) }
-
-            android.util.Log.d("MemoryRepo", "--- Top Semantic Search Results (Threshold: $minSimilarityThreshold): ${semanticResultsWithScores.size} ---")
-            semanticResultsWithScores.take(5).forEach { (memory, similarity) ->
-                android.util.Log.d("MemoryRepo", "  - [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
-            }
-
-            semanticResultsWithScores.forEachIndexed { index, (memory, similarity) ->
-                val rank = index + 1
-                
-                // RRF score (retains ranking information but has low impact)
-                val rankScore = 1.0 / (k + rank)
-                
-                // Raw similarity score (high impact, directly reflects semantic relevance)
-                val semanticWeight = 0.5f 
-                val similarityScore = similarity * semanticWeight
-
-                // Combine them. Importance should only affect the rank score, not the raw similarity.
-                val weightedScore = (rankScore * Math.sqrt(memory.importance.toDouble())) + similarityScore
-                scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
-
-                android.util.Log.d("MemoryRepo", "  [Semantic] Score for '${memory.title}': rank=$rank, similarity=${String.format("%.4f", similarity)}, rankScore=${String.format("%.4f", rankScore)}, similarityScore=${String.format("%.4f", similarityScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
+        // 自动升级旧的100维向量到384维
+        allMemories.forEach { memory ->
+            if (memory.embedding != null && memory.embedding!!.vector.size == 100) {
+                ensureEmbeddingUpToDate(memory)
             }
         }
+        
+        val allMemoriesWithEmbedding = allMemories.filter { it.embedding != null }
+        val minSimilarityThreshold = semanticThreshold // 语义相似度阈值（可配置）
+
+        // 对每个关键词分别进行语义搜索和评分
+        android.util.Log.d("MemoryRepo", "--- Starting Semantic Search for ${keywords.size} keywords ---")
+        keywords.forEachIndexed { keywordIndex, keyword ->
+            android.util.Log.d("MemoryRepo", "Processing keyword ${keywordIndex + 1}/${keywords.size}: '$keyword'")
+            
+            val queryEmbedding = OnnxEmbeddingService.generateEmbedding(keyword)
+            if (queryEmbedding != null) {
+                // Calculate ALL similarities for this keyword
+                val allSimilarities = allMemoriesWithEmbedding
+                    .map { memory ->
+                        memory.embedding?.let { memoryEmbedding ->
+                            val similarity = OnnxEmbeddingService.cosineSimilarity(
+                                queryEmbedding,
+                                memoryEmbedding
+                            )
+                            Triple(memory, similarity, similarity >= minSimilarityThreshold)
+                        } ?: Triple(memory, 0f, false)
+                    }
+                    .sortedByDescending { it.second }
+                
+                // Log top similarities for this keyword
+                android.util.Log.d("MemoryRepo", "  Top similarities for '$keyword' (Total: ${allSimilarities.size}):")
+                allSimilarities.take(5).forEach { (memory, similarity, aboveThreshold) ->
+                    val marker = if (aboveThreshold) "✓" else "✗"
+                    android.util.Log.d("MemoryRepo", "    $marker [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
+                }
+                
+                val semanticResultsWithScores = allSimilarities
+                    .filter { it.third }
+                    .map { Pair(it.first, it.second) }
+
+                android.util.Log.d("MemoryRepo", "  Results above threshold for '$keyword': ${semanticResultsWithScores.size}")
+
+                semanticResultsWithScores.forEachIndexed { index, (memory, similarity) ->
+                    val rank = index + 1
+                    
+                    // RRF score (retains ranking information but has low impact)
+                    val rankScore = 1.0 / (k + rank)
+                    
+                    // Raw similarity score (high impact, directly reflects semantic relevance)
+                    val semanticWeight = 0.5f 
+                    val similarityScore = similarity * semanticWeight
+
+                    // Combine them. Importance should only affect the rank score, not the raw similarity.
+                    val weightedScore = (rankScore * Math.sqrt(memory.importance.toDouble())) + similarityScore
+                    scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
+
+                    android.util.Log.d("MemoryRepo", "    [Semantic-'$keyword'] Score for '${memory.title}': rank=$rank, similarity=${String.format("%.4f", similarity)}, rankScore=${String.format("%.4f", rankScore)}, similarityScore=${String.format("%.4f", similarityScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
+                }
+            } else {
+                android.util.Log.w("MemoryRepo", "  Failed to generate embedding for keyword: '$keyword'")
+            }
+        }
+        android.util.Log.d("MemoryRepo", "--- Semantic Search Completed for All Keywords ---")
 
         // 4. Graph-based expansion: Boost scores of connected memories based on edge weights
         // Take top-scoring memories as "seed nodes" and propagate scores through edges

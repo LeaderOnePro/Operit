@@ -154,7 +154,7 @@ fun AIChatScreen(
     val enableThinkingMode by actualViewModel.enableThinkingMode.collectAsState() // 收集思考模式状态
     val enableThinkingGuidance by
             actualViewModel.enableThinkingGuidance.collectAsState() // 收集思考引导状态
-    val enableMemoryAttachment by actualViewModel.enableMemoryAttachment.collectAsState()
+    val enableMemoryQuery by actualViewModel.enableMemoryQuery.collectAsState()
     val enableTools by actualViewModel.enableTools.collectAsState()
     val summaryTokenThreshold by actualViewModel.summaryTokenThreshold.collectAsState()
     val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
@@ -648,9 +648,9 @@ fun AIChatScreen(
                                 onContextLengthChange = {
                                     actualViewModel.updateContextLength(it)
                                 },
-                                enableMemoryAttachment = enableMemoryAttachment,
-                                onToggleMemoryAttachment = {
-                                    actualViewModel.toggleMemoryAttachment()
+                                enableMemoryQuery = enableMemoryQuery,
+                                onToggleMemoryQuery = {
+                                    actualViewModel.toggleMemoryQuery()
                                 },
                                 summaryTokenThreshold = summaryTokenThreshold,
                                 onSummaryTokenThresholdChange = {

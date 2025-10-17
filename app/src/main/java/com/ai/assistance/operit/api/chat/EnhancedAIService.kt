@@ -635,7 +635,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             if (content.isEmpty()) {
                 Log.d(TAG, "Stream content is empty. Finalizing conversation state.")
                 // We call handleTaskCompletion to properly set the conversation as inactive and update the UI state.
-                // We pass enableMemoryAttachment = false because there's no content to analyze or save.
+                // We pass enableMemoryQuery = false because there's no content to analyze or save.
                 handleWaitForUserNeed(context, content, isSubTask)
                 return
             }

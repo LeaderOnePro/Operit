@@ -68,7 +68,7 @@ class ApiPreferences private constructor(private val context: Context) {
         val ENABLE_THINKING_GUIDANCE = booleanPreferencesKey("enable_thinking_guidance")
 
         // Key for Memory Attachment
-        val ENABLE_MEMORY_QUERY = booleanPreferencesKey("enable_memory_attachment")
+        val ENABLE_MEMORY_QUERY = booleanPreferencesKey("enable_memory_query")
 
         // Key for Auto Read
         val ENABLE_AUTO_READ = booleanPreferencesKey("enable_auto_read")

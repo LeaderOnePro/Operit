@@ -205,7 +205,7 @@ class PlanModeManager(
                 promptFunctionType = PromptFunctionType.CHAT,
                 enableThinking = false,
                 thinkingGuidance = false,
-                enableMemoryAttachment = false,
+                enableMemoryQuery = false,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError
