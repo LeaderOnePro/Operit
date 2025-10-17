@@ -34,6 +34,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -224,6 +227,36 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         messageProcessingDelegate.inputProcessingState
     }
 
+    // 会话隔离：仅当“当前聊天ID == 正在流式的聊天ID”时，才显示处理中/停止按钮
+    val activeStreamingChatId: StateFlow<String?> by lazy { messageProcessingDelegate.activeStreamingChatId }
+    val currentChatIsLoading: StateFlow<Boolean> by lazy {
+        kotlinx.coroutines.flow.combine(
+            messageProcessingDelegate.isLoading,
+            chatHistoryDelegate.currentChatId,
+            messageProcessingDelegate.activeStreamingChatId
+        ) { isLoading, currentId, activeId ->
+            isLoading && activeId != null && activeId == currentId
+        }.stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.Eagerly,
+            initialValue = false
+        )
+    }
+    val currentChatInputProcessingState: StateFlow<com.ai.assistance.operit.data.model.InputProcessingState> by lazy {
+        kotlinx.coroutines.flow.combine(
+            messageProcessingDelegate.inputProcessingState,
+            chatHistoryDelegate.currentChatId,
+            messageProcessingDelegate.activeStreamingChatId
+        ) { state, currentId, activeId ->
+            if (activeId != null && activeId == currentId) state
+            else com.ai.assistance.operit.data.model.InputProcessingState.Idle
+        }.stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.Eagerly,
+            initialValue = com.ai.assistance.operit.data.model.InputProcessingState.Idle
+        )
+    }
+
     val scrollToBottomEvent: SharedFlow<Unit> by lazy {
         messageProcessingDelegate.scrollToBottomEvent
     }
@@ -328,8 +361,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         viewModelScope = viewModelScope,
                         getEnhancedAiService = { enhancedAiService },
                         getChatHistory = { chatHistoryDelegate.chatHistory.value },
-                        addMessageToChat = { message ->
-                            chatHistoryDelegate.addMessageToChat(message)
+                        addMessageToChat = { targetChatId, message ->
+                            // 将消息固定写入指定聊天，避免在切换会话后串流到新会话
+                            chatHistoryDelegate.addMessageToChat(message, targetChatId)
                         },
                         saveCurrentChat = {
                             val (inputTokens, outputTokens) =

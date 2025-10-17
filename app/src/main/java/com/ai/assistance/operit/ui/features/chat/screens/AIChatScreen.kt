@@ -146,9 +146,11 @@ fun AIChatScreen(
     val isConfigured by actualViewModel.isConfigured.collectAsState()
     val chatHistory by actualViewModel.chatHistory.collectAsState()
     val userMessage by actualViewModel.userMessage.collectAsState()
-    val isLoading by actualViewModel.isLoading.collectAsState()
+    // 仅对当前会话显示处理中状态（影响“停止/发送”按钮）
+    val isLoading by actualViewModel.currentChatIsLoading.collectAsState()
     val errorMessage by actualViewModel.errorMessage.collectAsState()
-    val inputProcessingState by actualViewModel.inputProcessingState.collectAsState()
+    // 按会话隔离的输入处理状态（用于进度条文案）
+    val inputProcessingState by actualViewModel.currentChatInputProcessingState.collectAsState()
 
     val enableAiPlanning by actualViewModel.enableAiPlanning.collectAsState()
     val enableThinkingMode by actualViewModel.enableThinkingMode.collectAsState() // 收集思考模式状态

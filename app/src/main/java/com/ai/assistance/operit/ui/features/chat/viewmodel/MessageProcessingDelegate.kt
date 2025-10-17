@@ -36,7 +36,7 @@ class MessageProcessingDelegate(
         private val viewModelScope: CoroutineScope,
         private val getEnhancedAiService: () -> EnhancedAIService?,
         private val getChatHistory: () -> List<ChatMessage>,
-        private val addMessageToChat: (ChatMessage) -> Unit,
+        private val addMessageToChat: (String, ChatMessage) -> Unit,
         private val saveCurrentChat: () -> Unit,
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
@@ -60,6 +60,10 @@ class MessageProcessingDelegate(
 
     private val _inputProcessingState = MutableStateFlow<EnhancedInputProcessingState>(EnhancedInputProcessingState.Idle)
     val inputProcessingState: StateFlow<EnhancedInputProcessingState> = _inputProcessingState.asStateFlow()
+
+    // 记录当前进行中的会话ID，用于在UI层进行按会话隔离的“停止/发送”按钮显示
+    private val _activeStreamingChatId = MutableStateFlow<String?>(null)
+    val activeStreamingChatId: StateFlow<String?> = _activeStreamingChatId.asStateFlow()
 
     private val _scrollToBottomEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val scrollToBottomEvent = _scrollToBottomEvent.asSharedFlow()
@@ -101,11 +105,31 @@ class MessageProcessingDelegate(
             replyToMessage: ChatMessage? = null // 新增回复消息参数
     ) {
         if (_userMessage.value.isBlank() && attachments.isEmpty()) return
-        if (_isLoading.value) return
+        // 若当前存在其它会话的流式任务，允许“抢占”：取消正在进行的会话并继续发送当前会话的消息
+        if (_isLoading.value) {
+            val activeId = _activeStreamingChatId.value
+            if (activeId != null && chatId != null && activeId != chatId) {
+                try {
+                    // 取消本地收集任务和底层服务的会话
+                    streamCollectionJob?.cancel()
+                    streamCollectionJob = null
+                    AIMessageManager.cancelCurrentOperation()
+                } catch (_: Exception) {
+                }
+                _inputProcessingState.value = EnhancedInputProcessingState.Idle
+                _isLoading.value = false
+                _activeStreamingChatId.value = null
+            } else {
+                // 同一会话已在进行中，直接忽略本次发送
+                return
+            }
+        }
 
         val messageText = _userMessage.value.trim()
         _userMessage.value = ""
         _isLoading.value = true
+        // 标记当前活跃的流式会话
+        _activeStreamingChatId.value = chatId
         _inputProcessingState.value = EnhancedInputProcessingState.Processing("正在处理消息...")
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -151,7 +175,9 @@ class MessageProcessingDelegate(
                 }
             }
 
-            addMessageToChat(userMessage)
+            if (chatId != null) {
+                addMessageToChat(chatId, userMessage)
+            }
 
             lateinit var aiMessage: ChatMessage
             try {
@@ -233,7 +259,11 @@ class MessageProcessingDelegate(
                 
                 // 只有在非waifu模式下才添加初始的AI消息
                 if (!isWaifuModeEnabled) {
-                    withContext(Dispatchers.Main) { addMessageToChat(aiMessage) }
+                    withContext(Dispatchers.Main) {
+                        if (chatId != null) {
+                            addMessageToChat(chatId, aiMessage)
+                        }
+                    }
                 }
                 
                 // 启动一个独立的协程来收集流内容并持续更新数据库
@@ -249,7 +279,9 @@ class MessageProcessingDelegate(
                             
                             // 只有在非waifu模式下才显示流式更新
                             if (!isWaifuModeEnabled) {
-                                addMessageToChat(updatedMessage)
+                                if (chatId != null) {
+                                    addMessageToChat(chatId, updatedMessage)
+                                }
                                 _scrollToBottomEvent.tryEmit(Unit)
                             }
                         }
@@ -326,7 +358,9 @@ class MessageProcessingDelegate(
                                     )
                                     
                                     withContext(Dispatchers.Main) {
-                                        addMessageToChat(sentenceMessage)
+                                        if (chatId != null) {
+                                            addMessageToChat(chatId, sentenceMessage)
+                                        }
                                         // 如果启用了自动朗读，则朗读当前句子
                                         if (getIsAutoReadEnabled()) {
                                             speakMessage(sentence)
@@ -341,7 +375,9 @@ class MessageProcessingDelegate(
                             // 普通模式，直接清理流
                             val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
                             withContext(Dispatchers.Main) {
-                                addMessageToChat(finalMessage)
+                                if (chatId != null) {
+                                    addMessageToChat(chatId, finalMessage)
+                                }
                                 // 如果启用了自动朗读，则朗读完整消息
                                 if (getIsAutoReadEnabled()) {
                                     speakMessage(finalContent)
@@ -359,7 +395,9 @@ class MessageProcessingDelegate(
                         val finalContent = aiMessage.content
                         val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
                         withContext(Dispatchers.Main) {
-                            addMessageToChat(finalMessage)
+                            if (chatId != null) {
+                                addMessageToChat(chatId, finalMessage)
+                            }
                             // 如果启यो-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------t--了自动朗读，也朗读最终消息
                             // if (getIsAutoReadEnabled()) {
                             //     speakMessage(finalContent)
@@ -392,6 +430,8 @@ class MessageProcessingDelegate(
         viewModelScope.launch {
             _isLoading.value = false
             _inputProcessingState.value = EnhancedInputProcessingState.Idle
+            // 取消时清除活跃会话标记
+            _activeStreamingChatId.value = null
 
             // 取消正在进行的流收集
             streamCollectionJob?.cancel()
@@ -421,6 +461,10 @@ class MessageProcessingDelegate(
         viewModelScope.launch(Dispatchers.Main) {
             _inputProcessingState.value = state
             _isLoading.value = state !is EnhancedInputProcessingState.Idle && state !is EnhancedInputProcessingState.Completed
+            // 当服务状态进入空闲或完成，清理活跃会话标记
+            if (state is EnhancedInputProcessingState.Idle || state is EnhancedInputProcessingState.Completed) {
+                _activeStreamingChatId.value = null
+            }
 
             when (state) {
                 is EnhancedInputProcessingState.Error -> {
