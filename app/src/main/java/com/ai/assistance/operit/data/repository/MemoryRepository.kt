@@ -28,6 +28,15 @@ import kotlinx.coroutines.withContext
 import io.objectbox.query.QueryCondition
 import java.io.IOException
 import java.util.UUID
+import java.util.Date
+import com.ai.assistance.operit.data.model.MemoryExportData
+import com.ai.assistance.operit.data.model.SerializableMemory
+import com.ai.assistance.operit.data.model.SerializableLink
+import com.ai.assistance.operit.data.model.ImportStrategy
+import com.ai.assistance.operit.data.model.MemoryImportResult
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 /**
  * Repository for handling Memory data operations. It abstracts the data source (ObjectBox) from the
@@ -1257,6 +1266,232 @@ class MemoryRepository(private val context: Context, profileId: String) {
             }
             android.util.Log.d("MemoryRepo", "Deleted folder '$folderPath', moved ${memories.size} memories to '未分类'")
         }
+    }
+
+    /**
+     * 导出所有记忆（不包括文档节点）为 JSON 字符串
+     * @return JSON 格式的记忆库数据
+     */
+    suspend fun exportMemoriesToJson(): String = withContext(Dispatchers.IO) {
+        // 获取所有非文档节点的记忆
+        val memories = memoryBox.query(Memory_.isDocumentNode.equal(false)).build().find()
+        
+        // 转换为可序列化格式
+        val serializableMemories = memories.map { memory ->
+            // 获取标签名称
+            memory.tags.reset()
+            val tagNames = memory.tags.map { it.name }
+            
+            SerializableMemory(
+                uuid = memory.uuid,
+                title = memory.title,
+                content = memory.content,
+                contentType = memory.contentType,
+                source = memory.source,
+                credibility = memory.credibility,
+                importance = memory.importance,
+                folderPath = memory.folderPath,
+                createdAt = memory.createdAt,
+                updatedAt = memory.updatedAt,
+                tagNames = tagNames
+            )
+        }
+        
+        // 获取所有链接关系（只包含非文档节点之间的链接）
+        val memoryUuids = memories.map { it.uuid }.toSet()
+        val serializableLinks = mutableListOf<SerializableLink>()
+        
+        memories.forEach { memory ->
+            memory.links.reset()
+            memory.links.forEach { link ->
+                val sourceUuid = link.source.target?.uuid
+                val targetUuid = link.target.target?.uuid
+                
+                // 只导出两端都是非文档节点的链接
+                if (sourceUuid != null && targetUuid != null && 
+                    sourceUuid in memoryUuids && targetUuid in memoryUuids) {
+                    serializableLinks.add(
+                        SerializableLink(
+                            sourceUuid = sourceUuid,
+                            targetUuid = targetUuid,
+                            type = link.type,
+                            weight = link.weight,
+                            description = link.description
+                        )
+                    )
+                }
+            }
+        }
+        
+        // 创建导出数据
+        val exportData = MemoryExportData(
+            memories = serializableMemories,
+            links = serializableLinks.distinct(), // 去重
+            exportDate = Date(),
+            version = "1.0"
+        )
+        
+        // 序列化为 JSON
+        val json = Json { 
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
+        json.encodeToString(exportData)
+    }
+    
+    /**
+     * 从 JSON 字符串导入记忆
+     * @param jsonString JSON 格式的记忆库数据
+     * @param strategy 导入策略（遇到重复记忆时的处理方式）
+     * @return 导入结果统计
+     */
+    suspend fun importMemoriesFromJson(
+        jsonString: String,
+        strategy: ImportStrategy = ImportStrategy.SKIP
+    ): MemoryImportResult = withContext(Dispatchers.IO) {
+        val json = Json { 
+            ignoreUnknownKeys = true
+        }
+        
+        try {
+            val exportData = json.decodeFromString<MemoryExportData>(jsonString)
+            
+            var newCount = 0
+            var updatedCount = 0
+            var skippedCount = 0
+            val uuidMap = mutableMapOf<String, Memory>() // 旧UUID -> 新Memory对象
+            
+            // 导入记忆
+            exportData.memories.forEach { serializableMemory ->
+                val existingMemory = memoryBox.query(Memory_.uuid.equal(serializableMemory.uuid))
+                    .build().findFirst()
+                
+                when {
+                    existingMemory != null && strategy == ImportStrategy.SKIP -> {
+                        skippedCount++
+                        uuidMap[serializableMemory.uuid] = existingMemory
+                    }
+                    
+                    existingMemory != null && strategy == ImportStrategy.UPDATE -> {
+                        // 更新现有记忆
+                        existingMemory.apply {
+                            title = serializableMemory.title
+                            content = serializableMemory.content
+                            contentType = serializableMemory.contentType
+                            source = serializableMemory.source
+                            credibility = serializableMemory.credibility
+                            importance = serializableMemory.importance
+                            folderPath = serializableMemory.folderPath
+                            updatedAt = Date()
+                        }
+                        memoryBox.put(existingMemory)
+                        updatedCount++
+                        uuidMap[serializableMemory.uuid] = existingMemory
+                        
+                        // 更新标签
+                        updateMemoryTags(existingMemory, serializableMemory.tagNames)
+                    }
+                    
+                    else -> {
+                        // 创建新记忆
+                        val newMemory = createMemoryFromSerializable(
+                            serializableMemory,
+                            strategy == ImportStrategy.CREATE_NEW
+                        )
+                        newCount++
+                        uuidMap[serializableMemory.uuid] = newMemory
+                    }
+                }
+            }
+            
+            // 导入链接关系
+            var newLinksCount = 0
+            exportData.links.forEach { serializableLink ->
+                val sourceMemory = uuidMap[serializableLink.sourceUuid]
+                val targetMemory = uuidMap[serializableLink.targetUuid]
+                
+                if (sourceMemory != null && targetMemory != null) {
+                    // 检查链接是否已存在 - 查询所有链接并手动过滤
+                    val existingLink = sourceMemory.links.find { link ->
+                        link.target.target?.id == targetMemory.id && 
+                        link.type == serializableLink.type
+                    }
+                    
+                    if (existingLink == null) {
+                        val newLink = MemoryLink(
+                            type = serializableLink.type,
+                            weight = serializableLink.weight,
+                            description = serializableLink.description
+                        )
+                        newLink.source.target = sourceMemory
+                        newLink.target.target = targetMemory
+                        linkBox.put(newLink)
+                        newLinksCount++
+                    }
+                }
+            }
+            
+            android.util.Log.d("MemoryRepo", "Import completed: $newCount new, $updatedCount updated, $skippedCount skipped, $newLinksCount links")
+            
+            MemoryImportResult(
+                newMemories = newCount,
+                updatedMemories = updatedCount,
+                skippedMemories = skippedCount,
+                newLinks = newLinksCount
+            )
+            
+        } catch (e: Exception) {
+            android.util.Log.e("MemoryRepo", "Failed to import memories", e)
+            throw e
+        }
+    }
+    
+    /**
+     * 从可序列化的记忆数据创建 Memory 对象
+     * @param serializable 可序列化的记忆数据
+     * @param forceNewUuid 是否强制生成新的 UUID
+     * @return 创建的 Memory 对象
+     */
+    private fun createMemoryFromSerializable(
+        serializable: SerializableMemory,
+        forceNewUuid: Boolean
+    ): Memory {
+        val memory = Memory(
+            uuid = if (forceNewUuid) UUID.randomUUID().toString() else serializable.uuid,
+            title = serializable.title,
+            content = serializable.content,
+            contentType = serializable.contentType,
+            source = serializable.source,
+            credibility = serializable.credibility,
+            importance = serializable.importance,
+            folderPath = serializable.folderPath,
+            createdAt = serializable.createdAt,
+            updatedAt = serializable.updatedAt
+        )
+        
+        memoryBox.put(memory)
+        
+        // 添加标签
+        updateMemoryTags(memory, serializable.tagNames)
+        
+        return memory
+    }
+    
+    /**
+     * 更新记忆的标签
+     * @param memory 要更新的记忆
+     * @param tagNames 标签名称列表
+     */
+    private fun updateMemoryTags(memory: Memory, tagNames: List<String>) {
+        memory.tags.clear()
+        
+        tagNames.forEach { tagName ->
+            val tag = tagBox.query(MemoryTag_.name.equal(tagName)).build().findFirst()
+                ?: MemoryTag(name = tagName).also { tagBox.put(it) }
+            memory.tags.add(tag)
+        }
+        
+        memoryBox.put(memory)
     }
 
 }

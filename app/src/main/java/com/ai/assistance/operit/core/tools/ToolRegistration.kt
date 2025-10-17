@@ -99,6 +99,92 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 problemLibraryTool.invoke(tool)
             }
     )
+    
+    // 注册根据标题获取单个记忆工具
+    handler.registerTool(
+            name = "get_memory_by_title",
+            category = ToolCategory.FILE_READ,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "根据标题获取记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册用户偏好更新工具
+    handler.registerTool(
+            name = "update_user_preferences",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val params = mutableListOf<String>()
+                tool.parameters.forEach { param ->
+                    when (param.name) {
+                        "birth_date" -> params.add("生日")
+                        "gender" -> params.add("性别")
+                        "personality" -> params.add("性格")
+                        "identity" -> params.add("身份")
+                        "occupation" -> params.add("职业")
+                        "ai_style" -> params.add("AI风格")
+                    }
+                }
+                "更新用户偏好: ${params.joinToString(", ")}"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册创建记忆工具
+    handler.registerTool(
+            name = "create_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "创建记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册更新记忆工具
+    handler.registerTool(
+            name = "update_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val oldTitle = tool.parameters.find { it.name == "old_title" }?.value ?: ""
+                val newTitle = tool.parameters.find { it.name == "new_title" }?.value ?: oldTitle
+                "更新记忆: $oldTitle -> $newTitle"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册删除记忆工具
+    handler.registerTool(
+            name = "delete_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "删除记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
 
     // 系统操作工具
     handler.registerTool(

@@ -336,6 +336,9 @@
     <string name="tools_completed">Tool execution completed</string>
     <string name="tools_failed">Tool execution failed: %1$s</string>
     <string name="tool_result">Tool Execution Result</string>
+    <string name="disable_tools">Disable Tools</string>
+    <string name="disable_tools_desc">When disabled, AI cannot use regular tools like file system or HTTP. However, if \"Memory Attachment\" is enabled, AI can still access memory for knowledge queries and management</string>
+    <string name="tools_disabled">Tools Disabled</string>
     <string name="processing_input">Processing input...</string>
     <string name="references">References:</string>
     <string name="tool_weather">Weather Query</string>
@@ -1765,6 +1768,7 @@
     <string name="speech_services_saving">Saving...</string>
     <string name="speech_services_save_success">Settings saved</string>
     <string name="speech_services_save_error">Save failed: %1$s</string>
+    <string name="speech_services_test_tts">Test TTS Feature</string>
     
     <!-- Info Card -->
     <string name="speech_services_info_title">About Speech Services</string>
@@ -2281,6 +2285,16 @@
     <string name="confirm_rename">Confirm Rename</string>
     <string name="confirm_delete_profile">Confirm Delete Profile</string>
     <string name="delete_profile_warning">Are you sure you want to delete this preference profile? This operation will also delete its bound memory library data and cannot be recovered.\n\nWe recommend backing up important content beforehand.</string>
+    
+    <!-- Profile Selection for Import/Export -->
+    <string name="select_profile">Select Profile</string>
+    <string name="export_from_profile">Export from Profile</string>
+    <string name="import_to_profile">Import to Profile</string>
+    <string name="source_profile">Source Profile</string>
+    <string name="target_profile">Target Profile</string>
+    <string name="current_profile">Current Profile</string>
+    <string name="select_export_profile">Select profile to export from</string>
+    <string name="select_import_profile">Select profile to import to</string>
 
     
     <!-- User Preferences Guide Screen Dialog -->
@@ -2399,6 +2413,7 @@
     <string name="provider_siliconflow">SiliconFlow</string>
     <string name="provider_openrouter">OpenRouter (Multi-model Hub)</string>
     <string name="provider_infiniai">InfiniAI</string>
+    <string name="provider_alipay_bailing">Alipay Bailing Model</string>
     <string name="provider_lmstudio">LM Studio</string>
     <string name="provider_other">Other Providers</string>
     <string name="select_api_provider_title">Select API Provider</string>
@@ -2863,4 +2878,7 @@
     <string name="category_created">Category created</string>
     <string name="invalid_category_name">Category name can only contain lowercase letters, numbers, and underscores</string>
     
+    <!-- Voice Assistant Widget -->
+    <string name="voice_assistant_widget_description">Quick launch Operit voice assistant</string>
+
 </resources>

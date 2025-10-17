@@ -26,6 +26,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
+import com.ai.assistance.operit.data.repository.MemoryRepository
+import com.ai.assistance.operit.data.model.ImportStrategy
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.model.PreferenceProfile
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.io.File
@@ -50,17 +54,68 @@ enum class ChatHistoryOperation {
     FAILED
 }
 
+enum class MemoryOperation {
+    IDLE,
+    EXPORTING,
+    EXPORTED,
+    IMPORTING,
+    IMPORTED,
+    FAILED
+}
+
 @Composable
 fun ChatHistorySettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     val chatHistoryManager = remember { ChatHistoryManager.getInstance(context) }
+    val userPreferencesManager = remember { UserPreferencesManager(context) }
+    val activeProfileId by userPreferencesManager.activeProfileIdFlow.collectAsState(initial = "default")
+    var memoryRepo by remember { mutableStateOf<MemoryRepository?>(null) }
+    
+    // Initialize MemoryRepository with the current profile ID
+    LaunchedEffect(activeProfileId) {
+        memoryRepo = MemoryRepository(context, activeProfileId)
+    }
+    
+    // Profile list and selection states
+    val profileIds by userPreferencesManager.profileListFlow.collectAsState(initial = listOf("default"))
+    var allProfiles by remember { mutableStateOf<List<PreferenceProfile>>(emptyList()) }
+    
+    // Load all profile details
+    LaunchedEffect(profileIds) {
+        val profiles = profileIds.mapNotNull { profileId ->
+            try {
+                userPreferencesManager.getUserPreferencesFlow(profileId).first()
+            } catch (e: Exception) {
+                null
+            }
+        }
+        allProfiles = profiles
+    }
+    
+    // Export and import profile selection
+    var selectedExportProfileId by remember { mutableStateOf(activeProfileId) }
+    var selectedImportProfileId by remember { mutableStateOf(activeProfileId) }
+    var showExportProfileDialog by remember { mutableStateOf(false) }
+    var showImportProfileDialog by remember { mutableStateOf(false) }
+    
+    // Update selected profiles when active profile changes
+    LaunchedEffect(activeProfileId) {
+        selectedExportProfileId = activeProfileId
+        selectedImportProfileId = activeProfileId
+    }
 
     var totalChatCount by remember { mutableStateOf(0) }
+    var totalMemoryCount by remember { mutableStateOf(0) }
+    var totalMemoryLinkCount by remember { mutableStateOf(0) }
     var operationState by remember { mutableStateOf(ChatHistoryOperation.IDLE) }
     var operationMessage by remember { mutableStateOf("") }
+    var memoryOperationState by remember { mutableStateOf(MemoryOperation.IDLE) }
+    var memoryOperationMessage by remember { mutableStateOf("") }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showMemoryImportStrategyDialog by remember { mutableStateOf(false) }
+    var pendingMemoryImportUri by remember { mutableStateOf<Uri?>(null) }
 
     val chatFilePickerLauncher =
         rememberLauncherForActivityResult(
@@ -93,10 +148,32 @@ fun ChatHistorySettingsScreen() {
                 }
             }
         }
+    
+    val memoryFilePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    pendingMemoryImportUri = uri
+                    // First show profile selection dialog
+                    showImportProfileDialog = true
+                }
+            }
+        }
 
     LaunchedEffect(Unit) {
         chatHistoryManager.chatHistoriesFlow.collect { chatHistories ->
             totalChatCount = chatHistories.size
+        }
+    }
+    
+    LaunchedEffect(memoryRepo) {
+        memoryRepo?.let { repo ->
+            val memories = repo.searchMemories("")
+            totalMemoryCount = memories.count { !it.isDocumentNode }
+            val graph = repo.getMemoryGraph()
+            totalMemoryLinkCount = graph.edges.size
         }
     }
 
@@ -141,6 +218,26 @@ fun ChatHistorySettingsScreen() {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+        
+        MemoryManagementCard(
+            totalMemoryCount = totalMemoryCount,
+            totalLinkCount = totalMemoryLinkCount,
+            operationState = memoryOperationState,
+            operationMessage = memoryOperationMessage,
+            onExport = {
+                // Show profile selection dialog
+                showExportProfileDialog = true
+            },
+            onImport = {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/json"
+                }
+                memoryFilePickerLauncher.launch(intent)
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         FaqCard()
     }
@@ -161,6 +258,110 @@ fun ChatHistorySettingsScreen() {
                         operationMessage = "清除失败：${e.localizedMessage ?: e.toString()}"
                     }
                 }
+            }
+        )
+    }
+    
+    if (showMemoryImportStrategyDialog) {
+        MemoryImportStrategyDialog(
+            onDismiss = { 
+                showMemoryImportStrategyDialog = false
+                pendingMemoryImportUri = null
+            },
+            onConfirm = { strategy ->
+                showMemoryImportStrategyDialog = false
+                val uri = pendingMemoryImportUri
+                pendingMemoryImportUri = null
+                
+                if (uri != null) {
+                    scope.launch {
+                        memoryOperationState = MemoryOperation.IMPORTING
+                        try {
+                            // Create MemoryRepository for the selected profile
+                            val importRepo = MemoryRepository(context, selectedImportProfileId)
+                            val result = importMemoriesFromUri(context, importRepo, uri, strategy)
+                            memoryOperationState = MemoryOperation.IMPORTED
+                            val profileName = allProfiles.find { it.id == selectedImportProfileId }?.name ?: selectedImportProfileId
+                            memoryOperationMessage = "导入到配置「$profileName」成功：\n" +
+                                    "- 新增记忆：${result.newMemories}条\n" +
+                                    "- 更新记忆：${result.updatedMemories}条\n" +
+                                    "- 跳过记忆：${result.skippedMemories}条\n" +
+                                    "- 新增链接：${result.newLinks}个"
+                            
+                            // 更新统计信息（如果导入的是当前激活的 profile）
+                            if (selectedImportProfileId == activeProfileId) {
+                                val repo = memoryRepo
+                                if (repo != null) {
+                                    val memories = repo.searchMemories("")
+                                    totalMemoryCount = memories.count { !it.isDocumentNode }
+                                    val graph = repo.getMemoryGraph()
+                                    totalMemoryLinkCount = graph.edges.size
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            memoryOperationState = MemoryOperation.FAILED
+                            memoryOperationMessage = "导入失败：${e.localizedMessage ?: e.toString()}"
+                        }
+                    }
+                }
+            }
+        )
+    }
+    
+    // Export profile selection dialog
+    if (showExportProfileDialog) {
+        ProfileSelectionDialog(
+            title = "选择要导出的配置",
+            profiles = allProfiles,
+            selectedProfileId = selectedExportProfileId,
+            onProfileSelected = { selectedExportProfileId = it },
+            onDismiss = { showExportProfileDialog = false },
+            onConfirm = {
+                showExportProfileDialog = false
+                scope.launch {
+                    memoryOperationState = MemoryOperation.EXPORTING
+                    try {
+                        // Create MemoryRepository for the selected profile
+                        val exportRepo = MemoryRepository(context, selectedExportProfileId)
+                        val filePath = exportMemories(context, exportRepo)
+                        if (filePath != null) {
+                            memoryOperationState = MemoryOperation.EXPORTED
+                            val profileName = allProfiles.find { it.id == selectedExportProfileId }?.name ?: selectedExportProfileId
+                            val memories = exportRepo.searchMemories("")
+                            val memoryCount = memories.count { !it.isDocumentNode }
+                            val graph = exportRepo.getMemoryGraph()
+                            val linkCount = graph.edges.size
+                            memoryOperationMessage = "成功从配置「$profileName」导出 $memoryCount 条记忆和 $linkCount 个链接到：\n$filePath"
+                        } else {
+                            memoryOperationState = MemoryOperation.FAILED
+                            memoryOperationMessage = "导出失败：无法创建文件"
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        memoryOperationState = MemoryOperation.FAILED
+                        memoryOperationMessage = "导出失败：${e.localizedMessage ?: e.toString()}"
+                    }
+                }
+            }
+        )
+    }
+    
+    // Import profile selection dialog
+    if (showImportProfileDialog) {
+        ProfileSelectionDialog(
+            title = "选择要导入到的配置",
+            profiles = allProfiles,
+            selectedProfileId = selectedImportProfileId,
+            onProfileSelected = { selectedImportProfileId = it },
+            onDismiss = { 
+                showImportProfileDialog = false
+                pendingMemoryImportUri = null
+            },
+            onConfirm = {
+                showImportProfileDialog = false
+                // Now show the strategy dialog
+                showMemoryImportStrategyDialog = true
             }
         )
     }
@@ -551,3 +752,305 @@ private suspend fun deleteAllChatHistories(context: Context): Int =
             throw e
         }
     }
+
+@Composable
+private fun MemoryManagementCard(
+    totalMemoryCount: Int,
+    totalLinkCount: Int,
+    operationState: MemoryOperation,
+    operationMessage: String,
+    onExport: () -> Unit,
+    onImport: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "记忆库管理",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Psychology,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "当前共有 $totalMemoryCount 条记忆",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "$totalLinkCount 个链接关系",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 16.dp))
+
+            Text(
+                text = "您可以备份记忆库数据（不包括文档），或从备份文件中恢复。导出的文件将保存在「下载/Operit」文件夹中。",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ManagementButton(
+                    text = "导出",
+                    icon = Icons.Default.CloudDownload,
+                    onClick = onExport,
+                    modifier = Modifier.weight(1f)
+                )
+                ManagementButton(
+                    text = "导入",
+                    icon = Icons.Default.CloudUpload,
+                    onClick = onImport,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            AnimatedVisibility(visible = operationState != MemoryOperation.IDLE) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    when (operationState) {
+                        MemoryOperation.EXPORTING -> OperationProgressView(message = "正在导出记忆库...")
+                        MemoryOperation.IMPORTING -> OperationProgressView(message = "正在导入记忆库...")
+                        MemoryOperation.EXPORTED -> OperationResultCard(
+                            title = "导出成功",
+                            message = operationMessage,
+                            icon = Icons.Default.CloudDownload
+                        )
+                        MemoryOperation.IMPORTED -> OperationResultCard(
+                            title = "导入成功",
+                            message = operationMessage,
+                            icon = Icons.Default.CloudUpload
+                        )
+                        MemoryOperation.FAILED -> OperationResultCard(
+                            title = "操作失败",
+                            message = operationMessage,
+                            icon = Icons.Default.Info,
+                            isError = true
+                        )
+                        else -> {} // IDLE case is handled by visibility
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemoryImportStrategyDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (ImportStrategy) -> Unit
+) {
+    var selectedStrategy by remember { mutableStateOf(ImportStrategy.SKIP) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择导入策略") },
+        text = {
+            Column {
+                Text(
+                    text = "遇到重复的记忆（UUID相同）时如何处理？",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StrategyOption(
+                        title = "跳过（推荐）",
+                        description = "保留现有记忆，不导入重复数据",
+                        selected = selectedStrategy == ImportStrategy.SKIP,
+                        onClick = { selectedStrategy = ImportStrategy.SKIP }
+                    )
+                    
+                    StrategyOption(
+                        title = "更新",
+                        description = "用导入的数据更新现有记忆",
+                        selected = selectedStrategy == ImportStrategy.UPDATE,
+                        onClick = { selectedStrategy = ImportStrategy.UPDATE }
+                    )
+                    
+                    StrategyOption(
+                        title = "创建新记录",
+                        description = "即使UUID相同也创建新记忆（可能导致重复）",
+                        selected = selectedStrategy == ImportStrategy.CREATE_NEW,
+                        onClick = { selectedStrategy = ImportStrategy.CREATE_NEW }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedStrategy) }) {
+                Text("开始导入")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+@Composable
+private fun StrategyOption(
+    title: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) 
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else 
+                MaterialTheme.colorScheme.surface
+        ),
+        border = if (selected) 
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        else 
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = selected,
+                onClick = onClick
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// 导出记忆库
+private suspend fun exportMemories(context: Context, memoryRepository: MemoryRepository): String? =
+    withContext(Dispatchers.IO) {
+        try {
+            val jsonString = memoryRepository.exportMemoriesToJson()
+
+            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val exportDir = File(downloadDir, "Operit")
+            if (!exportDir.exists()) {
+                exportDir.mkdirs()
+            }
+
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+            val timestamp = dateFormat.format(Date())
+            val exportFile = File(exportDir, "memory_backup_$timestamp.json")
+
+            exportFile.writeText(jsonString)
+
+            return@withContext exportFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext null
+        }
+    }
+
+// 导入记忆库
+private suspend fun importMemoriesFromUri(
+    context: Context,
+    memoryRepository: MemoryRepository,
+    uri: Uri,
+    strategy: ImportStrategy
+) = withContext(Dispatchers.IO) {
+    val inputStream = context.contentResolver.openInputStream(uri)
+        ?: throw Exception("无法打开文件")
+    val jsonString = inputStream.bufferedReader().use { it.readText() }
+    inputStream.close()
+
+    if (jsonString.isBlank()) {
+        throw Exception("导入的文件为空")
+    }
+
+    memoryRepository.importMemoriesFromJson(jsonString, strategy)
+}
+
+@Composable
+private fun ProfileSelectionDialog(
+    title: String,
+    profiles: List<PreferenceProfile>,
+    selectedProfileId: String,
+    onProfileSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                profiles.forEach { profile ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        onClick = { onProfileSelected(profile.id) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedProfileId == profile.id) 
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            else 
+                                MaterialTheme.colorScheme.surface
+                        ),
+                        border = if (selectedProfileId == profile.id) 
+                            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                        else 
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedProfileId == profile.id,
+                                onClick = { onProfileSelected(profile.id) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = profile.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (selectedProfileId == profile.id) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}

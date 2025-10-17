@@ -146,8 +146,13 @@ HTTP Tools:
     private const val MEMORY_TOOLS_EN = """
 Memory and Memory Library Tools:
 - query_memory: Searches the memory library for relevant memories using hybrid search (keyword matching + semantic understanding). Use this when you need to recall past knowledge, look up specific information, or require context. To search for multiple keywords at once, separate them with '|' - each keyword will be independently matched semantically and the results will be combined with weighted scoring. Parameters: query (string, the keyword or question to search for)
+- get_memory_by_title: Retrieves a single specific memory node by its exact title. Use this when you know the exact title of a memory and want to get its full details. Parameters: title (required, string, the exact title of the memory)
+- create_memory: Creates a new memory node in the library. Use this when you want to save important information for future reference. Parameters: title (required, string), content (required, string), content_type (optional, default "text/plain"), source (optional, default "ai_created"), folder_path (optional, default "")
+- update_memory: Updates an existing memory node by title. Use this to modify an existing memory's content or metadata. Parameters: old_title (required, string to identify the memory), new_title (optional, string, new title if renaming), content (optional, string), content_type (optional, string), source (optional, string), credibility (optional, float 0-1), importance (optional, float 0-1), folder_path (optional, string), tags (optional, comma-separated string)
+- delete_memory: Deletes a memory node from the library by title. Use with caution as this operation is irreversible. Parameters: title (required, string to identify the memory)
+- update_user_preferences: Updates user preference information directly. Use this when you learn new information about the user that should be remembered (e.g., their birthday, gender, personality traits, identity, occupation, or preferred AI interaction style). This allows immediate updates without waiting for the automatic system. Parameters: birth_date (optional, Unix timestamp in milliseconds), gender (optional, string), personality (optional, string describing personality traits), identity (optional, string describing identity/role), occupation (optional, string), ai_style (optional, string describing preferred AI interaction style). At least one parameter must be provided.
 
-Note: The memory library and user personality profile are automatically updated by a separate system after you output the task completion marker. You don't need to worry about updating them manually.
+Note: The memory library and user personality profile are automatically updated by a separate system after you output the task completion marker. However, if you need to manage memories immediately or update user preferences, use the appropriate tools directly.
 
 """
 
@@ -229,8 +234,13 @@ HTTP工具：
     private const val MEMORY_TOOLS_CN = """
 记忆与记忆库工具：
 - query_memory: 使用混合搜索（关键词匹配 + 语义理解）从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。要一次搜索多个关键词，请使用"|"分隔 - 每个关键词都会独立进行语义匹配，结果将通过加权评分合并。参数：query (string, 搜索的关键词或问题)
+- get_memory_by_title: 通过精确的标题检索单个特定的记忆节点。当你知道记忆的确切标题并想获取其完整详情时使用。参数：title (必需, 字符串, 记忆的精确标题)
+- create_memory: 在记忆库中创建新的记忆节点。当你想保存重要信息供将来参考时使用。参数：title (必需, 字符串), content (必需, 字符串), content_type (可选, 默认"text/plain"), source (可选, 默认"ai_created"), folder_path (可选, 默认"")
+- update_memory: 通过标题更新现有的记忆节点。用于修改现有记忆的内容或元数据。参数：old_title (必需, 字符串，用于识别记忆), new_title (可选, 字符串, 重命名时的新标题), content (可选, 字符串), content_type (可选, 字符串), source (可选, 字符串), credibility (可选, 浮点数 0-1), importance (可选, 浮点数 0-1), folder_path (可选, 字符串), tags (可选, 逗号分隔的字符串)
+- delete_memory: 通过标题从记忆库中删除记忆节点。谨慎使用，此操作不可逆。参数：title (必需, 字符串，用于识别记忆)
+- update_user_preferences: 直接更新用户偏好信息。当你了解到用户的新信息时使用（例如生日、性别、性格特征、身份、职业或首选AI交互风格）。这允许立即更新而无需等待自动系统。参数：birth_date (可选, Unix时间戳，毫秒), gender (可选, 字符串), personality (可选, 描述性格特征的字符串), identity (可选, 描述身份/角色的字符串), occupation (可选, 字符串), ai_style (可选, 描述首选AI交互风格的字符串)。必须提供至少一个参数。
 
-注意：记忆库和用户性格档案会在你输出任务完成标志后由独立的系统自动更新，你无需手动更新它们。
+注意：记忆库和用户性格档案会在你输出任务完成标志后由独立的系统自动更新。但是，如果需要立即管理记忆或更新用户偏好，请直接使用相应的工具。
 
 """
 
@@ -302,7 +312,7 @@ HTTP工具：
       - <think> 模块必须紧邻你的最终答案或工具调用，中间不要有任何换行。
       - **重要提醒:** 即使聊天记录中之前的消息没有 <think> 模块，你在本次回复中也必须按要求使用它。这是强制指令。
       - 范例:
-<think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
+      <think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
       """.trimIndent()
 
     /**
@@ -445,18 +455,26 @@ HTTP工具：
             .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", if (useEnglish) PACKAGE_SYSTEM_GUIDELINES_EN else PACKAGE_SYSTEM_GUIDELINES_CN)
             .replace("AVAILABLE_TOOLS_SECTION", if (useEnglish) availableToolsEn else availableToolsCn)
     } else {
-        // Remove tool-related sections when tools are disabled
-        val toolsDisabledPrompt = if (useEnglish) {
-            "You are temporarily prohibited from calling tools, even if you have used them before. Please respond to user questions using text only."
+        if (enableMemoryQuery) {
+            // Only memory tools are available, package system is disabled
+            prompt = prompt
+                .replace("TOOL_USAGE_GUIDELINES_SECTION", if (useEnglish) TOOL_USAGE_GUIDELINES_EN else TOOL_USAGE_GUIDELINES_CN)
+                .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
+                .replace("AVAILABLE_TOOLS_SECTION", if (useEnglish) MEMORY_TOOLS_EN else MEMORY_TOOLS_CN)
         } else {
-            "你被暂时禁止调用工具，即使前面使用过，也依旧禁止使用。请仅通过文本回复用户问题。"
+            // Remove tool-related sections when tools are disabled
+            val toolsDisabledPrompt = if (useEnglish) {
+                "You are temporarily prohibited from calling tools, even if you have used them before. Please respond to user questions using text only."
+            } else {
+                "你被暂时禁止调用工具，即使前面使用过，也依旧禁止使用。请仅通过文本回复用户问题。"
+            }
+
+            // Replace tool-related sections with disabled message or remove them
+            prompt = prompt
+                .replace("TOOL_USAGE_GUIDELINES_SECTION", toolsDisabledPrompt)
+                .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
+                .replace("AVAILABLE_TOOLS_SECTION", "")
         }
-        
-        // Replace tool-related sections with disabled message or remove them
-        prompt = prompt
-            .replace("TOOL_USAGE_GUIDELINES_SECTION", toolsDisabledPrompt)
-            .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
-            .replace("AVAILABLE_TOOLS_SECTION", "")
     }
 
     return prompt
