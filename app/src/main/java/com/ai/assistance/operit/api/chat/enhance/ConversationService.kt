@@ -153,6 +153,7 @@ class ConversationService(
      * @param packageManager 包管理器
      * @param promptFunctionType 提示函数类型
      * @param thinkingGuidance 是否需要思考指导
+     * @param enableMemoryQuery Whether the AI is allowed to query memories.
      * @return 准备好的对话历史列表
      */
     suspend fun prepareConversationHistory(
@@ -162,7 +163,8 @@ class ConversationService(
             packageManager: PackageManager,
             promptFunctionType: PromptFunctionType,
             thinkingGuidance: Boolean = false,
-            customSystemPromptTemplate: String? = null
+            customSystemPromptTemplate: String? = null,
+            enableMemoryQuery: Boolean = true
     ): List<Pair<String, String>> {
         val preparedHistory = mutableListOf<Pair<String, String>>()
         conversationMutex.withLock {
@@ -201,7 +203,8 @@ class ConversationService(
                         introPrompt,
                                 thinkingGuidance,
                                 finalCustomSystemPromptTemplate,
-                                enableTools
+                                enableTools,
+                                enableMemoryQuery
                 )
 
                 // 构建waifu特殊规则

@@ -51,10 +51,18 @@ class MemoryRepository(private val context: Context, profileId: String) {
     private val tagBox = store.boxFor<MemoryTag>()
     private val linkBox = store.boxFor<MemoryLink>()
     private val chunkBox = store.boxFor<DocumentChunk>()
-
+    
     // --- HNSW向量索引集成 ---
     private val vectorIndexManager: VectorIndexManager<IndexItem<Memory>, String> by lazy {
         val indexFile = File(context.filesDir, "memory_hnsw_${profileId}.idx")
+        
+        // 检查是否有旧的100维向量，如果有则删除旧索引
+        val hasOldEmbeddings = memoryBox.all.any { it.embedding != null && it.embedding!!.vector.size == 100 }
+        if (hasOldEmbeddings && indexFile.exists()) {
+            android.util.Log.w("MemoryRepo", "Detected old 100-dim embeddings, deleting old index file")
+            indexFile.delete()
+        }
+        
         val manager =
                 VectorIndexManager<IndexItem<Memory>, String>(
                         dimensions = 384, // ONNX模型的embedding维度为384
@@ -62,13 +70,13 @@ class MemoryRepository(private val context: Context, profileId: String) {
                         indexFile = indexFile
                 )
         manager.initIndex()
-        // 首次构建索引
-        memoryBox.all.filter { it.embedding != null }.forEach { memory ->
+        // 首次构建索引 - 只添加384维的向量
+        memoryBox.all.filter { it.embedding != null && it.embedding!!.vector.size == 384 }.forEach { memory ->
             manager.addItem(IndexItem(memory.uuid, memory.embedding!!.vector, memory))
         }
         manager
     }
-
+    
     /**
      * 从外部文档创建记忆。
      * @param title 文档记忆的标题。
@@ -159,10 +167,30 @@ class MemoryRepository(private val context: Context, profileId: String) {
      * 生成带有元数据（可信度、重要性）的文本，用于embedding。
      */
     private fun generateTextForEmbedding(memory: Memory): String {
-        // 将credibility和importance格式化为两位小数
-        val credibilityStr = String.format("%.2f", memory.credibility)
-        val importanceStr = String.format("%.2f", memory.importance)
-        return "credibility: ${credibilityStr}, importance: ${importanceStr}, content: ${memory.content}"
+        // 只使用核心内容来生成向量，以确保语义的纯粹性。
+        // 元数据（如credibility, importance）应该在评分阶段作为权重使用，而不是成为文本本身的一部分。
+        return memory.content
+    }
+
+    /**
+     * 检查并修复旧的嵌入向量（从100维升级到384维）
+     * 如果检测到旧向量，自动重新生成
+     */
+    private suspend fun ensureEmbeddingUpToDate(memory: Memory): Boolean = withContext(Dispatchers.IO) {
+        val embedding = memory.embedding
+        if (embedding != null && embedding.vector.size == 100) {
+            // 检测到旧的100维向量，重新生成
+            android.util.Log.d("MemoryRepo", "Upgrading embedding for '${memory.title}' from 100 to 384 dimensions")
+            val textForEmbedding = generateTextForEmbedding(memory)
+            val newEmbedding = OnnxEmbeddingService.generateEmbedding(textForEmbedding)
+            if (newEmbedding != null) {
+                memory.embedding = newEmbedding
+                memoryBox.put(memory)
+                addMemoryToIndex(memory)
+                return@withContext true
+            }
+        }
+        return@withContext false
     }
 
     // --- Memory CRUD Operations ---
@@ -370,21 +398,36 @@ class MemoryRepository(private val context: Context, profileId: String) {
      * Searches memories using semantic search if a query is provided, otherwise returns all
      * memories.
      * @param query The search query string.
+     * @param semanticThreshold The minimum semantic similarity threshold (0.0-1.0). Lower values return more results.
      * @return A list of matching Memory objects, sorted by relevance.
      */
-    suspend fun searchMemories(query: String): List<Memory> = withContext(Dispatchers.IO) {
+    suspend fun searchMemories(query: String, semanticThreshold: Float = 0.6f): List<Memory> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext memoryBox.all
+
+        val keywords = query.split('|').map { it.trim() }.filter { it.isNotEmpty() }
+        if (keywords.isEmpty()) {
+            return@withContext emptyList()
+        }
 
         val scores = mutableMapOf<Long, Double>()
         val k = 60.0 // RRF constant for result fusion
         val allMemories = memoryBox.all // Fetch all memories once for efficiency
 
         // 1. Keyword-based search (Memory title/content contains query)
-        val titleCondition =
-                Memory_.title.contains(query, QueryBuilder.StringOrder.CASE_INSENSITIVE)
-        val contentCondition =
-                Memory_.content.contains(query, QueryBuilder.StringOrder.CASE_INSENSITIVE)
-        val keywordResults = memoryBox.query(titleCondition.or(contentCondition)).build().find()
+        val titleConditions = keywords.map { Memory_.title.contains(it, QueryBuilder.StringOrder.CASE_INSENSITIVE) }
+        val contentConditions = keywords.map { Memory_.content.contains(it, QueryBuilder.StringOrder.CASE_INSENSITIVE) }
+
+        val allConditions = titleConditions + contentConditions
+
+        val keywordResults = if (allConditions.isNotEmpty()) {
+            val finalCondition = allConditions.drop(1)
+                .fold(allConditions.first() as QueryCondition<Memory>) { acc, condition ->
+                    acc.or(condition)
+                }
+            memoryBox.query(finalCondition).build().find()
+        } else {
+            emptyList()
+        }
 
         android.util.Log.d("MemoryRepo", "--- Keyword Search Results: ${keywordResults.size} ---")
         keywordResults.forEachIndexed { index, memory ->
@@ -415,9 +458,16 @@ class MemoryRepository(private val context: Context, profileId: String) {
         // 3. Semantic search (for conceptual matches)
         val queryEmbedding = OnnxEmbeddingService.generateEmbedding(query)
         if (queryEmbedding != null) {
+            // 自动升级旧的100维向量到384维
+            allMemories.forEach { memory ->
+                if (memory.embedding != null && memory.embedding!!.vector.size == 100) {
+                    ensureEmbeddingUpToDate(memory)
+                }
+            }
+            
             val allMemoriesWithEmbedding = allMemories.filter { it.embedding != null }
 
-            val minSimilarityThreshold = 0.6f // 语义相似度阈值
+            val minSimilarityThreshold = semanticThreshold // 语义相似度阈值（可配置）
             
             // Calculate ALL similarities for debugging
             val allSimilarities = allMemoriesWithEmbedding
@@ -472,7 +522,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
         android.util.Log.d("MemoryRepo", "Graph expansion: Using ${topMemoriesForExpansion.size} seed nodes")
 
         var edgesTraversed = 0
-        val graphPropagationWeight = 0.1 // Reduced from 0.3 to prevent overpowering other scores
+        val graphPropagationWeight = 0.4 // Increased from 0.1
+        val basePropagationScore = 0.03 // Give a minimum score boost for any connection
 
         topMemoriesForExpansion.forEach { (sourceId, sourceScore) ->
             val sourceMemory = allMemories.find { it.id == sourceId } ?: return@forEach
@@ -487,7 +538,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 val targetMemory = link.target.target
                 if (targetMemory != null) {
                     // 边权重越高，传播的分数越多
-                    val propagatedScore = sourceScore * link.weight * graphPropagationWeight
+                    val propagatedScore = (sourceScore * link.weight * graphPropagationWeight) + basePropagationScore
                     scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
                     android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${sourceMemory.title}' to '${targetMemory.title}' (weight: ${link.weight})")
                     edgesTraversed++
@@ -499,7 +550,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 val targetMemory = link.source.target
                 if (targetMemory != null) {
                     // 边权重越高，传播的分数越多
-                    val propagatedScore = sourceScore * link.weight * graphPropagationWeight
+                    val propagatedScore = (sourceScore * link.weight * graphPropagationWeight) + basePropagationScore
                     scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
                     android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${targetMemory.title}' to '${sourceMemory.title}' (weight: ${link.weight})")
                     edgesTraversed++
@@ -572,9 +623,14 @@ class MemoryRepository(private val context: Context, profileId: String) {
             return@withContext getChunksForMemory(memoryId) // 返回有序的全部区块
         }
 
+        val keywords = query.split('|').map { it.trim() }.filter { it.isNotEmpty() }
+        if (keywords.isEmpty()) {
+            return@withContext getChunksForMemory(memoryId)
+        }
+
         // --- 关键词搜索（作为补充） ---
         val keywordResults = getChunksForMemory(memoryId)
-            .filter { it.content.contains(query, ignoreCase = true) }
+            .filter { chunk -> keywords.any { keyword -> chunk.content.contains(keyword, ignoreCase = true) } }
             .toMutableList()
 
         // 2. 向量语义搜索
@@ -642,7 +698,12 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
     suspend fun addMemoryToIndex(memory: Memory) = withContext(Dispatchers.IO) {
         if (memory.embedding != null) {
-            vectorIndexManager.addItem(IndexItem(memory.uuid, memory.embedding!!.vector, memory))
+            // 只添加384维的向量到索引
+            if (memory.embedding!!.vector.size == 384) {
+                vectorIndexManager.addItem(IndexItem(memory.uuid, memory.embedding!!.vector, memory))
+            } else {
+                android.util.Log.w("MemoryRepo", "Skipping adding memory '${memory.title}' to index: wrong dimension ${memory.embedding!!.vector.size}")
+            }
         }
     }
     suspend fun removeMemoryFromIndex(memory: Memory) = withContext(Dispatchers.IO) {
@@ -851,12 +912,15 @@ class MemoryRepository(private val context: Context, profileId: String) {
         newFolderPath: String? = memory.folderPath,
         newTags: List<String>? = null // 可选的要更新的标签列表
     ): Memory? = withContext(Dispatchers.IO) {
+        // 检查是否有旧的100维向量需要升级
+        val hasOldEmbedding = memory.embedding != null && memory.embedding!!.vector.size == 100
+        
         val contentChanged = memory.content != newContent
         val credibilityChanged = memory.credibility != newCredibility
         val importanceChanged = memory.importance != newImportance
 
-        // 只有在影响embedding的因素变化时才重新生成
-        val needsReEmbedding = contentChanged || credibilityChanged || importanceChanged
+        // 只有在影响embedding的因素变化时才重新生成，或者发现旧向量时强制升级
+        val needsReEmbedding = contentChanged || credibilityChanged || importanceChanged || hasOldEmbedding
 
         // 更新记忆属性
         memory.apply {
@@ -1189,4 +1253,5 @@ class MemoryRepository(private val context: Context, profileId: String) {
             android.util.Log.d("MemoryRepo", "Deleted folder '$folderPath', moved ${memories.size} memories to '未分类'")
         }
     }
+
 }

@@ -139,7 +139,7 @@ async function runTests(params: { testType?: string } = {}): Promise<void> {
             console.log("\n🔧 Testing Basic Tools...");
             testSummary.push("Running basic tools tests");
 
-            await testQueryProblemLibrary(results);
+            await testQueryMemory(results);
             await testUsePackage(results);
             await testCalculator(results);
             await testSleep(results);
@@ -255,12 +255,12 @@ async function runTests(params: { testType?: string } = {}): Promise<void> {
 }
 
 /**
- * Tests the query_knowledge_library tool
+ * Tests the query_memory tool
  */
-async function testQueryProblemLibrary(results: TestResults): Promise<void> {
+async function testQueryMemory(results: TestResults): Promise<void> {
     try {
-        console.log("\nTesting query_knowledge_library...");
-        const queryResult = await toolCall("query_knowledge_library", {
+        console.log("\nTesting query_memory...");
+        const queryResult = await toolCall("query_memory", {
             query: "how to use OperIT tools"
         });
 
@@ -270,13 +270,13 @@ async function testQueryProblemLibrary(results: TestResults): Promise<void> {
         console.log(`Query result length: ${resultString.length} characters`);
         console.log(`Result preview: ${resultString.substring(0, 100)}...`);
 
-        results["query_knowledge_library"] = {
+        results["query_memory"] = {
             success: typeof resultString === 'string' && resultString.length > 0,
             data: resultString
         };
     } catch (err) {
-        console.error("Error testing query_knowledge_library:", err);
-        results["query_knowledge_library"] = { success: false, error: String(err) };
+        console.error("Error testing query_memory:", err);
+        results["query_memory"] = { success: false, error: String(err) };
     }
 }
 
@@ -1902,7 +1902,7 @@ exports.testCategory = function (params: { testType: string }): Promise<void> {
 };
 
 // Add exports for these functions
-exports.testQueryProblemLibrary = testQueryProblemLibrary;
+exports.testQueryMemory = testQueryMemory;
 exports.testUsePackage = testUsePackage;
 exports.testCalculator = testCalculator;
 exports.testSleep = testSleep;

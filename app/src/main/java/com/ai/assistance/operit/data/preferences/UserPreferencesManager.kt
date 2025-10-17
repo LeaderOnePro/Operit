@@ -890,7 +890,7 @@ class UserPreferencesManager(private val context: Context) {
                 preferences[ACTIVE_PROFILE_ID] = DEFAULT_PROFILE_ID
             }
         }
-        // 删除对应的知识库数据库
+        // 删除对应的记忆库数据库
         ObjectBoxManager.delete(context, profileId)
     }
 

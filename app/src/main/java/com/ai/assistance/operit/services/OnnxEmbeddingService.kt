@@ -93,21 +93,26 @@ object OnnxEmbeddingService {
             isInitialized = true
             Log.d(TAG, "OnnxEmbeddingService initialized successfully with multilingual support.")
             
-            // 触发自动分类（使用 ProblemLibrary）
-            try {
-                CoroutineScope(Dispatchers.IO).launch {
-                    val enhancedAIService = EnhancedAIService.getInstance(context)
-                    val aiService = enhancedAIService.getBaseAIService()
-                    ProblemLibrary.autoCategorizeMemoriesAsync(context, aiService)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "触发自动分类失败", e)
-            }
-            
             // Log model info
             ortSession?.let { session ->
                 Log.d(TAG, "Model inputs: ${session.inputNames}")
                 Log.d(TAG, "Model outputs: ${session.outputNames}")
+            }
+            
+            // 触发自动分类（使用 ProblemLibrary）
+            Log.d(TAG, "准备触发记忆库未分类记忆的自动分类...")
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    Log.d(TAG, "开始获取 EnhancedAIService 实例...")
+                    val enhancedAIService = EnhancedAIService.getInstance(context)
+                    Log.d(TAG, "开始获取 PROBLEM_LIBRARY 功能的 AIService...")
+                    val aiService = enhancedAIService.getAIServiceForFunction(com.ai.assistance.operit.data.model.FunctionType.PROBLEM_LIBRARY)
+                    Log.d(TAG, "开始调用 ProblemLibrary.autoCategorizeMemoriesAsync...")
+                    ProblemLibrary.autoCategorizeMemoriesAsync(context, aiService)
+                    Log.d(TAG, "已触发自动分类任务")
+                } catch (e: Exception) {
+                    Log.e(TAG, "触发自动分类失败", e)
+                }
             }
             
         } catch (e: Exception) {

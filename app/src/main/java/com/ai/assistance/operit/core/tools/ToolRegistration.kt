@@ -87,7 +87,7 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
 
     // 注册问题库查询工具
     handler.registerTool(
-            name = "query_knowledge_library",
+            name = "query_memory",
             category = ToolCategory.FILE_READ,
             dangerCheck = null,
             descriptionGenerator = { tool ->

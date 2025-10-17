@@ -53,4 +53,54 @@ object ChatUtils {
             Pair(standardRole, processedContent)
         }
     }
+
+    /**
+     * 从 AI 响应中提取 JSON 对象部分
+     * AI 可能会在 JSON 前后添加说明文字或使用 ```json 代码块，需要提取出纯净的 JSON
+     */
+    fun extractJson(response: String): String {
+        var text = response.trim()
+        
+        // 处理 markdown 代码块格式 ```json ... ```
+        if (text.startsWith("```")) {
+            val lines = text.lines()
+            text = lines.drop(1).dropLast(1).joinToString("\n").trim()
+        }
+        
+        // 寻找第一个 { 和最后一个 }
+        val firstBrace = text.indexOf('{')
+        val lastBrace = text.lastIndexOf('}')
+        
+        return if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+            text.substring(firstBrace, lastBrace + 1)
+        } else {
+            // 如果没找到完整的 JSON 结构，返回原始字符串
+            text
+        }
+    }
+
+    /**
+     * 从 AI 响应中提取 JSON 数组部分
+     * AI 可能会在 JSON 前后添加说明文字或使用 ```json 代码块，需要提取出纯净的 JSON
+     */
+    fun extractJsonArray(response: String): String {
+        var text = response.trim()
+        
+        // 处理 markdown 代码块格式 ```json ... ```
+        if (text.startsWith("```")) {
+            val lines = text.lines()
+            text = lines.drop(1).dropLast(1).joinToString("\n").trim()
+        }
+        
+        // 寻找第一个 [ 和最后一个 ]
+        val firstBracket = text.indexOf('[')
+        val lastBracket = text.lastIndexOf(']')
+        
+        return if (firstBracket != -1 && lastBracket != -1 && firstBracket < lastBracket) {
+            text.substring(firstBracket, lastBracket + 1)
+        } else {
+            // 如果没找到完整的 JSON 结构，返回原始字符串
+            text
+        }
+    }
 }

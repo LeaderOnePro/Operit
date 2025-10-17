@@ -2279,7 +2279,7 @@
     <string name="enter_new_profile_name">请输入新的配置名称</string>
     <string name="confirm_rename">确认重命名</string>
     <string name="confirm_delete_profile">确认删除配置</string>
-    <string name="delete_profile_warning">您确定要删除该偏好配置吗？此操作会同时删除其绑定的知识库数据，且无法恢复。\n\n建议您提前备份重要内容。</string>
+    <string name="delete_profile_warning">您确定要删除该偏好配置吗？此操作会同时删除其绑定的记忆库数据，且无法恢复。\n\n建议您提前备份重要内容。</string>
 
     
     <!-- User Preferences Guide Screen Dialog -->

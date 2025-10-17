@@ -1971,7 +1971,7 @@
     <string name="manage_cookies_test_desc">Get google.com cookies</string>
     <string name="visit_web_test_desc">Visit Baidu and extract content</string>
     <string name="use_package_test_desc">Test activating a non-existent package</string>
-    <string name="query_knowledge_test_desc">Test querying knowledge base</string>
+    <string name="query_knowledge_test_desc">Test querying memory library</string>
     <string name="list_files_test_desc">List files in test directory</string>
     <string name="file_exists_test_desc">Check if test file exists</string>
     <string name="ocr_read_test_desc">Read test image content</string>
@@ -2280,7 +2280,7 @@
     <string name="enter_new_profile_name">Please enter new profile name</string>
     <string name="confirm_rename">Confirm Rename</string>
     <string name="confirm_delete_profile">Confirm Delete Profile</string>
-    <string name="delete_profile_warning">Are you sure you want to delete this preference profile? This operation will also delete its bound knowledge base data and cannot be recovered.\n\nWe recommend backing up important content beforehand.</string>
+    <string name="delete_profile_warning">Are you sure you want to delete this preference profile? This operation will also delete its bound memory library data and cannot be recovered.\n\nWe recommend backing up important content beforehand.</string>
 
     
     <!-- User Preferences Guide Screen Dialog -->

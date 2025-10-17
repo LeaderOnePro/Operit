@@ -198,7 +198,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 思考模式和思考引导状态现在由ApiConfigDelegate管理
     val enableThinkingMode: StateFlow<Boolean> by lazy { apiConfigDelegate.enableThinkingMode }
     val enableThinkingGuidance: StateFlow<Boolean> by lazy { apiConfigDelegate.enableThinkingGuidance }
-    val enableMemoryAttachment: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMemoryAttachment }
+    val enableMemoryQuery: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMemoryQuery }
     val enableTools: StateFlow<Boolean> by lazy { apiConfigDelegate.enableTools }
 
     val summaryTokenThreshold: StateFlow<Float> by lazy { apiConfigDelegate.summaryTokenThreshold }
@@ -493,8 +493,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     // 切换记忆附着的方法现在委托给ApiConfigDelegate
-    fun toggleMemoryAttachment() {
-        apiConfigDelegate.toggleMemoryAttachment()
+    fun toggleMemoryQuery() {
+        apiConfigDelegate.toggleMemoryQuery()
     }
 
     // 更新上下文长度
@@ -814,7 +814,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 promptFunctionType = promptFunctionType,
                 enableThinking = enableThinkingMode.value, // 传递思考模式的状态
                 thinkingGuidance = enableThinkingGuidance.value, // 传递思考引导的状态
-                enableMemoryAttachment = enableMemoryAttachment.value, // 传递记忆附着的状态
+                enableMemoryQuery = enableMemoryQuery.value, // 传递记忆附着的状态
                 enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
                 maxTokens = maxTokens,
                 //如果记忆总结没开，直接调1；如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断

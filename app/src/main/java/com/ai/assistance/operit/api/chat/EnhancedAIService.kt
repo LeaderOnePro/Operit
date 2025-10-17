@@ -331,7 +331,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
         enableThinking: Boolean = false,
         thinkingGuidance: Boolean = false,
-        enableMemoryAttachment: Boolean = true,
+        enableMemoryQuery: Boolean = true,
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit = {},
@@ -377,7 +377,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     workspacePath,
                                     promptFunctionType,
                                     thinkingGuidance,
-                                    customSystemPromptTemplate
+                                    customSystemPromptTemplate,
+                                    enableMemoryQuery
                             )
                     
                     // 关键修复：用准备好的历史记录（包含了系统提示）去同步更新内部的 conversationHistory 状态
@@ -510,7 +511,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             } finally {
                 // 确保流处理完成后调用
                 val collector = this
-                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryAttachment, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask) }
+                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask) }
             }
         }
     }
@@ -613,7 +614,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             functionType: FunctionType = FunctionType.CHAT,
             collector: StreamCollector<String>,
             enableThinking: Boolean = false,
-            enableMemoryAttachment: Boolean = true,
+            enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
             tokenUsageThreshold: Double,
@@ -656,7 +657,7 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // Handle task completion marker
             if (ConversationMarkupManager.containsTaskCompletion(enhancedContent)) {
-                handleTaskCompletion(context, enhancedContent, enableMemoryAttachment, isSubTask)
+                handleTaskCompletion(context, enhancedContent, enableMemoryQuery, isSubTask)
                 return
             }
 
@@ -710,7 +711,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                         functionType,
                         collector,
                         enableThinking,
-                        enableMemoryAttachment,
+                        enableMemoryQuery,
                         onNonFatalError,
                         maxTokens,
                         tokenUsageThreshold,
@@ -741,7 +742,7 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** Handle task completion logic - simplified version without callbacks */
-    private suspend fun handleTaskCompletion(context: MessageExecutionContext, content: String, enableMemoryAttachment: Boolean, isSubTask: Boolean) {
+    private suspend fun handleTaskCompletion(context: MessageExecutionContext, content: String, enableMemoryQuery: Boolean, isSubTask: Boolean) {
         // Mark conversation as complete
         context.isConversationActive.set(false)
 
@@ -755,7 +756,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
         }
 
-        if (enableMemoryAttachment) {
+        if (enableMemoryQuery) {
             // 保存问题记录到库
             toolProcessingScope.launch {
                 com.ai.assistance.operit.api.chat.library.ProblemLibrary.saveProblemAsync(
@@ -803,7 +804,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         functionType: FunctionType = FunctionType.CHAT,
         collector: StreamCollector<String>,
         enableThinking: Boolean = false,
-        enableMemoryAttachment: Boolean = true,
+        enableMemoryQuery: Boolean = true,
         onNonFatalError: suspend (error: String) -> Unit,
         maxTokens: Int,
         tokenUsageThreshold: Double,
@@ -841,7 +842,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             // 2. 按并行/串行对工具进行分组
             val parallelizableToolNames = setOf(
                 "list_files", "read_file", "read_file_part", "read_file_full", "file_exists",
-                "find_files", "file_info", "grep_code", "query_knowledge_library", "calculate", "ffmpeg_info"
+                "find_files", "file_info", "grep_code", "query_memory", "calculate", "ffmpeg_info"
             )
             val (parallelInvocations, serialInvocations) = permittedInvocations.partition { parallelizableToolNames.contains(it.tool.name) }
 
@@ -874,7 +875,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
                 processToolResults(
                     allToolResults, context, functionType, collector, enableThinking,
-                    enableMemoryAttachment, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask
+                    enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask
                 )
             }
         }
@@ -963,7 +964,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             functionType: FunctionType = FunctionType.CHAT,
             collector: StreamCollector<String>,
             enableThinking: Boolean = false,
-            enableMemoryAttachment: Boolean = true,
+            enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
             tokenUsageThreshold: Double,
@@ -1116,7 +1117,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "工具结果AI处理完成，收到 $totalChars 字符，耗时: ${processingTime}ms")
 
                 // 流处理完成，处理完成逻辑
-                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryAttachment, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask)
+                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask)
             } catch (e: Exception) {
                 Log.e(TAG, "处理工具执行结果时出错", e)
                 withContext(Dispatchers.Main) {
@@ -1127,10 +1128,6 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
         Log.d(TAG, "工具结果处理总耗时: ${System.currentTimeMillis() - startTime}ms")
     }
-
-    // Expose base AIService for token counting
-    fun getBaseAIService(): AIService = aiService
-
     /**
      * Get the current input token count from the last API call
      * @return The number of input tokens used in the most recent request
@@ -1208,7 +1205,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             workspacePath: String?,
             promptFunctionType: PromptFunctionType,
             thinkingGuidance: Boolean,
-            customSystemPromptTemplate: String? = null
+            customSystemPromptTemplate: String? = null,
+            enableMemoryQuery: Boolean
     ): List<Pair<String, String>> {
         return conversationService.prepareConversationHistory(
                 chatHistory,
@@ -1217,7 +1215,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 packageManager,
                 promptFunctionType,
                 thinkingGuidance,
-                customSystemPromptTemplate
+                customSystemPromptTemplate,
+                enableMemoryQuery
         )
     }
 

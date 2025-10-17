@@ -68,7 +68,7 @@ class ApiPreferences private constructor(private val context: Context) {
         val ENABLE_THINKING_GUIDANCE = booleanPreferencesKey("enable_thinking_guidance")
 
         // Key for Memory Attachment
-        val ENABLE_MEMORY_ATTACHMENT = booleanPreferencesKey("enable_memory_attachment")
+        val ENABLE_MEMORY_QUERY = booleanPreferencesKey("enable_memory_attachment")
 
         // Key for Auto Read
         val ENABLE_AUTO_READ = booleanPreferencesKey("enable_auto_read")
@@ -117,7 +117,7 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_ENABLE_THINKING_GUIDANCE = false
 
         // Default value for Memory Attachment
-        const val DEFAULT_ENABLE_MEMORY_ATTACHMENT = true
+        const val DEFAULT_ENABLE_MEMORY_QUERY = true
 
         // Default value for Auto Read
         const val DEFAULT_ENABLE_AUTO_READ = false
@@ -214,9 +214,9 @@ class ApiPreferences private constructor(private val context: Context) {
             }
 
     // Flow for Memory Attachment
-    val enableMemoryAttachmentFlow: Flow<Boolean> =
+    val enableMemoryQueryFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
-            preferences[ENABLE_MEMORY_ATTACHMENT] ?: DEFAULT_ENABLE_MEMORY_ATTACHMENT
+            preferences[ENABLE_MEMORY_QUERY] ?: DEFAULT_ENABLE_MEMORY_QUERY
         }
 
     // Flow for Auto Read
@@ -364,9 +364,9 @@ class ApiPreferences private constructor(private val context: Context) {
     }
 
     // Save Memory Attachment setting
-    suspend fun saveEnableMemoryAttachment(isEnabled: Boolean) {
+    suspend fun saveEnableMemoryQuery(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences ->
-            preferences[ENABLE_MEMORY_ATTACHMENT] = isEnabled
+            preferences[ENABLE_MEMORY_QUERY] = isEnabled
         }
     }
 

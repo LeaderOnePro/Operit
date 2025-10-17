@@ -11,7 +11,7 @@ object JsTimeoutConfig {
      * 主超时时间（秒）
      * 用于 JavaScript 引擎的总体执行超时
      */
-    const val MAIN_TIMEOUT_SECONDS = 180L
+    const val MAIN_TIMEOUT_SECONDS = 600L
     
     /**
      * 预警超时时间（秒）

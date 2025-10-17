@@ -60,7 +60,7 @@ object AIMessageManager {
      *
      * @param messageText 用户输入的原始文本。
      * @param attachments 附件列表。
-     * @param enableMemoryAttachment 是否启用记忆附着功能。
+     * @param enableMemoryQuery 是否允许AI查询记忆。
      * @param enableWorkspaceAttachment 是否启用工作区附着功能。
      * @param workspacePath 工作区路径。
      * @return 格式化后的完整消息字符串。
@@ -68,7 +68,7 @@ object AIMessageManager {
     suspend fun buildUserMessageContent(
         messageText: String,
         attachments: List<AttachmentInfo>,
-        enableMemoryAttachment: Boolean,
+        enableMemoryQuery: Boolean,
         enableWorkspaceAttachment: Boolean = false,
         workspacePath: String? = null,
         replyToMessage: ChatMessage? = null // 新增回复消息参数
@@ -84,23 +84,6 @@ object AIMessageManager {
             val instruction = "用户正在回复你之前的这条消息："
             "<reply_to sender=\"${roleName}\" timestamp=\"${message.timestamp}\">${instruction}\"${cleanContent}\"</reply_to>"
         } ?: ""
-
-        // 2. 根据开关决定是否查询知识库
-        val memoryTag = if (enableMemoryAttachment && messageText.isNotBlank() && !messageText.contains("<memory>", ignoreCase = true)) {
-            val queryTool = AITool(
-                name = "query_knowledge_library",
-                parameters = listOf(ToolParameter("query", messageText))
-            )
-            val result = toolHandler.executeTool(queryTool)
-            if (result.success && result.result is MemoryQueryResultData) {
-                val memoryData = result.result as MemoryQueryResultData
-                if (memoryData.memories.isNotEmpty()) {
-                    val instruction = "RAG Memory"
-                    val memoryContent = memoryData.toString()
-                    "<memory>${instruction}\n---\n${memoryContent}</memory>"
-                } else ""
-            } else ""
-        } else ""
 
         // 3. 根据开关决定是否生成工作区附着
         val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank() && !messageText.contains("<workspace_attachment>", ignoreCase = true)) {
@@ -130,7 +113,7 @@ object AIMessageManager {
         } else ""
 
         // 5. 组合最终消息
-        return listOf(messageText, attachmentTags, memoryTag, workspaceTag, replyTag)
+        return listOf(messageText, attachmentTags, workspaceTag, replyTag)
             .filter { it.isNotBlank() }
             .joinToString(" ")
     }
@@ -145,7 +128,7 @@ object AIMessageManager {
      * @param promptFunctionType 提示功能类型。
      * @param enableThinking 是否启用思考过程。
      * @param thinkingGuidance 是否启用思考引导。
-     * @param enableMemoryAttachment 是否启用记忆附着功能。
+     * @param enableMemoryQuery 是否允许AI查询记忆。
      * @return 包含AI响应流的ChatMessage对象。
      */
     suspend fun sendMessage(
@@ -156,7 +139,7 @@ object AIMessageManager {
         promptFunctionType: PromptFunctionType,
         enableThinking: Boolean,
         thinkingGuidance: Boolean,
-        enableMemoryAttachment: Boolean, // Add this parameter
+        enableMemoryQuery: Boolean,
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit
@@ -209,7 +192,7 @@ object AIMessageManager {
                 promptFunctionType = promptFunctionType,
                 enableThinking = enableThinking,
                 thinkingGuidance = thinkingGuidance,
-                enableMemoryAttachment = enableMemoryAttachment, // Pass it here
+                enableMemoryQuery = enableMemoryQuery,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError

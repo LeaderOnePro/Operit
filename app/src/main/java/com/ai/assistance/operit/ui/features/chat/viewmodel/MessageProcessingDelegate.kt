@@ -94,7 +94,7 @@ class MessageProcessingDelegate(
             promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
             enableThinking: Boolean = false,
             thinkingGuidance: Boolean = false,
-            enableMemoryAttachment: Boolean = true, // 新增参数
+            enableMemoryQuery: Boolean = true, // 新增参数
             enableWorkspaceAttachment: Boolean = false, // 新增工作区附着参数
             maxTokens: Int,
             tokenUsageThreshold: Double,
@@ -127,7 +127,7 @@ class MessageProcessingDelegate(
             val finalMessageContent = AIMessageManager.buildUserMessageContent(
                 messageText,
                 attachments,
-                enableMemoryAttachment,
+                enableMemoryQuery,
                 enableWorkspaceAttachment,
                 workspacePath,
                 replyToMessage
@@ -183,7 +183,7 @@ class MessageProcessingDelegate(
                     promptFunctionType = promptFunctionType,
                     enableThinking = enableThinking,
                     thinkingGuidance = thinkingGuidance,
-                    enableMemoryAttachment = enableMemoryAttachment, // Pass it here
+                    enableMemoryQuery = enableMemoryQuery, // Pass it here
                     maxTokens = maxTokens,
                     tokenUsageThreshold = tokenUsageThreshold,
                     onNonFatalError = { error ->

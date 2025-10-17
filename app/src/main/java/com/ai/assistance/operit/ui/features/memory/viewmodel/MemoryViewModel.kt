@@ -58,7 +58,7 @@ data class MemoryUiState(
 )
 
 /**
- * ViewModel for the Memory/Knowledge Base screen. It handles the business logic for interacting
+ * ViewModel for the Memory/Memory Library screen. It handles the business logic for interacting
  * with the MemoryRepository.
  */
 class MemoryViewModel(private val repository: MemoryRepository, private val context: Context) : ViewModel() {
@@ -323,12 +323,12 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
             try {
                 val aiToolHandler = AIToolHandler.getInstance(context)
                 // 确保工具已注册
-                if (aiToolHandler.getToolExecutor("query_knowledge_library") == null) {
+                if (aiToolHandler.getToolExecutor("query_memory") == null) {
                     aiToolHandler.registerDefaultTools()
                 }
 
                 val tool = AITool(
-                    name = "query_knowledge_library",
+                    name = "query_memory",
                     parameters = listOf(ToolParameter("query", query))
                 )
 

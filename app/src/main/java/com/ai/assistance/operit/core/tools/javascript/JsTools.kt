@@ -248,7 +248,7 @@ fun getJsToolsDefinition(): String {
             // 知识查询
             Query: {
                 // 查询问题库
-                knowledge: (query) => toolCall("query_knowledge_library", { query })
+                knowledge: (query) => toolCall("query_memory", { query })
             },
             // 计算功能
             calc: (expression) => toolCall("calculate", { expression }),

@@ -48,9 +48,9 @@ class ApiConfigDelegate(
             MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_THINKING_GUIDANCE)
     val enableThinkingGuidance: StateFlow<Boolean> = _enableThinkingGuidance.asStateFlow()
 
-    private val _enableMemoryAttachment =
-            MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_MEMORY_ATTACHMENT)
-    val enableMemoryAttachment: StateFlow<Boolean> = _enableMemoryAttachment.asStateFlow()
+    private val _enableMemoryQuery =
+            MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_MEMORY_QUERY)
+    val enableMemoryQuery: StateFlow<Boolean> = _enableMemoryQuery.asStateFlow()
 
     private val _enableAutoRead =
             MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_AUTO_READ)
@@ -151,8 +151,8 @@ class ApiConfigDelegate(
 
         // Collect memory attachment setting
         viewModelScope.launch {
-            apiPreferences.enableMemoryAttachmentFlow.collect { enabled ->
-                _enableMemoryAttachment.value = enabled
+            apiPreferences.enableMemoryQueryFlow.collect { enabled ->
+                _enableMemoryQuery.value = enabled
             }
         }
 
@@ -312,11 +312,11 @@ class ApiConfigDelegate(
     }
 
     /** 切换记忆附着 */
-    fun toggleMemoryAttachment() {
+    fun toggleMemoryQuery() {
         viewModelScope.launch {
-            val newValue = !_enableMemoryAttachment.value
-            apiPreferences.saveEnableMemoryAttachment(newValue)
-            _enableMemoryAttachment.value = newValue
+            val newValue = !_enableMemoryQuery.value
+            apiPreferences.saveEnableMemoryQuery(newValue)
+            _enableMemoryQuery.value = newValue
         }
     }
 

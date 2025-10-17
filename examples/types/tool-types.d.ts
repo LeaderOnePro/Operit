@@ -59,7 +59,7 @@ export type ConnectionToolName = 'establish_connection';
 /**
  * Package tool names
  */
-export type PackageToolName = 'use_package' | 'query_knowledge_library';
+export type PackageToolName = 'use_package' | 'query_memory';
 
 /**
  * FFmpeg tool names
@@ -136,7 +136,7 @@ export interface ToolResultMap {
 
     // Package operations
     'use_package': string;
-    'query_knowledge_library': string;
+    'query_memory': string;
 
     // FFmpeg operations
     'ffmpeg_execute': FFmpegResultData;

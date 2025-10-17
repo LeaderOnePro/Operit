@@ -197,11 +197,8 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
         repository: MemoryRepository
     ) {
         try {
-            val cleanJson = jsonString.trim().let {
-                val startIndex = it.indexOf("[")
-                val endIndex = it.lastIndexOf("]")
-                if (startIndex >= 0 && endIndex > startIndex) it.substring(startIndex, endIndex + 1) else return
-            }
+            val cleanJson = ChatUtils.extractJsonArray(jsonString)
+            if (cleanJson.isEmpty() || !cleanJson.startsWith("[")) return
             
             val jsonArray = JSONArray(cleanJson)
             val titleToFolderMap = mutableMapOf<String, String>()
@@ -282,7 +279,6 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
                 return@withLock
             }
 
-
             // Create a map to track all memories (new and updated) for linking
             val createdMemories = mutableMapOf<String, Memory>()
 
@@ -351,18 +347,32 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
 
             try {
                 // 1. Create main problem memory
-                Log.d(TAG, "1. 创建主要问题记忆节点: '${analysis.mainProblem.title}'")
-                val mainProblemMemory = Memory(
-                    title = analysis.mainProblem.title,
-                    content = analysis.mainProblem.content,
-                    source = "problem_library_analysis",
-                    folderPath = analysis.mainProblem.folderPath ?: "" // 使用分析出的文件夹路径
-                )
-                memoryRepository.saveMemory(mainProblemMemory)
-                analysis.mainProblem.tags.forEach { tagName ->
-                    memoryRepository.addTagToMemory(mainProblemMemory, tagName)
+                val mainProblemMemory = analysis.mainProblem?.let { mainProblem ->
+                    val existingMemory = memoryRepository.findMemoryByTitle(mainProblem.title)
+                    if (existingMemory != null) {
+                        Log.d(TAG, "1. 发现同名核心记忆，更新内容: '${mainProblem.title}'")
+                        existingMemory.content = mainProblem.content
+                        memoryRepository.saveMemory(existingMemory)
+                        existingMemory
+                    } else {
+                        Log.d(TAG, "1. 创建主要问题记忆节点: '${mainProblem.title}'")
+                        val memory = Memory(
+                            title = mainProblem.title,
+                            content = mainProblem.content,
+                            importance = 0.8f, // Main problems are highly important
+                            credibility = 1.0f,
+                            folderPath = mainProblem.folderPath ?: ""
+                        )
+                        memoryRepository.saveMemory(memory)
+                        mainProblem.tags.forEach { tagName ->
+                            memoryRepository.addTagToMemory(memory, tagName)
+                        }
+                        memory
+                    }
                 }
-                createdMemories[mainProblemMemory.title] = mainProblemMemory
+                mainProblemMemory?.let {
+                    createdMemories[it.title] = it
+                }
 
                 // 2. Process entities with new LLM-driven deduplication logic
                 analysis.extractedEntities.forEach { entity ->
@@ -466,16 +476,17 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
             // --- Hybrid Strategy: Local rough search + LLM final decision ---
             // 1. Use local embedding search for a "rough" candidate selection.
             val contextQuery = query + "\n" + solution.take(1000) // Combine query and solution for context
-            val candidateMemories = memoryRepository.searchMemories(contextQuery).take(15)
+            // 使用更宽松的阈值(0.5)以让AI看到更多可能相关的记忆，便于判断是否需要合并或更新
+            val candidateMemories = memoryRepository.searchMemories(contextQuery, semanticThreshold = 0.4f).take(15)
 
             // 2. Proactively find duplicates among candidates and instruct LLM to merge them
             val duplicatesPromptPart = findAndDescribeDuplicates(candidateMemories, memoryRepository)
 
             val existingMemoriesPrompt = if (candidateMemories.isNotEmpty()) {
-                "为避免重复，请参考以下知识库中可能相关的已有记忆。在提取实体时，如果发现与下列记忆语义相同的实体，请使用`alias_for`字段进行标注：\n" +
+                "为避免重复，请参考以下记忆库中可能相关的已有记忆。在提取实体时，如果发现与下列记忆语义相同的实体，请使用`alias_for`字段进行标注：\n" +
                         candidateMemories.joinToString("\n") { "- \"${it.title}\": ${it.content.take(150).replace("\n", " ")}..." }
             } else {
-                "知识库目前为空或没有找到相关记忆，请自由提取实体。"
+                "记忆库目前为空或没有找到相关记忆，请自由提取实体。"
             }
 
             // 获取现有文件夹列表
@@ -542,12 +553,13 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
                 ```
 
                 【重要指南】:
-                - 【**最重要**】如果本次对话内容非常简单、属于日常寒暄、没有包含任何新的、有价值的、值得长期记忆的知识点，或只是对已有知识的简单重复应用，请直接返回一个空的 JSON 对象 `{}`。这是控制知识库质量的关键。
+                - 【**最重要**】如果本次对话内容非常简单、属于日常寒暄、没有包含任何新的、有价值的、值得长期记忆的知识点，或只是对已有知识的简单重复应用，请直接返回一个空的 JSON 对象 `{}`。这是控制记忆库质量的关键。
                 - `main`: 这是AI学到的核心知识，作为一个中心记忆节点。它的 `title` 和 `content` 应该聚焦于知识本身，而不是用户的提问行为。
                 - `folder_path`: 为所有新知识指定一个有意义的、层级化的文件夹路径。尽量复用已有的文件夹。如果实体与`main`主题紧密相关，它们的`folder_path`应该一致。
                 - `new`: 【极其重要】为每个提取的实体做出判断。如果它与提供的“已有记忆”列表中的某一项实质上是同一个东西，必须在数组的第5个元素提供已有记忆的标题。否则，此元素的值必须是 JSON null。
-                - `update`: **【优先更新】** 你的首要任务是维护一个准确、丰富的知识库。当新信息可以改进现有记忆时（无论是纠正错误、补充细节、还是提供更新的视角），请大胆地使用此字段进行更新。**优先更新和合并，而不是创建大量相似或零散的新记忆。** 如果你认为新信息影响了某条记忆的【可信度】或【重要性】，请务必在数组的第4和第5个元素中给出新的评估值。
-                - `merge`: **【合并相似项】** 当你发现多个现有记忆（在`$existingMemoriesPrompt`中提供）实际上描述的是同一个核心概念时，使用此字段将它们合并成一个更完整、更准确的单一记忆。这对于保持知识库的整洁至关重要。
+                - `update`: **【优先更新】** 你的首要任务是维护一个准确、丰富的记忆库。当新信息可以**实质性地**改进现有记忆时（纠正错误、补充重要细节、提供全新视角），请使用此字段进行更新。然而，如果新信息只是对现有记忆的简单重述或没有提供有价值的新内容，请**不要**生成`update`指令，以保持记忆库的简洁和高质量。**优先更新和合并，而不是创建大量相似或零散的新记忆。** 如果你认为新信息影响了某条记忆的【可信度】或【重要性】，请务必在数组的第4和第5个元素中给出新的评估值。
+                - 【**冲突解决**】: `update` 和 `main` 是互斥的。如果对话的核心是**更新**一个现有概念，请**只使用 `update`**，并将 `main` 设置为 `null`。**绝对不要**在一次返回中同时使用 `update` 和 `main`。
+                - `merge`: **【合并相似项】** 当你发现多个现有记忆（在`${existingMemoriesPrompt.take(1000)}...`中提供）实际上描述的是同一个核心概念时，使用此字段将它们合并成一个更完整、更准确的单一记忆。这对于保持记忆库的整洁至关重要。
                 - `links`: 定义实体之间的关系。`source_title` 和 `target_title` 必须对应 `main` 或 `new` 中的实体标题。关系类型 (type) 应该使用大写字母和下划线 (e.g., `IS_A`, `PART_OF`, `LEADS_TO`)。`weight` 字段表示关系的强度 (0.0-1.0)，【强烈推荐】只使用以下三个标准值：
                   - `1.0`: 代表强关联 (例如: "A 是 B 的一部分", "A 导致了 B")
                   - `0.7`: 代表中等关联 (例如: "A 和 B 相关", "A 影响了 B")
@@ -632,11 +644,8 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
      */
     private fun parseAnalysisResult(jsonString: String): ParsedAnalysis {
         return try {
-            val cleanJson = jsonString.trim().let {
-                val startIndex = it.indexOf("{")
-                val endIndex = it.lastIndexOf("}")
-                if (startIndex >= 0 && endIndex > startIndex) it.substring(startIndex, endIndex + 1) else return ParsedAnalysis(null)
-            }
+            val cleanJson = ChatUtils.extractJson(jsonString)
+            if (cleanJson.isEmpty() || !cleanJson.startsWith("{")) return ParsedAnalysis(null)
 
             // Handle the case where AI decides not to extract any knowledge
             if (cleanJson == "{}") {
@@ -644,6 +653,9 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
             }
 
             val json = JSONObject(cleanJson)
+            
+            // 【新增】输出 AI 返回的完整 JSON 指令
+            Log.d(TAG, "AI 返回的完整 JSON 指令:\n${json.toString(2)}")
 
             // Parse main_problem from "main" array
             val mainProblem = json.optJSONArray("main")?.let {
@@ -834,4 +846,5 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
             "<tool_result $attributes>[...工具结果已省略...]</tool_result>"
         }
     }
+
 }
