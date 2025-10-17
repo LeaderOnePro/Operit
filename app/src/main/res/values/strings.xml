@@ -2550,10 +2550,12 @@
     <string name="tags">标签</string>
     <string name="old_config">旧配置</string>
     <string name="save_successful">保存成功</string>
+    <string name="duplicate_successful">创建副本成功</string>
     <string name="character_card_management">角色卡管理</string>
     <string name="create_new">新建</string>
     <string name="ai_creation">AI创作</string>
     <string name="edit">编辑</string>
+    <string name="duplicate">创建副本</string>
     <string name="delete">删除</string>
     <string name="character_setting_preview">角色设定：%1$s...</string>
     <string name="other_content_preview">其他内容：%1$s...</string>
