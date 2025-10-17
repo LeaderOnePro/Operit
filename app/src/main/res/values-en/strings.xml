@@ -2530,10 +2530,12 @@
     <string name="tags">Tags</string>
     <string name="old_config">Old Config</string>
     <string name="save_successful">Save successful</string>
+    <string name="duplicate_successful">Duplicate created successfully</string>
     <string name="character_card_management">Card Management</string>
     <string name="create_new">Create</string>
     <string name="ai_creation">AI Creation</string>
     <string name="edit">Edit</string>
+    <string name="duplicate">Duplicate</string>
     <string name="delete">Delete</string>
     <string name="character_setting_preview">Character Setting: %1$s...</string>
     <string name="other_content_preview">Other Content: %1$s...</string>

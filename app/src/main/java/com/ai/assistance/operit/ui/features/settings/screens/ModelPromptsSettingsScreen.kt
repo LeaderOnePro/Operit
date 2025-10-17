@@ -59,16 +59,17 @@ fun ModelPromptsSettingsScreen(
     val scope = rememberCoroutineScope()
     var showTagSavedHighlight by remember { mutableStateOf(false) }
     var showSaveSuccessMessage by remember { mutableStateOf(false) }
-    
+    var showDuplicateSuccessMessage by remember { mutableStateOf(false) }
+
     // 管理器
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val promptTagManager = remember { PromptTagManager.getInstance(context) }
     val oldPromptPreferencesManager = remember { PromptPreferencesManager(context) }
     val userPreferencesManager = remember { UserPreferencesManager(context) }
-    
+
     // 获取当前活跃角色卡ID
     val activeCharacterCardId by characterCardManager.activeCharacterCardIdFlow.collectAsState(initial = "")
-    
+
     // 状态
     var currentTab by remember { mutableStateOf(0) } // 0: 角色卡, 1: 标签, 2: 旧配置
     var refreshTrigger by remember { mutableStateOf(0) }
@@ -78,12 +79,12 @@ fun ModelPromptsSettingsScreen(
     var showAddCharacterCardDialog by remember { mutableStateOf(false) }
     var showEditCharacterCardDialog by remember { mutableStateOf(false) }
     var editingCharacterCard by remember { mutableStateOf<CharacterCard?>(null) }
-    
+
     // 删除确认对话框状态
     var showDeleteCharacterCardConfirm by remember { mutableStateOf(false) }
     var deletingCharacterCardId by remember { mutableStateOf("") }
     var deletingCharacterCardName by remember { mutableStateOf("") }
-    
+
     // 酒馆角色卡导入相关状态
     var showImportSuccessMessage by remember { mutableStateOf(false) }
     var showImportErrorMessage by remember { mutableStateOf(false) }
@@ -100,7 +101,7 @@ fun ModelPromptsSettingsScreen(
                         if (internalUri != null) {
                             userPreferencesManager.saveAiAvatarForCharacterCard(card.id, internalUri.toString())
                             Toast.makeText(context, context.getString(R.string.avatar_updated), Toast.LENGTH_SHORT).show()
-                            refreshTrigger++ 
+                            refreshTrigger++
                         } else {
                             Toast.makeText(context, context.getString(R.string.theme_copy_failed), Toast.LENGTH_LONG).show()
                         }
@@ -196,7 +197,7 @@ fun ModelPromptsSettingsScreen(
             }
         }
     }
-    
+
     // 标签相关状态
     val allTags by promptTagManager.allTagsFlow.collectAsState(initial = emptyList())
     var showAddTagDialog by remember { mutableStateOf(false) }
@@ -212,12 +213,12 @@ fun ModelPromptsSettingsScreen(
     val oldProfileList by oldPromptPreferencesManager.profileListFlow.collectAsState(initial = emptyList())
     var showOldConfigDialog by remember { mutableStateOf(false) }
     var selectedOldProfileId by remember { mutableStateOf("") }
-    
+
     // 初始化
     LaunchedEffect(Unit) {
         characterCardManager.initializeIfNeeded()
     }
-    
+
     // 获取所有角色卡
     var allCharacterCards by remember { mutableStateOf(emptyList<CharacterCard>()) }
     LaunchedEffect(characterCardList, refreshTrigger) {
@@ -226,7 +227,7 @@ fun ModelPromptsSettingsScreen(
             allCharacterCards = cards
         }
     }
-    
+
     // 保存角色卡
     fun saveCharacterCard() {
         editingCharacterCard?.let { card ->
@@ -287,14 +288,14 @@ fun ModelPromptsSettingsScreen(
             refreshTrigger++
         }
     }
-    
+
     // 显示删除角色卡确认对话框
     fun showDeleteCharacterCardConfirm(id: String, name: String) {
         deletingCharacterCardId = id
         deletingCharacterCardName = name
         showDeleteCharacterCardConfirm = true
     }
-    
+
     // 确认删除角色卡
     fun confirmDeleteCharacterCard() {
         scope.launch {
@@ -305,21 +306,36 @@ fun ModelPromptsSettingsScreen(
             refreshTrigger++
         }
     }
-    
+
+    // 复制角色卡
+    fun duplicateCharacterCard(card: CharacterCard) {
+        scope.launch {
+            val duplicatedCard = card.copy(
+                id = "", // 将由createCharacterCard生成新ID
+                name = "${card.name} (副本)",
+                isDefault = false
+            )
+            val newCardId = characterCardManager.createCharacterCard(duplicatedCard)
+            userPreferencesManager.saveCustomChatTitleForCharacterCard(newCardId, duplicatedCard.name.ifEmpty { null })
+            showDuplicateSuccessMessage = true
+            refreshTrigger++
+        }
+    }
+
     // 删除标签
     fun deleteTag(id: String) {
         scope.launch {
             promptTagManager.deletePromptTag(id)
             }
         }
-    
+
     // 显示删除标签确认对话框
     fun showDeleteTagConfirm(id: String, name: String) {
         deletingTagId = id
         deletingTagName = name
         showDeleteTagConfirm = true
     }
-    
+
     // 确认删除标签
     fun confirmDeleteTag() {
         scope.launch {
@@ -329,7 +345,7 @@ fun ModelPromptsSettingsScreen(
             deletingTagName = ""
         }
     }
-    
+
     CustomScaffold() { paddingValues ->
         Box(
             modifier = Modifier
@@ -418,6 +434,7 @@ fun ModelPromptsSettingsScreen(
                             showEditCharacterCardDialog = true
                         },
                         onDeleteCharacterCard = { card -> showDeleteCharacterCardConfirm(card.id, card.name) },
+                        onDuplicateCharacterCard = { card -> duplicateCharacterCard(card) },
                         onSetActiveCharacterCard = { cardId ->
                             scope.launch {
                                 characterCardManager.setActiveCharacterCard(cardId)
@@ -457,14 +474,14 @@ fun ModelPromptsSettingsScreen(
                     )
                 }
             }
-            
-                        // 成功保存消息
+
+            // 成功保存消息
             if (showSaveSuccessMessage) {
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(1500)
                     showSaveSuccessMessage = false
                 }
-                
+
                 Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -495,14 +512,52 @@ fun ModelPromptsSettingsScreen(
                                 }
                             }
                         }
-                        
+
+            // 创建副本成功消息
+            if (showDuplicateSuccessMessage) {
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(1500)
+                    showDuplicateSuccessMessage = false
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.duplicate_successful),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
             // 导入成功消息
             if (showImportSuccessMessage) {
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(2000)
                     showImportSuccessMessage = false
                 }
-                
+
                 Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -533,14 +588,14 @@ fun ModelPromptsSettingsScreen(
                     }
                 }
             }
-            
+
             // 导入失败消息
             if (showImportErrorMessage) {
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(3000)
                     showImportErrorMessage = false
                 }
-                
+
                 Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -618,7 +673,7 @@ fun ModelPromptsSettingsScreen(
             }
         )
     }
-    
+
     // 编辑角色卡对话框
     if (showEditCharacterCardDialog) {
         CharacterCardDialog(
@@ -654,7 +709,7 @@ fun ModelPromptsSettingsScreen(
             }
         )
                         }
-                        
+
     // 新建标签对话框
     if (showAddTagDialog) {
         TagDialog(
@@ -675,7 +730,7 @@ fun ModelPromptsSettingsScreen(
             }
         )
     }
-    
+
     // 编辑标签对话框
     if (showEditTagDialog) {
         TagDialog(
@@ -696,7 +751,7 @@ fun ModelPromptsSettingsScreen(
             }
         )
     }
-    
+
     // 旧配置查看对话框
     if (showOldConfigDialog) {
         OldConfigDialog(
@@ -708,11 +763,11 @@ fun ModelPromptsSettingsScreen(
                                         }
         )
     }
-    
+
     // 删除角色卡确认对话框
     if (showDeleteCharacterCardConfirm) {
         AlertDialog(
-            onDismissRequest = { 
+            onDismissRequest = {
                 showDeleteCharacterCardConfirm = false
                 deletingCharacterCardId = ""
                 deletingCharacterCardName = ""
@@ -728,7 +783,7 @@ fun ModelPromptsSettingsScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { 
+                    onClick = {
                         showDeleteCharacterCardConfirm = false
                         deletingCharacterCardId = ""
                         deletingCharacterCardName = ""
@@ -739,11 +794,11 @@ fun ModelPromptsSettingsScreen(
             }
         )
     }
-    
+
     // 删除标签确认对话框
     if (showDeleteTagConfirm) {
         AlertDialog(
-            onDismissRequest = { 
+            onDismissRequest = {
                 showDeleteTagConfirm = false
                 deletingTagId = ""
                 deletingTagName = ""
@@ -759,7 +814,7 @@ fun ModelPromptsSettingsScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { 
+                    onClick = {
                         showDeleteTagConfirm = false
                         deletingTagId = ""
                         deletingTagName = ""
@@ -770,7 +825,7 @@ fun ModelPromptsSettingsScreen(
             }
         )
     }
-    
+
     // 手动添加标签成功的高亮提示（底部显著提示，1.5s 自动消失）
     if (showTagSavedHighlight) {
         LaunchedEffect(Unit) {
@@ -810,6 +865,7 @@ fun CharacterCardTab(
     onAddCharacterCard: () -> Unit,
     onEditCharacterCard: (CharacterCard) -> Unit,
     onDeleteCharacterCard: (CharacterCard) -> Unit,
+    onDuplicateCharacterCard: (CharacterCard) -> Unit,
     onSetActiveCharacterCard: (String) -> Unit,
     onNavigateToPersonaGeneration: () -> Unit,
     onImportTavernCard: () -> Unit
@@ -844,9 +900,9 @@ fun CharacterCardTab(
                         Text(stringResource(R.string.create_new), fontSize = 13.sp)
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 // 第二行：功能按钮
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -859,7 +915,7 @@ fun CharacterCardTab(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(stringResource(R.string.ai_creation), fontSize = 12.sp)
                     }
-                    
+
                     OutlinedButton(
                         onClick = onImportTavernCard,
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
@@ -880,6 +936,7 @@ fun CharacterCardTab(
                 allTags = allTags,
                 onEdit = { onEditCharacterCard(characterCard) },
                 onDelete = { onDeleteCharacterCard(characterCard) },
+                onDuplicate = { onDuplicateCharacterCard(characterCard) },
                 onSetActive = { onSetActiveCharacterCard(characterCard.id) }
             )
         }
@@ -895,6 +952,7 @@ fun CharacterCardItem(
     allTags: List<PromptTag>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
     onSetActive: () -> Unit
 ) {
                         Card(
@@ -929,12 +987,12 @@ fun CharacterCardItem(
                             AssistChip(
                                 onClick = { },
                                 label = { Text(stringResource(R.string.currently_active), fontSize = 10.sp) },
-                                leadingIcon = { 
+                                leadingIcon = {
                                     Icon(
-                                        Icons.Default.Check, 
-                                        contentDescription = stringResource(R.string.currently_active), 
+                                        Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.currently_active),
                                         modifier = Modifier.size(14.dp)
-                                    ) 
+                                    )
                                 },
                                 modifier = Modifier.height(24.dp)
                             )
@@ -949,7 +1007,7 @@ fun CharacterCardItem(
                         )
                     }
                 }
-                
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -968,7 +1026,13 @@ fun CharacterCardItem(
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit), modifier = Modifier.size(16.dp))
                     }
-                    
+                    IconButton(
+                        onClick = onDuplicate,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.duplicate), modifier = Modifier.size(16.dp))
+                    }
+
                     if (!characterCard.isDefault) {
                         IconButton(
                             onClick = onDelete,
@@ -979,7 +1043,7 @@ fun CharacterCardItem(
                     }
                 }
             }
-            
+
             // 角色设定预览
             if (characterCard.characterSetting.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -990,7 +1054,7 @@ fun CharacterCardItem(
                     fontSize = 11.sp
                 )
             }
-            
+
             // 其他内容预览
             if (characterCard.otherContent.isNotBlank()) {
                                     Text(
@@ -1000,7 +1064,7 @@ fun CharacterCardItem(
                     fontSize = 11.sp
                 )
             }
-            
+
             // 附着的标签
             if (characterCard.attachedTagIds.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1031,7 +1095,7 @@ fun CharacterCardItem(
                     }
                 }
             }
-            
+
             // 高级自定义提示词预览
             if (characterCard.advancedCustomPrompt.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -1085,9 +1149,9 @@ fun TagTab(
                         Text(stringResource(R.string.create_new_tag), fontSize = 13.sp)
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 // 第二行：标签市场按钮
                 OutlinedButton(
                     onClick = onNavigateToMarket,
@@ -1099,7 +1163,7 @@ fun TagTab(
                 }
             }
         }
-        
+
         // 系统标签
         val systemTags = tags.filter { it.isSystemTag }
         if (systemTags.isNotEmpty()) {
@@ -1111,7 +1175,7 @@ fun TagTab(
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                 )
             }
-            
+
             items(systemTags) { tag ->
                 TagItem(
                     tag = tag,
@@ -1120,7 +1184,7 @@ fun TagTab(
                 )
             }
         }
-        
+
         // 自定义标签
         val customTags = tags.filter { !it.isSystemTag }
         if (customTags.isNotEmpty()) {
@@ -1132,7 +1196,7 @@ fun TagTab(
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                 )
             }
-            
+
             items(customTags) { tag ->
                 TagItem(
                     tag = tag,
@@ -1155,9 +1219,9 @@ fun TagItem(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (tag.isSystemTag) 
-                MaterialTheme.colorScheme.secondaryContainer 
-            else 
+            containerColor = if (tag.isSystemTag)
+                MaterialTheme.colorScheme.secondaryContainer
+            else
                 MaterialTheme.colorScheme.surface
         )
     ) {
@@ -1200,7 +1264,7 @@ fun TagItem(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit), modifier = Modifier.size(16.dp))
                 }
-                
+
                 if (!tag.isSystemTag) {
                     IconButton(
                         onClick = onDelete,
@@ -1231,7 +1295,7 @@ fun OldConfigTab(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
-            
+
                                                         Text(
                 text = stringResource(R.string.old_prompt_config_desc),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1240,7 +1304,7 @@ fun OldConfigTab(
                 fontSize = 13.sp
             )
         }
-        
+
         items(profileList) { profileId ->
             OldConfigItem(
                 profileId = profileId,
@@ -1261,7 +1325,7 @@ fun OldConfigItem(
     val profile by promptPreferencesManager.getPromptProfileFlow(profileId).collectAsState(
         initial = null
     )
-    
+
     profile?.let { promptProfile ->
         Card(
                                             modifier = Modifier.fillMaxWidth(),
@@ -1290,7 +1354,7 @@ fun OldConfigItem(
                         )
                     }
                 }
-                
+
                             Icon(
                     Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = stringResource(R.string.view_details),
@@ -1312,7 +1376,7 @@ fun TagDialog(
     var name by remember { mutableStateOf(tag.name) }
     var description by remember { mutableStateOf(tag.description) }
     var promptContent by remember { mutableStateOf(tag.promptContent) }
-    
+
         AlertDialog(
         onDismissRequest = onDismiss,
             title = {
@@ -1335,14 +1399,14 @@ fun TagDialog(
                     label = { Text(stringResource(R.string.tag_name)) },
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(stringResource(R.string.description_optional)) },
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 OutlinedTextField(
                     value = promptContent,
                     onValueChange = { promptContent = it },
@@ -1387,7 +1451,7 @@ fun OldConfigDialog(
     val profile by promptPreferencesManager.getPromptProfileFlow(profileId).collectAsState(
         initial = null
     )
-    
+
     // 复制到剪贴板的函数
     fun copyToClipboard(text: String, label: String) {
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -1395,7 +1459,7 @@ fun OldConfigDialog(
         clipboard.setPrimaryClip(clip)
         // 这里可以添加一个 Toast 提示，但为了简洁我们先不添加
     }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1418,7 +1482,7 @@ fun OldConfigDialog(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium
                     )
-                    
+
                     if (promptProfile.introPrompt.isNotBlank()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1456,7 +1520,7 @@ fun OldConfigDialog(
                             }
                         }
                     }
-                    
+
                     if (promptProfile.tonePrompt.isNotBlank()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1505,7 +1569,7 @@ fun OldConfigDialog(
                             append(stringResource(R.string.tone_prompt_label) + "\n${promptProfile.tonePrompt}")
                         }
                     }
-                    
+
                     OutlinedButton(
                         onClick = { copyToClipboard(allContent, context.getString(R.string.old_config_details)) },
                         modifier = Modifier.fillMaxWidth(),
@@ -1519,7 +1583,7 @@ fun OldConfigDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(stringResource(R.string.copy_all_content), fontSize = 14.sp)
                     }
-        
+
         Text(
                         text = stringResource(R.string.old_config_usage_tip),
             style = MaterialTheme.typography.bodySmall,
