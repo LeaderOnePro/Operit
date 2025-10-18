@@ -28,6 +28,8 @@ app/src/main/assets/pets
 .cursor
 .vscode
 .kotlin
+.windsurf
 
 tmp
 AGENTS.md
+kls_database.db

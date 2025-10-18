@@ -2908,5 +2908,6 @@
     <string name="currently_generating">Generating…</string>
     <string name="describe_character_hint">Describe the character you want…</string>
     <string name="character_card_complete">🎉 Character card generation complete! All information has been saved.</string>
+    <string name="confirm_clear_chat_history">Are you sure you want to clear the chat history for the current character card? This action cannot be undone.</string>
 
 </resources>
