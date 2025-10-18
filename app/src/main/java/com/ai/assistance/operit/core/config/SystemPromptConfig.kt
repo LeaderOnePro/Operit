@@ -83,43 +83,41 @@ File System Tools:
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
 - apply_file: Applies precise, line-number-based edits to a file.
   - **How it works**: You will be given files with line numbers (e.g., "123| code"). You must generate a patch using the structured format below to modify the file.
-  - **CRITICAL RULE 1: CONTEXT IS FOR UNAMBIGUOUS TARGETING**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its purpose is to help the system **unambiguously** locate the target code, especially if line numbers have shifted. The context should contain a combination of surrounding code snippets and/or precise descriptions. It does not have to be the exact, complete original code, but it **MUST** be unique and clear enough to prevent any misidentification. A good practice is to describe the function/block you are editing and include the code lines, or a description of those lines, immediately preceding and following the change.
+  - **CRITICAL RULE 1: CONTEXT BLOCK MUST CONTAIN VERBATIM CODE**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its **sole** purpose is to provide a code "anchor" for the system to locate the target precisely, even if line numbers have shifted.
+    - **Strict Requirement**: The `[CONTEXT]` block **MUST** only contain **verbatim, character-for-character identical lines of code** from the source file.
+    - **Forbidden**: **DO NOT** include any descriptive text, comments, or explanations inside the `[CONTEXT]` block. Any non-source-code content will cause the operation to fail.
+    - **Targeting Logic**:
+        - For `REPLACE` and `DELETE`, the context should contain the **first line (or first few lines)** of the code block defined by `start-end`. This serves as a precise anchor. The system will then operate on the full line range you provide. Providing just enough lines to make the anchor unique is the best practice.
+        - For `INSERT`, the context **is the single line of code at the line number specified** (i.e., line `N` for `after_line=N`).
   - **CRITICAL RULE 2: SYNTAX**: Control tags like `[START-REPLACE]`, `[CONTEXT]`, etc., must be commented out (e.g., `// [START-REPLACE:1-5]`). The code you provide for insertion or replacement, however, must be the raw, pure code without any line numbers or comment prefixes.
 
   - **Operations**:
-    - **Replace**: `// [START-REPLACE:start-end]` (Inclusive range. Removes lines from start to end, then inserts new code at the original position of the start line).
+    - **Replace**: `// [START-REPLACE:start-end]` (Inclusive range. Replaces the code specified in `[CONTEXT]`).
     // [CONTEXT]
-    // Description: In `renderUserProfile`, replacing the old, complex rendering logic.
-    // Preceded by: `function renderUserProfile(user) {`
     const container = document.getElementById('profile');
-    // ... many lines of old rendering logic ...
-    container.appendChild(element);
-    // Followed by: `}` (the closing brace of the function)
     // [/CONTEXT]
     ... new code ...
     // [END-REPLACE]
     - **Insert**: `// [START-INSERT:after_line=N]` (Inserts new code *after* line N).
     // [CONTEXT]
-    // Description: In `createUser`, inserting a logging statement after creating the user object.
-    // The line at N is: `const user = { name, email };`
+    const user = { name, email };
     // [/CONTEXT]
     ... new code to insert ...
     // [END-INSERT]
-    - **Delete**: `// [START-DELETE:start-end]` (Inclusive range. Removes lines from start to end).
+    - **Delete**: `// [START-DELETE:start-end]` (Inclusive range. Deletes the code specified in `[CONTEXT]`).
     // [CONTEXT]
-    // Description: Removing the deprecated and very long `calculateLegacyReport` function.
-    // Preceded by a comment block.
     function calculateLegacyReport(data) {
-      // ... numerous lines of complex logic ...
+      // ... all lines of the function to be deleted ...
       return report;
     }
-    // Followed by: `function generateNewReport(data) {`
     // [/CONTEXT]
     // [END-DELETE]
 
   - **Best Practices & Common Pitfalls**:
+    - **Inserting at the Start of a File**: To insert code at the very beginning of a file, use `// [START-INSERT:after_line=0]`. The `[CONTEXT]` block should then contain the file's current first line of code.
+    - **Appending to the End of a File**: To append code to the end of a file that has `L` lines, use `// [START-INSERT:after_line=L]`. The `[CONTEXT]` block should contain the file's current last line of code (line `L`).
+    - **Uniqueness**: The context you provide must be unique within the source file. If it's not, expand the context by including more surrounding lines until it becomes unique.
     - **Handling Whitespace**: Be extremely precise with whitespace and blank lines. When deleting a function or a code block, it's often necessary to include the surrounding blank lines in your `DELETE` range to avoid leaving awkward double blank lines or squashing code together.
-    - **Example of Deleting a Function**: Imagine a function from lines 28-30, with a blank line before it (27) and after it (31). To remove the function and the blank line *after* it, use `// [START-DELETE:28-31]`. To remove the function and *both* blank lines, use `// [START-DELETE:27-31]`. Think carefully about the desired final formatting.
     - **Combining Edits**: You can and should provide multiple edit blocks in a single `apply_file` call for efficiency. The system processes them in a way that handles shifting line numbers.
     - **Full Content**: For full replacement, provide the full file content without any special blocks.
 
@@ -171,43 +169,41 @@ Note: The memory library and user personality profile are automatically updated 
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
 - apply_file: 对文件进行精确的、基于行号的编辑。
   - **工作原理**: 你会收到带行号的文件内容 (例如 "123| code")。你必须使用下述结构化格式生成补丁来修改文件。
-  - **关键规则1: 上下文必须用于无歧义定位**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的目的是帮助系统在行号可能发生变动的情况下，依然能够**无歧义地**定位到目标代码。上下文内容应为周围代码片段和/或对代码的精确描述的组合。它不必是逐字逐句的、完整的原始代码，但**必须**足够独特和清晰，以消除任何可能的定位错误。一个好的实践是：描述你正在编辑的函数或代码块，并附上紧邻修改点之前和之后的代码行或者描述。
+  - **关键规则1: 上下文块必须包含逐字代码**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的**唯一**目的，是为系统提供一个代码“锚点”，以便在行号变化时也能精确定位。
+    - **严格要求**: `[CONTEXT]` 块内部**必须**只包含源文件中**逐字逐句、完全相同**的代码行。
+    - **禁止**: **严禁**在 `[CONTEXT]` 块中加入任何描述性文字、注释、或者对代码的解释。任何非源代码内容都会导致定位失败。
+    - **定位逻辑**:
+        - 对于 `REPLACE` 和 `DELETE` 操作，上下文应包含由 `起始-结束` 行号定义的**代码块的开头一行（或几行）**。这是一个精确定位锚点。系统随后将按你提供的完整行号范围执行操作。通常提供足以保证锚点唯一性的代码行即可。
+        - 对于 `INSERT` 操作，上下文**就是指定行号上的那一行代码**（即 `after_line=N` 中的第 `N` 行）。
   - **关键规则2: 语法**: 像 `[START-REPLACE]`, `[CONTEXT]` 这样的控制标签必须以注释形式出现 (例如 `// [START-REPLACE:1-5]`)。然而，你在标签之间提供的用于插入或替换的代码，必须是**不带行号或注释前缀的纯粹的原始代码**。
 
   - **操作指令**:
-    - **替换**: `// [START-REPLACE:起始-结束]` (范围是闭区间。移除从起始到结束的所有行，然后将新代码插入到起始行的原始位置)。
+    - **替换**: `// [START-REPLACE:起始-结束]` (范围是闭区间。替换 `[CONTEXT]` 中指定的代码)。
     // [CONTEXT]
-    // 描述：在 `renderUserProfile` 函数中，替换其内部旧的、复杂的渲染逻辑。
-    // 前一行是: `function renderUserProfile(user) {`
     const container = document.getElementById('profile');
-    // ... 大量旧的渲染逻辑代码 ...
-    container.appendChild(element);
-    // 后一行是: `}` (函数的结束括号)
     // [/CONTEXT]
     ... 新代码 ...
     // [END-REPLACE]
     - **插入**: `// [START-INSERT:after_line=N]` (在第 N 行*之后*插入新代码)。
     // [CONTEXT]
-    // 描述：在 `createUser` 函数中，创建用户对象后插入一条日志记录。
-    // 第 N 行是: `const user = { name, email };`
+    const user = { name, email };
     // [/CONTEXT]
     ... 要插入的新代码 ...
     // [END-INSERT]
-    - **删除**: `// [START-DELETE:起始-结束]` (范围是闭区间。移除从起始到结束的所有行)。
+    - **删除**: `// [START-DELETE:起始-结束]` (范围是闭区间。删除 `[CONTEXT]` 中指定的代码)。
     // [CONTEXT]
-    // 描述：移除已废弃且很长的 `calculateLegacyReport` 函数。
-    // 前面是一个注释块。
     function calculateLegacyReport(data) {
-      // ... 大量复杂的逻辑代码 ...
+      // ... all lines of the function to be deleted ...
       return report;
     }
-    // 后面是: `function generateNewReport(data) {`
     // [/CONTEXT]
     // [END-DELETE]
 
   - **最佳实践与常见陷阱**:
+    - **文件开头插入**: 要在文件最开头插入代码，使用 `// [START-INSERT:after_line=0]`。`[CONTEXT]` 块应包含文件当前的第一行代码。
+    - **文件末尾追加**: 要在文件末尾追加代码，假设文件共有 `L` 行，使用 `// [START-INSERT:after_line=L]`。`[CONTEXT]` 块应包含文件当前的最后一行（即第 `L` 行）代码。
+    - **唯一性**: 你提供的上下文必须在源文件中是唯一的。如果不是，请扩大上下文范围（增加更多行），直到它变得唯一为止。
     - **处理空白行**: 对待空白行和缩进必须极其精确。当删除一个函数或一个代码块时，通常需要将周围的空行也包含在 `DELETE` 的范围内，以避免留下尴尬的双重空行或导致代码紧贴在一起，破坏格式。
-    - **删除函数示例**: 假设一个函数体在 28-30 行，其前后各有一个空行 (第27和31行)。要删除该函数及其**后面**的空行，应使用 `// [START-DELETE:28-31]`。如果要同时删除函数及其**前后**的两个空行，则使用 `// [START-DELETE:27-31]`。请仔细思考你期望的最终代码格式。
     - **合并编辑**: 为了效率，你应该在单次 `apply_file` 调用中提供多个编辑块。系统会处理行号动态变化的问题。
     - **完整内容**: 若要完整替换，直接提供完整文件内容，不要使用特殊块。
 

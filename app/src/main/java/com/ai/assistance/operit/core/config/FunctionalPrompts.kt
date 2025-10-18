@@ -116,25 +116,46 @@ You will be given:
 5.  Output **ONLY** the mapping block.
 
 **CRITICAL RULES:**
-- **Your output MUST start directly with `// [MAPPING]` or `// [MAPPING-FAILED]`. No other text, explanation, or preamble is allowed.**
+- **Your output MUST start with one of the following markers: `[MAPPING]`, `[MAPPING-FAILED]`, or `[MAPPING-SYNTAX-ERROR]`. No other text or preamble is allowed before the marker.**
+- **Syntax Validation First**: Before searching for context, validate the `Patch Code`'s syntax. If an edit block is malformed (e.g., missing `[CONTEXT]`, `[END-...]`, or has mismatched tags), you must report a syntax error.
 - The `[CONTEXT]` block is your ground truth for finding the location. Ignore the line numbers in the original `[START-...]` tag; they are likely wrong.
 - For `INSERT:after_line=N` operations, the context is the line you need to insert after. Your corrected mapping **MUST** use the exact format `INSERT:after_line=new_line_number`. **Using a colon (:) or any other separator instead of an equals sign (=) is strictly forbidden.**
 - For `REPLACE` and `DELETE`, find the full context block. Your corrected mapping should be `REPLACE:new_start-new_end` or `DELETE:new_start-new_end`. The line range must be inclusive, covering the first and last lines of the matched context block.
-- If you find the context successfully, output the mapping in the specified format.
-- If you **cannot** find the exact context for **ANY** of the blocks in the `Source Code`, discard everything and output ONLY the failure marker: `// [MAPPING-FAILED]`
+- If you find the context successfully, output the mapping block.
+- If the patch syntax is valid but you cannot find the exact context for one or more blocks, you MUST output a failure report. It must start with `[MAPPING-FAILED]`, followed by a concise explanation of which context block(s) could not be found and why. Be specific about the context that failed.
+- If the patch syntax is invalid, output a syntax error report. It must start with `[MAPPING-SYNTAX-ERROR]`, followed by a short explanation of the problem and an example of the correct format.
 
 **EXAMPLE MAPPING OUTPUT:**
-// [MAPPING]
-// REPLACE:10-15 -> REPLACE:112-117
-// INSERT:after_line=20 -> INSERT:after_line=122
-// DELETE:30-32 -> DELETE:132-134
-// [/MAPPING]
+[MAPPING]
+REPLACE:10-15 -> REPLACE:112-117
+INSERT:after_line=20 -> INSERT:after_line=122
+DELETE:30-32 -> DELETE:132-134
+[/MAPPING]
+
+**EXAMPLE MAPPING FAILED OUTPUT:**
+[MAPPING-FAILED]
+I could not find the exact context for the `REPLACE:35-40` block in the source code. The context provided was:
+```
+// [CONTEXT]
+val service = multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
+// [/CONTEXT]
+```
+This snippet might have been modified, or it might not be unique within the provided source. Please review the file's current content.
+
+**EXAMPLE SYNTAX ERROR OUTPUT:**
+[MAPPING-SYNTAX-ERROR]
+Malformed block: Missing '[/CONTEXT]' tag.
+A correct block must include a context section. Example:
+// [START-REPLACE:1-1]
+// [CONTEXT]
+// ... context content ...
+// [/CONTEXT]
+// [END-REPLACE]
 
 **Source Code:**
 ```
 {{SOURCE_CODE}}
 ```
-
 **Patch Code:**
 ```
 {{PATCH_CODE}}

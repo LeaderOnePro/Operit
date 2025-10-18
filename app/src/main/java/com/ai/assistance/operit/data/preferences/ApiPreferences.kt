@@ -732,9 +732,19 @@ class ApiPreferences private constructor(private val context: Context) {
         return preferences[MAX_HTTP_RESPONSE_LENGTH] ?: DEFAULT_MAX_HTTP_RESPONSE_LENGTH
     }
 
-    // 重置所有截断设置为默认值
-    suspend fun resetTruncationSettings() {
+    // 重置上下文、总结和截断设置为默认值
+    suspend fun resetContextSummaryAndTruncationSettings() {
         context.apiDataStore.edit { preferences ->
+            // Context Settings
+            preferences[CONTEXT_LENGTH] = DEFAULT_CONTEXT_LENGTH
+
+            // Summary Settings
+            preferences[ENABLE_SUMMARY] = DEFAULT_ENABLE_SUMMARY
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
+            preferences[SUMMARY_TOKEN_THRESHOLD] = DEFAULT_SUMMARY_TOKEN_THRESHOLD
+
+            // Truncation Settings
             preferences[MAX_FILE_SIZE_BYTES] = DEFAULT_MAX_FILE_SIZE_BYTES
             preferences[PART_SIZE] = DEFAULT_PART_SIZE
             preferences[MAX_TEXT_RESULT_LENGTH] = DEFAULT_MAX_TEXT_RESULT_LENGTH

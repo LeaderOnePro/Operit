@@ -41,6 +41,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
+import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 
 /**
@@ -2174,68 +2175,59 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 ))
                         )
 
-                // 如果文件不存在，直接写入内容而不是合并
                 if (!fileExistsResult.success ||
                                 !(fileExistsResult.result as FileExistsData).exists
                 ) {
+                        // 文件不存在，直接创建并写入内容
+                        Log.d(TAG, "File does not exist. Creating new file '$path'...")
                         emit(
-                                ToolResult(
-                                        toolName = tool.name,
-                                        success = true,
-                                        result =
-                                                StringResultData(
-                                                        "File does not exist. Creating new file '$path'..."
-                                                )
-                                )
+                            ToolResult(
+                                toolName = tool.name,
+                                success = true,
+                                result = StringResultData("File does not exist. Creating new file '$path'...")
+                            )
                         )
 
-                        // 直接调用writeFile写入内容
-                        val writeResult =
-                                writeFile(
-                                        AITool(
-                                                name = "write_file",
-                                                parameters =
-                                                        listOf(
-                                                                ToolParameter("path", path),
-                                                                ToolParameter(
-                                                                        "content",
-                                                                        aiGeneratedCode
-                                                                ),
-                                                                ToolParameter("append", "false"),
-                                                                ToolParameter("environment", environment ?: "")
-                                                        )
-                                        )
+                        val writeResult = writeFile(
+                            AITool(
+                                name = "write_file",
+                                parameters = listOf(
+                                    ToolParameter("path", path),
+                                    ToolParameter("content", aiGeneratedCode),
+                                    ToolParameter("environment", environment ?: "")
                                 )
+                            )
+                        )
+
+                        val formattedDiff = FileBindingService.formatNewFileContentAsDiff(aiGeneratedCode)
 
                         if (writeResult.success) {
-                                // 成功写入新文件
-                                val operationData =
-                                        FileOperationData(
-                                                operation = "apply",
-                                                path = path,
-                                                successful = true,
-                                                details = "Successfully created new file with AI code: $path"
-                                        )
-
-                                // 执行语法检查
-                                val syntaxCheckResult = performSyntaxCheck(path, aiGeneratedCode)
-
-                                emit(
-                                        ToolResult(
-                                                toolName = tool.name,
-                                                success = true,
-                                                result =
-                                                        FileApplyResultData(
-                                                                operation = operationData,
-                                                                aiDiffInstructions = aiGeneratedCode,
-                                                                syntaxCheckResult = syntaxCheckResult
-                                                        ),
-                                                error = ""
-                                        )
+                            emit(
+                                ToolResult(
+                                    toolName = tool.name,
+                                    success = true,
+                                    result = FileOperationData(
+                                        operation = "create",
+                                        path = path,
+                                        successful = true,
+                                        details = "Successfully created new file with AI code: $path\n\n--- AI-Generated Diff ---\n$formattedDiff"
+                                    )
                                 )
+                            )
                         } else {
-                                // 写入失败，返回写入工具的错误
-                                emit(writeResult)
+                            emit(
+                                ToolResult(
+                                    toolName = tool.name,
+                                    success = false,
+                                    result = FileOperationData(
+                                        operation = "create",
+                                        path = path,
+                                        successful = false,
+                                        details = "Failed to create new file: ${writeResult.error}"
+                                    ),
+                                    error = "Failed to create new file: ${writeResult.error}"
+                                )
+                            )
                         }
                         return@flow
                 }

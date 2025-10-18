@@ -19,6 +19,33 @@ class FileBindingService(context: Context) {
             """//\s*\[START-(REPLACE|INSERT|DELETE):(?:after_line=)?([\d-]+)\]\n?(?:(?://\s*\[CONTEXT\]\s*(.*?)\s*//\s*\[/CONTEXT\]\s*(.*?))|(.*?))\s*//\s*\[END-\1\]""".toRegex(
                 RegexOption.DOT_MATCHES_ALL
             )
+
+        /**
+         * A dedicated utility function to generate a diff-like view for brand new file content.
+         * This is intended for callers who handle file creation separately and just need to format the output,
+         * ensuring new files also get line numbers and a diff-like appearance.
+         *
+         * @param newContent The full content of the newly created file.
+         * @return A string formatted as a diff, with each line prefixed by '+' and a line number.
+         */
+        fun formatNewFileContentAsDiff(newContent: String): String {
+            val modifiedLines = if (newContent.isEmpty()) emptyList() else newContent.lines()
+            if (modifiedLines.isEmpty()) {
+                return "Changes: +0 -0 lines\n\n(File created with empty content)"
+            }
+
+            val additions = modifiedLines.size
+            val sb = StringBuilder()
+            sb.appendLine("Changes: +$additions -0 lines")
+            sb.appendLine()
+
+            modifiedLines.forEachIndexed { index, line ->
+                val newLineNum = index + 1
+                sb.appendLine("+${newLineNum.toString().padEnd(4)}|$line")
+            }
+
+            return sb.toString()
+        }
     }
 
     private enum class EditAction {
@@ -29,7 +56,8 @@ class FileBindingService(context: Context) {
 
     private sealed class CorrectionResult {
         data class Success(val correctedPatch: String) : CorrectionResult()
-        object MappingFailed : CorrectionResult()
+        data class MappingFailed(val reason: String) : CorrectionResult()
+        data class SyntaxError(val errorMessage: String) : CorrectionResult()
         object Error : CorrectionResult()
     }
 
@@ -79,7 +107,13 @@ class FileBindingService(context: Context) {
                     }
                     is CorrectionResult.MappingFailed -> {
                         Log.w(TAG, "Sub-agent explicitly failed to find mapping. Reporting as tool error.")
-                        return Pair(originalContent, "Error: Could not apply patch. The sub-agent failed to find the correct line numbers, likely because the file has changed. Please read the file again to get the latest context and retry the edit.")
+                        val detailedMessage = "Error: Could not apply patch. The sub-agent failed to find the correct line numbers and provided the following reason:\n${correctionResult.reason}"
+                        return Pair(originalContent, detailedMessage)
+                    }
+                    is CorrectionResult.SyntaxError -> {
+                        Log.w(TAG, "Sub-agent reported a syntax error in the patch.")
+                        val detailedMessage = "Error: Could not apply patch. The sub-agent reported a syntax error in the AI-generated code patch:\n${correctionResult.errorMessage}"
+                        return Pair(originalContent, detailedMessage)
                     }
                     is CorrectionResult.Error -> {
                         // This includes general exceptions and parsing failures.
@@ -102,14 +136,74 @@ class FileBindingService(context: Context) {
     }
 
     private fun generateDiff(original: String, modified: String): String {
-        return UnifiedDiffUtils.generateUnifiedDiff(
-                                        "a/file",
-                                        "b/file",
-                        original.lines(),
-                        DiffUtils.diff(original.lines(), modified.lines()),
-                                        3
-                                )
-                                .joinToString("\n")
+        val originalLines = if (original.isEmpty()) emptyList() else original.lines()
+        val modifiedLines = if (modified.isEmpty()) emptyList() else modified.lines()
+        val patch = DiffUtils.diff(originalLines, modifiedLines)
+
+        if (patch.deltas.isEmpty()) {
+            return "No changes detected (files are identical)"
+        }
+
+        // First, calculate stats
+        val sb = StringBuilder()
+        var additions = 0
+        var deletions = 0
+        patch.deltas.forEach { delta ->
+            when (delta.type) {
+                com.github.difflib.patch.DeltaType.INSERT -> additions += delta.target.lines.size
+                com.github.difflib.patch.DeltaType.DELETE -> deletions += delta.source.lines.size
+                com.github.difflib.patch.DeltaType.CHANGE -> {
+                    additions += delta.target.lines.size
+                    deletions += delta.source.lines.size
+                }
+                else -> {}
+            }
+        }
+        sb.appendLine("Changes: +$additions -$deletions lines")
+        sb.appendLine()
+
+        // Generate a standard unified diff to process
+        val unifiedDiffLines = UnifiedDiffUtils.generateUnifiedDiff(
+            "a/file",
+            "b/file",
+            originalLines,
+            patch,
+            3 // Context lines
+        )
+
+        val resultLines = mutableListOf<String>()
+        var origLineNum = 0
+        var newLineNum = 0
+        val hunkHeaderRegex = """^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*$""".toRegex()
+
+        for (line in unifiedDiffLines) {
+            when {
+                line.startsWith("---") || line.startsWith("+++") -> resultLines.add(line)
+                line.startsWith("@@") -> {
+                    resultLines.add(line)
+                    hunkHeaderRegex.find(line)?.let {
+                        origLineNum = it.groupValues[1].toInt()
+                        newLineNum = it.groupValues[3].toInt()
+                    }
+                }
+                line.startsWith("-") -> {
+                    resultLines.add("-${origLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    origLineNum++
+                }
+                line.startsWith("+") -> {
+                    resultLines.add("+${newLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    newLineNum++
+                }
+                line.startsWith(" ") -> {
+                    resultLines.add(" ${origLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    origLineNum++
+                    newLineNum++
+                }
+            }
+        }
+
+        sb.append(resultLines.joinToString("\n"))
+        return sb.toString()
     }
 
     /**
@@ -299,26 +393,32 @@ class FileBindingService(context: Context) {
             val rawResponse = ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
             Log.d(TAG, "Sub-agent raw response: $rawResponse")
 
-            val mappingBlock = extractMappingBlock(rawResponse)
-            Log.d(TAG, "Extracted mapping block: $mappingBlock")
-
-            if (mappingBlock.contains("// [MAPPING-FAILED]")) {
-                return CorrectionResult.MappingFailed
+            // Check for different response types from the sub-agent
+            return when {
+                rawResponse.startsWith("[MAPPING-SYNTAX-ERROR]") -> {
+                    Log.w(TAG, "Sub-agent reported a syntax error.")
+                    CorrectionResult.SyntaxError(rawResponse)
+                }
+                rawResponse.startsWith("[MAPPING-FAILED]") -> {
+                    Log.w(TAG, "Sub-agent explicitly failed to find mapping.")
+                    val reason = rawResponse.substringAfter("[MAPPING-FAILED]").trim()
+                    CorrectionResult.MappingFailed(reason)
+                }
+                rawResponse.startsWith("[MAPPING]") -> {
+                    val correctedPatch = applyMappingToPatch(aiPatchCode, rawResponse)
+                    if (correctedPatch.isNotBlank()) {
+                        Log.d(TAG, "Successfully constructed corrected patch from mapping.")
+                        CorrectionResult.Success(correctedPatch)
+                    } else {
+                        Log.e(TAG, "Failed to apply mapping to patch, though mapping block was present.")
+                        CorrectionResult.Error
+                    }
+                }
+                else -> {
+                    Log.w(TAG, "Sub-agent response did not contain any known mapping markers.")
+                    CorrectionResult.Error
+                }
             }
-
-            if (mappingBlock.isBlank()) {
-                Log.w(TAG, "Could not extract a valid mapping block from sub-agent response.")
-                return CorrectionResult.Error
-            }
-
-            // Parse the mapping and apply it to the original patch code
-            val correctedPatch = applyMappingToPatch(aiPatchCode, mappingBlock)
-            return if (correctedPatch.isNotBlank()) {
-                CorrectionResult.Success(correctedPatch)
-            } else {
-                CorrectionResult.Error
-            }
-
         } catch (e: Exception) {
             Log.e(TAG, "Sub-agent for line correction failed with an exception.", e)
             return CorrectionResult.Error
@@ -334,17 +434,17 @@ class FileBindingService(context: Context) {
      * @return The corrected patch code, or an empty string if parsing fails.
      */
     private fun applyMappingToPatch(originalPatch: String, mappingBlock: String): String {
-        if (!mappingBlock.contains("// [MAPPING]")) {
+        if (!mappingBlock.contains("[MAPPING]")) {
             Log.w(TAG, "Sub-agent output did not contain a valid mapping block.")
             return ""
         }
 
         val mappingLines = mappingBlock.lines()
             .map { it.trim() }
-            .filter { it.startsWith("//") && it.contains(" -> ") }
+            .filter { it.contains(" -> ") }
 
         val lineMappings = mappingLines.mapNotNull { line ->
-            val parts = line.removePrefix("// ").split(" -> ")
+            val parts = line.split(" -> ")
             if (parts.size == 2) {
                 Pair(parts[0].trim(), parts[1].trim())
             } else {
@@ -504,15 +604,4 @@ class FileBindingService(context: Context) {
         return snippetBuilder.toString().trim()
     }
 
-    private fun extractMappingBlock(rawResponse: String): String {
-        val startIndex = rawResponse.indexOf("// [MAPPING]")
-        if (startIndex == -1) {
-            return if (rawResponse.contains("// [MAPPING-FAILED]")) "// [MAPPING-FAILED]" else ""
-        }
-        val endIndex = rawResponse.lastIndexOf("// [/MAPPING]")
-        if (endIndex == -1 || endIndex < startIndex) {
-            return ""
-        }
-        return rawResponse.substring(startIndex, endIndex + "// [/MAPPING]".length)
-    }
 } 

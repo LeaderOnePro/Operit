@@ -339,7 +339,7 @@
     <string name="tool_weather">天气查询</string>
     <string name="tool_calculator">计算器</string>
     <string name="tool_web_search">网络搜索</string>
-    <string name="ai_planning_desc">将会进行任务分解和触发多个子agent去搜集信息，最后汇总。子agent的工具调用能力和聊天用的agent相同。</string>
+    <string name="ai_planning_desc">将会进行任务分解和触发多个子agent去搜集信息，最后汇总。子agent的工具调用能力和聊天用的agent相同。这会变得非常耗时，仅建议搜集信息的时候开启。</string>
     <string name="enhanced_service_not_initialized">增强AI服务未初始化，请检查设置</string>
     <string name="ui_automation_in_progress">正在执行界面任务...</string>
     

@@ -373,7 +373,7 @@ class MessageProcessingDelegate(
                             }
                         } else {
                             // 普通模式，直接清理流
-                            val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
+                            val finalMessage = aiMessage.copy(content = finalContent)
                             withContext(Dispatchers.Main) {
                                 if (chatId != null) {
                                     addMessageToChat(chatId, finalMessage)
