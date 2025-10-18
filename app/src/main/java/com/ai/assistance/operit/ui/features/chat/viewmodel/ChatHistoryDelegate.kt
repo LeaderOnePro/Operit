@@ -348,9 +348,8 @@ class ChatHistoryDelegate(
                 val existingIndex = currentMessages.indexOfFirst { it.timestamp == message.timestamp }
 
                 if (existingIndex >= 0) {
+                    //只更新消息，不能重新加载聊天记录
                     val updated = currentMessages.toMutableList().also { it[existingIndex] = message }
-                    _chatHistory.value = updated
-                    onChatHistoryLoaded(updated)
                     chatHistoryManager.updateMessage(targetChatId, message)
                 } else {
                     Log.d(

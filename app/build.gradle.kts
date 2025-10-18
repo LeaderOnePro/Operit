@@ -377,4 +377,7 @@ dependencies {
     // Glance for Widgets (Compose for Widgets)
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
+
+    // Tasker Plugin
+    implementation("com.joaomgcd:taskerpluginlibrary:0.4.10")
 }

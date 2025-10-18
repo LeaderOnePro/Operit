@@ -2901,5 +2901,9 @@
     <string name="currently_generating">正在生成…</string>
     <string name="describe_character_hint">描述你想要的角色…</string>
     <string name="character_card_complete">🎉 角色卡生成完成！所有信息都已保存。</string>
+    <string name="confirm_clear_chat_history">确定要清空当前角色卡的对话记录吗？此操作不可撤销。</string>
+    <string name="message_limit_reached_title">对话数量已达上限</string>
+    <string name="message_limit_reached_message">当前对话数量已达 %1$d 条上限。\n为了保持对话质量和性能，请清空历史记录后继续。</string>
+    <string name="go_clear">去清空</string>
 
 </resources>

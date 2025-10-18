@@ -26,6 +26,7 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.PromptTagManager
 import com.ai.assistance.operit.util.stream.Stream
+import com.ai.assistance.operit.data.preferences.PersonaCardChatHistoryManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
@@ -157,6 +158,7 @@ fun PersonaCardGenerationScreen(
     // 角色卡数据
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val tagManager = remember { PromptTagManager.getInstance(context) }
+    val chatHistoryManager = remember { PersonaCardChatHistoryManager.getInstance(context) }
     var allCharacterCards by remember { mutableStateOf(listOf<CharacterCard>()) }
     var allTags by remember { mutableStateOf(listOf<PromptTag>()) }
     var activeCardId by remember { mutableStateOf("") }
@@ -164,7 +166,12 @@ fun PersonaCardGenerationScreen(
     var expanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showClearHistoryConfirm by remember { mutableStateOf(false) }
+    var showMessageLimitWarning by remember { mutableStateOf(false) }
     var newCardName by remember { mutableStateOf("") }
+    
+    // 对话数量限制
+    val MESSAGE_LIMIT = 40
 
     // 编辑器值
     var editName by remember { mutableStateOf("") }
@@ -231,12 +238,21 @@ fun PersonaCardGenerationScreen(
                     editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
                 }
 
-                // 为新卡片重置聊天记录
+                // 加载该角色卡的聊天历史
                 chatMessages.clear()
-                chatMessages.add(CharacterChatMessage("assistant",
-                    context.getString(R.string.persona_generation_welcome, 
+                val savedHistory = chatHistoryManager.loadChatHistory(activeCardId)
+                if (savedHistory.isNotEmpty()) {
+                    // 转换为界面使用的消息格式
+                    savedHistory.forEach { msg ->
+                        chatMessages.add(CharacterChatMessage(msg.role, msg.content, msg.timestamp))
+                    }
+                } else {
+                    // 如果没有历史记录，添加欢迎消息
+                    chatMessages.add(CharacterChatMessage("assistant",
+                        context.getString(R.string.persona_generation_welcome, 
                         card?.name ?: context.getString(R.string.new_character))
-                ))
+                    ))
+                }
             }
         }
     }
@@ -376,18 +392,37 @@ fun PersonaCardGenerationScreen(
         }
     }
 
+    // 保存聊天历史
+    fun saveChatHistory() {
+        scope.launch(Dispatchers.IO) {
+            val messages = chatMessages.map { msg ->
+                PersonaCardChatHistoryManager.ChatMessage(msg.role, msg.content, msg.timestamp)
+            }
+            chatHistoryManager.saveChatHistory(activeCardId, messages)
+        }
+    }
+
     fun sendMessage() {
         if (userInput.isBlank() || isGenerating) return
+        
+        // 检查对话数量限制
+        if (chatMessages.size >= MESSAGE_LIMIT) {
+            showMessageLimitWarning = true
+            return
+        }
+        
         val input = userInput
         userInput = ""
 
         scope.launch(Dispatchers.Main) {
             chatMessages.add(CharacterChatMessage("user", input))
+            saveChatHistory() // 保存用户消息
             isGenerating = true
 
             // 检查是否已完成，如果已完成则直接结束
             if (isCharacterCardComplete()) {
                 chatMessages.add(CharacterChatMessage("assistant", context.getString(R.string.character_card_complete)))
+                saveChatHistory() // 保存完成消息
                 isGenerating = false
                 scope.launch { listState.animateScrollToItem(chatMessages.lastIndex) }
                 return@launch
@@ -440,6 +475,9 @@ fun PersonaCardGenerationScreen(
                 withContext(Dispatchers.IO) {
                     processToolInvocations(rawBuffer.toString(), assistantIndex)
                 }
+                
+                // 保存助手回复
+                saveChatHistory()
             } catch (e: Exception) {
                 chatMessages.add(
                     CharacterChatMessage(
@@ -447,6 +485,7 @@ fun PersonaCardGenerationScreen(
                         content = context.getString(R.string.send_failed, e.message ?: "Unknown error")
                     )
                 )
+                saveChatHistory() // 保存错误消息
             } finally {
                 isGenerating = false
             }
@@ -761,6 +800,12 @@ fun PersonaCardGenerationScreen(
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
+                IconButton(onClick = { showClearHistoryConfirm = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteSweep,
+                        contentDescription = context.getString(R.string.clear_chat_history)
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { scope.launch { drawerState.open() } }) {
                     Text(activeCard?.name ?: context.getString(R.string.no_character_card))
@@ -838,20 +883,34 @@ fun PersonaCardGenerationScreen(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = userInput,
-                        onValueChange = { userInput = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp),
-                        placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
-                        enabled = !isGenerating,
-                        maxLines = 4
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = userInput,
+                            onValueChange = { userInput = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp),
+                            placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
+                            enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT,
+                            maxLines = 4
+                        )
+                        // 对话计数器 - 右上角小标签
+                        Text(
+                            text = "${chatMessages.size}/$MESSAGE_LIMIT",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (chatMessages.size >= MESSAGE_LIMIT) 
+                                MaterialTheme.colorScheme.error 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 4.dp, end = 12.dp)
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     FilledIconButton(
                         onClick = { if (!isGenerating) sendMessage() },
-                        enabled = !isGenerating
+                        enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT
                     ) {
                         Icon(
                             imageVector = if (isGenerating) Icons.Filled.HourglassBottom else Icons.Filled.Send,
@@ -861,5 +920,55 @@ fun PersonaCardGenerationScreen(
                 }
             }
         }
+    }
+    
+    // 对话数量限制警告对话框
+    if (showMessageLimitWarning) {
+        AlertDialog(
+            onDismissRequest = { showMessageLimitWarning = false },
+            title = { Text(context.getString(R.string.message_limit_reached_title)) },
+            text = { 
+                Text(context.getString(R.string.message_limit_reached_message, MESSAGE_LIMIT))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMessageLimitWarning = false
+                    showClearHistoryConfirm = true
+                }) { Text(context.getString(R.string.go_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMessageLimitWarning = false }) { Text(context.getString(R.string.cancel)) }
+            }
+        )
+    }
+    
+    // 清空对话记录确认对话框
+    if (showClearHistoryConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryConfirm = false },
+            title = { Text(context.getString(R.string.clear_chat_history)) },
+            text = { Text(context.getString(R.string.confirm_clear_chat_history)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearHistoryConfirm = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            chatHistoryManager.clearChatHistory(activeCardId)
+                        }
+                        // 清空界面显示的消息
+                        chatMessages.clear()
+                        // 添加欢迎消息
+                        chatMessages.add(CharacterChatMessage("assistant",
+                            context.getString(R.string.persona_generation_welcome, 
+                            activeCard?.name ?: context.getString(R.string.new_character))
+                        ))
+                        saveChatHistory()
+                    }
+                }) { Text(context.getString(R.string.clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryConfirm = false }) { Text(context.getString(R.string.cancel)) }
+            }
+        )
     }
 } 
