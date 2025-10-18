@@ -99,7 +99,6 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     var latestPartialText by remember { mutableStateOf("") }
     var aiMessage by remember { mutableStateOf("长按下方麦克风开始说话") }
     val coroutineScope = rememberCoroutineScope()
-    var activeMessage by remember { mutableStateOf<ChatMessage?>(null) }
     val isInitialLoad = remember { mutableStateOf(true) }
     
     // 波浪可视化相关状态
@@ -323,7 +322,6 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
         accumulatedText = ""
         latestPartialText = ""
         aiMessage = "长按下方麦克风开始说话"
-        activeMessage = null
         isInitialLoad.value = true // 确保每次进入都重置
         timeoutJob?.cancel()
         silenceTimeoutJob?.cancel()
@@ -361,12 +359,11 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     // The logic is now handled directly in the onToggleActive lambda.
 
     // 监听最新的AI消息
-    LaunchedEffect(floatContext.messages) {
+    LaunchedEffect(floatContext.messages.lastOrNull()?.timestamp) {
         val lastMessage = floatContext.messages.lastOrNull()
 
         // 只处理新消息
-        if (lastMessage === activeMessage || lastMessage == null) return@LaunchedEffect
-        activeMessage = lastMessage
+        if (lastMessage == null) return@LaunchedEffect
 
         // 如果是首次加载，只更新UI，不朗读
         if (isInitialLoad.value) {

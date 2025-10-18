@@ -60,6 +60,8 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.widget.WidgetLaunchManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -677,7 +679,10 @@ fun AIChatScreen(
 
         // Web开发模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
         Layout(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = if (showWebView) 1f else 0f)
+                .clipToBounds(),
             content = {
                 // The content is composed unconditionally, keeping it "alive"
                 val currentChat = chatHistories.find { it.id == currentChatId }
@@ -716,7 +721,10 @@ fun AIChatScreen(
 
         // AI电脑模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
         Layout(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = if (showAiComputer) 1f else 0f)
+                .clipToBounds(),
             content = {
                 // The content is composed unconditionally, keeping it "alive"
                 ComputerScreen()

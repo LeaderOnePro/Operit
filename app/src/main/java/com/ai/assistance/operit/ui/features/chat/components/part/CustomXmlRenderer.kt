@@ -413,11 +413,18 @@ class CustomXmlRenderer(
                             builtInZoomControls = false
                             displayZoomControls = false
                         }
+                        // 使用软件渲染层，这有助于解决在Compose中嵌入WebView时可能出现的渲染线程崩溃问题，
+                        // 尤其是在涉及硬件加速的复杂视图层级中。
+                        setLayerType(WebView.LAYER_TYPE_SOFTWARE, null)
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     }
                 },
                 update = { webView ->
                     webView.loadDataWithBaseURL(null, fullHtml, "text/html", "UTF-8", null)
+                },
+                onRelease = { webView ->
+                    // 在视图被销毁时，明确调用destroy()以释放WebView资源，防止内存泄漏和崩溃。
+                    webView.destroy()
                 }
             )
         }

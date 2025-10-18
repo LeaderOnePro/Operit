@@ -1278,6 +1278,28 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         return try {
+            // 首先检查目录是否已存在
+            val checkDirResult =
+                    AndroidShellExecutor.executeShellCommand(
+                            "test -d '$path' && echo 'exists' || echo 'not exists'"
+                    )
+            
+            if (checkDirResult.success && checkDirResult.stdout.trim() == "exists") {
+                // 目录已存在，返回成功
+                return ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result =
+                                FileOperationData(
+                                        operation = "mkdir",
+                                        path = path,
+                                        successful = true,
+                                        details = "Directory already exists: $path"
+                                ),
+                        error = ""
+                )
+            }
+
             val mkdirCommand = if (createParents) "mkdir -p '$path'" else "mkdir '$path'"
             val result = AndroidShellExecutor.executeShellCommand(mkdirCommand)
 
@@ -1295,6 +1317,28 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                         error = ""
                 )
             } else {
+                // 创建失败后再次检查是否已存在（可能在执行过程中被创建）
+                val recheckDirResult =
+                        AndroidShellExecutor.executeShellCommand(
+                                "test -d '$path' && echo 'exists' || echo 'not exists'"
+                        )
+                
+                if (recheckDirResult.success && recheckDirResult.stdout.trim() == "exists") {
+                    // 目录已存在，返回成功
+                    return ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result =
+                                    FileOperationData(
+                                            operation = "mkdir",
+                                            path = path,
+                                            successful = true,
+                                            details = "Directory already exists: $path"
+                                    ),
+                            error = ""
+                    )
+                }
+                
                 return ToolResult(
                         toolName = tool.name,
                         success = false,

@@ -1,6 +1,6 @@
 /* METADATA
 {
-    "name": "System_Tools",
+    "name": "system_tools",
     "description": "提供系统级操作工具，包括设置管理、应用管理、通知获取、位置服务和设备信息查询。",
     "enabledByDefault": true,
     "tools": [
