@@ -2909,5 +2909,8 @@
     <string name="describe_character_hint">Describe the character you want…</string>
     <string name="character_card_complete">🎉 Character card generation complete! All information has been saved.</string>
     <string name="confirm_clear_chat_history">Are you sure you want to clear the chat history for the current character card? This action cannot be undone.</string>
+    <string name="message_limit_reached_title">Message Limit Reached</string>
+    <string name="message_limit_reached_message">The current conversation has reached the limit of %1$d messages.\nTo maintain conversation quality and performance, please clear the history to continue.</string>
+    <string name="go_clear">Clear Now</string>
 
 </resources>

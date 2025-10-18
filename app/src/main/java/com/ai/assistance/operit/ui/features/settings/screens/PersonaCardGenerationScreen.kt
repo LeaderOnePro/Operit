@@ -167,7 +167,11 @@ fun PersonaCardGenerationScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showClearHistoryConfirm by remember { mutableStateOf(false) }
+    var showMessageLimitWarning by remember { mutableStateOf(false) }
     var newCardName by remember { mutableStateOf("") }
+    
+    // 对话数量限制
+    val MESSAGE_LIMIT = 40
 
     // 编辑器值
     var editName by remember { mutableStateOf("") }
@@ -400,6 +404,13 @@ fun PersonaCardGenerationScreen(
 
     fun sendMessage() {
         if (userInput.isBlank() || isGenerating) return
+        
+        // 检查对话数量限制
+        if (chatMessages.size >= MESSAGE_LIMIT) {
+            showMessageLimitWarning = true
+            return
+        }
+        
         val input = userInput
         userInput = ""
 
@@ -872,20 +883,34 @@ fun PersonaCardGenerationScreen(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = userInput,
-                        onValueChange = { userInput = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp),
-                        placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
-                        enabled = !isGenerating,
-                        maxLines = 4
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = userInput,
+                            onValueChange = { userInput = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp),
+                            placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
+                            enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT,
+                            maxLines = 4
+                        )
+                        // 对话计数器 - 右上角小标签
+                        Text(
+                            text = "${chatMessages.size}/$MESSAGE_LIMIT",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (chatMessages.size >= MESSAGE_LIMIT) 
+                                MaterialTheme.colorScheme.error 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 4.dp, end = 12.dp)
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     FilledIconButton(
                         onClick = { if (!isGenerating) sendMessage() },
-                        enabled = !isGenerating
+                        enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT
                     ) {
                         Icon(
                             imageVector = if (isGenerating) Icons.Filled.HourglassBottom else Icons.Filled.Send,
@@ -895,6 +920,26 @@ fun PersonaCardGenerationScreen(
                 }
             }
         }
+    }
+    
+    // 对话数量限制警告对话框
+    if (showMessageLimitWarning) {
+        AlertDialog(
+            onDismissRequest = { showMessageLimitWarning = false },
+            title = { Text(context.getString(R.string.message_limit_reached_title)) },
+            text = { 
+                Text(context.getString(R.string.message_limit_reached_message, MESSAGE_LIMIT))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMessageLimitWarning = false
+                    showClearHistoryConfirm = true
+                }) { Text(context.getString(R.string.go_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMessageLimitWarning = false }) { Text(context.getString(R.string.cancel)) }
+            }
+        )
     }
     
     // 清空对话记录确认对话框
