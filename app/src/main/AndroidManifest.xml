@@ -147,6 +147,16 @@
             android:process=":crash"
             android:theme="@style/Theme.Operit" />
         
+        <activity
+            android:name=".integrations.tasker.ActivityConfigAIAgentAction"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="AI Agent Action">
+            <intent-filter>
+                <action android:name="net.dinglisch.android.tasker.ACTION_EDIT_EVENT" />
+            </intent-filter>
+        </activity>
+        
         <!-- Floating Chat Service -->
         <service
             android:name=".services.FloatingChatService"
