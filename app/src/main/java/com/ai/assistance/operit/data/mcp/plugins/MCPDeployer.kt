@@ -61,10 +61,10 @@ class MCPDeployer(private val context: Context) {
 
                     val mcpLocalServer = MCPLocalServer.getInstance(context)
 
-                    // 检查是否是虚拟路径（npx/uvx 类型的插件）
+                    // 检查是否是虚拟路径（npx/uvx/uv 类型的插件）
                     if (pluginPath.startsWith("virtual://")) {
                         val serverConfig = mcpLocalServer.getMCPServer(pluginId)
-                        val command = serverConfig?.command?.lowercase() ?: "npx/uvx"
+                        val command = serverConfig?.command?.lowercase() ?: "npx/uvx/uv"
 
                         Log.d(TAG, "插件 $pluginId 使用 $command 命令（虚拟路径），开始最小化部署...")
                         statusCallback(DeploymentStatus.InProgress("检测到 $command 类型插件，执行最小化部署"))

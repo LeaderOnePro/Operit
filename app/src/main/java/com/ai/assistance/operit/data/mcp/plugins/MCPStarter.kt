@@ -197,7 +197,7 @@ class MCPStarter(private val context: Context) {
                     // 使用MCPDeployer自动部署
                     val deployer = MCPDeployer(context)
 
-                    // 对于虚拟路径（npx/uvx 插件），直接使用空命令列表
+                    // 对于虚拟路径（npx/uvx/uv 插件），直接使用空命令列表
                     val deployCommands = if (pluginPath.startsWith("virtual://")) {
                         emptyList()
                     } else {

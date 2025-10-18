@@ -123,7 +123,7 @@ class MCPRepository(private val context: Context) {
                 val isInstalled = if (metadata.type == "remote") {
                     true // 远程服务器
                 } else {
-                    isPluginPhysicallyInstalled(metadata.id) // 自动处理 npx/uvx
+                    isPluginPhysicallyInstalled(metadata.id) // 自动处理 npx/uvx/uv
                 }
                 
                 if (isInstalled) {
@@ -164,16 +164,17 @@ class MCPRepository(private val context: Context) {
     }
 
     /**
-     * 判断插件是否需要物理安装（npx/uvx/remote 类型不需要）
+     * 判断插件是否需要物理安装（npx/uvx/uv/remote 类型不需要）
      */
     private fun needsPhysicalInstallation(serverId: String): Boolean {
         val serverConfig = mcpLocalServer.getMCPServer(serverId)
         val command = serverConfig?.command?.lowercase() ?: return true
         
-        // npx、uvx、remote 类型的插件不需要物理安装
+        // npx、uvx、uv、remote 类型的插件不需要物理安装
         return when {
             command == "npx" -> false
             command == "uvx" -> false
+            command == "uv" -> false
             else -> true
         }
     }
@@ -204,7 +205,7 @@ class MCPRepository(private val context: Context) {
         } else if (metadata.type == "remote") {
             true // 远程服务器配置后即为已安装
         } else {
-            isPluginPhysicallyInstalled(serverId) // 自动处理 npx/uvx
+            isPluginPhysicallyInstalled(serverId) // 自动处理 npx/uvx/uv
         }
     }
 
@@ -212,7 +213,7 @@ class MCPRepository(private val context: Context) {
      * 获取已安装插件的路径
      */
     fun getInstalledPluginPath(serverId: String): String? {
-        // 对于 npx/uvx 类型的插件，返回一个虚拟路径标记
+        // 对于 npx/uvx/uv 类型的插件，返回一个虚拟路径标记
         if (!needsPhysicalInstallation(serverId)) {
             return "virtual://$serverId"
         }
