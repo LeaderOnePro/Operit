@@ -388,17 +388,23 @@ HTTP工具：
     // Build the available packages section
     val packagesSection = StringBuilder()
 
+    // Filter out imported packages that no longer exist in availablePackages
+    val validImportedPackages = importedPackages.filter { packageName ->
+        packageManager.getPackageTools(packageName) != null
+    }
+
     // Check if any packages (JS or MCP) are available
-    val hasPackages = importedPackages.isNotEmpty() || mcpServers.isNotEmpty()
+    val hasPackages = validImportedPackages.isNotEmpty() || mcpServers.isNotEmpty()
 
     if (hasPackages) {
       packagesSection.appendLine("Available packages:")
 
-      // List imported JS packages
-      for (packageName in importedPackages) {
-        packagesSection.appendLine(
-                "- $packageName : ${packageManager.getPackageTools(packageName)?.description}"
-        )
+      // List imported JS packages (only those that still exist)
+      for (packageName in validImportedPackages) {
+        val packageTools = packageManager.getPackageTools(packageName)
+        if (packageTools != null) {
+          packagesSection.appendLine("- $packageName : ${packageTools.description}")
+        }
       }
 
       // List available MCP servers as regular packages
