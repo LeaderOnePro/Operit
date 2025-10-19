@@ -29,6 +29,7 @@ import com.ai.assistance.operit.ui.features.settings.screens.ChatHistorySettings
 import com.ai.assistance.operit.ui.features.settings.screens.ContextSummarySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.FunctionalConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.LanguageSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.LayoutAdjustmentSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ModelConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ModelPromptsSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.TagMarketScreen
@@ -303,7 +304,8 @@ sealed class Screen(
                     navigateToPersonaCardGeneration = { navigateTo(PersonaCardGeneration) },
                     navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
                     navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) },
-                    navigateToContextSummarySettings = { navigateTo(ContextSummarySettings) }
+                    navigateToContextSummarySettings = { navigateTo(ContextSummarySettings) },
+                    navigateToLayoutAdjustmentSettings = { navigateTo(LayoutAdjustmentSettings) }
             )
         }
     }
@@ -666,6 +668,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             ThemeSettingsScreen()
+        }
+    }
+
+    data object LayoutAdjustmentSettings :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_layout_adjustment) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            LayoutAdjustmentSettingsScreen(onNavigateBack = onGoBack)
         }
     }
 

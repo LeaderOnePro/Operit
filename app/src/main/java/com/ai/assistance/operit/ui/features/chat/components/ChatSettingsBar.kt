@@ -123,6 +123,10 @@ fun ChatSettingsBar(
         preferenceProfiles =
                 profileIds.map { id -> userPreferencesManager.getUserPreferencesFlow(id).first() }
     }
+    
+    // 获取聊天设置按钮右边距设置
+    val chatSettingsBarRightMargin by
+            userPreferencesManager.chatSettingsButtonEndPadding.collectAsState(initial = 2f)
 
     val onSelectModel: (String) -> Unit = { selectedId ->
         scope.launch {
@@ -140,7 +144,7 @@ fun ChatSettingsBar(
     }
 
     // The passed modifier will align this Box within its parent.
-    Box(modifier = modifier) {
+    Box(modifier = modifier.padding(end = chatSettingsBarRightMargin.dp)) {
         Row(
             // This modifier just adds padding. The Row will wrap its content.
             modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp),

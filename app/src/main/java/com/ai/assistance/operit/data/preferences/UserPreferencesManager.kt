@@ -149,6 +149,8 @@ class UserPreferencesManager(private val context: Context) {
         // 全局用户名称设置
         private val KEY_GLOBAL_USER_NAME = stringPreferencesKey("global_user_name")
 
+        // 布局调整设置
+        private val CHAT_SETTINGS_BUTTON_END_PADDING = floatPreferencesKey("chat_settings_button_end_padding")
 
         // 最近使用颜色
         private val RECENT_COLORS = stringPreferencesKey("recent_colors")
@@ -445,6 +447,12 @@ class UserPreferencesManager(private val context: Context) {
             preferences[CUSTOM_FONT_PATH]
         }
 
+    // 布局调整设置
+    val chatSettingsButtonEndPadding: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[CHAT_SETTINGS_BUTTON_END_PADDING] ?: 2f // 默认2dp
+        }
+
     // 获取最近使用颜色
     val recentColorsFlow: Flow<List<Int>> =
         context.userPreferencesDataStore.data.map { preferences ->
@@ -476,6 +484,20 @@ class UserPreferencesManager(private val context: Context) {
             val trimmedColors = currentColors.take(14)
 
             preferences[RECENT_COLORS] = trimmedColors.joinToString(",")
+        }
+    }
+
+    // 保存聊天设置按钮右边距
+    suspend fun saveChatSettingsButtonEndPadding(padding: Float) {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences[CHAT_SETTINGS_BUTTON_END_PADDING] = padding
+        }
+    }
+
+    // 重置布局设置
+    suspend fun resetLayoutSettings() {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences.remove(CHAT_SETTINGS_BUTTON_END_PADDING)
         }
     }
 

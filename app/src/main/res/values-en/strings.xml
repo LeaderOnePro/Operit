@@ -2107,6 +2107,8 @@
     <string name="settings_user_preferences_subtitle">Personal preferences and behavior settings</string>
     <string name="settings_language_subtitle">Interface language switching</string>
     <string name="settings_theme_subtitle">Theme and appearance customization</string>
+    <string name="layout_adjustment">Layout Adjustment</string>
+    <string name="layout_adjustment_subtitle">Adjust UI element positions and margins</string>
     <string name="settings_model_params_subtitle">Model parameters and API configuration</string>
     <string name="settings_functional_model_subtitle">Functional model specific configuration</string>
     <string name="settings_speech_services">Speech Services Configuration</string>
@@ -2132,6 +2134,22 @@
     <string name="settings_max_http_response_subtitle">Maximum character limit for network request responses</string>
     <string name="settings_reset_truncation">Reset Truncation Settings</string>
     <string name="settings_reset_truncation_desc">Reset all truncation settings to default values</string>
+    
+    <!-- Layout Adjustment Settings -->
+    <string name="layout_adjustment_settings_title">Layout Adjustment Settings</string>
+    <string name="layout_adjustment_description">Adjust the position and spacing of UI elements to customize your experience</string>
+    <string name="chat_settings_bar_section">Chat Settings Bar</string>
+    <string name="chat_settings_bar_right_margin">Right Margin</string>
+    <string name="chat_settings_bar_right_margin_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="chat_settings_button_end_padding">Chat Settings Button End Padding</string>
+    <string name="chat_settings_button_end_padding_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="current_value">Current Value</string>
+    <string name="closer_to_edge">Closer to Edge</string>
+    <string name="farther_from_edge">Farther from Edge</string>
+    <string name="invalid_value_range">Invalid value. Please enter a number between %.1f and %.1f</string>
+    <string name="reset_to_default">Reset to Default</string>
+    <string name="layout_reset_settings">Reset Layout Settings</string>
+    <string name="layout_reset_settings_desc">Reset all layout adjustment settings to default values</string>
     
     <string name="settings_data_permissions">Data and Permissions</string>
     <string name="settings_tool_permissions_subtitle">Tool permissions and security settings</string>
@@ -2520,6 +2538,7 @@
     <string name="screen_title_model_prompts_settings">Model Prompts Settings</string>
     <string name="screen_title_functional_config">Functional Model Configuration</string>
     <string name="screen_title_theme_settings">Theme Settings</string>
+    <string name="screen_title_layout_adjustment">Layout Adjustment</string>
     <string name="screen_title_chat_history_settings">Chat History Management</string>
     <string name="screen_title_language_settings">Language Settings</string>
     <string name="screen_title_file_manager">File Manager</string>

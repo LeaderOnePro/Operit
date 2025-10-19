@@ -2102,6 +2102,8 @@
     <string name="settings_user_preferences_subtitle">个人偏好和行为设置</string>
     <string name="settings_language_subtitle">界面语言切换</string>
     <string name="settings_theme_subtitle">主题和外观定制</string>
+    <string name="layout_adjustment">布局调整</string>
+    <string name="layout_adjustment_subtitle">调整界面元素位置和边距</string>
     <string name="settings_model_params_subtitle">模型参数和API配置</string>
     <string name="settings_functional_model_subtitle">功能模型专项配置</string>
     <string name="settings_speech_services">语音服务配置</string>
@@ -2127,6 +2129,22 @@
     <string name="settings_max_http_response_subtitle">网络请求响应的最大字符数限制</string>
     <string name="settings_reset_truncation">重置截断设置</string>
     <string name="settings_reset_truncation_desc">重置所有截断设置为默认值</string>
+    
+    <!-- 布局调整设置 -->
+    <string name="layout_adjustment_settings_title">布局调整设置</string>
+    <string name="layout_adjustment_description">在这里可以调整界面元素的位置和边距，自定义您的使用体验</string>
+    <string name="chat_settings_bar_section">聊天设置栏</string>
+    <string name="chat_settings_bar_right_margin">右边距</string>
+    <string name="chat_settings_bar_right_margin_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="chat_settings_button_end_padding">聊天设置按钮右边距</string>
+    <string name="chat_settings_button_end_padding_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="current_value">当前值</string>
+    <string name="closer_to_edge">靠近边缘</string>
+    <string name="farther_from_edge">远离边缘</string>
+    <string name="invalid_value_range">无效值。请输入%.1f到%.1f之间的数字</string>
+    <string name="reset_to_default">恢复默认</string>
+    <string name="layout_reset_settings">重置布局设置</string>
+    <string name="layout_reset_settings_desc">将所有布局调整设置恢复为默认值</string>
     
     <string name="settings_data_permissions">数据和权限</string>
     <string name="settings_tool_permissions_subtitle">工具权限和安全设置</string>
@@ -2525,6 +2543,7 @@
     <string name="screen_title_model_prompts_settings">模型提示词设置</string>
     <string name="screen_title_functional_config">功能模型配置</string>
     <string name="screen_title_theme_settings">主题设置</string>
+    <string name="screen_title_layout_adjustment">布局调整</string>
     <string name="screen_title_chat_history_settings">聊天记录管理</string>
     <string name="screen_title_language_settings">语言设置</string>
     <string name="screen_title_file_manager">文件管理器</string>
