@@ -37,7 +37,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
+fun ModelConfigScreen(
+    onBackPressed: () -> Unit = {},
+    navigateToMnnModelDownload: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val configManager = remember { ModelConfigManager(context) }
             val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -246,7 +249,8 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                                                         AIServiceFactory.createService(
                                                                 config = config,
                                                                 customHeadersJson = customHeadersJson,
-                                                                modelConfigManager = configManager
+                                                                modelConfigManager = configManager,
+                                                                context = context
                                                         )
                                                 testResult = service.testConnection()
                                             } ?: run {
@@ -416,7 +420,8 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                 ModelApiSettingsSection(
                         config = config,
                         configManager = configManager,
-                        showNotification = { message -> showNotification(message) }
+                        showNotification = { message -> showNotification(message) },
+                        navigateToMnnModelDownload = navigateToMnnModelDownload
                 )
             }
 

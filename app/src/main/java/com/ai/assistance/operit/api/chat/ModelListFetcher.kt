@@ -1,8 +1,11 @@
 package com.ai.assistance.operit.api.chat
 
+import android.content.Context
+import android.os.Environment
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
+import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URL
@@ -409,5 +412,69 @@ object ModelListFetcher {
         }
 
         return modelList.sortedBy { it.id }
+    }
+
+    /**
+     * 获取本地MNN模型列表
+     * 从固定目录读取已下载的MNN模型文件夹
+     */
+    suspend fun getMnnLocalModels(context: Context): Result<List<ModelOption>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val modelsDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Operit/models/mnn"
+                )
+                
+                Log.d(TAG, "读取MNN模型目录: ${modelsDir.absolutePath}")
+                
+                if (!modelsDir.exists()) {
+                    Log.w(TAG, "MNN模型目录不存在")
+                    return@withContext Result.success(emptyList())
+                }
+                
+                // 遍历所有模型文件夹
+                val models = modelsDir.listFiles { file -> 
+                    file.isDirectory
+                }?.mapNotNull { folder ->
+                    // 在文件夹中查找 llm.mnn 主文件
+                    val mnnFile = File(folder, "llm.mnn")
+                    val mnnWeightFile = File(folder, "llm.mnn.weight")
+                    
+                    if (mnnFile.exists()) {
+                        // 计算文件夹总大小
+                        val totalSize = folder.listFiles()?.sumOf { it.length() } ?: 0L
+                        
+                        Log.d(TAG, "找到MNN模型: ${folder.name}, 主文件: ${mnnFile.exists()}, 权重文件: ${mnnWeightFile.exists()}, 总大小: ${formatFileSize(totalSize)}")
+                        
+                        ModelOption(
+                            id = folder.name,  // 使用文件夹名称作为ID（与其他提供商保持一致）
+                            name = "${folder.name} (${formatFileSize(totalSize)})"
+                        )
+                    } else {
+                        Log.w(TAG, "文件夹 ${folder.name} 中未找到 llm.mnn 文件")
+                        null
+                    }
+                }?.sortedBy { it.name } ?: emptyList()
+                
+                Log.d(TAG, "找到 ${models.size} 个可用的MNN模型")
+                Result.success(models)
+            } catch (e: Exception) {
+                Log.e(TAG, "读取MNN模型列表失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 格式化文件大小
+     */
+    private fun formatFileSize(sizeBytes: Long): String {
+        return when {
+            sizeBytes < 1024 -> "$sizeBytes B"
+            sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024} KB"
+            sizeBytes < 1024 * 1024 * 1024 -> "${sizeBytes / (1024 * 1024)} MB"
+            else -> String.format("%.2f GB", sizeBytes / (1024.0 * 1024.0 * 1024.0))
+        }
     }
 }

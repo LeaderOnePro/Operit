@@ -40,6 +40,7 @@ import com.ai.assistance.operit.ui.features.settings.screens.ToolPermissionSetti
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesGuideScreen
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.CustomHeadersSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.MnnModelDownloadScreen
 import com.ai.assistance.operit.ui.features.settings.screens.TokenUsageStatisticsScreen
 import com.ai.assistance.operit.ui.features.token.TokenConfigWebViewScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.AppPermissionsToolScreen
@@ -490,7 +491,10 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            ModelConfigScreen(onBackPressed = onGoBack)
+            ModelConfigScreen(
+                onBackPressed = onGoBack,
+                navigateToMnnModelDownload = { navigateTo(MnnModelDownload) }
+            )
         }
     }
     // 添加SpeechServicesSettings屏幕定义
@@ -529,6 +533,24 @@ sealed class Screen(
             onGestureConsumed: (Boolean) -> Unit
         ) {
             CustomHeadersSettingsScreen(onBackPressed = onGoBack)
+        }
+    }
+    
+    // MNN模型下载屏幕
+    data object MnnModelDownload :
+        Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_mnn_model_download) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MnnModelDownloadScreen(onBackPressed = onGoBack)
         }
     }
     

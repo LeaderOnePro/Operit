@@ -101,7 +101,8 @@ class MultiServiceManager(private val context: Context) {
         return AIServiceFactory.createService(
             config = config,
             customHeadersJson = customHeadersJson,
-            modelConfigManager = modelConfigManager
+            modelConfigManager = modelConfigManager,
+            context = context
         )
     }
 

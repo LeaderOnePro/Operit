@@ -287,6 +287,33 @@ class ModelConfigManager(private val context: Context) {
         return updatedConfig
     }
 
+    // 更新模型配置 - 包含API提供商类型和MNN配置
+    suspend fun updateModelConfig(
+            configId: String,
+            apiKey: String,
+            apiEndpoint: String,
+            modelName: String,
+            apiProviderType: com.ai.assistance.operit.data.model.ApiProviderType,
+            mnnForwardType: Int,
+            mnnThreadCount: Int
+    ): ModelConfigData {
+        val config = getModelConfigFlow(configId).first()
+        val updatedConfig =
+                config.copy(
+                        apiKey = apiKey,
+                        apiEndpoint = apiEndpoint,
+                        modelName = modelName,
+                        apiProviderType = apiProviderType,
+                        mnnForwardType = mnnForwardType,
+                        mnnThreadCount = mnnThreadCount
+                )
+
+        // 保存更新后的配置
+        saveConfigToDataStore(updatedConfig)
+
+        return updatedConfig
+    }
+
     // 更新自定义参数
     suspend fun updateCustomParameters(configId: String, parametersJson: String): ModelConfigData {
         val config = getModelConfigFlow(configId).first()

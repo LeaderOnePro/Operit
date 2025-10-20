@@ -378,7 +378,8 @@ fun FunctionConfigCard(
                                                     AIServiceFactory.createService(
                                                             config = fullConfig,
                                                             customHeadersJson = customHeadersJson,
-                                                            modelConfigManager = modelConfigManager
+                                                            modelConfigManager = modelConfigManager,
+                                                            context = context
                                                     )
                                             testResult = service.testConnection()
                                         } catch (e: Exception) {

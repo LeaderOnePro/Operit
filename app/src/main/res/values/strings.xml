@@ -2892,6 +2892,33 @@
     <!-- Voice Assistant Widget -->
     <string name="voice_assistant_widget_description">快速启动 Operit 语音助手</string>
 
+    <!-- MNN Model Download -->
+    <string name="screen_title_mnn_model_download">MNN模型下载</string>
+    <string name="mnn_model_download">下载MNN模型</string>
+    <string name="mnn_model_management">模型管理</string>
+    <string name="mnn_download_from_modelscope">从ModelScope下载</string>
+    <string name="mnn_model_size">模型大小: %1$.2f GB</string>
+    <string name="mnn_downloading">下载中</string>
+    <string name="mnn_download_speed">速度: %1$s</string>
+    <string name="mnn_download_complete">下载完成</string>
+    <string name="mnn_download_failed">下载失败: %1$s</string>
+    <string name="mnn_no_models_downloaded">暂无已下载的模型</string>
+    <string name="mnn_select_downloaded_model">选择已下载的模型</string>
+    <string name="mnn_model_name_only">模型名称</string>
+    <string name="mnn_download_progress">进度: %1$d%%</string>
+    <string name="mnn_pause_download">暂停下载</string>
+    <string name="mnn_resume_download">继续下载</string>
+    <string name="mnn_delete_model">删除模型</string>
+    <string name="mnn_confirm_delete">确认删除此模型吗？</string>
+    <string name="mnn_loading_models">加载模型列表中...</string>
+    <string name="mnn_load_failed">加载失败</string>
+    <string name="mnn_retry">重试</string>
+    <string name="mnn_start_download">开始下载</string>
+    <string name="mnn_no_local_models">尚未下载任何模型</string>
+    <string name="mnn_go_download">去下载</string>
+    <string name="mnn_search_models">搜索模型...</string>
+    <string name="mnn_no_search_results">没有找到匹配的模型</string>
+
     <!-- Persona Card Generation Screen -->
     <string name="persona_card_generation_title">将修改的角色卡</string>
     <string name="no_character_card">无角色卡</string>
@@ -2924,5 +2951,12 @@
     <string name="message_limit_reached_title">对话数量已达上限</string>
     <string name="message_limit_reached_message">当前对话数量已达 %1$d 条上限。\n为了保持对话质量和性能，请清空历史记录后继续。</string>
     <string name="go_clear">去清空</string>
+    
+    <!-- MNN 本地推理 -->
+    <string name="provider_mnn">MNN (本地推理)</string>
+    <string name="mnn_model_path">模型文件路径</string>
+    <string name="mnn_model_path_placeholder">输入MNN模型文件的完整路径</string>
+    <string name="mnn_forward_type">计算类型</string>
+    <string name="mnn_thread_count">线程数</string>
 
 </resources>
