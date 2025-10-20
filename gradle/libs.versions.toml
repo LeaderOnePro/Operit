@@ -71,6 +71,7 @@ mediapipe = "0.10.11"
  animationAndroid = "1.6.2"
  uiAndroid = "1.6.2"
  glance = "1.0.0"
+ activityKtx = "1.7.1"
 
  [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -236,6 +237,7 @@ objectbox-processor = { group = "io.objectbox", name = "objectbox-processor", ve
 # Glance (Compose for Widgets)
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+ androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
 
  [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

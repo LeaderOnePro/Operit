@@ -36,7 +36,7 @@ fun MnnModelDownloadScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val downloadManager = remember { MnnModelDownloadManager(context) }
+    val downloadManager = remember { MnnModelDownloadManager.getInstance(context) }
     val keyboardController = LocalSoftwareKeyboardController.current
     
     var modelList by remember { mutableStateOf<List<MnnModel>>(emptyList()) }
@@ -261,7 +261,13 @@ private fun ModelCard(
 ) {
     val scope = rememberCoroutineScope()
     val downloadState by downloadManager.getDownloadState(model.modelName).collectAsState()
-    val isDownloaded = downloadManager.isModelDownloaded(model.modelName)
+
+    // 根据下载状态判断是否允许删除
+    val canDelete = when (downloadState) {
+        is DownloadState.Completed, is DownloadState.Failed, is DownloadState.Paused -> true
+        is DownloadState.Idle -> downloadManager.isModelDownloaded(model.modelName)
+        else -> false // Downloading, Connecting
+    }
     
     // 优先使用ModelScope源
     val downloadUrl = model.sources["ModelScope"] 
@@ -342,8 +348,8 @@ private fun ModelCard(
             
             // 下载进度和按钮
             when (downloadState) {
-                is DownloadState.Idle -> {
-                    if (isDownloaded) {
+                is DownloadState.Idle, is DownloadState.Completed -> {
+                    if (downloadManager.isModelDownloaded(model.modelName)) {
                         // 已下载，显示删除按钮
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -367,41 +373,65 @@ private fun ModelCard(
                             
                             IconButton(
                                 onClick = { onDelete(model.modelName) },
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp),
+                                enabled = canDelete
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = stringResource(R.string.mnn_delete_model),
-                                    tint = MaterialTheme.colorScheme.error,
+                                    tint = if (canDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
                     } else {
                         // 未下载，显示下载按钮
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    downloadManager.downloadModel(model.modelName, downloadUrl)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(36.dp),
-                            enabled = downloadUrl.isNotEmpty(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
                         ) {
-                            Icon(
-                                Icons.Default.Download, 
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                stringResource(R.string.mnn_start_download),
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp)
-                            )
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        downloadManager.downloadModel(model.modelName, downloadUrl)
+                                    }
+                                },
+                                modifier = Modifier.height(32.dp),
+                                enabled = downloadUrl.isNotEmpty(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Download, 
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    stringResource(R.string.mnn_start_download),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp)
+                                )
+                            }
                         }
+                    }
+                }
+
+                is DownloadState.Connecting -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.mnn_connecting),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 
@@ -487,26 +517,46 @@ private fun ModelCard(
                                 ),
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
                             )
-                            
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        downloadManager.downloadModel(model.modelName, downloadUrl)
-                                    }
-                                },
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.PlayArrow, 
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    stringResource(R.string.mnn_resume_download),
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
-                                )
+                                // 继续下载按钮
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            downloadManager.downloadModel(model.modelName, downloadUrl)
+                                        }
+                                    },
+                                    modifier = Modifier.height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        stringResource(R.string.mnn_resume_download),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                                    )
+                                }
+
+                                // 删除按钮
+                                IconButton(
+                                    onClick = { onDelete(model.modelName) },
+                                    modifier = Modifier.size(32.dp),
+                                    enabled = canDelete
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.mnn_delete_model),
+                                        tint = if (canDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -535,12 +585,13 @@ private fun ModelCard(
                         
                         IconButton(
                             onClick = { onDelete(model.modelName) },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(32.dp),
+                            enabled = canDelete
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.mnn_delete_model),
-                                tint = MaterialTheme.colorScheme.error,
+                                tint = if (canDelete) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -550,37 +601,42 @@ private fun ModelCard(
                 is DownloadState.Failed -> {
                     val state = downloadState as DownloadState.Failed
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stringResource(R.string.mnn_download_failed, state.error),
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.error,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        
-                        Spacer(modifier = Modifier.height(6.dp))
-                        
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    downloadManager.downloadModel(model.modelName, downloadUrl)
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(32.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Refresh, 
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                stringResource(R.string.mnn_retry),
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                                text = stringResource(R.string.mnn_download_failed, state.error),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        downloadManager.downloadModel(model.modelName, downloadUrl)
+                                    }
+                                },
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh, 
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    stringResource(R.string.mnn_retry),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                                )
+                            }
                         }
                     }
                 }

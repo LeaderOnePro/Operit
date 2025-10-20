@@ -2911,6 +2911,7 @@
     <string name="mnn_delete_model">删除模型</string>
     <string name="mnn_confirm_delete">确认删除此模型吗？</string>
     <string name="mnn_loading_models">加载模型列表中...</string>
+    <string name="mnn_connecting">正在连接...</string>
     <string name="mnn_load_failed">加载失败</string>
     <string name="mnn_retry">重试</string>
     <string name="mnn_start_download">开始下载</string>

@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.animation.android)
     implementation(libs.androidx.ui.android)
+    implementation(libs.androidx.activity.ktx)
 
     // Desugaring support for modern Java APIs on older Android
     coreLibraryDesugaring(libs.desugar.jdk)

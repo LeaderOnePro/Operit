@@ -5,6 +5,29 @@ project("mnn_jni")
 # 设置 MNN 源代码路径
 set(MNN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/main/cpp/MNN)
 
+# 使用 CMake Policy CMP0077 来让 set() 覆盖 option()
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
+# 设置标志以避免 MNN 的 POST_BUILD 命令问题
+set(MNN_BUILD_FOR_ANDROID_COMMAND ON CACHE BOOL "Build from command" FORCE)
+
+# 启用 LLM 支持及相关优化
+set(MNN_BUILD_LLM ON CACHE BOOL "Build LLM support" FORCE)
+set(MNN_LOW_MEMORY ON CACHE BOOL "Use low memory mode" FORCE)
+set(MNN_SUPPORT_TRANSFORMER_FUSE ON CACHE BOOL "Support transformer fuse" FORCE)
+set(MNN_CPU_WEIGHT_DEQUANT_GEMM ON CACHE BOOL "CPU weight dequant gemm" FORCE)
+
+# 禁用不需要的功能以加快编译
+set(MNN_BUILD_BENCHMARK OFF CACHE BOOL "Build benchmark" FORCE)
+set(MNN_BUILD_TEST OFF CACHE BOOL "Build test" FORCE)
+set(MNN_BUILD_TOOLS OFF CACHE BOOL "Build tools" FORCE)
+set(MNN_BUILD_QUANTOOLS OFF CACHE BOOL "Build quantools" FORCE)
+set(MNN_EVALUATION OFF CACHE BOOL "Build evaluation" FORCE)
+set(MNN_BUILD_CONVERTER OFF CACHE BOOL "Build converter" FORCE)
+set(MNN_BUILD_TRAIN OFF CACHE BOOL "Build train" FORCE)
+
 # 添加 MNN 主项目
 add_subdirectory(${MNN_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/MNN)
 
@@ -14,6 +37,7 @@ add_library(
     SHARED
     src/main/cpp/mnnnetnative.cpp
     src/main/cpp/mnnmodulennative.cpp
+    src/main/cpp/mnnllmnative.cpp
     # mnnportraitnative.cpp 使用的是不同的包名，这里不需要
 )
 
@@ -22,11 +46,15 @@ target_include_directories(MNNWrapper PRIVATE
     ${MNN_SOURCE_DIR}/include
     ${MNN_SOURCE_DIR}/source
     ${MNN_SOURCE_DIR}/express
+    ${MNN_SOURCE_DIR}/transformers/llm/engine/include
 )
 
 # 添加编译选项以解决 TLS 问题
 target_compile_options(MNNWrapper PRIVATE -fno-emulated-tls)
 target_compile_options(MNN PRIVATE -fno-emulated-tls)
+if(TARGET llm)
+    target_compile_options(llm PRIVATE -fno-emulated-tls)
+endif()
 
 # 链接 MNN 库
 target_link_libraries(
@@ -36,4 +64,9 @@ target_link_libraries(
     log
     jnigraphics
 )
+
+# 如果 LLM 库存在，也链接它
+if(TARGET llm)
+    target_link_libraries(MNNWrapper llm)
+endif()
 

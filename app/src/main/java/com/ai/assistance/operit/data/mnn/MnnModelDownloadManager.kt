@@ -3,14 +3,22 @@ package com.ai.assistance.operit.data.mnn
 import android.content.Context
 import android.os.Environment
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.buffer
+import okio.sink
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -52,8 +60,24 @@ data class MsFileInfo(
     val Type: String? = null
 )
 
+@Serializable
+private data class PersistentDownloadState(
+    val modelName: String,
+    val url: String,
+    val modelFolderName: String,
+    val totalBytes: Long,
+    val fileTasks: List<PersistentFileTask> = emptyList() // For multi-file downloads
+)
+
+@Serializable
+private data class PersistentFileTask(
+    val path: String,
+    val size: Long
+)
+
 sealed class DownloadState {
     object Idle : DownloadState()
+    object Connecting : DownloadState() // 新增状态，表示正在连接或准备下载
     data class Downloading(
         val progress: Float, 
         val speed: String, 
@@ -68,12 +92,21 @@ sealed class DownloadState {
     data class Failed(val error: String) : DownloadState()
 }
 
-class MnnModelDownloadManager(private val context: Context) {
+class MnnModelDownloadManager private constructor(private val context: Context) {
     
     companion object {
+        @Volatile
+        private var INSTANCE: MnnModelDownloadManager? = null
+
+        fun getInstance(context: Context): MnnModelDownloadManager {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: MnnModelDownloadManager(context.applicationContext).also { INSTANCE = it }
+            }
+        }
         private const val TAG = "MnnModelDownloadMgr"
         private const val MODEL_MARKET_URL = "https://meta.alicdn.com/data/mnn/apis/model_market.json"
         private const val CACHE_FILE_NAME = "mnn_model_market_cache.json"
+        private const val PERSISTENT_STATE_FILE_NAME = "mnn_download_states.json"
         private const val TEMP_SUFFIX = ".tmp"
         
         val MODEL_DIR = File(
@@ -81,6 +114,8 @@ class MnnModelDownloadManager(private val context: Context) {
             "Operit/models/mnn"
         )
     }
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -92,19 +127,115 @@ class MnnModelDownloadManager(private val context: Context) {
         isLenient = true
     }
     
-    private val downloadStateMap = ConcurrentHashMap<String, MutableStateFlow<DownloadState>>()
+    private val downloadStates = ConcurrentHashMap<String, MutableStateFlow<DownloadState>>()
     private val pauseFlags = ConcurrentHashMap<String, Boolean>()
-    
+    private val downloadJobs = ConcurrentHashMap<String, Job>()
+    private var persistentStates = ConcurrentHashMap<String, PersistentDownloadState>()
+
+
     init {
         if (!MODEL_DIR.exists()) {
             MODEL_DIR.mkdirs()
         }
+        loadPersistentStates()
+    }
+
+    private fun loadPersistentStates() {
+        applicationScope.launch {
+            val stateFile = File(context.filesDir, PERSISTENT_STATE_FILE_NAME)
+            if (!stateFile.exists()) return@launch
+
+            try {
+                val jsonString = stateFile.readText()
+                if (jsonString.isBlank()) return@launch
+
+                val states = json.decodeFromString<List<PersistentDownloadState>>(jsonString)
+                persistentStates = ConcurrentHashMap(states.associateBy { it.modelName })
+                Log.d(TAG, "成功加载 ${states.size} 个持久化下载状态")
+
+                states.forEach { state ->
+                    val modelFolder = File(MODEL_DIR, state.modelFolderName)
+                    var downloadedBytes = 0L
+
+                    if (state.fileTasks.isNotEmpty()) {
+                        // 多文件下载
+                        state.fileTasks.forEach { task ->
+                            val tempFile = File(modelFolder, "${task.path}$TEMP_SUFFIX")
+                            if (tempFile.exists()) {
+                                downloadedBytes += tempFile.length()
+                            } else {
+                                val finalFile = File(modelFolder, task.path)
+                                if (finalFile.exists() && finalFile.length() == task.size) {
+                                    downloadedBytes += finalFile.length()
+                                }
+                            }
+                        }
+                    } else {
+                        // 单文件下载
+                        val fileName = getFileName(state.modelName)
+                        val tempFile = File(modelFolder, "$fileName$TEMP_SUFFIX")
+                        if (tempFile.exists()) {
+                            downloadedBytes = tempFile.length()
+                        }
+                    }
+
+                    if (downloadedBytes > 0 && downloadedBytes < state.totalBytes) {
+                        val progress = if (state.totalBytes > 0) downloadedBytes.toFloat() / state.totalBytes else 0f
+                        updateDownloadState(state.modelName, DownloadState.Paused(progress, downloadedBytes))
+                        Log.d(TAG, "恢复 '${state.modelName}' 为暂停状态，进度: ${"%.2f".format(progress * 100)}%")
+                    } else if (downloadedBytes >= state.totalBytes && state.totalBytes > 0) {
+                        // 发现下载已完成但未清理状态，进行清理
+                        removePersistentState(state.modelName)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "加载持久化状态失败", e)
+            }
+        }
+    }
+
+    private fun savePersistentStates() {
+        applicationScope.launch {
+            try {
+                val stateFile = File(context.filesDir, PERSISTENT_STATE_FILE_NAME)
+                val states = persistentStates.values.toList()
+                if (states.isEmpty()) {
+                    if (stateFile.exists()) stateFile.delete()
+                } else {
+                    val jsonString = json.encodeToString(
+                        ListSerializer(PersistentDownloadState.serializer()),
+                        states
+                    )
+                    stateFile.writeText(jsonString)
+                }
+                Log.d(TAG, "成功保存 ${states.size} 个持久化下载状态")
+            } catch (e: Exception) {
+                Log.e(TAG, "保存持久化状态失败", e)
+            }
+        }
+    }
+
+    private fun addPersistentState(state: PersistentDownloadState) {
+        persistentStates[state.modelName] = state
+        savePersistentStates()
+    }
+
+    private fun removePersistentState(modelName: String) {
+        if (persistentStates.containsKey(modelName)) {
+            persistentStates.remove(modelName)
+            savePersistentStates()
+        }
     }
     
     fun getDownloadState(modelName: String): StateFlow<DownloadState> {
-        return downloadStateMap.getOrPut(modelName) {
-            MutableStateFlow(DownloadState.Idle)
-        }
+        return downloadStates.getOrPut(modelName) {
+            val initialState = if (isModelDownloaded(modelName)) {
+                DownloadState.Completed
+            } else {
+                DownloadState.Idle
+            }
+            MutableStateFlow(initialState)
+        }.asStateFlow()
     }
     
     suspend fun fetchModelList(): Result<List<MnnModel>> = withContext(Dispatchers.IO) {
@@ -164,17 +295,33 @@ class MnnModelDownloadManager(private val context: Context) {
             val url = "https://modelscope.cn/api/v1/models/${parts[0]}/${parts[1]}/repo/files?Recursive=1"
             Log.d(TAG, "获取文件列表: $url")
             
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36")
+                .addHeader("Accept", "application/json")
+                .build()
             val response = okHttpClient.newCall(request).execute()
+            
+            Log.d(TAG, "响应码: ${response.code}")
             
             if (!response.isSuccessful) {
                 val error = "HTTP ${response.code}: ${response.message}"
                 Log.e(TAG, "获取文件列表失败: $error")
+                val body = response.body?.string() ?: ""
+                if (body.isNotEmpty()) {
+                    Log.e(TAG, "响应体: $body")
+                }
                 return@withContext Result.failure(Exception(error))
             }
             
             val jsonString = response.body?.string() ?: ""
-            Log.d(TAG, "文件列表响应: $jsonString")
+            if (jsonString.isEmpty()) {
+                Log.e(TAG, "响应体为空")
+                return@withContext Result.failure(Exception("响应体为空"))
+            }
+            
+            Log.d(TAG, "文件列表响应长度: ${jsonString.length}")
+            Log.d(TAG, "文件列表响应前500字符: ${jsonString.take(500)}")
             
             val repoInfo = json.decodeFromString<MsRepoInfo>(jsonString)
             
@@ -185,210 +332,243 @@ class MnnModelDownloadManager(private val context: Context) {
             val files = repoInfo.Data?.Files?.filter { it.Type != "tree" } ?: emptyList()
             Result.success(files)
         } catch (e: Exception) {
-            Log.e(TAG, "获取文件列表异常", e)
+            Log.e(TAG, "获取文件列表异常: ${e.javaClass.simpleName}: ${e.message}", e)
+            e.printStackTrace()
             Result.failure(e)
         }
     }
     
-    suspend fun downloadModel(
-        modelName: String,
-        sourceUrl: String
-    ): Result<File> = withContext(Dispatchers.IO) {
-        try {
-            // 创建模型文件夹（参考 MsModelDownloader.kt:174-176）
-            val modelFolderName = getLastFileName(sourceUrl)
-            val modelFolder = File(MODEL_DIR, modelFolderName)
-            
-            if (!modelFolder.exists()) {
-                modelFolder.mkdirs()
-            }
-            
-            Log.d(TAG, "========== 开始下载模型 ==========")
-            Log.d(TAG, "模型名称: $modelName")
-            Log.d(TAG, "源地址: $sourceUrl")
-            Log.d(TAG, "模型文件夹: ${modelFolder.absolutePath}")
-            
-            // 构建下载URL（参考 MsModelDownloader.kt:244-248）
-            val downloadUrl = if (sourceUrl.startsWith("http")) {
-                sourceUrl
-            } else {
-                // ModelScope仓库格式: owner/repo
-                // 先获取仓库文件列表，找到实际的文件路径
-                val filesResult = fetchRepoFiles(sourceUrl)
-                if (filesResult.isFailure) {
-                    val error = "获取仓库文件列表失败: ${filesResult.exceptionOrNull()?.message}"
-                    updateDownloadState(modelName, DownloadState.Failed(error))
-                    return@withContext Result.failure(Exception(error))
-                }
-                
-                val files = filesResult.getOrNull() ?: emptyList()
-                Log.d(TAG, "仓库文件列表 (${files.size} 个文件):")
-                files.forEach { file ->
-                    Log.d(TAG, "  - ${file.Path} (${file.Size} 字节, ${file.Type})")
-                }
-                
-                // 下载所有非目录文件（参考 MsModelDownloader.kt:236-241）
-                return@withContext downloadAllFiles(modelName, sourceUrl, files, modelFolder)
-            }
-            
-            // 单文件下载（直接URL）
-            val fileName = getFileName(modelName)
-            val targetFile = File(modelFolder, fileName)
-            val tempFile = File(modelFolder, "$fileName$TEMP_SUFFIX")
-            
-            Log.d(TAG, "目标文件路径: ${targetFile.absolutePath}")
-            Log.d(TAG, "临时文件路径: ${tempFile.absolutePath}")
-            
-            // 获取服务器文件大小
-            Log.d(TAG, "发送 HEAD 请求获取文件大小...")
+    suspend fun downloadModel(modelName: String, url: String) {
+        // 立即更新状态，防止重复点击
+        val currentState = getDownloadState(modelName).value
+        if (currentState is DownloadState.Downloading || currentState is DownloadState.Connecting) {
+            Log.w(TAG, "Download for $modelName is already in progress or connecting, ignoring click.")
+            return
+        }
+        updateDownloadState(modelName, DownloadState.Connecting)
+
+        // 先取消可能存在的旧任务
+        downloadJobs[modelName]?.cancel()
+        Log.d(TAG, "Starting download for $modelName. Any existing job was cancelled.")
+
+        val job = applicationScope.launch {
             try {
-                val headRequest = Request.Builder().url(downloadUrl).head().build()
-                val headResponse = okHttpClient.newCall(headRequest).execute()
-                val serverFileSize = headResponse.header("Content-Length")?.toLongOrNull() ?: -1L
-                val responseCode = headResponse.code
-                headResponse.close()
+                // 重置暂停标志
+                pauseFlags[modelName] = false
                 
-                Log.d(TAG, "HEAD 响应码: $responseCode")
-                Log.d(TAG, "服务器文件大小: $serverFileSize 字节 (${formatFileSize(serverFileSize)})")
+                // 创建模型文件夹（参考 MsModelDownloader.kt:174-176）
+                val modelFolderName = getLastFileName(url)
+                val modelFolder = File(MODEL_DIR, modelFolderName)
                 
-                // 检查文件是否已完整下载
-                if (targetFile.exists()) {
-                    val localFileSize = targetFile.length()
-                    Log.d(TAG, "发现本地文件，大小: $localFileSize 字节 (${formatFileSize(localFileSize)})")
-                    
-                    if (serverFileSize > 0 && localFileSize == serverFileSize) {
-                        Log.d(TAG, "✅ 文件大小匹配，已完整下载，跳过下载")
-                        updateDownloadState(modelName, DownloadState.Completed)
-                        return@withContext Result.success(targetFile)
-                    } else {
-                        Log.w(TAG, "❌ 文件大小不匹配！期望: $serverFileSize, 实际: $localFileSize")
-                        Log.w(TAG, "删除损坏的文件...")
-                        val deleted = targetFile.delete()
-                        Log.d(TAG, "删除${if (deleted) "成功" else "失败"}")
-                    }
+                if (!modelFolder.exists()) {
+                    modelFolder.mkdirs()
+                }
+                
+                Log.d(TAG, "========== 开始下载模型 ==========")
+                Log.d(TAG, "模型名称: $modelName")
+                Log.d(TAG, "源地址: $url")
+                Log.d(TAG, "模型文件夹: ${modelFolder.absolutePath}")
+                
+                // 构建下载URL（参考 MsModelDownloader.kt:244-248）
+                val downloadUrl = if (url.startsWith("http")) {
+                    url
                 } else {
-                    Log.d(TAG, "本地文件不存在，需要下载")
+                    // ModelScope仓库格式: owner/repo
+                    // 先获取仓库文件列表，找到实际的文件路径
+                    val filesResult = fetchRepoFiles(url)
+                    if (filesResult.isFailure) {
+                        val error = "获取仓库文件列表失败: ${filesResult.exceptionOrNull()?.message}"
+                        updateDownloadState(modelName, DownloadState.Failed(error))
+                        return@launch
+                    }
+                    
+                    val files = filesResult.getOrNull() ?: emptyList()
+                    val totalSize = files.sumOf { it.Size }
+                    
+                    // 持久化状态
+                    val persistentTasks = files.map { PersistentFileTask(it.Path!!, it.Size) }
+                    addPersistentState(PersistentDownloadState(modelName, url, modelFolderName, totalSize, persistentTasks))
+
+                    Log.d(TAG, "仓库文件列表 (${files.size} 个文件):")
+                    files.forEach { file ->
+                        Log.d(TAG, "  - ${file.Path} (${file.Size} 字节, ${file.Type})")
+                    }
+                    
+                    // 下载所有非目录文件（参考 MsModelDownloader.kt:236-241）
+                    downloadAllFiles(modelName, url, files, modelFolder)
+                    return@launch
+                }
+                
+                // 单文件下载（直接URL）
+                val fileName = getFileName(modelName)
+                val targetFile = File(modelFolder, fileName)
+                val tempFile = File(modelFolder, "$fileName$TEMP_SUFFIX")
+                
+                Log.d(TAG, "目标文件路径: ${targetFile.absolutePath}")
+                Log.d(TAG, "临时文件路径: ${tempFile.absolutePath}")
+                
+                // 获取服务器文件大小
+                Log.d(TAG, "发送 HEAD 请求获取文件大小...")
+                try {
+                    val headRequest = Request.Builder().url(downloadUrl).head().build()
+                    val headResponse = okHttpClient.newCall(headRequest).execute()
+                    val serverFileSize = headResponse.header("Content-Length")?.toLongOrNull() ?: -1L
+                    val responseCode = headResponse.code
+                    headResponse.close()
+                    
+                    if (serverFileSize > 0) {
+                        addPersistentState(PersistentDownloadState(modelName, url, modelFolderName, serverFileSize))
+                    }
+
+                    Log.d(TAG, "HEAD 响应码: $responseCode")
+                    Log.d(TAG, "服务器文件大小: $serverFileSize 字节 (${formatFileSize(serverFileSize)})")
+                    
+                    // 检查文件是否已完整下载
+                    if (targetFile.exists()) {
+                        val localFileSize = targetFile.length()
+                        Log.d(TAG, "发现本地文件，大小: $localFileSize 字节 (${formatFileSize(localFileSize)})")
+                        
+                        if (serverFileSize > 0 && localFileSize == serverFileSize) {
+                            Log.d(TAG, "✅ 文件大小匹配，已完整下载，跳过下载")
+                            updateDownloadState(modelName, DownloadState.Completed)
+                            return@launch
+                        } else {
+                            Log.w(TAG, "❌ 文件大小不匹配！期望: $serverFileSize, 实际: $localFileSize")
+                            Log.w(TAG, "删除损坏的文件...")
+                            val deleted = targetFile.delete()
+                            Log.d(TAG, "删除${if (deleted) "成功" else "失败"}")
+                        }
+                    } else {
+                        Log.d(TAG, "本地文件不存在，需要下载")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "HEAD 请求失败: ${e.message}", e)
+                    // HEAD 失败不影响继续下载，只是无法验证已存在的文件
+                    if (targetFile.exists()) {
+                        Log.w(TAG, "无法验证文件完整性，删除后重新下载")
+                        targetFile.delete()
+                    }
+                }
+                
+                // 断点续传
+                val downloadedBytes = if (tempFile.exists()) tempFile.length() else 0L
+                
+                if (downloadedBytes > 0) {
+                    Log.d(TAG, "发现临时文件，使用断点续传，已下载: $downloadedBytes 字节 (${formatFileSize(downloadedBytes)})")
+                } else {
+                    Log.d(TAG, "从头开始下载")
+                }
+                
+                val requestBuilder = Request.Builder().url(downloadUrl)
+                if (downloadedBytes > 0) {
+                    requestBuilder.header("Range", "bytes=$downloadedBytes-")
+                    Log.d(TAG, "添加 Range 请求头: bytes=$downloadedBytes-")
+                }
+                
+                Log.d(TAG, "发送下载请求...")
+                val response = okHttpClient.newCall(requestBuilder.build()).execute()
+                Log.d(TAG, "响应码: ${response.code}")
+                
+                if (!response.isSuccessful && response.code != 206) {
+                    val error = "下载失败: HTTP ${response.code} ${response.message}"
+                    Log.e(TAG, error)
+                    updateDownloadState(modelName, DownloadState.Failed(error))
+                    return@launch
+                }
+                
+                val contentLength = response.body?.contentLength() ?: 0L
+                val totalBytes = if (response.code == 206) downloadedBytes + contentLength else contentLength
+                
+                Log.d(TAG, "Content-Length: $contentLength 字节")
+                Log.d(TAG, "总大小: $totalBytes 字节 (${formatFileSize(totalBytes)})")
+                Log.d(TAG, "开始写入数据...")
+                
+                val inputStream = response.body?.byteStream() ?: run {
+                    updateDownloadState(modelName, DownloadState.Failed("响应体为空"))
+                    return@launch
+                }
+                
+                val outputStream = FileOutputStream(tempFile, downloadedBytes > 0)
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                var currentDownloaded = downloadedBytes
+                var lastUpdateTime = System.currentTimeMillis()
+                var lastDownloaded = downloadedBytes
+                var loopCount = 0
+                
+                Log.d(TAG, "进入下载循环...")
+                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    loopCount++
+                    
+                    if (pauseFlags[modelName] == true) {
+                        Log.w(TAG, "检测到暂停标志，暂停下载")
+                        outputStream.close()
+                        inputStream.close()
+                        val progress = if (totalBytes > 0) currentDownloaded.toFloat() / totalBytes else 0f
+                        updateDownloadState(modelName, DownloadState.Paused(progress, currentDownloaded))
+                        return@launch
+                    }
+                    
+                    outputStream.write(buffer, 0, bytesRead)
+                    currentDownloaded += bytesRead
+                    
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastUpdateTime >= 500) {
+                        val speedBytesPerSec = (currentDownloaded - lastDownloaded) / ((currentTime - lastUpdateTime) / 1000.0)
+                        val progress = if (totalBytes > 0) currentDownloaded.toFloat() / totalBytes else 0f
+                        
+                        Log.d(TAG, "下载进度: ${String.format("%.2f", progress * 100)}% " +
+                                "(${formatFileSize(currentDownloaded)}/${formatFileSize(totalBytes)}) " +
+                                "速度: ${formatSpeed(speedBytesPerSec)} " +
+                                "循环次数: $loopCount")
+                        
+                        updateDownloadState(
+                            modelName,
+                            DownloadState.Downloading(progress, formatSpeed(speedBytesPerSec), currentDownloaded, totalBytes)
+                        )
+                        lastUpdateTime = currentTime
+                        lastDownloaded = currentDownloaded
+                    }
+                }
+                
+                outputStream.close()
+                inputStream.close()
+                
+                Log.d(TAG, "下载完成！总循环次数: $loopCount, 最终大小: ${formatFileSize(currentDownloaded)}")
+                Log.d(TAG, "重命名临时文件: ${tempFile.name} -> ${targetFile.name}")
+                
+                if (tempFile.renameTo(targetFile)) {
+                    Log.d(TAG, "✅ 重命名成功，下载完成")
+                    updateDownloadState(modelName, DownloadState.Completed)
+                    removePersistentState(modelName)
+                } else {
+                    Log.e(TAG, "❌ 重命名失败！")
+                    updateDownloadState(modelName, DownloadState.Failed("重命名失败"))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "HEAD 请求失败: ${e.message}", e)
-                // HEAD 失败不影响继续下载，只是无法验证已存在的文件
-                if (targetFile.exists()) {
-                    Log.w(TAG, "无法验证文件完整性，删除后重新下载")
-                    targetFile.delete()
-                }
+                Log.e(TAG, "========== 下载异常 ==========")
+                Log.e(TAG, "模型: $modelName", e)
+                Log.e(TAG, "错误: ${e.javaClass.simpleName}: ${e.message}")
+                e.printStackTrace()
+                updateDownloadState(modelName, DownloadState.Failed(e.message ?: "未知错误"))
             }
-            
-            // 断点续传
-            pauseFlags[modelName] = false
-            val downloadedBytes = if (tempFile.exists()) tempFile.length() else 0L
-            
-            if (downloadedBytes > 0) {
-                Log.d(TAG, "发现临时文件，使用断点续传，已下载: $downloadedBytes 字节 (${formatFileSize(downloadedBytes)})")
-            } else {
-                Log.d(TAG, "从头开始下载")
-            }
-            
-            val requestBuilder = Request.Builder().url(downloadUrl)
-            if (downloadedBytes > 0) {
-                requestBuilder.header("Range", "bytes=$downloadedBytes-")
-                Log.d(TAG, "添加 Range 请求头: bytes=$downloadedBytes-")
-            }
-            
-            Log.d(TAG, "发送下载请求...")
-            val response = okHttpClient.newCall(requestBuilder.build()).execute()
-            Log.d(TAG, "响应码: ${response.code}")
-            
-            if (!response.isSuccessful && response.code != 206) {
-                val error = "下载失败: HTTP ${response.code} ${response.message}"
-                Log.e(TAG, error)
-                updateDownloadState(modelName, DownloadState.Failed(error))
-                return@withContext Result.failure(Exception(error))
-            }
-            
-            val contentLength = response.body?.contentLength() ?: 0L
-            val totalBytes = if (response.code == 206) downloadedBytes + contentLength else contentLength
-            
-            Log.d(TAG, "Content-Length: $contentLength 字节")
-            Log.d(TAG, "总大小: $totalBytes 字节 (${formatFileSize(totalBytes)})")
-            Log.d(TAG, "开始写入数据...")
-            
-            val inputStream = response.body?.byteStream() ?: run {
-                updateDownloadState(modelName, DownloadState.Failed("响应体为空"))
-                return@withContext Result.failure(Exception("响应体为空"))
-            }
-            
-            val outputStream = FileOutputStream(tempFile, downloadedBytes > 0)
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            var currentDownloaded = downloadedBytes
-            var lastUpdateTime = System.currentTimeMillis()
-            var lastDownloaded = downloadedBytes
-            var loopCount = 0
-            
-            Log.d(TAG, "进入下载循环...")
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                loopCount++
-                
-                if (pauseFlags[modelName] == true) {
-                    Log.w(TAG, "检测到暂停标志，暂停下载")
-                    outputStream.close()
-                    inputStream.close()
-                    val progress = if (totalBytes > 0) currentDownloaded.toFloat() / totalBytes else 0f
-                    updateDownloadState(modelName, DownloadState.Paused(progress, currentDownloaded))
-                    return@withContext Result.failure(Exception("下载已暂停"))
-                }
-                
-                outputStream.write(buffer, 0, bytesRead)
-                currentDownloaded += bytesRead
-                
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - lastUpdateTime >= 500) {
-                    val speedBytesPerSec = (currentDownloaded - lastDownloaded) / ((currentTime - lastUpdateTime) / 1000.0)
-                    val progress = if (totalBytes > 0) currentDownloaded.toFloat() / totalBytes else 0f
-                    
-                    Log.d(TAG, "下载进度: ${String.format("%.2f", progress * 100)}% " +
-                            "(${formatFileSize(currentDownloaded)}/${formatFileSize(totalBytes)}) " +
-                            "速度: ${formatSpeed(speedBytesPerSec)} " +
-                            "循环次数: $loopCount")
-                    
-                    updateDownloadState(
-                        modelName,
-                        DownloadState.Downloading(progress, formatSpeed(speedBytesPerSec), currentDownloaded, totalBytes)
-                    )
-                    lastUpdateTime = currentTime
-                    lastDownloaded = currentDownloaded
-                }
-            }
-            
-            outputStream.close()
-            inputStream.close()
-            
-            Log.d(TAG, "下载完成！总循环次数: $loopCount, 最终大小: ${formatFileSize(currentDownloaded)}")
-            Log.d(TAG, "重命名临时文件: ${tempFile.name} -> ${targetFile.name}")
-            
-            if (tempFile.renameTo(targetFile)) {
-                Log.d(TAG, "✅ 重命名成功，下载完成")
-                updateDownloadState(modelName, DownloadState.Completed)
-                Result.success(targetFile)
-            } else {
-                Log.e(TAG, "❌ 重命名失败！")
-                updateDownloadState(modelName, DownloadState.Failed("重命名失败"))
-                Result.failure(Exception("重命名失败"))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "========== 下载异常 ==========")
-            Log.e(TAG, "模型: $modelName", e)
-            Log.e(TAG, "错误: ${e.javaClass.simpleName}: ${e.message}")
-            e.printStackTrace()
-            updateDownloadState(modelName, DownloadState.Failed(e.message ?: "未知错误"))
-            Result.failure(e)
+        }
+        downloadJobs[modelName] = job
+        job.invokeOnCompletion {
+            downloadJobs.remove(modelName)
         }
     }
-    
+
     fun pauseDownload(modelName: String) {
         pauseFlags[modelName] = true
     }
-    
+
+    fun cancelDownload(modelName: String) {
+        downloadJobs[modelName]?.cancel()
+        downloadJobs.remove(modelName)
+        updateDownloadState(modelName, DownloadState.Idle)
+    }
+
     fun deleteModel(modelName: String): Boolean {
         return try {
             val folderName = getLastFileName(modelName)
@@ -405,6 +585,7 @@ class MnnModelDownloadManager(private val context: Context) {
                 targetFile.delete() or tempFile.delete()
             }
             
+            removePersistentState(modelName)
             updateDownloadState(modelName, DownloadState.Idle)
             deleted
         } catch (e: Exception) {
@@ -428,9 +609,8 @@ class MnnModelDownloadManager(private val context: Context) {
     }
     
     private fun updateDownloadState(modelName: String, state: DownloadState) {
-        downloadStateMap.getOrPut(modelName) {
-            MutableStateFlow(DownloadState.Idle)
-        }.value = state
+        val stateFlow = downloadStates.getOrPut(modelName) { MutableStateFlow(state) }
+        stateFlow.value = state
     }
     
     private fun getFileName(modelName: String): String {
@@ -611,6 +791,7 @@ class MnnModelDownloadManager(private val context: Context) {
             
             Log.d(TAG, "所有文件下载完成！模型文件夹: ${modelFolder.absolutePath}")
             updateDownloadState(modelName, DownloadState.Completed)
+            removePersistentState(modelName)
             
             Result.success(modelFolder)
         } catch (e: Exception) {
