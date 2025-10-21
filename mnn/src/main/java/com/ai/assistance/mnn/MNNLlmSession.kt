@@ -17,10 +17,22 @@ class MNNLlmSession private constructor(
         /**
          * 从模型目录创建 LLM 会话
          * @param modelDir 模型目录（包含 llm_config.json）
+         * @param backendType 后端类型（"cpu", "opencl", "metal"）
+         * @param threadNum 线程数
+         * @param precision 精度（"low", "normal", "high"）
+         * @param memory 内存模式（"low", "normal", "high"）
+         * @param tmpPath 临时文件目录（用于缓存文件），默认为模型目录
          * @return MNNLlmSession 实例，失败返回 null
          */
         @JvmStatic
-        fun create(modelDir: String): MNNLlmSession? {
+        fun create(
+            modelDir: String,
+            backendType: String = "cpu",
+            threadNum: Int = 4,
+            precision: String = "low",
+            memory: String = "low",
+            tmpPath: String? = null
+        ): MNNLlmSession? {
             val configFile = File(modelDir, "llm_config.json")
             
             if (!configFile.exists()) {
@@ -29,14 +41,46 @@ class MNNLlmSession private constructor(
             }
             
             Log.d(TAG, "Creating LLM session from: ${configFile.absolutePath}")
+            Log.d(TAG, "Backend: $backendType, Threads: $threadNum, Precision: $precision, Memory: $memory")
+            Log.d(TAG, "Cache path: ${tmpPath ?: modelDir}")
             
+            // 步骤1: 创建LLM实例（不加载）
             val llmPtr = MNNLlmNative.nativeCreateLlm(configFile.absolutePath)
             if (llmPtr == 0L) {
                 Log.e(TAG, "Failed to create LLM native instance")
                 return null
             }
             
-            Log.i(TAG, "LLM session created successfully")
+            // 步骤2: 设置配置（必须在load之前！）
+            // 按照官方 llm_bench.cpp 的顺序设置配置
+            // tmp_path 用于存放 mnn_cachefile.bin 等临时文件
+            val cachePath = tmpPath ?: modelDir
+            val configs = listOf(
+                """{"tmp_path":"$cachePath"}""",
+                """{"async":false}""",
+                """{"precision":"$precision"}""",
+                """{"memory":"$memory"}""",
+                """{"backend_type":"$backendType"}""",
+                """{"thread_num":$threadNum}"""
+            )
+            
+            for (config in configs) {
+                if (!MNNLlmNative.nativeSetConfig(llmPtr, config)) {
+                    Log.e(TAG, "Failed to set config: $config")
+                    MNNLlmNative.nativeReleaseLlm(llmPtr)
+                    return null
+                }
+                Log.d(TAG, "Config set: $config")
+            }
+            
+            // 步骤3: 加载模型（配置已设置）
+            if (!MNNLlmNative.nativeLoadLlm(llmPtr)) {
+                Log.e(TAG, "Failed to load LLM model")
+                MNNLlmNative.nativeReleaseLlm(llmPtr)
+                return null
+            }
+            
+            Log.i(TAG, "LLM session created and loaded successfully")
             return MNNLlmSession(llmPtr, modelDir)
         }
     }

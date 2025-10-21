@@ -54,26 +54,47 @@ Java_com_ai_assistance_mnn_MNNLlmNative_nativeCreateLlm(
     LOGD("Creating LLM from config: %s", configPath.c_str());
     
     try {
-        // 使用 MNN LLM 引擎创建实例
+        // 使用 MNN LLM 引擎创建实例（但不加载）
+        // 按照官方 llm_session.cpp 的做法，先创建实例
         Llm* llm = Llm::createLLM(configPath);
         if (llm == nullptr) {
             LOGE("Failed to create LLM instance");
             return 0;
         }
         
-        // 加载模型
-        if (!llm->load()) {
-            LOGE("Failed to load LLM model");
-            Llm::destroy(llm);
-            return 0;
-        }
-        
-        LOGI("LLM created successfully at %p", llm);
+        // 注意：这里不调用 load()，让上层在设置完配置后再调用 load()
+        // 这是关键：配置必须在 load() 之前设置！
+        LOGI("LLM instance created at %p (not loaded yet)", llm);
         return reinterpret_cast<jlong>(llm);
         
     } catch (const std::exception& e) {
         LOGE("Exception creating LLM: %s", e.what());
         return 0;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ai_assistance_mnn_MNNLlmNative_nativeLoadLlm(
+    JNIEnv* env, jclass clazz, jlong llmPtr) {
+    
+    if (llmPtr == 0) return JNI_FALSE;
+    
+    Llm* llm = reinterpret_cast<Llm*>(llmPtr);
+    LOGD("Loading LLM model at %p", llm);
+    
+    try {
+        // 加载模型（必须在配置设置之后调用）
+        if (!llm->load()) {
+            LOGE("Failed to load LLM model");
+            return JNI_FALSE;
+        }
+        
+        LOGI("LLM model loaded successfully");
+        return JNI_TRUE;
+        
+    } catch (const std::exception& e) {
+        LOGE("Exception loading LLM: %s", e.what());
+        return JNI_FALSE;
     }
 }
 

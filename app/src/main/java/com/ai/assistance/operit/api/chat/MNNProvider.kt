@@ -106,18 +106,57 @@ class MNNProvider(
                     )
                 }
 
-                // 创建 LLM Session
-                llmSession = MNNLlmSession.create(modelDir)
-                if (llmSession == null) {
-                    return@withContext Result.failure(
-                        Exception("无法创建MNN LLM会话，请检查模型文件")
-                    )
+                // 将 forwardType 映射到 backend_type 字符串
+                val backendType = when (forwardType) {
+                    0 -> "cpu"
+                    3 -> "opencl"
+                    4 -> "auto"
+                    6 -> "opengl"
+                    7 -> "vulkan"
+                    else -> {
+                        Log.w(TAG, "未知的 forwardType: $forwardType，使用默认 CPU")
+                        "cpu"
+                    }
                 }
                 
-                // 应用硬件后端和线程配置
-                applyBackendConfig(llmSession!!)
+                Log.d(TAG, "创建MNN LLM会话，后端: $backendType, 线程数: $threadCount")
+                
+                // Vulkan/OpenCL 后端需要 normal 内存模式以避免 Clone error
+                // CPU 后端可以使用 low 内存模式
+                val memoryMode = if (backendType in listOf("vulkan", "opencl", "opengl")) {
+                    "normal"
+                } else {
+                    "low"
+                }
+                
+                Log.d(TAG, "内存模式: $memoryMode (后端: $backendType)")
+                
+                // 创建缓存目录（用于存放 mnn_cachefile.bin 等临时文件）
+                val cacheDir = File(context.cacheDir, "mnn_cache")
+                if (!cacheDir.exists()) {
+                    val created = cacheDir.mkdirs()
+                    Log.d(TAG, "创建MNN缓存目录: $created")
+                }
+                Log.d(TAG, "MNN缓存目录: ${cacheDir.absolutePath}")
+                Log.d(TAG, "缓存目录存在: ${cacheDir.exists()}, 可写: ${cacheDir.canWrite()}")
+                
+                // 创建 LLM Session（配置必须在创建时传入！）
+                llmSession = MNNLlmSession.create(
+                    modelDir = modelDir,
+                    backendType = backendType,
+                    threadNum = threadCount,
+                    precision = "low",      // 使用低精度以提升性能
+                    memory = memoryMode,    // 根据后端选择内存模式
+                    tmpPath = cacheDir.absolutePath  // 指定缓存目录
+                )
+                
+                if (llmSession == null) {
+                    return@withContext Result.failure(
+                        Exception("无法创建MNN LLM会话，请检查模型文件和配置")
+                    )
+                }
 
-                Log.i(TAG, "MNN LLM模型初始化成功")
+                Log.i(TAG, "MNN LLM模型初始化成功，后端: $backendType")
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -451,41 +490,6 @@ class MNNProvider(
      * - 6 -> "opengl"
      * - 7 -> "vulkan"
      */
-    private fun applyBackendConfig(session: MNNLlmSession) {
-        try {
-            // 将 forwardType 映射到 backend_type 字符串
-            val backendType = when (forwardType) {
-                0 -> "cpu"
-                3 -> "opencl"
-                4 -> "auto"
-                6 -> "opengl"
-                7 -> "vulkan"
-                else -> {
-                    Log.w(TAG, "未知的 forwardType: $forwardType，使用默认 CPU")
-                    "cpu"
-                }
-            }
-            
-            // 分别设置 backend_type 和 thread_num（参考 llm_bench.cpp 的实现）
-            val backendConfigJson = """{"backend_type":"$backendType"}"""
-            val threadConfigJson = """{"thread_num":$threadCount}"""
-            
-            Log.d(TAG, "应用后端配置: $backendConfigJson, 线程配置: $threadConfigJson")
-            
-            var success = session.setConfig(backendConfigJson)
-            if (!success) {
-                Log.e(TAG, "设置 backend_type 失败")
-            }
-            
-            success = session.setConfig(threadConfigJson)
-            if (!success) {
-                Log.e(TAG, "设置 thread_num 失败")
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "应用后端配置时出错", e)
-        }
-    }
     
     /**
      * 格式化文件大小

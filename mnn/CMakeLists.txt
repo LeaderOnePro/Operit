@@ -19,6 +19,15 @@ set(MNN_LOW_MEMORY ON CACHE BOOL "Use low memory mode" FORCE)
 set(MNN_SUPPORT_TRANSFORMER_FUSE ON CACHE BOOL "Support transformer fuse" FORCE)
 set(MNN_CPU_WEIGHT_DEQUANT_GEMM ON CACHE BOOL "CPU weight dequant gemm" FORCE)
 
+# 启用 GPU 后端支持
+set(MNN_VULKAN ON CACHE BOOL "Enable Vulkan backend" FORCE)
+set(MNN_OPENCL ON CACHE BOOL "Enable OpenCL backend" FORCE)
+set(MNN_OPENGL ON CACHE BOOL "Enable OpenGL backend" FORCE)
+set(MNN_SUPPORT_RENDER ON CACHE BOOL "Enable render backend" FORCE)
+
+# 禁用分离编译 - 将所有后端编入 libMNN.so (解决 "Can't Find type=3 backend" 问题)
+set(MNN_SEP_BUILD OFF CACHE BOOL "Build backends separately" FORCE)
+
 # 禁用不需要的功能以加快编译
 set(MNN_BUILD_BENCHMARK OFF CACHE BOOL "Build benchmark" FORCE)
 set(MNN_BUILD_TEST OFF CACHE BOOL "Build test" FORCE)

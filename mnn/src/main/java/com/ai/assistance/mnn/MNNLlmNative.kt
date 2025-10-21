@@ -11,12 +11,21 @@ object MNNLlmNative {
     }
     
     /**
-     * 从配置文件创建 LLM 实例
+     * 从配置文件创建 LLM 实例（不加载模型）
      * @param configPath 配置文件路径 (llm_config.json)
      * @return LLM 指针，失败返回 0
+     * 注意：创建后需要先调用 nativeSetConfig 设置配置，然后调用 nativeLoadLlm 加载模型
      */
     @JvmStatic
     external fun nativeCreateLlm(configPath: String): Long
+    
+    /**
+     * 加载 LLM 模型（必须在设置配置后调用）
+     * @param llmPtr LLM 指针
+     * @return 是否加载成功
+     */
+    @JvmStatic
+    external fun nativeLoadLlm(llmPtr: Long): Boolean
     
     /**
      * 释放 LLM 实例
