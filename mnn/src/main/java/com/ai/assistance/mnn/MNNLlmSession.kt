@@ -161,6 +161,42 @@ class MNNLlmSession private constructor(
     }
     
     /**
+     * 设置 LLM 配置
+     * @param configJson JSON 格式的配置字符串
+     * @return 是否设置成功
+     */
+    fun setConfig(configJson: String): Boolean {
+        synchronized(lock) {
+            checkValid()
+            val success = MNNLlmNative.nativeSetConfig(llmPtr, configJson)
+            if (success) {
+                Log.d(TAG, "Config set successfully: $configJson")
+            } else {
+                Log.e(TAG, "Failed to set config: $configJson")
+            }
+            return success
+        }
+    }
+    
+    /**
+     * 启用或禁用 thinking 模式（仅对支持的模型有效，如 Qwen3）
+     * @param enabled 是否启用 thinking 模式
+     * @return 是否设置成功
+     */
+    fun setThinkingMode(enabled: Boolean): Boolean {
+        val configJson = """
+        {
+            "jinja": {
+                "context": {
+                    "enable_thinking": $enabled
+                }
+            }
+        }
+        """.trimIndent()
+        return setConfig(configJson)
+    }
+    
+    /**
      * 释放会话
      */
     fun release() {

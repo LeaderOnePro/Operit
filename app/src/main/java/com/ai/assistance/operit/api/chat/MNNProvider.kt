@@ -7,6 +7,7 @@ import com.ai.assistance.mnn.MNNLlmSession
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.data.model.ParameterValueType
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,9 @@ class MNNProvider(
                         Exception("无法创建MNN LLM会话，请检查模型文件")
                     )
                 }
+                
+                // 应用硬件后端和线程配置
+                applyBackendConfig(llmSession!!)
 
                 Log.i(TAG, "MNN LLM模型初始化成功")
             }
@@ -191,6 +195,17 @@ class MNNProvider(
                 return@stream
             }
 
+            // 设置 thinking 模式（仅对支持的模型有效，如 Qwen3）
+            try {
+                session.setThinkingMode(enableThinking)
+                Log.d(TAG, "Thinking mode set to: $enableThinking")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to set thinking mode (model may not support it): ${e.message}")
+            }
+
+            // 应用模型参数（采样参数）
+            applyModelParameters(session, modelParameters)
+
             // 构建历史记录（添加当前消息）
             val fullHistory = chatHistory.toMutableList().apply {
                 add("user" to message)
@@ -201,7 +216,7 @@ class MNNProvider(
             _inputTokenCount = countTokens(estimatedPrompt)
             onTokensUpdated(_inputTokenCount, 0, 0)
 
-            Log.d(TAG, "开始MNN LLM推理，历史消息数: ${fullHistory.size}")
+            Log.d(TAG, "开始MNN LLM推理，历史消息数: ${fullHistory.size}, thinking模式: $enableThinking")
 
             // 从模型参数中获取 max_tokens（如果有的话）
             val maxTokens = modelParameters
@@ -295,6 +310,184 @@ class MNNProvider(
     }
     
     /**
+     * 应用模型参数到 MNN Session
+     * MNN 支持的采样参数：temperature, topP, topK, minP, penalty, tfsZ, typical, nGram 等
+     * 
+     * 参数映射说明：
+     * - temperature: 温度参数，控制输出随机性
+     * - top_p -> topP: Top-P 采样（核采样）
+     * - top_k -> topK: Top-K 采样
+     * - min_p -> minP: Min-P 采样
+     * - repetition_penalty/presence_penalty/frequency_penalty -> penalty: 重复惩罚
+     * - 自定义参数: 直接传递（如 tfsZ, typical, nGram 等）
+     */
+    private fun applyModelParameters(session: MNNLlmSession, parameters: List<ModelParameter<*>>) {
+        try {
+            // 构建配置 JSON（只包含启用的参数）
+            val configMap = mutableMapOf<String, Any>()
+            
+            parameters.filter { it.isEnabled }.forEach { param ->
+                when (param.apiName.lowercase()) {
+                    "temperature" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["temperature"] = it
+                        }
+                    }
+                    "top_p", "topp" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["topP"] = it  // MNN 使用 topP 而不是 top_p
+                        }
+                    }
+                    "top_k", "topk" -> {
+                        (param.currentValue as? Number)?.toInt()?.let { 
+                            configMap["topK"] = it  // MNN 使用 topK 而不是 top_k
+                        }
+                    }
+                    "min_p", "minp" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["minP"] = it
+                        }
+                    }
+                    "presence_penalty", "frequency_penalty", "repetition_penalty" -> {
+                        // MNN 使用统一的 penalty 参数
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["penalty"] = it
+                        }
+                    }
+                    "max_tokens", "max_new_tokens" -> {
+                        // max_tokens 在 generateStream 中单独处理，这里不设置
+                        // 但 MNN 也支持 maxNewTokens 配置
+                        (param.currentValue as? Number)?.toInt()?.let { 
+                            configMap["max_new_tokens"] = it
+                        }
+                    }
+                    // MNN 高级采样参数
+                    "tfsz", "tfs_z" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["tfsZ"] = it
+                        }
+                    }
+                    "typical" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["typical"] = it
+                        }
+                    }
+                    "n_gram", "ngram" -> {
+                        (param.currentValue as? Number)?.toInt()?.let { 
+                            configMap["n_gram"] = it
+                        }
+                    }
+                    "ngram_factor" -> {
+                        (param.currentValue as? Number)?.toFloat()?.let { 
+                            configMap["ngram_factor"] = it
+                        }
+                    }
+                    else -> {
+                        // 对于自定义参数，尝试直接传递
+                        if (param.isCustom) {
+                            when (param.valueType) {
+                                ParameterValueType.INT -> {
+                                    (param.currentValue as? Number)?.toInt()?.let {
+                                        configMap[param.apiName] = it
+                                    }
+                                }
+                                ParameterValueType.FLOAT -> {
+                                    (param.currentValue as? Number)?.toFloat()?.let {
+                                        configMap[param.apiName] = it
+                                    }
+                                }
+                                ParameterValueType.BOOLEAN -> {
+                                    (param.currentValue as? Boolean)?.let {
+                                        configMap[param.apiName] = it
+                                    }
+                                }
+                                ParameterValueType.STRING -> {
+                                    configMap[param.apiName] = param.currentValue.toString()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (configMap.isNotEmpty()) {
+                // 将 Map 转换为 JSON 字符串
+                val configJson = buildString {
+                    append("{")
+                    configMap.entries.forEachIndexed { index, entry ->
+                        if (index > 0) append(",")
+                        append("\"${entry.key}\":")
+                        when (val value = entry.value) {
+                            is String -> append("\"$value\"")
+                            is Number -> append(value)
+                            is Boolean -> append(value)
+                            else -> append("\"$value\"")
+                        }
+                    }
+                    append("}")
+                }
+                
+                Log.d(TAG, "应用模型参数: $configJson")
+                val success = session.setConfig(configJson)
+                if (!success) {
+                    Log.w(TAG, "部分模型参数设置失败")
+                }
+            } else {
+                Log.d(TAG, "没有启用的模型参数需要应用")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "应用模型参数时出错", e)
+        }
+    }
+    
+    /**
+     * 应用硬件后端配置（backend_type 和 thread_num）
+     * 将用户在 UI 中选择的 forwardType 和 threadCount 应用到 MNN Session
+     * 
+     * forwardType 映射:
+     * - 0 -> "cpu"
+     * - 3 -> "opencl" 
+     * - 4 -> "auto"
+     * - 6 -> "opengl"
+     * - 7 -> "vulkan"
+     */
+    private fun applyBackendConfig(session: MNNLlmSession) {
+        try {
+            // 将 forwardType 映射到 backend_type 字符串
+            val backendType = when (forwardType) {
+                0 -> "cpu"
+                3 -> "opencl"
+                4 -> "auto"
+                6 -> "opengl"
+                7 -> "vulkan"
+                else -> {
+                    Log.w(TAG, "未知的 forwardType: $forwardType，使用默认 CPU")
+                    "cpu"
+                }
+            }
+            
+            // 分别设置 backend_type 和 thread_num（参考 llm_bench.cpp 的实现）
+            val backendConfigJson = """{"backend_type":"$backendType"}"""
+            val threadConfigJson = """{"thread_num":$threadCount}"""
+            
+            Log.d(TAG, "应用后端配置: $backendConfigJson, 线程配置: $threadConfigJson")
+            
+            var success = session.setConfig(backendConfigJson)
+            if (!success) {
+                Log.e(TAG, "设置 backend_type 失败")
+            }
+            
+            success = session.setConfig(threadConfigJson)
+            if (!success) {
+                Log.e(TAG, "设置 thread_num 失败")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "应用后端配置时出错", e)
+        }
+    }
+    
+    /**
      * 格式化文件大小
      */
     private fun formatFileSize(sizeBytes: Long): String {
@@ -321,8 +514,9 @@ class MNNProvider(
 
     /**
      * 释放资源
+     * 释放MNN模型占用的native内存和相关资源
      */
-    fun release() {
+    override fun release() {
         try {
             llmSession?.release()
             llmSession = null

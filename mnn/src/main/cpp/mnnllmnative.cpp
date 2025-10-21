@@ -478,3 +478,30 @@ Java_com_ai_assistance_mnn_MNNLlmNative_nativeReset(
     }
 }
 
+// =======================
+// Set Config
+// =======================
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ai_assistance_mnn_MNNLlmNative_nativeSetConfig(
+    JNIEnv* env, jclass clazz, jlong llmPtr, jstring jconfigJson) {
+    
+    if (llmPtr == 0) return JNI_FALSE;
+    
+    Llm* llm = reinterpret_cast<Llm*>(llmPtr);
+    std::string configJson = jstringToString(env, jconfigJson);
+    
+    try {
+        bool success = llm->set_config(configJson);
+        if (success) {
+            LOGD("LLM config set successfully");
+        } else {
+            LOGE("Failed to set LLM config");
+        }
+        return success ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("Exception in set_config: %s", e.what());
+        return JNI_FALSE;
+    }
+}
+

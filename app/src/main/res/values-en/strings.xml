@@ -2068,7 +2068,7 @@
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
     <string name="ai_planning_desc">Will perform task decomposition and trigger multiple sub-agents to collect information, then summarize. Sub-agents have the same tool-calling capabilities as the chat agent. This can be very time-consuming, only recommended when collecting information.</string>
     <string name="thinking_mode">Thinking Mode</string>
-    <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3, Claude and SiliconFlow, enabling built-in thinking.</string>
+    <string name="thinking_mode_desc">Currently supports Gemini, Qwen3, Claude, SiliconFlow and MNN local models, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>
     <string name="thinking_guidance_desc">Can force models that can\'t think to perform thinking. This option is not recommended for thinking models.</string>
     <string name="model_selection">Model Selection</string>
@@ -2931,5 +2931,39 @@
     <string name="message_limit_reached_title">Message Limit Reached</string>
     <string name="message_limit_reached_message">The current conversation has reached the limit of %1$d messages.\nTo maintain conversation quality and performance, please clear the history to continue.</string>
     <string name="go_clear">Clear Now</string>
+    
+    <!-- MNN Local Inference -->
+    <string name="provider_mnn">MNN (Local Inference)</string>
+    <string name="screen_title_mnn_model_download">MNN Model Download</string>
+    <string name="mnn_model_download">Download MNN Model</string>
+    <string name="mnn_model_management">Model Management</string>
+    <string name="mnn_download_from_modelscope">Download from ModelScope</string>
+    <string name="mnn_model_size">Model Size: %1$.2f GB</string>
+    <string name="mnn_downloading">Downloading</string>
+    <string name="mnn_download_speed">Speed: %1$s</string>
+    <string name="mnn_download_complete">Download Complete</string>
+    <string name="mnn_download_failed">Download Failed: %1$s</string>
+    <string name="mnn_no_models_downloaded">No models downloaded yet</string>
+    <string name="mnn_select_downloaded_model">Select downloaded model</string>
+    <string name="mnn_model_name_only">Model Name</string>
+    <string name="mnn_download_progress">Progress: %1$d%%</string>
+    <string name="mnn_pause_download">Pause Download</string>
+    <string name="mnn_resume_download">Resume Download</string>
+    <string name="mnn_delete_model">Delete Model</string>
+    <string name="mnn_confirm_delete">Confirm to delete this model?</string>
+    <string name="mnn_loading_models">Loading model list...</string>
+    <string name="mnn_connecting">Connecting...</string>
+    <string name="mnn_load_failed">Load Failed</string>
+    <string name="mnn_retry">Retry</string>
+    <string name="mnn_start_download">Start Download</string>
+    <string name="mnn_no_local_models">No models downloaded yet</string>
+    <string name="mnn_go_download">Go to Download</string>
+    <string name="mnn_search_models">Search models...</string>
+    <string name="mnn_no_search_results">No matching models found</string>
+    <string name="mnn_local_model_tip">Local models have limited understanding. It\'s recommended to disable memory links and enable tool restrictions for conversations</string>
+    <string name="mnn_model_path">Model File Path</string>
+    <string name="mnn_model_path_placeholder">Enter the full path to MNN model file</string>
+    <string name="mnn_forward_type">Forward Type</string>
+    <string name="mnn_thread_count">Thread Count</string>
 
 </resources>

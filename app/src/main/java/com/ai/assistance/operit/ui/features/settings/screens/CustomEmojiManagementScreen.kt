@@ -64,13 +64,6 @@ fun CustomEmojiManagementScreen(
     }
 
     // 显示消息
-    LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            // 显示错误提示
-            viewModel.clearErrorMessage()
-        }
-    }
-
     LaunchedEffect(successMessage) {
         successMessage?.let {
             // 显示成功提示

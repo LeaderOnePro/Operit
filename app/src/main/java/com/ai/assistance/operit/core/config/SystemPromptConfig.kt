@@ -243,73 +243,73 @@ HTTP工具：
 
     /** Base system prompt template used by the enhanced AI service */
     val SYSTEM_PROMPT_TEMPLATE =
-        """
-        BEGIN_SELF_INTRODUCTION_SECTION
-        
-        THINKING_GUIDANCE_SECTION
+"""
+BEGIN_SELF_INTRODUCTION_SECTION
 
-        $BEHAVIOR_GUIDELINES_EN
+THINKING_GUIDANCE_SECTION
 
-        WEB_WORKSPACE_GUIDELINES_SECTION
+$BEHAVIOR_GUIDELINES_EN
 
-        FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
+WEB_WORKSPACE_GUIDELINES_SECTION
 
-        TOOL_USAGE_GUIDELINES_SECTION
+FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
 
-        PACKAGE_SYSTEM_GUIDELINES_SECTION
-        
-        ACTIVE_PACKAGES_SECTION
+TOOL_USAGE_GUIDELINES_SECTION
 
-        AVAILABLE_TOOLS_SECTION
-        """.trimIndent()
+PACKAGE_SYSTEM_GUIDELINES_SECTION
+
+ACTIVE_PACKAGES_SECTION
+
+AVAILABLE_TOOLS_SECTION
+""".trimIndent()
 
     /** Guidance for the AI on how to "think" using tags. */
     val THINKING_GUIDANCE_PROMPT =
-      """
-      THINKING PROCESS GUIDELINES:
-      - Before providing your final response, you MUST use a <think> block to outline your thought process. This is for your internal monologue.
-      - In your thoughts, deconstruct the user's request, consider alternatives, anticipate outcomes, and reflect on the best strategy. Formulate a precise action plan. Your plan should be efficient and use multiple tools in parallel for information gathering whenever possible.
-      - The user will see your thoughts but cannot reply to them directly. This block is NOT saved in the chat history, so your final answer must be self-contained.
-      - The <think> block must be immediately followed by your final answer or tool call without any newlines.
-      - **CRITICAL REMINDER:** Even if previous messages in the chat history do not show a `<think>` block, you MUST include one in your current response. This is a mandatory instruction for this conversation mode.
-      - Example:
-      <think>The user wants to know about the configuration files for project A and project B. I need to read the config files for both projects. To be efficient, I will call the `read_file` tool twice in one turn to read `projectA/config.json` and `projectB/config.xml` respectively.</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
-      """.trimIndent()
+"""
+THINKING PROCESS GUIDELINES:
+- Before providing your final response, you MUST use a <think> block to outline your thought process. This is for your internal monologue.
+- In your thoughts, deconstruct the user's request, consider alternatives, anticipate outcomes, and reflect on the best strategy. Formulate a precise action plan. Your plan should be efficient and use multiple tools in parallel for information gathering whenever possible.
+- The user will see your thoughts but cannot reply to them directly. This block is NOT saved in the chat history, so your final answer must be self-contained.
+- The <think> block must be immediately followed by your final answer or tool call without any newlines.
+- **CRITICAL REMINDER:** Even if previous messages in the chat history do not show a `<think>` block, you MUST include one in your current response. This is a mandatory instruction for this conversation mode.
+- Example:
+<think>The user wants to know about the configuration files for project A and project B. I need to read the config files for both projects. To be efficient, I will call the `read_file` tool twice in one turn to read `projectA/config.json` and `projectB/config.xml` respectively.</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
+""".trimIndent()
 
 
     /** 中文版本系统提示模板 */
     val SYSTEM_PROMPT_TEMPLATE_CN =
-        """
-        BEGIN_SELF_INTRODUCTION_SECTION
+"""
+BEGIN_SELF_INTRODUCTION_SECTION
 
-        THINKING_GUIDANCE_SECTION
+THINKING_GUIDANCE_SECTION
 
-        $BEHAVIOR_GUIDELINES_CN
-       
-        WEB_WORKSPACE_GUIDELINES_SECTION
-        
-        公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
-        
-        TOOL_USAGE_GUIDELINES_SECTION
-        
-        PACKAGE_SYSTEM_GUIDELINES_SECTION
-        
-        ACTIVE_PACKAGES_SECTION
-        
-        AVAILABLE_TOOLS_SECTION""".trimIndent()
+$BEHAVIOR_GUIDELINES_CN
+
+WEB_WORKSPACE_GUIDELINES_SECTION
+
+公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
+
+TOOL_USAGE_GUIDELINES_SECTION
+
+PACKAGE_SYSTEM_GUIDELINES_SECTION
+
+ACTIVE_PACKAGES_SECTION
+
+AVAILABLE_TOOLS_SECTION""".trimIndent()
 
     /** 中文版本的思考引导提示 */
     val THINKING_GUIDANCE_PROMPT_CN =
-            """
-      思考过程指南:
-      - 在提供最终答案之前，你必须使用 <think> 模块来阐述你的思考过程。这是你的内心独白。
-      - 在思考中，你需要拆解用户需求，评估备选方案，预判执行结果，并反思最佳策略，最终形成精确的行动计划。你的计划应当是高效的，并尽可能地并行调用多个工具来收集信息。
-      - 用户能看到你的思考过程，但无法直接回复。此模块不会保存在聊天记录中，因此你的最终答案必须是完整的。
-      - <think> 模块必须紧邻你的最终答案或工具调用，中间不要有任何换行。
-      - **重要提醒:** 即使聊天记录中之前的消息没有 <think> 模块，你在本次回复中也必须按要求使用它。这是强制指令。
-      - 范例:
-      <think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
-      """.trimIndent()
+"""
+思考过程指南:
+- 在提供最终答案之前，你必须使用 <think> 模块来阐述你的思考过程。这是你的内心独白。
+- 在思考中，你需要拆解用户需求，评估备选方案，预判执行结果，并反思最佳策略，最终形成精确的行动计划。你的计划应当是高效的，并尽可能地并行调用多个工具来收集信息。
+- 用户能看到你的思考过程，但无法直接回复。此模块不会保存在聊天记录中，因此你的最终答案必须是完整的。
+- <think> 模块必须紧邻你的最终答案或工具调用，中间不要有任何换行。
+- **重要提醒:** 即使聊天记录中之前的消息没有 <think> 模块，你在本次回复中也必须按要求使用它。这是强制指令。
+- 范例:
+<think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
+""".trimIndent()
 
     /**
      * Prompt for a subtask agent that should be strictly task-focused,
@@ -338,7 +338,7 @@ HTTP工具：
         ACTIVE_PACKAGES_SECTION
 
         $AVAILABLE_TOOLS_EN
-    """.trimIndent()
+        """.trimIndent()
 
   /**
    * Applies custom prompt replacements from ApiPreferences to the system prompt
@@ -464,20 +464,19 @@ HTTP工具：
                 .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
                 .replace("AVAILABLE_TOOLS_SECTION", if (useEnglish) MEMORY_TOOLS_EN else MEMORY_TOOLS_CN)
         } else {
-            // Remove tool-related sections when tools are disabled
-            val toolsDisabledPrompt = if (useEnglish) {
-                "You are temporarily prohibited from calling tools, even if you have used them before. Please respond to user questions using text only."
-            } else {
-                "你被暂时禁止调用工具，即使前面使用过，也依旧禁止使用。请仅通过文本回复用户问题。"
-            }
-
-            // Replace tool-related sections with disabled message or remove them
+            // Remove all guidance sections when tools and memory are disabled
+            // Replace tool-related sections and remove behavior guidelines and workspace guidelines
             prompt = prompt
-                .replace("TOOL_USAGE_GUIDELINES_SECTION", toolsDisabledPrompt)
+                .replace("TOOL_USAGE_GUIDELINES_SECTION", "")
                 .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
                 .replace("AVAILABLE_TOOLS_SECTION", "")
+                .replace(if (useEnglish) BEHAVIOR_GUIDELINES_EN else BEHAVIOR_GUIDELINES_CN, "")
+                .replace(workspaceGuidelines, "")
         }
     }
+
+    // Clean up multiple consecutive blank lines (replace 3+ newlines with 2)
+    prompt = prompt.replace(Regex("\n{3,}"), "\n\n")
 
     return prompt
   }

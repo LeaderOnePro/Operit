@@ -227,6 +227,34 @@ fun ModelApiSettingsSection(
 
             // MNN特定配置（仅在选择MNN提供商时显示）
             if (selectedApiProvider == ApiProviderType.MNN) {
+                // MNN使用提示
+                Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                                text = stringResource(R.string.mnn_local_model_tip),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                lineHeight = 18.sp
+                        )
+                    }
+                }
+                
                 // 下载模型按钮
                 navigateToMnnModelDownload?.let { navigate ->
                     Button(

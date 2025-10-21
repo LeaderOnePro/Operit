@@ -92,6 +92,15 @@ object MNNLlmNative {
     external fun nativeReset(llmPtr: Long)
     
     /**
+     * 设置 LLM 配置（用于运行时修改配置）
+     * @param llmPtr LLM 指针
+     * @param configJson JSON 格式的配置字符串
+     * @return 是否设置成功
+     */
+    @JvmStatic
+    external fun nativeSetConfig(llmPtr: Long, configJson: String): Boolean
+    
+    /**
      * 生成回调接口
      */
     interface GenerationCallback {
