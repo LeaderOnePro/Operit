@@ -389,92 +389,113 @@ private fun parseMessageContent(content: String): MessageParseResult {
     }
 
     try {
-        // Enhanced regex pattern to find attachments with optional content attribute
-        // 注意：由于content属性可能包含json数据，我们用非贪婪匹配确保正确解析
-        val attachmentPattern =
-            "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
-                RegexOption.DOT_MATCHES_ALL
-            )
+        // Enhanced regex pattern to find attachments in both formats:
+        // 1. New format (paired tags): <attachment ...>content</attachment>
+        // 2. Old format (self-closing): <attachment ... content="..." />
+        // 注意：优先匹配新格式（配对标签），回退到旧格式（自闭合标签）
+        val pairedTagPattern =
+                "<attachment\\s+id=\"([^\"]+\")\\s+filename=\"([^\"]+\")\\s+type=\"([^\"]+\")\"(?:\\s+size=\"([^\"]+\"))?\\s*>([\\s\\S]*?)</attachment>".toRegex()
+        val selfClosingPattern =
+                "<attachment\\s+id=\"([^\"]+\")\\s+filename=\"([^\"]+\")\\s+type=\"([^\"]+\")\"(?:\\s+size=\"([^\"]+\"))?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
+                        RegexOption.DOT_MATCHES_ALL
+                )
 
-        // Get all matches
-        val matches = attachmentPattern.findAll(cleanedContent).toList()
+        // Try to find matches with both patterns
+        val pairedMatches = pairedTagPattern.findAll(cleanedContent).toList()
+        val selfClosingMatches = selfClosingPattern.findAll(cleanedContent).toList()
+        
+        // Combine and sort all matches by position
+        val allMatches = (pairedMatches.map { it to true } + selfClosingMatches.map { it to false })
+                .sortedBy { it.first.range.first }
+        
+        // Remove overlapping matches (prefer paired tag format)
+        val matches = mutableListOf<Pair<MatchResult, Boolean>>()
+        var lastEnd = -1
+        allMatches.forEach { (match, isPaired) ->
+                if (match.range.first > lastEnd) {
+                        matches.add(match to isPaired)
+                        lastEnd = match.range.last
+                }
+        }
+        
         if (matches.isEmpty()) {
-            return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
+                return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
         }
 
         // Determine which attachments form a contiguous block at the end
         val trailingAttachmentIndices = mutableSetOf<Int>()
         if (matches.isNotEmpty()) {
-            val contentAfterLast = cleanedContent.substring(matches.last().range.last + 1)
-            if (contentAfterLast.isBlank()) {
-                trailingAttachmentIndices.add(matches.size - 1)
-                for (i in matches.size - 2 downTo 0) {
-                    val textBetween = cleanedContent.substring(matches[i].range.last + 1, matches[i + 1].range.first)
-                    if (textBetween.isBlank()) {
-                        trailingAttachmentIndices.add(i)
-                    } else {
-                        break
-                    }
+                val contentAfterLast = cleanedContent.substring(matches.last().first.range.last + 1)
+                if (contentAfterLast.isBlank()) {
+                        trailingAttachmentIndices.add(matches.size - 1)
+                        for (i in matches.size - 2 downTo 0) {
+                                val textBetween = cleanedContent.substring(matches[i].first.range.last + 1, matches[i + 1].first.range.first)
+                                if (textBetween.isBlank()) {
+                                        trailingAttachmentIndices.add(i)
+                                } else {
+                                        break
+                                }
+                        }
                 }
-            }
         }
 
         // Process all attachments
         var lastIndex = 0
-        matches.forEachIndexed { index, matchResult ->
-            // Add text before this attachment
-            val startIndex = matchResult.range.first
+        matches.forEachIndexed { index, (matchResult, isPaired) ->
+                // Add text before this attachment
+                val startIndex = matchResult.range.first
 
-            // Extract attachment data
-            val id = matchResult.groupValues[1]
-            val filename = matchResult.groupValues[2]
-            val type = matchResult.groupValues[3]
-            val size = matchResult.groupValues[4].toLongOrNull() ?: 0L
-            val attachmentContent = matchResult.groupValues[5]
+                // Extract attachment data
+                val id = matchResult.groupValues[1]
+                val filename = matchResult.groupValues[2]
+                val type = matchResult.groupValues[3]
+                val size = matchResult.groupValues[4].toLongOrNull() ?: 0L
+                // For paired tags, content is in group 5; for self-closing, it's also in group 5
+                val attachmentContent = matchResult.groupValues[5]
 
-            // Create attachment data object, including content if available
-            val attachment =
-                AttachmentData(
-                    id = id,
-                    filename = filename,
-                    type = type,
-                    size = size,
-                    content = attachmentContent
-                )
+                // Create attachment data object, including content if available
+                val attachment =
+                        AttachmentData(
+                                id = id,
+                                filename = filename,
+                                type = type,
+                                size = size,
+                                content = attachmentContent
+                        )
 
-            val isTrailingAttachment = trailingAttachmentIndices.contains(index)
+                val isTrailingAttachment = trailingAttachmentIndices.contains(index)
 
-            // 特殊处理屏幕内容附件，始终将其作为trailing attachment
-            val isScreenContent =
-                (type == "text/json" && filename == "screen_content.json")
+                // 特殊处理屏幕内容附件，始终将其作为trailing attachment
+                val isScreenContent =
+                        (type == "text/json" && filename == "screen_content.json")
 
-            val shouldBeTrailing = isTrailingAttachment || isScreenContent
+                val shouldBeTrailing = isTrailingAttachment || isScreenContent
 
-            if (startIndex > lastIndex) {
-                val textBefore = cleanedContent.substring(lastIndex, startIndex)
-                // Only append text if it's before an inline attachment,
-                // or if it's before the very first trailing attachment.
-                if (!shouldBeTrailing || (trailingAttachmentIndices.isNotEmpty() && index == trailingAttachmentIndices.minOrNull())) {
-                    messageText.append(textBefore)
+                if (startIndex > lastIndex) {
+                        val textBefore = cleanedContent.substring(lastIndex, startIndex)
+                        // Only append text if it's before an inline attachment,
+                        // or if it's before the very first trailing attachment.
+                        if (!shouldBeTrailing || (trailingAttachmentIndices.isNotEmpty() && index == trailingAttachmentIndices.minOrNull())) {
+                                messageText.append(textBefore)
+                        }
                 }
-            }
 
-            if (shouldBeTrailing) {
-                // This is a trailing attachment, extract it
-                trailingAttachments.add(attachment)
-            } else {
-                // This is an inline attachment, keep it in the text as @filename
-                messageText.append("@${filename}")
-                // Also add to general attachments list for reference
-                attachments.add(attachment)
-            }
+                if (shouldBeTrailing) {
+                        // This is a trailing attachment, extract it
+                        trailingAttachments.add(attachment)
+                } else {
+                        // This is an inline attachment, keep it in the text as @filename
+                        messageText.append("@${filename}")
+                        // Also add to general attachments list for reference
+                        attachments.add(attachment)
+                }
 
-            lastIndex = matchResult.range.last + 1
+                lastIndex = matchResult.range.last + 1
         }
 
         // Add any remaining text if the last part of the message was not a trailing attachment
         if (lastIndex < cleanedContent.length) {
-            messageText.append(cleanedContent.substring(lastIndex))
+                messageText.append(cleanedContent.substring(lastIndex))
         }
 
         trailingAttachments.addAll(0, workspaceAttachments)

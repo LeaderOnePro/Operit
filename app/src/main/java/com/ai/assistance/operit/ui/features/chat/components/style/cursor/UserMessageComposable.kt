@@ -375,15 +375,35 @@ private fun parseMessageContent(content: String): MessageParseResult {
         }
 
         try {
-                // Enhanced regex pattern to find attachments with optional content attribute
-                // 注意：由于content属性可能包含json数据，我们用非贪婪匹配确保正确解析
-                val attachmentPattern =
+                // Enhanced regex pattern to find attachments in both formats:
+                // 1. New format (paired tags): <attachment ...>content</attachment>
+                // 2. Old format (self-closing): <attachment ... content="..." />
+                // 注意：优先匹配新格式（配对标签），回退到旧格式（自闭合标签）
+                val pairedTagPattern =
+                        "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?\\s*>([\\s\\S]*?)</attachment>".toRegex()
+                val selfClosingPattern =
                         "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
                                 RegexOption.DOT_MATCHES_ALL
                         )
 
-                // Get all matches
-                val matches = attachmentPattern.findAll(cleanedContent).toList()
+                // Try to find matches with both patterns
+                val pairedMatches = pairedTagPattern.findAll(cleanedContent).toList()
+                val selfClosingMatches = selfClosingPattern.findAll(cleanedContent).toList()
+                
+                // Combine and sort all matches by position
+                val allMatches = (pairedMatches.map { it to true } + selfClosingMatches.map { it to false })
+                        .sortedBy { it.first.range.first }
+                
+                // Remove overlapping matches (prefer paired tag format)
+                val matches = mutableListOf<Pair<MatchResult, Boolean>>()
+                var lastEnd = -1
+                allMatches.forEach { (match, isPaired) ->
+                        if (match.range.first > lastEnd) {
+                                matches.add(match to isPaired)
+                                lastEnd = match.range.last
+                        }
+                }
+                
                 if (matches.isEmpty()) {
                         return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
                 }
@@ -391,11 +411,11 @@ private fun parseMessageContent(content: String): MessageParseResult {
                 // Determine which attachments form a contiguous block at the end
                 val trailingAttachmentIndices = mutableSetOf<Int>()
                 if (matches.isNotEmpty()) {
-                        val contentAfterLast = cleanedContent.substring(matches.last().range.last + 1)
+                        val contentAfterLast = cleanedContent.substring(matches.last().first.range.last + 1)
                         if (contentAfterLast.isBlank()) {
                                 trailingAttachmentIndices.add(matches.size - 1)
                                 for (i in matches.size - 2 downTo 0) {
-                                        val textBetween = cleanedContent.substring(matches[i].range.last + 1, matches[i + 1].range.first)
+                                        val textBetween = cleanedContent.substring(matches[i].first.range.last + 1, matches[i + 1].first.range.first)
                                         if (textBetween.isBlank()) {
                                                 trailingAttachmentIndices.add(i)
                                         } else {
@@ -407,7 +427,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
 
                 // Process all attachments
                 var lastIndex = 0
-                matches.forEachIndexed { index, matchResult ->
+                matches.forEachIndexed { index, (matchResult, isPaired) ->
                         // Add text before this attachment
                         val startIndex = matchResult.range.first
 
@@ -416,6 +436,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
                         val filename = matchResult.groupValues[2]
                         val type = matchResult.groupValues[3]
                         val size = matchResult.groupValues[4].toLongOrNull() ?: 0L
+                        // For paired tags, content is in group 5; for self-closing, it's also in group 5
                         val attachmentContent = matchResult.groupValues[5]
 
                         // Create attachment data object, including content if available

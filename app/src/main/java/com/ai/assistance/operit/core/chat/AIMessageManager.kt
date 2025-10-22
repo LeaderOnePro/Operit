@@ -102,13 +102,16 @@ object AIMessageManager {
         // 4. 构建附件标签
         val attachmentTags = if (attachments.isNotEmpty()) {
             attachments.joinToString(" ") { attachment ->
-                "<attachment " +
-                        "id=\"${attachment.filePath}\" " +
-                        "filename=\"${attachment.fileName}\" " +
-                        "type=\"${attachment.mimeType}\" " +
-                        (if (attachment.fileSize > 0) "size=\"${attachment.fileSize}\" " else "") +
-                        (if (attachment.content.isNotEmpty()) "content=\"${attachment.content}\" " else "") +
-                        "/>"
+                val attributes = buildString {
+                    append("id=\"${attachment.filePath}\" ")
+                    append("filename=\"${attachment.fileName}\" ")
+                    append("type=\"${attachment.mimeType}\"")
+                    if (attachment.fileSize > 0) {
+                        append(" size=\"${attachment.fileSize}\"")
+                    }
+                }
+                
+                "<attachment $attributes>${attachment.content}</attachment>"
             }
         } else ""
 

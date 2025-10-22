@@ -23,6 +23,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
+import com.ai.assistance.operit.ui.common.rememberLocal
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
+
+/**
+ * 文件夹展开状态的持久化数据类（与 MemoryFolderSelectionDialog 共享）
+ */
+@Serializable
+data class FolderExpandedState(
+    val expandedPaths: Set<String> = emptySet()
+)
 
 /**
  * 配置文件选择器
@@ -108,8 +119,12 @@ fun FolderNavigator(
         buildFolderTree(folderPaths)
     }
 
-    // 用于管理展开/折叠状态（默认全部收起）
-    var expandedPaths by remember { mutableStateOf(setOf<String>()) }
+    // 使用 rememberLocal 持久化展开状态（默认为空，即全部折叠）
+    var expandedState by rememberLocal(
+        key = "folder_navigator_expanded_state",
+        defaultValue = FolderExpandedState(),
+        serializer = serializer()
+    )
     
     // 对话框状态
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -227,12 +242,13 @@ fun FolderNavigator(
                         nodes = rootNode.children,
                         level = 0,
                         selectedPath = selectedFolderPath,
-                        expandedPaths = expandedPaths,
+                        expandedPaths = expandedState.expandedPaths,
                         onToggleExpand = { path ->
-                            expandedPaths = if (path in expandedPaths) {
-                                expandedPaths - path
+                            // 持久化展开状态
+                            expandedState = if (path in expandedState.expandedPaths) {
+                                expandedState.copy(expandedPaths = expandedState.expandedPaths - path)
                             } else {
-                                expandedPaths + path
+                                expandedState.copy(expandedPaths = expandedState.expandedPaths + path)
                             }
                         },
                         onFolderSelected = onFolderSelected,

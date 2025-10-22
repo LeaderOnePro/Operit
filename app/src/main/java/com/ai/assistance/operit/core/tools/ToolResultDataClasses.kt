@@ -789,7 +789,9 @@ data class MemoryQueryResultData(
         val content: String,
         val source: String,
         val tags: List<String>,
-        val createdAt: String
+        val createdAt: String,
+        val chunkInfo: String? = null,
+        val chunkIndices: List<Int>? = null
     )
 
     override fun toString(): String {
