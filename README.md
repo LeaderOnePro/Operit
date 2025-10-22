@@ -143,8 +143,12 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 
 ## 📞 联系我们
 
-- 邮箱：aaswordsman@foxmail.com
-- 问题反馈：[Issue区](https://github.com/AAswordman/Operit/issues)
+如果您有任何问题、建议或想要交流，欢迎通过以下方式联系我们：
+
+- **📧 Email（电子邮件）**: aaswordsman@foxmail.com
+- **💬 QQ群**: [点击加入](https://qm.qq.com/q/Sa4fKEH7sO)
+- **🎮 Discord**: [加入服务器](https://discord.gg/YnV9MWurRF)
+- **🐛 问题反馈**: [Issue区](https://github.com/AAswordman/Operit/issues)
 
 ## 📄 许可证
 

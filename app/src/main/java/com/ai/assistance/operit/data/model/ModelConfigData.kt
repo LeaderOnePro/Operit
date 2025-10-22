@@ -20,6 +20,8 @@ enum class ApiProviderType {
         INFINIAI, // 无问芯穹
         ALIPAY_BAILING, // 支付宝百灵大模型
         LMSTUDIO, // LM Studio本地模型服务
+        MNN, // MNN本地推理引擎
+        PPINFRA, // 派欧云
         OTHER // 其他提供商
 }
 
@@ -63,7 +65,12 @@ data class ModelConfigData(
         val repetitionPenalty: Float = 1.0f,
 
         // 自定义参数JSON字符串
-        val customParameters: String = "[]"
+        val customParameters: String = "[]",
+
+        // MNN特定配置
+        // 注意：MNN模型路径会根据modelName自动构建，不需要单独存储
+        val mnnForwardType: Int = 0, // 前向计算类型 (CPU/GPU等)
+        val mnnThreadCount: Int = 4 // 推理线程数
 )
 
 /** 简化版的模型配置数据，用于列表显示 */

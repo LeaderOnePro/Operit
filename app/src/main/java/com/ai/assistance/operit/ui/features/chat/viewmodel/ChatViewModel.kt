@@ -1087,6 +1087,30 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
                 // 直接委托给attachmentManager执行
                 attachmentManager.captureLocation()
+                
+                // 隐藏进度状态
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error capturing location", e)
+                uiStateDelegate.showToast("获取位置失败: ${e.message}")
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            }
+        }
+    }
+
+    /**
+     * 捕获记忆文件夹作为附件
+     */
+    fun captureMemoryFolders(folderPaths: List<String>) {
+        viewModelScope.launch {
+            try {
+                messageProcessingDelegate.updateUserMessage("")
+                // 显示记忆文件夹附着进度
+                messageProcessingDelegate.setInputProcessingState(true, "正在附着记忆文件夹...")
+                uiStateDelegate.showToast("正在附着记忆文件夹...")
+
+                // 直接委托给attachmentManager执行
+                attachmentManager.captureMemoryFolders(folderPaths)
 
                 // 完成后立即更新悬浮窗中的附件列表
                 updateFloatingWindowAttachments()
@@ -1094,8 +1118,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 清除进度显示
                 messageProcessingDelegate.setInputProcessingState(false, "")
             } catch (e: Exception) {
-                Log.e(TAG, "获取位置数据失败", e)
-                uiStateDelegate.showErrorMessage("获取位置数据失败: ${e.message}")
+                Log.e(TAG, "附着记忆文件夹失败", e)
+                uiStateDelegate.showErrorMessage("附着记忆文件夹失败: ${e.message}")
                 messageProcessingDelegate.setInputProcessingState(false, "")
             }
         }

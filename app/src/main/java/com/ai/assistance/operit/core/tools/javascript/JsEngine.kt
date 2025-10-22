@@ -1314,7 +1314,7 @@ class JsEngine(private val context: Context) {
                                     val resultString = result.result.toString()
                                     Log.d(
                                             TAG,
-                                            "[Async] Tool execution succeeded: ${resultString.take(80000)}${if (resultString.length > 80000) "..." else ""}"
+                                            "[Async] Tool execution succeeded: ${resultString.take(1000)}${if (resultString.length > 1000) "..." else ""}"
                                     )
                                     // 发送成功结果回调
                                     val resultJson =

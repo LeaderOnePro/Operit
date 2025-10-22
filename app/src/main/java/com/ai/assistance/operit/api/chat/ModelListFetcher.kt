@@ -1,8 +1,11 @@
 package com.ai.assistance.operit.api.chat
 
+import android.content.Context
+import android.os.Environment
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
+import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URL
@@ -80,6 +83,7 @@ object ModelListFetcher {
                     ApiProviderType.INFINIAI -> "${extractBaseUrl(apiEndpoint)}/maas/v1/models"
                     ApiProviderType.ALIPAY_BAILING -> "${extractBaseUrl(apiEndpoint)}/llm/v1/models"
                     ApiProviderType.LMSTUDIO -> "${extractBaseUrl(apiEndpoint)}/v1/models"
+                    ApiProviderType.PPINFRA -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     // 其他API提供商可能需要特殊处理
                     else -> "${extractBaseUrl(apiEndpoint)}/v1/models" // 默认尝试OpenAI兼容格式
                 }
@@ -93,20 +97,21 @@ object ModelListFetcher {
         return try {
             val url = URL(fullUrl)
             val path = url.path
-            val v1Index = path.indexOf("/v1")
-            if (v1Index >= 0) {
-                val baseUrl = "${url.protocol}://${url.host}"
-                val finalUrl =
-                        if (url.port != -1 && url.port != 80 && url.port != 443) {
-                            "$baseUrl:${url.port}"
-                        } else {
-                            baseUrl
-                        }
-                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (找到/v1)")
+
+            // 查找版本路径，例如 /v1, /v2
+            val versionPathRegex = Regex("/v\\d+")
+            val match = versionPathRegex.find(path)
+
+            if (match != null) {
+                // 截取到版本路径之前的部分
+                val pathBeforeVersion = path.substring(0, match.range.first)
+                val finalUrl = "${url.protocol}://${url.authority}$pathBeforeVersion"
+                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (找到版本路径 ${match.value})")
                 finalUrl
             } else {
-                val finalUrl = fullUrl.substringBefore("/v1")
-                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (未找到/v1)")
+                // 如果找不到版本路径，则返回原始URL的主机部分，这通常是安全的备选方案
+                val finalUrl = "${url.protocol}://${url.authority}"
+                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (未找到版本路径)")
                 finalUrl
             }
         } catch (e: Exception) {
@@ -212,7 +217,8 @@ object ModelListFetcher {
                                     ApiProviderType.OPENROUTER,
                                     ApiProviderType.INFINIAI,
                                     ApiProviderType.ALIPAY_BAILING,
-                                    ApiProviderType.LMSTUDIO ->
+                                    ApiProviderType.LMSTUDIO,
+                                    ApiProviderType.PPINFRA ->
                                             parseOpenAIModelResponse(responseBody)
                                     ApiProviderType.ANTHROPIC ->
                                             parseAnthropicModelResponse(responseBody)
@@ -409,5 +415,69 @@ object ModelListFetcher {
         }
 
         return modelList.sortedBy { it.id }
+    }
+
+    /**
+     * 获取本地MNN模型列表
+     * 从固定目录读取已下载的MNN模型文件夹
+     */
+    suspend fun getMnnLocalModels(context: Context): Result<List<ModelOption>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val modelsDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Operit/models/mnn"
+                )
+                
+                Log.d(TAG, "读取MNN模型目录: ${modelsDir.absolutePath}")
+                
+                if (!modelsDir.exists()) {
+                    Log.w(TAG, "MNN模型目录不存在")
+                    return@withContext Result.success(emptyList())
+                }
+                
+                // 遍历所有模型文件夹
+                val models = modelsDir.listFiles { file -> 
+                    file.isDirectory
+                }?.mapNotNull { folder ->
+                    // 在文件夹中查找 llm.mnn 主文件
+                    val mnnFile = File(folder, "llm.mnn")
+                    val mnnWeightFile = File(folder, "llm.mnn.weight")
+                    
+                    if (mnnFile.exists()) {
+                        // 计算文件夹总大小
+                        val totalSize = folder.listFiles()?.sumOf { it.length() } ?: 0L
+                        
+                        Log.d(TAG, "找到MNN模型: ${folder.name}, 主文件: ${mnnFile.exists()}, 权重文件: ${mnnWeightFile.exists()}, 总大小: ${formatFileSize(totalSize)}")
+                        
+                        ModelOption(
+                            id = folder.name,  // 使用文件夹名称作为ID（与其他提供商保持一致）
+                            name = "${folder.name} (${formatFileSize(totalSize)})"
+                        )
+                    } else {
+                        Log.w(TAG, "文件夹 ${folder.name} 中未找到 llm.mnn 文件")
+                        null
+                    }
+                }?.sortedBy { it.name } ?: emptyList()
+                
+                Log.d(TAG, "找到 ${models.size} 个可用的MNN模型")
+                Result.success(models)
+            } catch (e: Exception) {
+                Log.e(TAG, "读取MNN模型列表失败", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * 格式化文件大小
+     */
+    private fun formatFileSize(sizeBytes: Long): String {
+        return when {
+            sizeBytes < 1024 -> "$sizeBytes B"
+            sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024} KB"
+            sizeBytes < 1024 * 1024 * 1024 -> "${sizeBytes / (1024 * 1024)} MB"
+            else -> String.format("%.2f GB", sizeBytes / (1024.0 * 1024.0 * 1024.0))
+        }
     }
 }

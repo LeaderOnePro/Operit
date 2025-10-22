@@ -2,6 +2,7 @@ package com.ai.assistance.operit.ui.features.settings.viewmodels
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.model.CustomEmoji
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 class CustomEmojiViewModel(context: Context) : ViewModel() {
 
     private val repository = CustomEmojiRepository.getInstance(context)
+    private val TAG = "CustomEmojiViewModel"
 
     // 当前选中的类别
     private val _selectedCategory = MutableStateFlow(CustomEmojiPreferences.BUILTIN_EMOTIONS.first())
@@ -82,6 +84,7 @@ class CustomEmojiViewModel(context: Context) : ViewModel() {
                     successCount++
                 } else {
                     failCount++
+                    Log.e(TAG, "Failed to add emoji from URI: $uri", result.exceptionOrNull())
                 }
             }
 
@@ -91,7 +94,7 @@ class CustomEmojiViewModel(context: Context) : ViewModel() {
                 _successMessage.value = "成功添加 $successCount 个表情${if (failCount > 0) "，失败 $failCount 个" else ""}"
             }
             if (failCount > 0 && successCount == 0) {
-                _errorMessage.value = "添加失败，请检查图片格式"
+                _errorMessage.value = "添加失败，请检查日志"
             }
         }
     }
@@ -113,7 +116,8 @@ class CustomEmojiViewModel(context: Context) : ViewModel() {
             if (result.isSuccess) {
                 _successMessage.value = "表情已删除"
             } else {
-                _errorMessage.value = "删除失败: ${result.exceptionOrNull()?.message}"
+                Log.e(TAG, "Failed to delete emoji: $emojiId", result.exceptionOrNull())
+                _errorMessage.value = "删除失败，详情请看日志"
             }
         }
     }
@@ -137,7 +141,8 @@ class CustomEmojiViewModel(context: Context) : ViewModel() {
                 // 切换到第一个内置类别
                 _selectedCategory.value = CustomEmojiPreferences.BUILTIN_EMOTIONS.first()
             } else {
-                _errorMessage.value = "删除失败: ${result.exceptionOrNull()?.message}"
+                Log.e(TAG, "Failed to delete category: $category", result.exceptionOrNull())
+                _errorMessage.value = "删除失败，详情请看日志"
             }
         }
     }
@@ -212,6 +217,7 @@ class CustomEmojiViewModel(context: Context) : ViewModel() {
                 _selectedCategory.value = CustomEmojiPreferences.BUILTIN_EMOTIONS.first()
             } catch (e: Exception) {
                 _isLoading.value = false
+                Log.e(TAG, "Failed to reset emojis", e)
                 _errorMessage.value = "重置失败: ${e.message}"
             }
         }

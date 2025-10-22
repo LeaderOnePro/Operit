@@ -67,4 +67,13 @@ interface AIService {
             message: String,
             chatHistory: List<Pair<String, String>>
     ): Int
+
+    /**
+     * 释放资源
+     * 对于本地模型（如MNN），需要释放native内存和模型资源
+     * 对于API服务，通常不需要特别处理
+     */
+    fun release() {
+        // 默认空实现，子类按需覆盖
+    }
 }

@@ -68,6 +68,7 @@ fun AttachmentSelectorPanel(
         onAttachScreenContent: () -> Unit,
         onAttachNotifications: () -> Unit = {},
         onAttachLocation: () -> Unit = {},
+        onAttachMemory: () -> Unit = {},
         onTakePhoto: (Uri) -> Unit,
         userQuery: String = "",
         onDismiss: () -> Unit
@@ -187,11 +188,14 @@ fun AttachmentSelectorPanel(
                             }
                     )
 
-                    // 视频选项
+                    // 记忆选项
                     AttachmentOption(
-                            icon = Icons.Default.VideoCameraBack,
-                            label = "视频",
-                            onClick = { imagePickerLauncher.launch("video/*") }
+                            icon = Icons.Default.Memory,
+                            label = "记忆",
+                            onClick = { 
+                                onAttachMemory()
+                                onDismiss()
+                            }
                     )
 
                     // 音频选项

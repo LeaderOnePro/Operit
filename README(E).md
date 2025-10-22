@@ -151,8 +151,12 @@ We do our best to address every reasonable issue, but please understand that ope
 
 ## 📞 Contact Us
 
-- Email: aaswordsman@foxmail.com
-- For issues: [Issue Tracker](https://github.com/AAswordman/Operit/issues)
+If you have any questions, suggestions, or would like to connect, feel free to reach out through the following channels:
+
+- **📧 Email**: aaswordsman@foxmail.com
+- **💬 QQ Group**: [Join Now](https://qm.qq.com/q/Sa4fKEH7sO)
+- **🎮 Discord**: [Join Server](https://discord.gg/YnV9MWurRF)
+- **🐛 Issues**: [Issue Tracker](https://github.com/AAswordman/Operit/issues)
 
 ## 📄 License
 

@@ -406,36 +406,61 @@ class MemoryRepository(private val context: Context, profileId: String) {
     /**
      * Searches memories using semantic search if a query is provided, otherwise returns all
      * memories.
-     * @param query The search query string.
+     * @param query The search query string. Keywords can be separated by '|' or spaces.
+     * @param folderPath Optional path to a folder to limit the search.
      * @param semanticThreshold The minimum semantic similarity threshold (0.0-1.0). Lower values return more results.
      * @return A list of matching Memory objects, sorted by relevance.
      */
-    suspend fun searchMemories(query: String, semanticThreshold: Float = 0.6f): List<Memory> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) return@withContext memoryBox.all
+    suspend fun searchMemories(
+        query: String,
+        folderPath: String? = null,
+        semanticThreshold: Float = 0.6f
+    ): List<Memory> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) {
+            return@withContext if (folderPath.isNullOrBlank() || folderPath == "未分类") {
+                memoryBox.all.filter { it.folderPath.isNullOrEmpty() }
+            } else {
+                getMemoriesByFolderPath(folderPath)
+            }
+        }
 
-        val keywords = query.split('|').map { it.trim() }.filter { it.isNotEmpty() }
+        // 支持两种分隔符：'|' 或空格
+        val keywords = if (query.contains('|')) {
+            query.split('|').map { it.trim() }.filter { it.isNotEmpty() }
+        } else {
+            query.split(Regex("\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+        }
         if (keywords.isEmpty()) {
             return@withContext emptyList()
         }
 
         val scores = mutableMapOf<Long, Double>()
         val k = 60.0 // RRF constant for result fusion
-        val allMemories = memoryBox.all // Fetch all memories once for efficiency
+
+        // --- PRE-FILTERING BY FOLDER ---
+        // If a folder path is provided, all subsequent searches will be performed on this subset.
+        // Otherwise, search all memories.
+        val memoriesToSearch = if (folderPath.isNullOrBlank() || folderPath == "未分类") {
+            if (folderPath == "未分类") {
+                memoryBox.all.filter { it.folderPath.isNullOrEmpty() }
+            } else {
+                memoryBox.all
+            }
+        } else {
+            getMemoriesByFolderPath(folderPath)
+        }
+
+        if (memoriesToSearch.isEmpty()) {
+            android.util.Log.d("MemoryRepo", "No memories found in folder '$folderPath' to search.")
+            return@withContext emptyList()
+        }
+
 
         // 1. Keyword-based search (Memory title/content contains query)
-        val titleConditions = keywords.map { Memory_.title.contains(it, QueryBuilder.StringOrder.CASE_INSENSITIVE) }
-        val contentConditions = keywords.map { Memory_.content.contains(it, QueryBuilder.StringOrder.CASE_INSENSITIVE) }
-
-        val allConditions = titleConditions + contentConditions
-
-        val keywordResults = if (allConditions.isNotEmpty()) {
-            val finalCondition = allConditions.drop(1)
-                .fold(allConditions.first() as QueryCondition<Memory>) { acc, condition ->
-                    acc.or(condition)
-                }
-            memoryBox.query(finalCondition).build().find()
-        } else {
-            emptyList()
+        val keywordResults = memoriesToSearch.filter { memory ->
+            keywords.any { keyword ->
+                memory.title.contains(keyword, ignoreCase = true) || memory.content.contains(keyword, ignoreCase = true)
+            }
         }
 
         android.util.Log.d("MemoryRepo", "--- Keyword Search Results: ${keywordResults.size} ---")
@@ -451,7 +476,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         // 2. Reverse Containment Search (Query contains Memory Title)
         // This is crucial for finding "长安大学" within the query "长安大学在西安".
         val reverseContainmentResults =
-                allMemories.filter { memory -> query.contains(memory.title, ignoreCase = true) }
+                memoriesToSearch.filter { memory -> query.contains(memory.title, ignoreCase = true) }
         
         android.util.Log.d("MemoryRepo", "--- Reverse Containment Search Results: ${reverseContainmentResults.size} ---")
         reverseContainmentResults.forEachIndexed { index, memory ->
@@ -466,13 +491,13 @@ class MemoryRepository(private val context: Context, profileId: String) {
 
         // 3. Semantic search (for conceptual matches)
         // 自动升级旧的100维向量到384维
-        allMemories.forEach { memory ->
+        memoriesToSearch.forEach { memory ->
             if (memory.embedding != null && memory.embedding!!.vector.size == 100) {
                 ensureEmbeddingUpToDate(memory)
             }
         }
         
-        val allMemoriesWithEmbedding = allMemories.filter { it.embedding != null }
+        val allMemoriesWithEmbedding = memoriesToSearch.filter { it.embedding != null }
         val minSimilarityThreshold = semanticThreshold // 语义相似度阈值（可配置）
 
         // 对每个关键词分别进行语义搜索和评分
@@ -540,7 +565,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val basePropagationScore = 0.03 // Give a minimum score boost for any connection
 
         topMemoriesForExpansion.forEach { (sourceId, sourceScore) ->
-            val sourceMemory = allMemories.find { it.id == sourceId } ?: return@forEach
+            val sourceMemory = memoriesToSearch.find { it.id == sourceId } ?: return@forEach
             val sourceScore = scores[sourceId] ?: 0.0
             
             // 重置关系缓存以获取最新连接
@@ -587,7 +612,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         // --- 详细日志记录 ---
         val sortedScoresForLogging = scores.entries.sortedByDescending { it.value }
         sortedScoresForLogging.take(15).forEach { (id, score) ->
-            val memory = allMemories.find { it.id == id }
+            val memory = memoriesToSearch.find { it.id == id }
             if (memory != null) {
                 android.util.Log.d("MemoryRepo", "  - [${memory.title}]: Final Score = ${String.format("%.4f", score)}")
             }
@@ -602,7 +627,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val sortedMemoryIds = filteredScores.sortedByDescending { it.value }.map { it.key }
 
         // Fetch the sorted entities from the database
-        val sortedMemories = memoryBox.get(sortedMemoryIds)
+        val sortedMemories = memoryBox.get(sortedMemoryIds).filterNotNull()
 
         // 7. Semantic Deduplication
         // deduplicateBySemantics(sortedMemories)
@@ -618,6 +643,38 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val memory = findMemoryById(memoryId)
         // 从数据库关系中获取，并按原始顺序排序
         memory?.documentChunks?.sortedBy { it.chunkIndex } ?: emptyList()
+    }
+
+    /**
+     * 根据索引获取单个文档区块。
+     * @param memoryId 父记忆的ID。
+     * @param chunkIndex 区块索引（0-based）。
+     * @return 对应的DocumentChunk，如果不存在则返回null。
+     */
+    suspend fun getChunkByIndex(memoryId: Long, chunkIndex: Int): DocumentChunk? = withContext(Dispatchers.IO) {
+        val chunks = getChunksForMemory(memoryId)
+        chunks.firstOrNull { it.chunkIndex == chunkIndex }
+    }
+
+    /**
+     * 获取指定范围内的文档区块。
+     * @param memoryId 父记忆的ID。
+     * @param startIndex 起始索引（0-based，包含）。
+     * @param endIndex 结束索引（0-based，包含）。
+     * @return 指定范围内的DocumentChunk列表。
+     */
+    suspend fun getChunksByRange(memoryId: Long, startIndex: Int, endIndex: Int): List<DocumentChunk> = withContext(Dispatchers.IO) {
+        val chunks = getChunksForMemory(memoryId)
+        chunks.filter { it.chunkIndex in startIndex..endIndex }
+    }
+
+    /**
+     * 获取文档的总区块数。
+     * @param memoryId 父记忆的ID。
+     * @return 总区块数。
+     */
+    suspend fun getTotalChunkCount(memoryId: Long): Int = withContext(Dispatchers.IO) {
+        getChunksForMemory(memoryId).size
     }
 
     /**

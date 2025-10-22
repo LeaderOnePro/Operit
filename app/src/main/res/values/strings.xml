@@ -2062,7 +2062,7 @@
     <string name="memory_attachment">记忆附着</string>
     <string name="memory_attachment_desc">开启后，发送消息时会自动从记忆库中检索并附加相关内容，但这可能会影响AI回答的焦点。</string>
     <string name="thinking_mode">思考模式</string>
-    <string name="thinking_mode_desc">目前只支持Gemini、Qwen3、Claude和硅基流动，能够启用内置的思考。</string>
+    <string name="thinking_mode_desc">目前支持Gemini、Qwen3、Claude、硅基流动和MNN本地模型，能够启用内置的思考。</string>
     <string name="thinking_guidance">思考引导</string>
     <string name="thinking_guidance_desc">能够让不能思考的模型强制进行思考。该选项不建议对思考模型开启。</string>
     <string name="details">详情</string>
@@ -2102,6 +2102,8 @@
     <string name="settings_user_preferences_subtitle">个人偏好和行为设置</string>
     <string name="settings_language_subtitle">界面语言切换</string>
     <string name="settings_theme_subtitle">主题和外观定制</string>
+    <string name="layout_adjustment">布局调整</string>
+    <string name="layout_adjustment_subtitle">调整界面元素位置和边距</string>
     <string name="settings_model_params_subtitle">模型参数和API配置</string>
     <string name="settings_functional_model_subtitle">功能模型专项配置</string>
     <string name="settings_speech_services">语音服务配置</string>
@@ -2127,6 +2129,22 @@
     <string name="settings_max_http_response_subtitle">网络请求响应的最大字符数限制</string>
     <string name="settings_reset_truncation">重置截断设置</string>
     <string name="settings_reset_truncation_desc">重置所有截断设置为默认值</string>
+    
+    <!-- 布局调整设置 -->
+    <string name="layout_adjustment_settings_title">布局调整设置</string>
+    <string name="layout_adjustment_description">在这里可以调整界面元素的位置和边距，自定义您的使用体验</string>
+    <string name="chat_settings_bar_section">聊天设置栏</string>
+    <string name="chat_settings_bar_right_margin">右边距</string>
+    <string name="chat_settings_bar_right_margin_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="chat_settings_button_end_padding">聊天设置按钮右边距</string>
+    <string name="chat_settings_button_end_padding_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="current_value">当前值</string>
+    <string name="closer_to_edge">靠近边缘</string>
+    <string name="farther_from_edge">远离边缘</string>
+    <string name="invalid_value_range">无效值。请输入%.1f到%.1f之间的数字</string>
+    <string name="reset_to_default">恢复默认</string>
+    <string name="layout_reset_settings">重置布局设置</string>
+    <string name="layout_reset_settings_desc">将所有布局调整设置恢复为默认值</string>
     
     <string name="settings_data_permissions">数据和权限</string>
     <string name="settings_tool_permissions_subtitle">工具权限和安全设置</string>
@@ -2416,6 +2434,7 @@
     <string name="provider_infiniai">无问芯穹</string>
     <string name="provider_alipay_bailing">支付宝百灵大模型</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">派欧云</string>
     <string name="provider_other">其他提供商</string>
     <string name="select_api_provider_title">选择API提供商</string>
     <string name="search_providers">搜索提供商</string>
@@ -2525,6 +2544,7 @@
     <string name="screen_title_model_prompts_settings">模型提示词设置</string>
     <string name="screen_title_functional_config">功能模型配置</string>
     <string name="screen_title_theme_settings">主题设置</string>
+    <string name="screen_title_layout_adjustment">布局调整</string>
     <string name="screen_title_chat_history_settings">聊天记录管理</string>
     <string name="screen_title_language_settings">语言设置</string>
     <string name="screen_title_file_manager">文件管理器</string>
@@ -2873,6 +2893,34 @@
     <!-- Voice Assistant Widget -->
     <string name="voice_assistant_widget_description">快速启动 Operit 语音助手</string>
 
+    <!-- MNN Model Download -->
+    <string name="screen_title_mnn_model_download">MNN模型下载</string>
+    <string name="mnn_model_download">下载MNN模型</string>
+    <string name="mnn_model_management">模型管理</string>
+    <string name="mnn_download_from_modelscope">从ModelScope下载</string>
+    <string name="mnn_model_size">模型大小: %1$.2f GB</string>
+    <string name="mnn_downloading">下载中</string>
+    <string name="mnn_download_speed">速度: %1$s</string>
+    <string name="mnn_download_complete">下载完成</string>
+    <string name="mnn_download_failed">下载失败: %1$s</string>
+    <string name="mnn_no_models_downloaded">暂无已下载的模型</string>
+    <string name="mnn_select_downloaded_model">选择已下载的模型</string>
+    <string name="mnn_model_name_only">模型名称</string>
+    <string name="mnn_download_progress">进度: %1$d%%</string>
+    <string name="mnn_pause_download">暂停下载</string>
+    <string name="mnn_resume_download">继续下载</string>
+    <string name="mnn_delete_model">删除模型</string>
+    <string name="mnn_confirm_delete">确认删除此模型吗？</string>
+    <string name="mnn_loading_models">加载模型列表中...</string>
+    <string name="mnn_connecting">正在连接...</string>
+    <string name="mnn_load_failed">加载失败</string>
+    <string name="mnn_retry">重试</string>
+    <string name="mnn_start_download">开始下载</string>
+    <string name="mnn_no_local_models">尚未下载任何模型</string>
+    <string name="mnn_go_download">去下载</string>
+    <string name="mnn_search_models">搜索模型...</string>
+    <string name="mnn_no_search_results">没有找到匹配的模型</string>
+
     <!-- Persona Card Generation Screen -->
     <string name="persona_card_generation_title">将修改的角色卡</string>
     <string name="no_character_card">无角色卡</string>
@@ -2905,5 +2953,13 @@
     <string name="message_limit_reached_title">对话数量已达上限</string>
     <string name="message_limit_reached_message">当前对话数量已达 %1$d 条上限。\n为了保持对话质量和性能，请清空历史记录后继续。</string>
     <string name="go_clear">去清空</string>
+    
+    <!-- MNN 本地推理 -->
+    <string name="provider_mnn">MNN (本地推理)</string>
+    <string name="mnn_local_model_tip">本地运行模型理解能力较差，建议关闭记忆链接、开启禁用工具进行对话</string>
+    <string name="mnn_model_path">模型文件路径</string>
+    <string name="mnn_model_path_placeholder">输入MNN模型文件的完整路径</string>
+    <string name="mnn_forward_type">计算类型</string>
+    <string name="mnn_thread_count">线程数</string>
 
 </resources>

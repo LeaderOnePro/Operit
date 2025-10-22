@@ -155,7 +155,7 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_MAX_FILE_SIZE_BYTES = 32000  // 文件读取操作的最大字节数限制
         const val DEFAULT_PART_SIZE = 200  // 分段读取文件时，每个部分的行数
         const val DEFAULT_MAX_TEXT_RESULT_LENGTH = 5000  // 通用文本结果的最大字符数限制
-        const val DEFAULT_MAX_HTTP_RESPONSE_LENGTH = 100000  // 网络请求响应的最大字符数限制
+        const val DEFAULT_MAX_HTTP_RESPONSE_LENGTH = 5000000  // 网络请求响应的最大字符数限制（5MB）
 
         // 自定义参数存储键
         val CUSTOM_PARAMETERS = stringPreferencesKey("custom_parameters")

@@ -95,15 +95,15 @@ class FileBindingService(context: Context) {
                 when (val correctionResult = runSubAgentCorrection(originalContent, aiGeneratedCode, multiServiceManager)) {
                     is CorrectionResult.Success -> {
                         // Second attempt with the corrected patch
-                        val (success, patchedContent) = applyLineBasedPatch(originalContent, correctionResult.correctedPatch)
+                        val (success, resultString) = applyLineBasedPatch(originalContent, correctionResult.correctedPatch)
                         if (success) {
                             Log.d(TAG, "Line-based patch succeeded after sub-agent correction.")
-                            val diffString = generateDiff(originalContent.replace("\r\n", "\n"), patchedContent)
-                            return Pair(patchedContent, diffString)
+                            val diffString = generateDiff(originalContent.replace("\r\n", "\n"), resultString)
+                            return Pair(resultString, diffString)
                         }
                         // If even the corrected patch fails, it's a hard error.
                         Log.w(TAG, "Patch application failed even after sub-agent correction. Reporting as error.")
-                        return Pair(originalContent, "Error: The corrected patch could not be applied. The patch logic might be invalid.")
+                        return Pair(originalContent, "Error: The corrected patch could not be applied. Reason: $resultString")
                     }
                     is CorrectionResult.MappingFailed -> {
                         Log.w(TAG, "Sub-agent explicitly failed to find mapping. Reporting as tool error.")
@@ -212,7 +212,8 @@ class FileBindingService(context: Context) {
      *
      * Operations are applied in reverse line order to avoid index shifting issues.
      *
-     * @return A Pair of (Boolean, String) indicating success and the modified content.
+     * @return A Pair of (Boolean, String) indicating success and the modified content, or failure
+     * and a detailed error message.
      */
     private fun applyLineBasedPatch(
             originalContent: String,
@@ -251,7 +252,7 @@ class FileBindingService(context: Context) {
 
             if (operations.isEmpty()) {
                 Log.w(TAG, "Patch code contained START tags but no valid operations were parsed.")
-                return Pair(false, originalContent)
+                return Pair(false, "Patch code contained START tags but no valid operations were parsed.")
             }
 
             Log.d(TAG, "Starting line-based patch application. Found ${operations.size} operations.")
@@ -294,14 +295,16 @@ class FileBindingService(context: Context) {
                 when (op.action) {
                     EditAction.INSERT -> {
                         if (op.startLine < 0 || op.startLine > maxLine) {
-                            Log.e(TAG, "Invalid INSERT line: ${op.startLine}. File has $maxLine lines.")
-                            return Pair(false, originalContent)
+                            val errorMsg = "Invalid INSERT line: ${op.startLine}. File has $maxLine lines."
+                            Log.e(TAG, errorMsg)
+                            return Pair(false, errorMsg)
                         }
                     }
                     EditAction.REPLACE, EditAction.DELETE -> {
                         if (op.startLine <= 0 || op.startLine > maxLine || op.endLine < op.startLine) {
-                            Log.e(TAG, "Invalid ${op.action} range: ${op.startLine}-${op.endLine}. File has $maxLine lines.")
-                            return Pair(false, originalContent)
+                            val errorMsg = "Invalid ${op.action} range: ${op.startLine}-${op.endLine}. File has $maxLine lines."
+                            Log.e(TAG, errorMsg)
+                            return Pair(false, errorMsg)
                         }
                     }
                 }
@@ -351,8 +354,9 @@ class FileBindingService(context: Context) {
             Log.d(TAG, "Patch application finished successfully.")
             return Pair(true, originalLines.joinToString("\n"))
         } catch (e: Exception) {
+            val errorMsg = "Failed to apply line-based patch due to an exception: ${e.message}"
             Log.e(TAG, "Failed to apply line-based patch due to an exception.", e)
-            return Pair(false, originalContent)
+            return Pair(false, errorMsg)
         }
     }
 

@@ -448,6 +448,71 @@ class AttachmentManager(private val context: Context, private val toolHandler: A
                 }
             }
 
+    /** 
+     * 捕获记忆文件夹并作为附件添加到消息
+     * @param folderPaths 选中的记忆文件夹路径列表
+     */
+    suspend fun captureMemoryFolders(folderPaths: List<String>) =
+            withContext(Dispatchers.IO) {
+                try {
+                    if (folderPaths.isEmpty()) {
+                        _toastEvent.emit("未选择任何记忆文件夹")
+                        return@withContext
+                    }
+
+                    // 生成唯一ID
+                    val captureId = "memory_context_${System.currentTimeMillis()}"
+                    
+                    // 构建XML格式的记忆上下文
+                    val memoryContext = buildMemoryContextXml(folderPaths)
+
+                    // 创建附件信息
+                    val attachmentInfo =
+                            AttachmentInfo(
+                                    filePath = captureId,
+                                    fileName = "memory_context.xml",
+                                    mimeType = "application/xml",
+                                    fileSize = memoryContext.length.toLong(),
+                                    content = memoryContext
+                            )
+
+                    // 添加到附件列表
+                    val currentList = _attachments.value
+                    _attachments.value = currentList + attachmentInfo
+
+                    val folderCountText = if (folderPaths.size == 1) {
+                        "已添加记忆文件夹: ${folderPaths[0]}"
+                    } else {
+                        "已添加 ${folderPaths.size} 个记忆文件夹"
+                    }
+                    _toastEvent.emit(folderCountText)
+                } catch (e: Exception) {
+                    _toastEvent.emit("添加记忆文件夹失败: ${e.message}")
+                    Log.e(TAG, "Error capturing memory folders", e)
+                }
+            }
+
+    /**
+     * 构建记忆上下文XML字符串
+     */
+    private fun buildMemoryContextXml(folderPaths: List<String>): String {
+        val foldersText = folderPaths.joinToString("\n") { "  - $it" }
+        val examplePath = folderPaths.firstOrNull() ?: "some/folder/path"
+
+        return """
+<memory_context>
+ <available_folders>
+$foldersText
+ </available_folders>
+ <instruction>
+- **CRITICAL**: To search within the folders listed above, you **MUST** use the `query_memory` tool and provide the `folder_path` parameter.
+- The `folder_path` parameter's value **MUST** be one of the paths from the `<available_folders>` list.
+- Autonomously decide whether a search is needed and what query to use based on the user's question.
+- Example: `<tool name="query_memory"><param name="query">search query</param><param name="folder_path">$examplePath</param></tool>`
+ </instruction>
+</memory_context>""".trimIndent()
+    }
+
     /** 从Content URI获取文件的实际路径，不复制文件内容 */
     private fun getFilePathFromUri(uri: Uri): String? {
         try {

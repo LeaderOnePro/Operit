@@ -57,7 +57,8 @@ fun SettingsScreen(
         navigateToPersonaCardGeneration: () -> Unit,
         navigateToWaifuModeSettings: () -> Unit,
         navigateToTokenUsageStatistics: () -> Unit,
-        navigateToContextSummarySettings: () -> Unit
+        navigateToContextSummarySettings: () -> Unit,
+        navigateToLayoutAdjustmentSettings: () -> Unit
 ) {
         val context = LocalContext.current
         val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -134,6 +135,13 @@ fun SettingsScreen(
                                 subtitle = stringResource(id = R.string.settings_theme_subtitle),
                                 icon = Icons.Default.Palette,
                                 onClick = navigateToThemeSettings
+                        )
+                        
+                        CompactSettingsItem(
+                                title = stringResource(R.string.layout_adjustment),
+                                subtitle = stringResource(R.string.layout_adjustment_subtitle),
+                                icon = Icons.Default.AspectRatio,
+                                onClick = navigateToLayoutAdjustmentSettings
                         )
                 }
 

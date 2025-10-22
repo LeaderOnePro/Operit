@@ -143,8 +143,8 @@ HTTP Tools:
 - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)"""
     private const val MEMORY_TOOLS_EN = """
 Memory and Memory Library Tools:
-- query_memory: Searches the memory library for relevant memories using hybrid search (keyword matching + semantic understanding). Use this when you need to recall past knowledge, look up specific information, or require context. To search for multiple keywords at once, separate them with '|' - each keyword will be independently matched semantically and the results will be combined with weighted scoring. Parameters: query (string, the keyword or question to search for)
-- get_memory_by_title: Retrieves a single specific memory node by its exact title. Use this when you know the exact title of a memory and want to get its full details. Parameters: title (required, string, the exact title of the memory)
+- query_memory: Searches the memory library for relevant memories using hybrid search (keyword matching + semantic understanding). Use this when you need to recall past knowledge, look up specific information, or require context. Keywords can be separated by '|' or spaces - each keyword will be independently matched semantically and the results will be combined with weighted scoring. When the user attaches a memory folder, a `<memory_context>` will be provided in the prompt. You MUST use the `folder_path` parameter to restrict the search to that folder. **IMPORTANT**: For document nodes (uploaded files), this tool uses vector search to return ONLY the most relevant chunks matching your query, NOT the entire document. Results show "Document: [name], Chunk X/Y: [content]" format. To read the complete document or specific parts, use `get_memory_by_title` instead. Parameters: query (string, the keyword or question to search for), folder_path (optional, string, the specific folder path to search within), threshold (optional, float 0.0-1.0, semantic similarity threshold, default 0.35, lower values return more results), limit (optional, int 1-20, maximum number of results to return, default 5)
+- get_memory_by_title: Retrieves a memory by exact title. For regular memories, returns full content. For document nodes (uploaded files), you can: 1) Read entire document (no parameters), 2) Read specific chunk(s) via `chunk_index` (e.g., "3") or `chunk_range` (e.g., "3-7"), 3) Search within document via `query`. Use this when query_memory returns partial results and you need more complete content. Parameters: title (required, string, the exact title of the memory), chunk_index (optional, int, read a specific chunk by its number, e.g., 3 for the 3rd chunk), chunk_range (optional, string, read a range of chunks in "start-end" format, e.g., "3-7" for chunks 3 through 7), query (optional, string, search for matching chunks within the document using keywords or semantic search)
 - create_memory: Creates a new memory node in the library. Use this when you want to save important information for future reference. Parameters: title (required, string), content (required, string), content_type (optional, default "text/plain"), source (optional, default "ai_created"), folder_path (optional, default "")
 - update_memory: Updates an existing memory node by title. Use this to modify an existing memory's content or metadata. Parameters: old_title (required, string to identify the memory), new_title (optional, string, new title if renaming), content (optional, string), content_type (optional, string), source (optional, string), credibility (optional, float 0-1), importance (optional, float 0-1), folder_path (optional, string), tags (optional, comma-separated string)
 - delete_memory: Deletes a memory node from the library by title. Use with caution as this operation is irreversible. Parameters: title (required, string to identify the memory)
@@ -229,8 +229,8 @@ HTTP工具：
 - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)"""
     private const val MEMORY_TOOLS_CN = """
 记忆与记忆库工具：
-- query_memory: 使用混合搜索（关键词匹配 + 语义理解）从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。要一次搜索多个关键词，请使用"|"分隔 - 每个关键词都会独立进行语义匹配，结果将通过加权评分合并。参数：query (string, 搜索的关键词或问题)
-- get_memory_by_title: 通过精确的标题检索单个特定的记忆节点。当你知道记忆的确切标题并想获取其完整详情时使用。参数：title (必需, 字符串, 记忆的精确标题)
+- query_memory: 使用混合搜索（关键词匹配 + 语义理解）从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。关键词可以使用"|"或空格分隔 - 每个关键词都会独立进行语义匹配，结果将通过加权评分合并。当用户附加记忆文件夹时，提示中会提供`<memory_context>`。你必须使用 `folder_path` 参数将搜索限制在该文件夹内。**重要**：对于文档节点（上传的文件），此工具使用向量搜索只返回与查询最相关的分块，而不是整个文档。结果显示"Document: [文档名], Chunk X/Y: [内容]"格式。如需阅读完整文档或特定部分，请改用 `get_memory_by_title` 工具。参数：query (string, 搜索的关键词或问题), folder_path (可选, string, 要搜索的特定文件夹路径), threshold (可选, float 0.0-1.0, 语义相似度阈值, 默认0.35, 较低的值返回更多结果), limit (可选, int 1-20, 返回结果的最大数量, 默认5)
+- get_memory_by_title: 通过精确标题检索记忆。对于普通记忆，返回完整内容。对于文档节点（上传的文件），可以：1) 读取整个文档（不提供参数），2) 通过 `chunk_index`（如"3"）或 `chunk_range`（如"3-7"）读取特定分块，3) 通过 `query` 在文档内搜索。当 query_memory 返回部分结果而你需要更完整内容时使用。参数：title (必需, 字符串, 记忆的精确标题), chunk_index (可选, 整数, 读取特定编号的分块, 例如3表示第3块), chunk_range (可选, 字符串, 读取分块范围，格式为"起始-结束"，例如"3-7"表示第3到第7块), query (可选, 字符串, 使用关键词或语义搜索在文档内查找匹配的分块)
 - create_memory: 在记忆库中创建新的记忆节点。当你想保存重要信息供将来参考时使用。参数：title (必需, 字符串), content (必需, 字符串), content_type (可选, 默认"text/plain"), source (可选, 默认"ai_created"), folder_path (可选, 默认"")
 - update_memory: 通过标题更新现有的记忆节点。用于修改现有记忆的内容或元数据。参数：old_title (必需, 字符串，用于识别记忆), new_title (可选, 字符串, 重命名时的新标题), content (可选, 字符串), content_type (可选, 字符串), source (可选, 字符串), credibility (可选, 浮点数 0-1), importance (可选, 浮点数 0-1), folder_path (可选, 字符串), tags (可选, 逗号分隔的字符串)
 - delete_memory: 通过标题从记忆库中删除记忆节点。谨慎使用，此操作不可逆。参数：title (必需, 字符串，用于识别记忆)
@@ -243,73 +243,73 @@ HTTP工具：
 
     /** Base system prompt template used by the enhanced AI service */
     val SYSTEM_PROMPT_TEMPLATE =
-        """
-        BEGIN_SELF_INTRODUCTION_SECTION
-        
-        THINKING_GUIDANCE_SECTION
+"""
+BEGIN_SELF_INTRODUCTION_SECTION
 
-        $BEHAVIOR_GUIDELINES_EN
+THINKING_GUIDANCE_SECTION
 
-        WEB_WORKSPACE_GUIDELINES_SECTION
+$BEHAVIOR_GUIDELINES_EN
 
-        FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
+WEB_WORKSPACE_GUIDELINES_SECTION
 
-        TOOL_USAGE_GUIDELINES_SECTION
+FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
 
-        PACKAGE_SYSTEM_GUIDELINES_SECTION
-        
-        ACTIVE_PACKAGES_SECTION
+TOOL_USAGE_GUIDELINES_SECTION
 
-        AVAILABLE_TOOLS_SECTION
-        """.trimIndent()
+PACKAGE_SYSTEM_GUIDELINES_SECTION
+
+ACTIVE_PACKAGES_SECTION
+
+AVAILABLE_TOOLS_SECTION
+""".trimIndent()
 
     /** Guidance for the AI on how to "think" using tags. */
     val THINKING_GUIDANCE_PROMPT =
-      """
-      THINKING PROCESS GUIDELINES:
-      - Before providing your final response, you MUST use a <think> block to outline your thought process. This is for your internal monologue.
-      - In your thoughts, deconstruct the user's request, consider alternatives, anticipate outcomes, and reflect on the best strategy. Formulate a precise action plan. Your plan should be efficient and use multiple tools in parallel for information gathering whenever possible.
-      - The user will see your thoughts but cannot reply to them directly. This block is NOT saved in the chat history, so your final answer must be self-contained.
-      - The <think> block must be immediately followed by your final answer or tool call without any newlines.
-      - **CRITICAL REMINDER:** Even if previous messages in the chat history do not show a `<think>` block, you MUST include one in your current response. This is a mandatory instruction for this conversation mode.
-      - Example:
-      <think>The user wants to know about the configuration files for project A and project B. I need to read the config files for both projects. To be efficient, I will call the `read_file` tool twice in one turn to read `projectA/config.json` and `projectB/config.xml` respectively.</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
-      """.trimIndent()
+"""
+THINKING PROCESS GUIDELINES:
+- Before providing your final response, you MUST use a <think> block to outline your thought process. This is for your internal monologue.
+- In your thoughts, deconstruct the user's request, consider alternatives, anticipate outcomes, and reflect on the best strategy. Formulate a precise action plan. Your plan should be efficient and use multiple tools in parallel for information gathering whenever possible.
+- The user will see your thoughts but cannot reply to them directly. This block is NOT saved in the chat history, so your final answer must be self-contained.
+- The <think> block must be immediately followed by your final answer or tool call without any newlines.
+- **CRITICAL REMINDER:** Even if previous messages in the chat history do not show a `<think>` block, you MUST include one in your current response. This is a mandatory instruction for this conversation mode.
+- Example:
+<think>The user wants to know about the configuration files for project A and project B. I need to read the config files for both projects. To be efficient, I will call the `read_file` tool twice in one turn to read `projectA/config.json` and `projectB/config.xml` respectively.</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
+""".trimIndent()
 
 
     /** 中文版本系统提示模板 */
     val SYSTEM_PROMPT_TEMPLATE_CN =
-        """
-        BEGIN_SELF_INTRODUCTION_SECTION
+"""
+BEGIN_SELF_INTRODUCTION_SECTION
 
-        THINKING_GUIDANCE_SECTION
+THINKING_GUIDANCE_SECTION
 
-        $BEHAVIOR_GUIDELINES_CN
-       
-        WEB_WORKSPACE_GUIDELINES_SECTION
-        
-        公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
-        
-        TOOL_USAGE_GUIDELINES_SECTION
-        
-        PACKAGE_SYSTEM_GUIDELINES_SECTION
-        
-        ACTIVE_PACKAGES_SECTION
-        
-        AVAILABLE_TOOLS_SECTION""".trimIndent()
+$BEHAVIOR_GUIDELINES_CN
+
+WEB_WORKSPACE_GUIDELINES_SECTION
+
+公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
+
+TOOL_USAGE_GUIDELINES_SECTION
+
+PACKAGE_SYSTEM_GUIDELINES_SECTION
+
+ACTIVE_PACKAGES_SECTION
+
+AVAILABLE_TOOLS_SECTION""".trimIndent()
 
     /** 中文版本的思考引导提示 */
     val THINKING_GUIDANCE_PROMPT_CN =
-            """
-      思考过程指南:
-      - 在提供最终答案之前，你必须使用 <think> 模块来阐述你的思考过程。这是你的内心独白。
-      - 在思考中，你需要拆解用户需求，评估备选方案，预判执行结果，并反思最佳策略，最终形成精确的行动计划。你的计划应当是高效的，并尽可能地并行调用多个工具来收集信息。
-      - 用户能看到你的思考过程，但无法直接回复。此模块不会保存在聊天记录中，因此你的最终答案必须是完整的。
-      - <think> 模块必须紧邻你的最终答案或工具调用，中间不要有任何换行。
-      - **重要提醒:** 即使聊天记录中之前的消息没有 <think> 模块，你在本次回复中也必须按要求使用它。这是强制指令。
-      - 范例:
-      <think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
-      """.trimIndent()
+"""
+思考过程指南:
+- 在提供最终答案之前，你必须使用 <think> 模块来阐述你的思考过程。这是你的内心独白。
+- 在思考中，你需要拆解用户需求，评估备选方案，预判执行结果，并反思最佳策略，最终形成精确的行动计划。你的计划应当是高效的，并尽可能地并行调用多个工具来收集信息。
+- 用户能看到你的思考过程，但无法直接回复。此模块不会保存在聊天记录中，因此你的最终答案必须是完整的。
+- <think> 模块必须紧邻你的最终答案或工具调用，中间不要有任何换行。
+- **重要提醒:** 即使聊天记录中之前的消息没有 <think> 模块，你在本次回复中也必须按要求使用它。这是强制指令。
+- 范例:
+<think>用户想了解项目A和项目B的配置文件。我需要读取这两个项目的配置文件。为了提高效率，我将一次性调用两次 `read_file` 工具来分别读取 `projectA/config.json` 和 `projectB/config.xml`。</think><tool name="read_file"><param name="path">/sdcard/projectA/config.json</param></tool><tool name="read_file"><param name="path">/sdcard/projectB/config.xml</param></tool>
+""".trimIndent()
 
     /**
      * Prompt for a subtask agent that should be strictly task-focused,
@@ -338,7 +338,7 @@ HTTP工具：
         ACTIVE_PACKAGES_SECTION
 
         $AVAILABLE_TOOLS_EN
-    """.trimIndent()
+        """.trimIndent()
 
   /**
    * Applies custom prompt replacements from ApiPreferences to the system prompt
@@ -388,17 +388,23 @@ HTTP工具：
     // Build the available packages section
     val packagesSection = StringBuilder()
 
+    // Filter out imported packages that no longer exist in availablePackages
+    val validImportedPackages = importedPackages.filter { packageName ->
+        packageManager.getPackageTools(packageName) != null
+    }
+
     // Check if any packages (JS or MCP) are available
-    val hasPackages = importedPackages.isNotEmpty() || mcpServers.isNotEmpty()
+    val hasPackages = validImportedPackages.isNotEmpty() || mcpServers.isNotEmpty()
 
     if (hasPackages) {
       packagesSection.appendLine("Available packages:")
 
-      // List imported JS packages
-      for (packageName in importedPackages) {
-        packagesSection.appendLine(
-                "- $packageName : ${packageManager.getPackageTools(packageName)?.description}"
-        )
+      // List imported JS packages (only those that still exist)
+      for (packageName in validImportedPackages) {
+        val packageTools = packageManager.getPackageTools(packageName)
+        if (packageTools != null) {
+          packagesSection.appendLine("- $packageName : ${packageTools.description}")
+        }
       }
 
       // List available MCP servers as regular packages
@@ -458,20 +464,19 @@ HTTP工具：
                 .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
                 .replace("AVAILABLE_TOOLS_SECTION", if (useEnglish) MEMORY_TOOLS_EN else MEMORY_TOOLS_CN)
         } else {
-            // Remove tool-related sections when tools are disabled
-            val toolsDisabledPrompt = if (useEnglish) {
-                "You are temporarily prohibited from calling tools, even if you have used them before. Please respond to user questions using text only."
-            } else {
-                "你被暂时禁止调用工具，即使前面使用过，也依旧禁止使用。请仅通过文本回复用户问题。"
-            }
-
-            // Replace tool-related sections with disabled message or remove them
+            // Remove all guidance sections when tools and memory are disabled
+            // Replace tool-related sections and remove behavior guidelines and workspace guidelines
             prompt = prompt
-                .replace("TOOL_USAGE_GUIDELINES_SECTION", toolsDisabledPrompt)
+                .replace("TOOL_USAGE_GUIDELINES_SECTION", "")
                 .replace("PACKAGE_SYSTEM_GUIDELINES_SECTION", "")
                 .replace("AVAILABLE_TOOLS_SECTION", "")
+                .replace(if (useEnglish) BEHAVIOR_GUIDELINES_EN else BEHAVIOR_GUIDELINES_CN, "")
+                .replace(workspaceGuidelines, "")
         }
     }
+
+    // Clean up multiple consecutive blank lines (replace 3+ newlines with 2)
+    prompt = prompt.replace(Regex("\n{3,}"), "\n\n")
 
     return prompt
   }

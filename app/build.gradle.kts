@@ -35,8 +35,8 @@ android {
         applicationId = "com.ai.assistance.operit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.5.2"
+        versionCode = 27
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -129,6 +129,7 @@ dependencies {
     implementation("com.github.jelmerk:hnswlib-core:1.2.1")
     implementation(project(":dragonbones"))
     implementation(project(":terminal"))
+    implementation(project(":mnn"))
     implementation(libs.androidx.ui.graphics.android)
     implementation(files("libs\\ffmpegkit.jar"))
     implementation(files("libs\\arsc.jar"))
@@ -136,6 +137,7 @@ dependencies {
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.animation.android)
     implementation(libs.androidx.ui.android)
+    implementation(libs.androidx.activity.ktx)
 
     // Desugaring support for modern Java APIs on older Android
     coreLibraryDesugaring(libs.desugar.jdk)

@@ -52,16 +52,28 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
     private suspend fun executeQueryMemory(tool: AITool): ToolResult {
         val query = tool.parameters.find { it.name == "query" }?.value ?: ""
+        val folderPath = tool.parameters.find { it.name == "folder_path" }?.value
+        val threshold = tool.parameters.find { it.name == "threshold" }?.value?.toFloatOrNull() ?: 0.35f
+        val limit = tool.parameters.find { it.name == "limit" }?.value?.toIntOrNull() ?: 5
+
         if (query.isBlank()) {
             return ToolResult(toolName = tool.name, success = false, result = StringResultData(""), error = "Query parameter cannot be empty.")
         }
 
-        Log.d(TAG, "Executing memory query: $query")
+        // 验证参数范围
+        val validThreshold = threshold.coerceIn(0.0f, 1.0f)
+        val validLimit = limit.coerceIn(1, 20)
+
+        Log.d(TAG, "Executing memory query: '$query' in folder: '${folderPath ?: "All"}', threshold: $validThreshold, limit: $validLimit")
 
         return try {
-            val results = memoryRepository.searchMemories(query) // 改用更强大的混合搜索
+            val results = memoryRepository.searchMemories(
+                query = query,
+                folderPath = folderPath,
+                semanticThreshold = validThreshold
+            )
             
-            val formattedResult = buildResultData(results.take(5), query) // 取前5个结果
+            val formattedResult = buildResultData(results.take(validLimit), query)
             Log.d(TAG, "Memory query result for '$query':\n$formattedResult")
             ToolResult(toolName = tool.name, success = true, result = formattedResult)
         } catch (e: Exception) {
@@ -81,7 +93,12 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             )
         }
 
-        Log.d(TAG, "Getting memory by title: $title")
+        // 提取可选的分块相关参数
+        val chunkIndexParam = tool.parameters.find { it.name == "chunk_index" }?.value
+        val chunkRangeParam = tool.parameters.find { it.name == "chunk_range" }?.value
+        val queryParam = tool.parameters.find { it.name == "query" }?.value
+
+        Log.d(TAG, "Getting memory by title: $title, chunk_index: $chunkIndexParam, chunk_range: $chunkRangeParam, query: $queryParam")
 
         return try {
             val memory = memoryRepository.findMemoryByTitle(title)
@@ -94,6 +111,12 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 )
             }
 
+            // 如果是文档节点且提供了分块参数，则进行特殊处理
+            if (memory.isDocumentNode && (chunkIndexParam != null || chunkRangeParam != null || queryParam != null)) {
+                return handleDocumentChunkRetrieval(tool.name, memory, chunkIndexParam, chunkRangeParam, queryParam)
+            }
+
+            // 默认行为：返回完整记忆
             val formattedResult = buildResultData(listOf(memory), title)
             Log.d(TAG, "Found memory by title '$title':\n$formattedResult")
             ToolResult(
@@ -108,6 +131,115 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 success = false,
                 result = StringResultData(""),
                 error = "Failed to get memory by title: ${e.message}"
+            )
+        }
+    }
+
+    private suspend fun handleDocumentChunkRetrieval(
+        toolName: String,
+        memory: Memory,
+        chunkIndexParam: String?,
+        chunkRangeParam: String?,
+        queryParam: String?
+    ): ToolResult = withContext(Dispatchers.IO) {
+        val totalChunks = memoryRepository.getTotalChunkCount(memory.id)
+        
+        try {
+            // 优先级：query > chunk_range > chunk_index
+            val chunks = when {
+                // 模糊搜索分块
+                !queryParam.isNullOrBlank() -> {
+                    Log.d(TAG, "Searching chunks in document '${memory.title}' with query: '$queryParam'")
+                    memoryRepository.searchChunksInDocument(memory.id, queryParam)
+                }
+                // 范围查询
+                !chunkRangeParam.isNullOrBlank() -> {
+                    val rangeParts = chunkRangeParam.split("-")
+                    if (rangeParts.size != 2) {
+                        return@withContext ToolResult(
+                            toolName = toolName,
+                            success = false,
+                            result = StringResultData(""),
+                            error = "Invalid chunk_range format. Expected 'start-end' (e.g., '3-7')"
+                        )
+                    }
+                    // 解析为1-based索引，转换为0-based
+                    val startIndex = (rangeParts[0].toIntOrNull() ?: 1) - 1
+                    val endIndex = (rangeParts[1].toIntOrNull() ?: totalChunks) - 1
+                    
+                    if (startIndex < 0 || endIndex >= totalChunks || startIndex > endIndex) {
+                        return@withContext ToolResult(
+                            toolName = toolName,
+                            success = false,
+                            result = StringResultData(""),
+                            error = "Chunk range out of bounds. Document has $totalChunks chunks. Valid range: 1-$totalChunks"
+                        )
+                    }
+                    Log.d(TAG, "Retrieving chunk range ${startIndex + 1}-${endIndex + 1} from document '${memory.title}'")
+                    memoryRepository.getChunksByRange(memory.id, startIndex, endIndex)
+                }
+                // 单个分块
+                !chunkIndexParam.isNullOrBlank() -> {
+                    // 解析为1-based索引，转换为0-based
+                    val chunkIndex = (chunkIndexParam.toIntOrNull() ?: 1) - 1
+                    if (chunkIndex < 0 || chunkIndex >= totalChunks) {
+                        return@withContext ToolResult(
+                            toolName = toolName,
+                            success = false,
+                            result = StringResultData(""),
+                            error = "Chunk index out of bounds. Document has $totalChunks chunks. Valid range: 1-$totalChunks"
+                        )
+                    }
+                    Log.d(TAG, "Retrieving chunk ${chunkIndex + 1} from document '${memory.title}'")
+                    val chunk = memoryRepository.getChunkByIndex(memory.id, chunkIndex)
+                    listOfNotNull(chunk)
+                }
+                else -> emptyList()
+            }
+
+            if (chunks.isEmpty()) {
+                return@withContext ToolResult(
+                    toolName = toolName,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "No matching chunks found"
+                )
+            }
+
+            // 格式化返回结果
+            val content = "Document: ${memory.title}\n" +
+                chunks.joinToString("\n---\n") { chunk ->
+                    "Chunk ${chunk.chunkIndex + 1}/$totalChunks:\n${chunk.content}"
+                }
+
+            val chunkIndices = chunks.map { it.chunkIndex }
+            val chunkInfo = if (chunks.size == 1) {
+                "Chunk ${chunks[0].chunkIndex + 1}/$totalChunks"
+            } else {
+                "Chunks ${chunks.map { it.chunkIndex + 1 }.joinToString(", ")}/$totalChunks"
+            }
+
+            Log.d(TAG, "Retrieved ${chunks.size} chunks from document '${memory.title}': $chunkInfo")
+            
+            ToolResult(
+                toolName = toolName,
+                success = true,
+                result = StringResultData(content)
+            )
+        } catch (e: NumberFormatException) {
+            ToolResult(
+                toolName = toolName,
+                success = false,
+                result = StringResultData(""),
+                error = "Invalid number format in chunk parameters: ${e.message}"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to retrieve document chunks", e)
+            ToolResult(
+                toolName = toolName,
+                success = false,
+                result = StringResultData(""),
+                error = "Failed to retrieve document chunks: ${e.message}"
             )
         }
     }
@@ -362,31 +494,53 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val memoryInfos = memories.map { memory ->
             val content: String
+            val chunkInfo: String?
+            val chunkIndices: List<Int>?
+            
             if (memory.isDocumentNode) {
-                // 对于文档节点，执行“二次探查”，获取匹配的区块内容
+                // 对于文档节点，执行"二次探查"，获取匹配的区块内容
                 Log.d(TAG, "Memory result is a document ('${memory.title}'). Fetching specific matching chunks for query: '$query'")
                 val matchingChunks = memoryRepository.searchChunksInDocument(memory.id, query)
+                val totalChunks = memoryRepository.getTotalChunkCount(memory.id)
 
-                content = if (matchingChunks.isNotEmpty()) {
-                    // 将匹配的区块内容拼接起来
-                    "Matching content from document '${memory.title}':\n" +
-                    matchingChunks.take(5) // 最多取5个最相关的区块
-                        .joinToString("\n---\n") { chunk -> chunk.content }
+                if (matchingChunks.isNotEmpty()) {
+                    // 收集分块索引（使用1-based显示）
+                    chunkIndices = matchingChunks.map { it.chunkIndex }
+                    
+                    // 生成分块信息摘要
+                    chunkInfo = if (matchingChunks.size == 1) {
+                        "Chunk ${matchingChunks[0].chunkIndex + 1}/$totalChunks"
+                    } else {
+                        "Chunks ${matchingChunks.map { it.chunkIndex + 1 }.take(5).joinToString(", ")}/$totalChunks"
+                    }
+                    
+                    // 将匹配的区块内容拼接起来，每个区块显示编号
+                    content = "Document: ${memory.title}\n" +
+                        matchingChunks.take(5) // 最多取5个最相关的区块
+                            .joinToString("\n---\n") { chunk -> 
+                                "Chunk ${chunk.chunkIndex + 1}/$totalChunks:\n${chunk.content}"
+                            }
                 } else {
-                    // 如果二次探cha未找到（理论上很少见，因为全局搜索已经认为它相关），提供一个回退信息
-                    "Document '${memory.title}' was found, but no specific chunks strongly matched the query '$query'. The document's general content is: ${memory.content}"
+                    // 如果二次探查未找到（理论上很少见，因为全局搜索已经认为它相关），提供一个回退信息
+                    chunkInfo = null
+                    chunkIndices = null
+                    content = "Document '${memory.title}' was found, but no specific chunks strongly matched the query '$query'. The document's general content is: ${memory.content}"
                 }
             } else {
                 // 对于普通记忆，直接使用其内容
                 content = memory.content
+                chunkInfo = null
+                chunkIndices = null
             }
 
             MemoryQueryResultData.MemoryInfo(
                 title = memory.title,
-                content = content, // 使用新生成的、包含具体区块的内容
+                content = content,
                 source = memory.source,
                 tags = memory.tags.map { it.name },
-                createdAt = sdf.format(memory.createdAt)
+                createdAt = sdf.format(memory.createdAt),
+                chunkInfo = chunkInfo,
+                chunkIndices = chunkIndices
             )
         }
         MemoryQueryResultData(memories = memoryInfos)

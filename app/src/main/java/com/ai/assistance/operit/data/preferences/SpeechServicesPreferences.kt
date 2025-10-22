@@ -62,6 +62,12 @@ class SpeechServicesPreferences(private val context: Context) {
             voiceId = "",
             modelName = ""
         )
+        
+        // TTS Cleaner 的默认正则表达式列表（去除中英文括号内容）
+        val DEFAULT_TTS_CLEANER_REGEXS = listOf(
+            "\\([^)]+\\)",  // 英文括号
+            "（[^）]+）"     // 中文括号
+        )
     }
 
     // --- TTS Flows ---
@@ -85,7 +91,12 @@ class SpeechServicesPreferences(private val context: Context) {
     }
 
     val ttsCleanerRegexsFlow: Flow<List<String>> = dataStore.data.map { prefs ->
-        (prefs[TTS_CLEANER_REGEXS] ?: emptySet()).toList()
+        val storedRegexs = prefs[TTS_CLEANER_REGEXS]
+        if (storedRegexs == null) {
+            DEFAULT_TTS_CLEANER_REGEXS
+        } else {
+            storedRegexs.toList()
+        }
     }
 
     // --- STT Flows ---

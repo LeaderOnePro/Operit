@@ -3,6 +3,7 @@ package com.ai.assistance.operit.data.repository
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.webkit.MimeTypeMap
 import com.ai.assistance.operit.data.model.CustomEmoji
 import com.ai.assistance.operit.data.preferences.CustomEmojiPreferences
 import kotlinx.coroutines.Dispatchers
@@ -308,23 +309,12 @@ class CustomEmojiRepository private constructor(private val context: Context) {
      */
     private fun getFileExtension(uri: Uri): String? {
         return try {
-            // 尝试从 URI 路径获取扩展名
-            val path = uri.path
-            if (path != null) {
-                val lastDot = path.lastIndexOf('.')
-                if (lastDot != -1) {
-                    return path.substring(lastDot + 1)
-                }
-            }
-
-            // 尝试从 MIME 类型获取扩展名
-            val mimeType = context.contentResolver.getType(uri)
-            when (mimeType) {
-                "image/jpeg" -> "jpg"
-                "image/png" -> "png"
-                "image/gif" -> "gif"
-                "image/webp" -> "webp"
-                else -> null
+            if ("content" == uri.scheme) {
+                val mimeType = context.contentResolver.getType(uri)
+                MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+            } else {
+                val path = uri.path
+                path?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting file extension", e)

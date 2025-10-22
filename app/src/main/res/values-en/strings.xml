@@ -2068,7 +2068,7 @@
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
     <string name="ai_planning_desc">Will perform task decomposition and trigger multiple sub-agents to collect information, then summarize. Sub-agents have the same tool-calling capabilities as the chat agent. This can be very time-consuming, only recommended when collecting information.</string>
     <string name="thinking_mode">Thinking Mode</string>
-    <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3, Claude and SiliconFlow, enabling built-in thinking.</string>
+    <string name="thinking_mode_desc">Currently supports Gemini, Qwen3, Claude, SiliconFlow and MNN local models, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>
     <string name="thinking_guidance_desc">Can force models that can\'t think to perform thinking. This option is not recommended for thinking models.</string>
     <string name="model_selection">Model Selection</string>
@@ -2107,6 +2107,8 @@
     <string name="settings_user_preferences_subtitle">Personal preferences and behavior settings</string>
     <string name="settings_language_subtitle">Interface language switching</string>
     <string name="settings_theme_subtitle">Theme and appearance customization</string>
+    <string name="layout_adjustment">Layout Adjustment</string>
+    <string name="layout_adjustment_subtitle">Adjust UI element positions and margins</string>
     <string name="settings_model_params_subtitle">Model parameters and API configuration</string>
     <string name="settings_functional_model_subtitle">Functional model specific configuration</string>
     <string name="settings_speech_services">Speech Services Configuration</string>
@@ -2132,6 +2134,22 @@
     <string name="settings_max_http_response_subtitle">Maximum character limit for network request responses</string>
     <string name="settings_reset_truncation">Reset Truncation Settings</string>
     <string name="settings_reset_truncation_desc">Reset all truncation settings to default values</string>
+    
+    <!-- Layout Adjustment Settings -->
+    <string name="layout_adjustment_settings_title">Layout Adjustment Settings</string>
+    <string name="layout_adjustment_description">Adjust the position and spacing of UI elements to customize your experience</string>
+    <string name="chat_settings_bar_section">Chat Settings Bar</string>
+    <string name="chat_settings_bar_right_margin">Right Margin</string>
+    <string name="chat_settings_bar_right_margin_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="chat_settings_button_end_padding">Chat Settings Button End Padding</string>
+    <string name="chat_settings_button_end_padding_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="current_value">Current Value</string>
+    <string name="closer_to_edge">Closer to Edge</string>
+    <string name="farther_from_edge">Farther from Edge</string>
+    <string name="invalid_value_range">Invalid value. Please enter a number between %.1f and %.1f</string>
+    <string name="reset_to_default">Reset to Default</string>
+    <string name="layout_reset_settings">Reset Layout Settings</string>
+    <string name="layout_reset_settings_desc">Reset all layout adjustment settings to default values</string>
     
     <string name="settings_data_permissions">Data and Permissions</string>
     <string name="settings_tool_permissions_subtitle">Tool permissions and security settings</string>
@@ -2415,6 +2433,7 @@
     <string name="provider_infiniai">InfiniAI</string>
     <string name="provider_alipay_bailing">Alipay Bailing Model</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">PPInfra Cloud</string>
     <string name="provider_other">Other Providers</string>
     <string name="select_api_provider_title">Select API Provider</string>
     <string name="search_providers">Search providers</string>
@@ -2520,6 +2539,7 @@
     <string name="screen_title_model_prompts_settings">Model Prompts Settings</string>
     <string name="screen_title_functional_config">Functional Model Configuration</string>
     <string name="screen_title_theme_settings">Theme Settings</string>
+    <string name="screen_title_layout_adjustment">Layout Adjustment</string>
     <string name="screen_title_chat_history_settings">Chat History Management</string>
     <string name="screen_title_language_settings">Language Settings</string>
     <string name="screen_title_file_manager">File Manager</string>
@@ -2912,5 +2932,39 @@
     <string name="message_limit_reached_title">Message Limit Reached</string>
     <string name="message_limit_reached_message">The current conversation has reached the limit of %1$d messages.\nTo maintain conversation quality and performance, please clear the history to continue.</string>
     <string name="go_clear">Clear Now</string>
+    
+    <!-- MNN Local Inference -->
+    <string name="provider_mnn">MNN (Local Inference)</string>
+    <string name="screen_title_mnn_model_download">MNN Model Download</string>
+    <string name="mnn_model_download">Download MNN Model</string>
+    <string name="mnn_model_management">Model Management</string>
+    <string name="mnn_download_from_modelscope">Download from ModelScope</string>
+    <string name="mnn_model_size">Model Size: %1$.2f GB</string>
+    <string name="mnn_downloading">Downloading</string>
+    <string name="mnn_download_speed">Speed: %1$s</string>
+    <string name="mnn_download_complete">Download Complete</string>
+    <string name="mnn_download_failed">Download Failed: %1$s</string>
+    <string name="mnn_no_models_downloaded">No models downloaded yet</string>
+    <string name="mnn_select_downloaded_model">Select downloaded model</string>
+    <string name="mnn_model_name_only">Model Name</string>
+    <string name="mnn_download_progress">Progress: %1$d%%</string>
+    <string name="mnn_pause_download">Pause Download</string>
+    <string name="mnn_resume_download">Resume Download</string>
+    <string name="mnn_delete_model">Delete Model</string>
+    <string name="mnn_confirm_delete">Confirm to delete this model?</string>
+    <string name="mnn_loading_models">Loading model list...</string>
+    <string name="mnn_connecting">Connecting...</string>
+    <string name="mnn_load_failed">Load Failed</string>
+    <string name="mnn_retry">Retry</string>
+    <string name="mnn_start_download">Start Download</string>
+    <string name="mnn_no_local_models">No models downloaded yet</string>
+    <string name="mnn_go_download">Go to Download</string>
+    <string name="mnn_search_models">Search models...</string>
+    <string name="mnn_no_search_results">No matching models found</string>
+    <string name="mnn_local_model_tip">Local models have limited understanding. It\'s recommended to disable memory links and enable tool restrictions for conversations</string>
+    <string name="mnn_model_path">Model File Path</string>
+    <string name="mnn_model_path_placeholder">Enter the full path to MNN model file</string>
+    <string name="mnn_forward_type">Forward Type</string>
+    <string name="mnn_thread_count">Thread Count</string>
 
 </resources>
