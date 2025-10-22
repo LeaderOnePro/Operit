@@ -121,6 +121,7 @@ export interface ToolResultMap {
     'device_info': DeviceInfoResultData;
     'get_notifications': NotificationData;
     'get_device_location': LocationData;
+    'trigger_tasker_event': string;
 
     // UI operations
     'get_page_info': UIPageResultData;

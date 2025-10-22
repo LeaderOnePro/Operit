@@ -308,13 +308,14 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
+    // Tasker事件触发工具
     handler.registerTool(
             name = "trigger_tasker_event",
             category = ToolCategory.SYSTEM_OPERATION,
             descriptionGenerator = { tool ->
                 val taskType = tool.parameters.find { it.name == "task_type" }?.value ?: ""
-                val arg1 = tool.parameters.find { it.name == "arg1" }?.value
-                if (!arg1.isNullOrBlank()) "触发Tasker事件: $taskType ($arg1)" else "触发Tasker事件: $taskType"
+                val args = tool.parameters.filter { it.name.startsWith("arg1") }.joinToString(",")
+                "触发Tasker事件: $taskType ($args)"
             },
             executor = { tool ->
                 val params = tool.parameters.associate { it.name to it.value }

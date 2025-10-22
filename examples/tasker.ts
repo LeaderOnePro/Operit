@@ -21,10 +21,10 @@
   "category": "SYSTEM_OPERATION"
 }
 */
-
+/// <reference path="./types/index.d.ts" />
 const TaskerIntegration = (function () {
-    async function trigger_tasker_event(params) {
-        const data = await Tools.Tasker.triggerEvent(params);
+    async function trigger_tasker_event(params: Tasker.TriggerTaskerEventParams) {
+        const data: string = await Tools.Tasker.triggerEvent(params);
         return {
             success: true,
             message: "Tasker 事件已触发",
@@ -32,18 +32,18 @@ const TaskerIntegration = (function () {
         };
     }
 
-    async function wrapToolExecution(func, params) {
+    async function wrapToolExecution<T>(func: (params: any) => Promise<T>, params?: any) {
         try {
             const result = await func(params || {});
             complete(result);
-        } catch (error) {
+        } catch (error: any) {
             console.error(`Tool ${func.name} failed unexpectedly`, error);
             complete({ success: false, message: String(error && error.message ? error.message : error) });
         }
     }
 
     return {
-        trigger_tasker_event: (params) => wrapToolExecution(trigger_tasker_event, params)
+        trigger_tasker_event: (params?: Tasker.TriggerTaskerEventParams) => wrapToolExecution(trigger_tasker_event, params)
     };
 })();
 
