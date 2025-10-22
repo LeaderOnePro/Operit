@@ -263,6 +263,14 @@
 
     <string name="modify_memory">Modify Memory</string>
     <string name="delete_from_here">Delete From Here</string>
+    <string name="multi_select">Multi-select</string>
+    <string name="exit_multi_select">Exit Multi-select</string>
+    <string name="delete_selected">Delete Selected</string>
+    <string name="share_selected">Share</string>
+    <string name="selected_count">%d selected</string>
+    <string name="generating_image">Generating image...</string>
+    <string name="share_failed">Share failed</string>
+    <string name="image_generated">Image generated</string>
     <string name="load_more_history">Load more history messages...</string>
 
     <!-- Theme Settings Screen -->
@@ -571,7 +579,6 @@
     <!-- File Manager -->
     <string name="files_selected">%1$d files selected</string>
     <string name="file_count">%1$d items</string>
-    <string name="exit_multi_select">Exit multi-select</string>
     
     <!-- Search Dialog -->
     <string name="search_files">Search Files</string>

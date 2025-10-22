@@ -256,7 +256,6 @@
     <!-- File Manager -->
     <string name="files_selected">%1$d archivos seleccionados</string>
     <string name="file_count">%1$d elementos</string>
-    <string name="exit_multi_select">Salir del modo de selección múltiple</string>
 
     <!-- Search Dialog -->
     <string name="search_files">Buscar archivos</string>
@@ -1234,6 +1233,14 @@
     <string name="edit_and_resend">Editar y Reenviar</string>
     <string name="modify_memory">Modificar Memoria</string>
     <string name="delete_from_here">Eliminar desde aquí</string>
+    <string name="multi_select">Selección múltiple</string>
+    <string name="exit_multi_select">Salir de selección múltiple</string>
+    <string name="delete_selected">Eliminar seleccionados</string>
+    <string name="share_selected">Compartir</string>
+    <string name="selected_count">%d seleccionados</string>
+    <string name="generating_image">Generando imagen...</string>
+    <string name="share_failed">Error al compartir</string>
+    <string name="image_generated">Imagen generada</string>
     <string name="load_more_history">Cargar más mensajes del historial...</string>
     
     <!-- Layout Adjustment Settings -->

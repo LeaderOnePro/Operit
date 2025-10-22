@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
@@ -110,7 +111,11 @@ fun ChatArea(
     onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调参数
     messagesPerPage: Int = 10, // 每页显示的消息数量
     topPadding: Dp = 0.dp,
-    chatStyle: ChatStyle = ChatStyle.CURSOR // 新增参数，默认为CURSOR风格
+    chatStyle: ChatStyle = ChatStyle.CURSOR, // 新增参数，默认为CURSOR风格
+    isMultiSelectMode: Boolean = false, // 是否处于多选模式
+    selectedMessageIndices: Set<Int> = emptySet(), // 已选中的消息索引集合
+    onToggleMultiSelectMode: ((Int?) -> Unit)? = null, // 切换多选模式的回调，可传入要初始选中的消息索引
+    onToggleMessageSelection: ((Int) -> Unit)? = null // 切换消息选中状态的回调
 ) {
     // 记住当前深度状态，但当chatHistory发生变化时重置为1
     var currentDepth = remember(chatHistory) { mutableStateOf(1) }
@@ -186,7 +191,12 @@ fun ChatArea(
                         onSpeakMessage = onSpeakMessage, // 传递朗读回调
                         onReplyToMessage = onReplyToMessage, // 传递回复回调
                         chatStyle = chatStyle, // 传递风格
-                        isHidden = shouldHide // 新增参数控制隐藏
+                        isHidden = shouldHide, // 新增参数控制隐藏
+                        isMultiSelectMode = isMultiSelectMode, // 传递多选模式状态
+                        isSelected = selectedMessageIndices.contains(actualIndex), // 传递选中状态
+                        onToggleSelection = { onToggleMessageSelection?.invoke(actualIndex) }, // 传递选中切换回调
+                        onToggleMultiSelectMode = onToggleMultiSelectMode, // 传递多选模式切换回调
+                        messageIndex = actualIndex // 传递消息索引
                     )
                 }
 
@@ -248,7 +258,12 @@ private fun MessageItem(
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
     onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调
     chatStyle: ChatStyle, // 新增参数
-    isHidden: Boolean = false // 新增参数控制隐藏
+    isHidden: Boolean = false, // 新增参数控制隐藏
+    isMultiSelectMode: Boolean = false, // 是否处于多选模式
+    isSelected: Boolean = false, // 是否被选中
+    onToggleSelection: (() -> Unit)? = null, // 切换选中状态的回调
+    onToggleMultiSelectMode: ((Int?) -> Unit)? = null, // 切换多选模式的回调，可传入要初始选中的消息索引
+    messageIndex: Int // 消息索引，用于进入多选时自动选中
 ) {
     val context = LocalContext.current
     var showContextMenu by remember { mutableStateOf(false) }
@@ -261,9 +276,25 @@ private fun MessageItem(
         modifier =
         Modifier
             .alpha(if (isHidden) 0f else 1f)
+            .then(
+                if (isSelected) {
+                    Modifier.background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                } else Modifier
+            )
             .combinedClickable(
-                onClick = {},
-                onLongClick = { if (isActionable) showContextMenu = true },
+                onClick = {
+                    if (isMultiSelectMode && isActionable) {
+                        onToggleSelection?.invoke()
+                    }
+                },
+                onLongClick = { 
+                    if (!isMultiSelectMode && isActionable) {
+                        showContextMenu = true
+                    }
+                },
             ),
     ) {
         when (chatStyle) {
@@ -442,30 +473,6 @@ private fun MessageItem(
                 modifier = Modifier.height(36.dp)
             )
 
-            // 删除到此
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(id = R.string.delete_from_here),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
-                    )
-                },
-                onClick = {
-                    onDeleteMessagesFrom?.invoke(index)
-                    showContextMenu = false
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.DeleteSweep,
-                        contentDescription = stringResource(id = R.string.delete_from_here),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                },
-                modifier = Modifier.height(36.dp)
-            )
-
             // 回复选项
             if (message.sender == "ai") {
                 DropdownMenuItem(
@@ -491,6 +498,30 @@ private fun MessageItem(
                     modifier = Modifier.height(36.dp)
                 )
             }
+
+            // 多选
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(id = R.string.multi_select),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.sp
+                    )
+                },
+                onClick = {
+                    onToggleMultiSelectMode?.invoke(messageIndex) // 传入消息索引
+                    showContextMenu = false
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = stringResource(id = R.string.multi_select),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                modifier = Modifier.height(36.dp)
+            )
         }
 
 

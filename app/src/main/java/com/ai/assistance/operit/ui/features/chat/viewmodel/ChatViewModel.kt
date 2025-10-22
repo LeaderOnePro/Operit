@@ -8,6 +8,9 @@ import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Color
+import androidx.core.content.FileProvider
+import com.ai.assistance.operit.ui.features.chat.components.ChatStyle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.api.chat.EnhancedAIService
@@ -595,6 +598,89 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             Log.d(TAG, "准备从索引 $index 开始删除后续消息")
             chatHistoryDelegate.deleteMessagesFrom(index)
+        }
+    }
+
+    /** 批量删除消息 */
+    fun deleteMessages(indices: Set<Int>) {
+        viewModelScope.launch {
+            Log.d(TAG, "准备批量删除消息，索引: $indices")
+            // 按降序排列索引后依次删除，避免索引偏移问题
+            val sortedIndices = indices.sortedDescending()
+            sortedIndices.forEach { index ->
+                chatHistoryDelegate.deleteMessage(index)
+            }
+            Log.d(TAG, "批量删除完成")
+        }
+    }
+
+    /** 分享消息为图片 */
+    fun shareMessages(
+        context: Context,
+        messageIndices: Set<Int>,
+        userMessageColor: Color,
+        aiMessageColor: Color,
+        userTextColor: Color,
+        aiTextColor: Color,
+        systemMessageColor: Color,
+        systemTextColor: Color,
+        thinkingBackgroundColor: Color,
+        thinkingTextColor: Color,
+        chatStyle: ChatStyle,
+        onSuccess: (Uri) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "开始生成分享图片，消息索引: $messageIndices")
+                
+                // 获取当前聊天历史
+                val currentHistory = chatHistoryDelegate.chatHistory.value
+                
+                // 验证索引有效性
+                if (messageIndices.any { it < 0 || it >= currentHistory.size }) {
+                    onError("无效的消息索引")
+                    return@launch
+                }
+                
+                // 获取选中的消息
+                val selectedMessages = messageIndices.sorted().map { currentHistory[it] }
+                
+                Log.d(TAG, "准备生成图片，选中消息数量: ${selectedMessages.size}")
+                
+                // 生成图片（内部会自动处理线程切换）
+                val imageFile = com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
+                    .generateMessageImage(
+                        context = context,
+                        messages = selectedMessages,
+                        userMessageColor = userMessageColor,
+                        aiMessageColor = aiMessageColor,
+                        userTextColor = userTextColor,
+                        aiTextColor = aiTextColor,
+                        systemMessageColor = systemMessageColor,
+                        systemTextColor = systemTextColor,
+                        thinkingBackgroundColor = thinkingBackgroundColor,
+                        thinkingTextColor = thinkingTextColor,
+                        chatStyle = chatStyle
+                    )
+                
+                Log.d(TAG, "图片文件生成成功: ${imageFile.absolutePath}, 大小: ${imageFile.length()} bytes")
+                
+                // 使用 FileProvider 获取 Uri
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    imageFile
+                )
+                
+                Log.d(TAG, "Uri 获取成功: $uri")
+                
+                onSuccess(uri)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "生成分享图片失败", e)
+                onError("生成图片失败: ${e.message}")
+            }
         }
     }
 

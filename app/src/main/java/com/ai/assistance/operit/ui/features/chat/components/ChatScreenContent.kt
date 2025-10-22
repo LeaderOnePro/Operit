@@ -8,7 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.ui.tooling.preview.Preview
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -117,6 +120,11 @@ fun ChatScreenContent(
     var headerHeight by remember { mutableStateOf(0.dp) }
     var showCharacterSelector by remember { mutableStateOf(false) }
 
+    // 多选模式状态
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var selectedMessageIndices by remember { mutableStateOf(setOf<Int>()) }
+    var isGeneratingImage by remember { mutableStateOf(false) }
+
     // 获取WebView状态
     val showWebView = actualViewModel.showWebView.collectAsState().value
     val currentChat = chatHistories.find { it.id == currentChatId }
@@ -173,7 +181,25 @@ fun ChatScreenContent(
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
                         topPadding = headerHeight,
-                        chatStyle = chatStyle // Pass chat style
+                        chatStyle = chatStyle, // Pass chat style
+                        isMultiSelectMode = isMultiSelectMode,
+                        selectedMessageIndices = selectedMessageIndices,
+                        onToggleMultiSelectMode = { initialIndex ->
+                            isMultiSelectMode = !isMultiSelectMode
+                            if (!isMultiSelectMode) {
+                                selectedMessageIndices = emptySet()
+                            } else if (initialIndex != null) {
+                                // 进入多选模式时，自动选中触发的消息
+                                selectedMessageIndices = setOf(initialIndex)
+                            }
+                        },
+                        onToggleMessageSelection = { index ->
+                            selectedMessageIndices = if (selectedMessageIndices.contains(index)) {
+                                selectedMessageIndices - index
+                            } else {
+                                selectedMessageIndices + index
+                            }
+                        }
                 )
                 ChatScreenHeader(
                         modifier =
@@ -223,8 +249,187 @@ fun ChatScreenContent(
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
-                        chatStyle = chatStyle // Pass chat style
+                        chatStyle = chatStyle, // Pass chat style
+                        isMultiSelectMode = isMultiSelectMode,
+                        selectedMessageIndices = selectedMessageIndices,
+                        onToggleMultiSelectMode = { initialIndex ->
+                            isMultiSelectMode = !isMultiSelectMode
+                            if (!isMultiSelectMode) {
+                                selectedMessageIndices = emptySet()
+                            } else if (initialIndex != null) {
+                                // 进入多选模式时，自动选中触发的消息
+                                selectedMessageIndices = setOf(initialIndex)
+                            }
+                        },
+                        onToggleMessageSelection = { index ->
+                            selectedMessageIndices = if (selectedMessageIndices.contains(index)) {
+                                selectedMessageIndices - index
+                            } else {
+                                selectedMessageIndices + index
+                            }
+                        }
                 )
+            }
+        }
+
+        // 多选模式底部操作栏
+        AnimatedVisibility(
+            visible = isMultiSelectMode,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 2.dp,
+                shadowElevation = 4.dp,
+                color = Color.White.copy(alpha = 0.97f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 显示选中数量
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 取消按钮移到左侧
+                        IconButton(
+                            onClick = {
+                                isMultiSelectMode = false
+                                selectedMessageIndices = emptySet()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.exit_multi_select),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        
+                        Text(
+                            text = if (selectedMessageIndices.isEmpty()) {
+                                stringResource(R.string.multi_select)
+                            } else {
+                                stringResource(R.string.selected_count, selectedMessageIndices.size)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 分享按钮
+                        FilledIconButton(
+                            onClick = {
+                                if (selectedMessageIndices.isNotEmpty() && !isGeneratingImage) {
+                                    isGeneratingImage = true
+                                    
+                                    actualViewModel.shareMessages(
+                                        context = context,
+                                        messageIndices = selectedMessageIndices,
+                                        userMessageColor = userMessageColor,
+                                        aiMessageColor = aiMessageColor,
+                                        userTextColor = userTextColor,
+                                        aiTextColor = aiTextColor,
+                                        systemMessageColor = systemMessageColor,
+                                        systemTextColor = systemTextColor,
+                                        thinkingBackgroundColor = thinkingBackgroundColor,
+                                        thinkingTextColor = thinkingTextColor,
+                                        chatStyle = chatStyle,
+                                        onSuccess = { uri ->
+                                            isGeneratingImage = false
+                                            
+                                            // 调用系统分享
+                                            try {
+                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "image/png"
+                                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(
+                                                    Intent.createChooser(shareIntent, context.getString(R.string.share_selected))
+                                                )
+                                                
+                                                // 退出多选模式
+                                                isMultiSelectMode = false
+                                                selectedMessageIndices = emptySet()
+                                            } catch (e: Exception) {
+                                                Log.e("ChatScreenContent", "分享失败", e)
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.share_failed),
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        onError = { error ->
+                                            isGeneratingImage = false
+                                            Log.e("ChatScreenContent", "生成图片失败: $error")
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                error,
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    )
+                                }
+                            },
+                            enabled = selectedMessageIndices.isNotEmpty() && !isGeneratingImage,
+                            modifier = Modifier.size(32.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = stringResource(R.string.share_selected),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // 删除按钮
+                        FilledIconButton(
+                            onClick = {
+                                if (selectedMessageIndices.isNotEmpty()) {
+                                    actualViewModel.deleteMessages(selectedMessageIndices)
+                                    selectedMessageIndices = emptySet()
+                                    isMultiSelectMode = false
+                                }
+                            },
+                            enabled = selectedMessageIndices.isNotEmpty(),
+                            modifier = Modifier.size(32.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.delete_selected),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
