@@ -83,6 +83,7 @@ object ModelListFetcher {
                     ApiProviderType.INFINIAI -> "${extractBaseUrl(apiEndpoint)}/maas/v1/models"
                     ApiProviderType.ALIPAY_BAILING -> "${extractBaseUrl(apiEndpoint)}/llm/v1/models"
                     ApiProviderType.LMSTUDIO -> "${extractBaseUrl(apiEndpoint)}/v1/models"
+                    ApiProviderType.PPINFRA -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     // 其他API提供商可能需要特殊处理
                     else -> "${extractBaseUrl(apiEndpoint)}/v1/models" // 默认尝试OpenAI兼容格式
                 }
@@ -96,20 +97,21 @@ object ModelListFetcher {
         return try {
             val url = URL(fullUrl)
             val path = url.path
-            val v1Index = path.indexOf("/v1")
-            if (v1Index >= 0) {
-                val baseUrl = "${url.protocol}://${url.host}"
-                val finalUrl =
-                        if (url.port != -1 && url.port != 80 && url.port != 443) {
-                            "$baseUrl:${url.port}"
-                        } else {
-                            baseUrl
-                        }
-                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (找到/v1)")
+
+            // 查找版本路径，例如 /v1, /v2
+            val versionPathRegex = Regex("/v\\d+")
+            val match = versionPathRegex.find(path)
+
+            if (match != null) {
+                // 截取到版本路径之前的部分
+                val pathBeforeVersion = path.substring(0, match.range.first)
+                val finalUrl = "${url.protocol}://${url.authority}$pathBeforeVersion"
+                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (找到版本路径 ${match.value})")
                 finalUrl
             } else {
-                val finalUrl = fullUrl.substringBefore("/v1")
-                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (未找到/v1)")
+                // 如果找不到版本路径，则返回原始URL的主机部分，这通常是安全的备选方案
+                val finalUrl = "${url.protocol}://${url.authority}"
+                Log.d(TAG, "从 $fullUrl 提取基本URL: $finalUrl (未找到版本路径)")
                 finalUrl
             }
         } catch (e: Exception) {
@@ -215,7 +217,8 @@ object ModelListFetcher {
                                     ApiProviderType.OPENROUTER,
                                     ApiProviderType.INFINIAI,
                                     ApiProviderType.ALIPAY_BAILING,
-                                    ApiProviderType.LMSTUDIO ->
+                                    ApiProviderType.LMSTUDIO,
+                                    ApiProviderType.PPINFRA ->
                                             parseOpenAIModelResponse(responseBody)
                                     ApiProviderType.ANTHROPIC ->
                                             parseAnthropicModelResponse(responseBody)

@@ -21,6 +21,7 @@ enum class ApiProviderType {
         ALIPAY_BAILING, // 支付宝百灵大模型
         LMSTUDIO, // LM Studio本地模型服务
         MNN, // MNN本地推理引擎
+        PPINFRA, // 派欧云
         OTHER // 其他提供商
 }
 

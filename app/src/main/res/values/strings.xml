@@ -2434,6 +2434,7 @@
     <string name="provider_infiniai">无问芯穹</string>
     <string name="provider_alipay_bailing">支付宝百灵大模型</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">派欧云</string>
     <string name="provider_other">其他提供商</string>
     <string name="select_api_provider_title">选择API提供商</string>
     <string name="search_providers">搜索提供商</string>

@@ -2433,6 +2433,7 @@
     <string name="provider_infiniai">InfiniAI</string>
     <string name="provider_alipay_bailing">Alipay Bailing Model</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">PPInfra Cloud</string>
     <string name="provider_other">Other Providers</string>
     <string name="select_api_provider_title">Select API Provider</string>
     <string name="search_providers">Search providers</string>
