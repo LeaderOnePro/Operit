@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
@@ -14,7 +14,6 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.*
@@ -25,12 +24,12 @@ import org.json.JSONObject
 
 /** Google Gemini API的实现 支持标准Gemini接口流式传输 */
 class GeminiProvider(
-        private val apiEndpoint: String,
-        private val apiKeyProvider: ApiKeyProvider,
-        private val modelName: String,
-        private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap(),
-        private val providerType: ApiProviderType = ApiProviderType.GOOGLE
+    private val apiEndpoint: String,
+    private val apiKeyProvider: ApiKeyProvider,
+    private val modelName: String,
+    private val client: OkHttpClient,
+    private val customHeaders: Map<String, String> = emptyMap(),
+    private val providerType: ApiProviderType = ApiProviderType.GOOGLE
 ) : AIService {
     companion object {
         private const val TAG = "GeminiProvider"
@@ -93,6 +92,42 @@ class GeminiProvider(
         return tokenCacheManager.calculateInputTokens(message, chatHistory)
     }
 
+    /**
+     * 构建包含文本和图片的parts数组
+     */
+    private fun buildPartsArray(text: String): JSONArray {
+        val partsArray = JSONArray()
+        
+        if (ImageLinkParser.hasImageLinks(text)) {
+            val imageLinks = ImageLinkParser.extractImageLinks(text)
+            val textWithoutLinks = ImageLinkParser.removeImageLinks(text).trim()
+            
+            // 添加图片
+            imageLinks.forEach { link ->
+                partsArray.put(JSONObject().apply {
+                    put("inline_data", JSONObject().apply {
+                        put("mime_type", link.mimeType)
+                        put("data", link.base64Data)
+                    })
+                })
+            }
+            
+            // 添加文本（如果有）
+            if (textWithoutLinks.isNotEmpty()) {
+                partsArray.put(JSONObject().apply {
+                    put("text", textWithoutLinks)
+                })
+            }
+        } else {
+            // 纯文本消息
+            partsArray.put(JSONObject().apply {
+                put("text", text)
+            })
+        }
+        
+        return partsArray
+    }
+
     private fun buildContentsAndCountTokens(
             message: String,
             chatHistory: List<Pair<String, String>>
@@ -135,12 +170,7 @@ class GeminiProvider(
             val contentObject =
                 JSONObject().apply {
                     put("role", if (role == "assistant") "model" else role)
-                    put(
-                        "parts",
-                        JSONArray().apply {
-                            put(JSONObject().apply { put("text", content) })
-                        }
-                    )
+                    put("parts", buildPartsArray(content))
                 }
             contentsArray.put(contentObject)
             tokenCount += ChatUtils.estimateTokenCount(content)
@@ -155,28 +185,38 @@ class GeminiProvider(
             // Last message is not user, safe to add
             val userContentObject = JSONObject().apply {
                 put("role", "user")
-                put("parts", JSONArray().apply {
-                    put(JSONObject().apply { put("text", message) })
-                })
+                put("parts", buildPartsArray(message))
             }
             contentsArray.put(userContentObject)
             tokenCount += ChatUtils.estimateTokenCount(message)
         } else {
-            // Last message is already user, check if it's the same message
+            // Last message is already user, try to merge
             val lastMessage = contentsArray.getJSONObject(contentsArray.length() - 1)
             val lastParts = lastMessage.getJSONArray("parts")
-            val lastText = if (lastParts.length() > 0) {
-                lastParts.getJSONObject(0).optString("text", "")
-            } else ""
-            
+
+            // Find the text part by searching backwards from the end of the parts array.
+            // This is because image parts are added first, followed by a single optional text part.
+            val textPart = (lastParts.length() - 1 downTo 0)
+                .map { lastParts.getJSONObject(it) }
+                .find { it.has("text") }
+
+            val lastText = textPart?.optString("text", "") ?: ""
+
             if (lastText != message) {
-                // Different message, combine them
-                val combinedText = "$lastText\n$message"
-                lastParts.getJSONObject(0).put("text", combinedText)
                 tokenCount += ChatUtils.estimateTokenCount(message)
-                logDebug("合并连续的user消息")
+                if (textPart != null) {
+                    // Found an existing text part, so we'll merge the new message into it.
+                    val combinedText = "$lastText\n$message"
+                    textPart.put("text", combinedText)
+                    logDebug("合并连续的user消息")
+                } else {
+                    // No text part was found in the previous message, so add a new one.
+                    // This handles cases where the last user message contained only an image.
+                    lastParts.put(JSONObject().apply { put("text", message) })
+                    logDebug("为连续的user消息添加新的文本部分")
+                }
             } else {
-                // Same message, skip adding (already in history)
+                // The new message is identical to the last one, so we can skip it.
                 logDebug("跳过重复的user消息")
             }
         }
@@ -838,9 +878,9 @@ class GeminiProvider(
     /** 获取模型列表 */
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         return ModelListFetcher.getModelsList(
-                apiKey = apiKeyProvider.getApiKey(),
-                apiEndpoint = apiEndpoint,
-                apiProviderType = ApiProviderType.GOOGLE
+            apiKey = apiKeyProvider.getApiKey(),
+            apiEndpoint = apiEndpoint,
+            apiProviderType = ApiProviderType.GOOGLE
         )
     }
 

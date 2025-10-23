@@ -15,6 +15,7 @@ import com.ai.assistance.operit.util.stream.share
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,12 @@ class MessageProcessingDelegate(
 
     // 角色卡管理器
     private val characterCardManager = CharacterCardManager.getInstance(context)
+    
+    // 模型配置管理器
+    private val modelConfigManager = ModelConfigManager(context)
+    
+    // 功能配置管理器，用于获取正确的模型配置ID
+    private val functionalConfigManager = com.ai.assistance.operit.data.preferences.FunctionalConfigManager(context)
 
     private val _userMessage = MutableStateFlow("")
     val userMessage: StateFlow<String> = _userMessage.asStateFlow()
@@ -147,6 +154,13 @@ class MessageProcessingDelegate(
 
             Log.d(TAG, "开始处理用户消息：附件数量=${attachments.size}")
 
+            // 获取当前模型配置以检查是否启用直接图片处理
+            // 聊天功能直接使用CHAT类型的配置
+            val configId = functionalConfigManager.getConfigIdForFunction(FunctionType.CHAT)
+            val currentModelConfig = modelConfigManager.getModelConfigFlow(configId).first()
+            val enableDirectImageProcessing = currentModelConfig.enableDirectImageProcessing
+            Log.d(TAG, "直接图片处理状态: $enableDirectImageProcessing (配置ID: $configId)")
+
             // 1. 使用 AIMessageManager 构建最终消息
             val finalMessageContent = AIMessageManager.buildUserMessageContent(
                 messageText,
@@ -154,7 +168,8 @@ class MessageProcessingDelegate(
                 enableMemoryQuery,
                 enableWorkspaceAttachment,
                 workspacePath,
-                replyToMessage
+                replyToMessage,
+                enableDirectImageProcessing
             )
 
             val userMessage = ChatMessage(

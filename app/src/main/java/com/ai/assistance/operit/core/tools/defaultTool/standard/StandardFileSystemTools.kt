@@ -285,10 +285,39 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
                         }
                         "jpg", "jpeg", "png", "gif", "bmp" -> {
+                                // 获取可选的intent参数
+                                val intent = tool.parameters.find { it.name == "intent" }?.value
+                                
                                 Log.d(
                                         TAG,
-                                        "Detected image file, attempting to extract text using OCR"
+                                        "Detected image file, intent=${intent ?: "无"}"
                                 )
+                                
+                                // 如果提供了intent，使用识图模型
+                                if (!intent.isNullOrBlank()) {
+                                        try {
+                                                val enhancedService = com.ai.assistance.operit.api.chat.EnhancedAIService.getInstance(context)
+                                                val analysisResult = kotlinx.coroutines.runBlocking {
+                                                        enhancedService.analyzeImageWithIntent(path, intent)
+                                                }
+                                                
+                                                return ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result = FileContentData(
+                                                                path = path,
+                                                                content = analysisResult,
+                                                                size = analysisResult.length.toLong()
+                                                        ),
+                                                        error = ""
+                                                )
+                                        } catch (e: Exception) {
+                                                Log.e(TAG, "识图模型调用失败，回退到OCR", e)
+                                                // 回退到默认OCR处理
+                                        }
+                                }
+                                
+                                // 默认OCR处理
                                 try {
                                         val bitmap = android.graphics.BitmapFactory.decodeFile(path)
                                         if (bitmap != null) {

@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
@@ -12,7 +12,6 @@ import com.ai.assistance.operit.util.stream.stream
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -22,12 +21,12 @@ import org.json.JSONObject
 
 /** Anthropic Claude API的实现，处理Claude特有的API格式 */
 class ClaudeProvider(
-        private val apiEndpoint: String,
-        private val apiKeyProvider: ApiKeyProvider,
-        private val modelName: String,
-        private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap(),
-        private val providerType: ApiProviderType = ApiProviderType.ANTHROPIC
+    private val apiEndpoint: String,
+    private val apiKeyProvider: ApiKeyProvider,
+    private val modelName: String,
+    private val client: OkHttpClient,
+    private val customHeaders: Map<String, String> = emptyMap(),
+    private val providerType: ApiProviderType = ApiProviderType.ANTHROPIC
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -76,6 +75,47 @@ class ClaudeProvider(
     }
 
     /**
+     * 构建包含文本和图片的content数组
+     */
+    private fun buildContentArray(text: String): JSONArray {
+        val contentArray = JSONArray()
+        
+        // 检查是否包含图片链接
+        if (ImageLinkParser.hasImageLinks(text)) {
+            val imageLinks = ImageLinkParser.extractImageLinks(text)
+            val textWithoutLinks = ImageLinkParser.removeImageLinks(text).trim()
+            
+            // 添加图片
+            imageLinks.forEach { link ->
+                contentArray.put(JSONObject().apply {
+                    put("type", "image")
+                    put("source", JSONObject().apply {
+                        put("type", "base64")
+                        put("media_type", link.mimeType)
+                        put("data", link.base64Data)
+                    })
+                })
+            }
+            
+            // 添加文本（如果有）
+            if (textWithoutLinks.isNotEmpty()) {
+                contentArray.put(JSONObject().apply {
+                    put("type", "text")
+                    put("text", textWithoutLinks)
+                })
+            }
+        } else {
+            // 纯文本消息
+            contentArray.put(JSONObject().apply {
+                put("type", "text")
+                put("text", text)
+            })
+        }
+        
+        return contentArray
+    }
+
+    /**
      * 构建Claude的消息体和计算Token的核心逻辑
      */
     private fun buildMessagesAndCountTokens(
@@ -116,13 +156,7 @@ class ClaudeProvider(
             val messageObject = JSONObject()
             val claudeRole = if (role == "assistant") "assistant" else "user"
             messageObject.put("role", claudeRole)
-
-            val contentObject = JSONObject().apply {
-                put("type", "text")
-                put("text", content)
-            }
-            val contentArray = JSONArray().apply { put(contentObject) }
-            messageObject.put("content", contentArray)
+            messageObject.put("content", buildContentArray(content))
             messagesArray.put(messageObject)
             tokenCount += ChatUtils.estimateTokenCount(content)
         }
@@ -137,20 +171,15 @@ class ClaudeProvider(
         if (lastMessageRole != "user") {
             val userMessage = JSONObject().apply {
                 put("role", "user")
-                val userContentObject = JSONObject().apply {
-                    put("type", "text")
-                    put("text", message)
-                }
-                val userContentArray = JSONArray().apply { put(userContentObject) }
-                put("content", userContentArray)
+                put("content", buildContentArray(message))
             }
             messagesArray.put(userMessage)
             tokenCount += ChatUtils.estimateTokenCount(message)
         } else {
             val lastMessage = messagesArray.getJSONObject(lastMessageIndex)
             val lastContentArray = lastMessage.getJSONArray("content")
-            val lastContentObject = lastContentArray.getJSONObject(0)
-            val existingText = lastContentObject.getString("text")
+            val lastContentObject = lastContentArray.getJSONObject(lastContentArray.length() - 1)
+            val existingText = lastContentObject.optString("text", "")
             lastContentObject.put("text", existingText + "\n" + message)
             tokenCount += ChatUtils.estimateTokenCount(message)
         }
@@ -487,9 +516,9 @@ class ClaudeProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKeyProvider.getApiKey(),
-                apiEndpoint = apiEndpoint,
-                apiProviderType = ApiProviderType.ANTHROPIC
+            apiKey = apiKeyProvider.getApiKey(),
+            apiEndpoint = apiEndpoint,
+            apiProviderType = ApiProviderType.ANTHROPIC
         )
     }
 

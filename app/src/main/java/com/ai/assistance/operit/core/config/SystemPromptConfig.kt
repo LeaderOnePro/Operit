@@ -68,7 +68,14 @@ PACKAGE SYSTEM
 - 这将显示包中的所有工具及其使用方法
 - 只有在激活包后，才能直接使用其工具"""
 
-    private const val AVAILABLE_TOOLS_EN = """
+    private fun getAvailableToolsEn(hasImageRecognition: Boolean): String {
+        val readFileDescription = if (hasImageRecognition) {
+            "- read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR, or you can provide an 'intent' parameter to use vision model for analysis. Parameters: path (file path), intent (optional, user's question about the image, e.g., \"What's in this image?\", \"Extract formulas from this image\")"
+        } else {
+            "- read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)"
+        }
+        
+        return """
 Available tools:
 - sleep: Demonstration tool that pauses briefly. Parameters: duration_ms (milliseconds, default 1000, max 10000)
 - use_package: Activate a package for use in the current session. Parameters: package_name (name of the package to activate)
@@ -79,7 +86,7 @@ File System Tools:
   - When "linux" is specified, paths use Linux format (e.g., "/home/user/file.txt", "/etc/hosts") and are automatically mapped to the actual location in the Android filesystem.
 
 - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
-- read_file: Read the content of a file. For image files (jpg, jpeg, png, gif, bmp), it automatically extracts text using OCR. Parameters: path (file path)
+$readFileDescription
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
 - apply_file: Applies precise, line-number-based edits to a file.
   - **How it works**: You will be given files with line numbers (e.g., "123| code"). You must generate a patch using the structured format below to modify the file.
@@ -141,6 +148,8 @@ HTTP Tools:
 - multipart_request: Upload files. Parameters: url, method (POST/PUT), headers, form_data, files (file array)
 - manage_cookies: Manage cookies. Parameters: action (get/set/clear), domain, cookies
 - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)"""
+    }
+    
     private const val MEMORY_TOOLS_EN = """
 Memory and Memory Library Tools:
 - query_memory: Searches the memory library for relevant memories using hybrid search (keyword matching + semantic understanding). Use this when you need to recall past knowledge, look up specific information, or require context. Keywords can be separated by '|' or spaces - each keyword will be independently matched semantically and the results will be combined with weighted scoring. When the user attaches a memory folder, a `<memory_context>` will be provided in the prompt. You MUST use the `folder_path` parameter to restrict the search to that folder. **IMPORTANT**: For document nodes (uploaded files), this tool uses vector search to return ONLY the most relevant chunks matching your query, NOT the entire document. Results show "Document: [name], Chunk X/Y: [content]" format. To read the complete document or specific parts, use `get_memory_by_title` instead. Parameters: query (string, the keyword or question to search for), folder_path (optional, string, the specific folder path to search within), threshold (optional, float 0.0-1.0, semantic similarity threshold, default 0.35, lower values return more results), limit (optional, int 1-20, maximum number of results to return, default 5)
@@ -154,7 +163,14 @@ Note: The memory library and user personality profile are automatically updated 
 
 """
 
-    private const val AVAILABLE_TOOLS_CN = """
+    private fun getAvailableToolsCn(hasImageRecognition: Boolean): String {
+        val readFileDescription = if (hasImageRecognition) {
+            "- read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，默认使用OCR提取文本，也可提供'intent'参数使用视觉模型分析。参数：path（文件路径），intent（可选，用户对图片的问题，如\"这个图片里面有什么\"、\"提取图片中的公式\"）"
+        } else {
+            "- read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，自动使用OCR提取文本。参数：path（文件路径）"
+        }
+        
+        return """
 可用工具：
 - sleep: 演示工具，短暂暂停。参数：duration_ms（毫秒，默认1000，最大10000）
 - use_package: 在当前会话中激活包。参数：package_name（要激活的包名）
@@ -165,7 +181,7 @@ Note: The memory library and user personality profile are automatically updated 
   - 当指定"linux"时，路径使用Linux格式（如"/home/user/file.txt"、"/etc/hosts"），系统会自动映射到Android文件系统中的实际位置。
 
 - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
-- read_file: 读取文件内容。对于图片文件(jpg, jpeg, png, gif, bmp)，会自动使用OCR提取文本。参数：path（文件路径）
+$readFileDescription
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
 - apply_file: 对文件进行精确的、基于行号的编辑。
   - **工作原理**: 你会收到带行号的文件内容 (例如 "123| code")。你必须使用下述结构化格式生成补丁来修改文件。
@@ -227,6 +243,8 @@ HTTP工具：
 - multipart_request: 上传文件。参数：url, method (POST/PUT), headers, form_data, files (文件数组)
 - manage_cookies: 管理cookies。参数：action (get/set/clear), domain, cookies
 - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)"""
+    }
+    
     private const val MEMORY_TOOLS_CN = """
 记忆与记忆库工具：
 - query_memory: 使用混合搜索（关键词匹配 + 语义理解）从记忆库中搜索相关记忆。当需要回忆过去的知识、查找特定信息或需要上下文时使用。关键词可以使用"|"或空格分隔 - 每个关键词都会独立进行语义匹配，结果将通过加权评分合并。当用户附加记忆文件夹时，提示中会提供`<memory_context>`。你必须使用 `folder_path` 参数将搜索限制在该文件夹内。**重要**：对于文档节点（上传的文件），此工具使用向量搜索只返回与查询最相关的分块，而不是整个文档。结果显示"Document: [文档名], Chunk X/Y: [内容]"格式。如需阅读完整文档或特定部分，请改用 `get_memory_by_title` 工具。参数：query (string, 搜索的关键词或问题), folder_path (可选, string, 要搜索的特定文件夹路径), threshold (可选, float 0.0-1.0, 语义相似度阈值, 默认0.35, 较低的值返回更多结果), limit (可选, int 1-20, 返回结果的最大数量, 默认5)
@@ -331,13 +349,13 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
 
         THINKING_GUIDANCE_SECTION
 
-        $TOOL_USAGE_GUIDELINES_EN
+        TOOL_USAGE_GUIDELINES_SECTION
 
-        $PACKAGE_SYSTEM_GUIDELINES_EN
+        PACKAGE_SYSTEM_GUIDELINES_SECTION
 
         ACTIVE_PACKAGES_SECTION
 
-        $AVAILABLE_TOOLS_EN
+        AVAILABLE_TOOLS_SECTION
         """.trimIndent()
 
   /**
@@ -371,6 +389,7 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
    * @param customSystemPromptTemplate Custom system prompt template (empty means use built-in)
    * @param enableTools Whether tools are enabled
    * @param enableMemoryQuery Whether the AI is allowed to query memories.
+   * @param hasImageRecognition Whether image recognition service is configured
    * @return The complete system prompt with package information
    */
   fun getSystemPrompt(
@@ -380,7 +399,8 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
           thinkingGuidance: Boolean = false,
           customSystemPromptTemplate: String = "",
           enableTools: Boolean = true,
-          enableMemoryQuery: Boolean = true
+          enableMemoryQuery: Boolean = true,
+          hasImageRecognition: Boolean = false
   ): String {
     val importedPackages = packageManager.getImportedPackages()
     val mcpServers = packageManager.getAvailableServerPackages()
@@ -446,9 +466,9 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
                 prompt.replace("THINKING_GUIDANCE_SECTION", "")
             }
 
-    // Determine the available tools string based on memory query setting
-    val availableToolsEn = if (enableMemoryQuery) MEMORY_TOOLS_EN + AVAILABLE_TOOLS_EN else AVAILABLE_TOOLS_EN
-    val availableToolsCn = if (enableMemoryQuery) MEMORY_TOOLS_CN + AVAILABLE_TOOLS_CN else AVAILABLE_TOOLS_CN
+    // Determine the available tools string based on memory query setting and image recognition
+    val availableToolsEn = if (enableMemoryQuery) MEMORY_TOOLS_EN + getAvailableToolsEn(hasImageRecognition) else getAvailableToolsEn(hasImageRecognition)
+    val availableToolsCn = if (enableMemoryQuery) MEMORY_TOOLS_CN + getAvailableToolsCn(hasImageRecognition) else getAvailableToolsCn(hasImageRecognition)
 
     // Handle tools disable/enable
     if (enableTools) {
@@ -536,6 +556,7 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
    * @param customSystemPromptTemplate Custom system prompt template (empty means use built-in)
    * @param enableTools Whether tools are enabled
    * @param enableMemoryQuery Whether the AI is allowed to query memories.
+   * @param hasImageRecognition Whether image recognition service is configured
    * @return The complete system prompt with custom prompts and package information
    */
   fun getSystemPromptWithCustomPrompts(
@@ -545,10 +566,11 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
           thinkingGuidance: Boolean = false,
           customSystemPromptTemplate: String = "",
           enableTools: Boolean = true,
-          enableMemoryQuery: Boolean = true
+          enableMemoryQuery: Boolean = true,
+          hasImageRecognition: Boolean = false
   ): String {
     // Get the base system prompt
-    val basePrompt = getSystemPrompt(packageManager, workspacePath, false, thinkingGuidance, customSystemPromptTemplate, enableTools, enableMemoryQuery)
+    val basePrompt = getSystemPrompt(packageManager, workspacePath, false, thinkingGuidance, customSystemPromptTemplate, enableTools, enableMemoryQuery, hasImageRecognition)
 
     // Apply custom prompts
     return applyCustomPrompts(basePrompt, customIntroPrompt)
@@ -556,6 +578,6 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
 
   /** Original method for backward compatibility */
   fun getSystemPrompt(packageManager: PackageManager): String {
-    return getSystemPrompt(packageManager, null, false, false)
+    return getSystemPrompt(packageManager, null, false, false, "", true, true, false)
   }
 }

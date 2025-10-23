@@ -13,6 +13,7 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.WorkspaceAttachmentProcessor
+import com.ai.assistance.operit.util.ImagePoolManager
 import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import kotlinx.coroutines.CoroutineScope
@@ -63,6 +64,7 @@ object AIMessageManager {
      * @param enableMemoryQuery 是否允许AI查询记忆。
      * @param enableWorkspaceAttachment 是否启用工作区附着功能。
      * @param workspacePath 工作区路径。
+     * @param enableDirectImageProcessing 是否将图片附件转换为link标签（用于直接图片处理）。
      * @return 格式化后的完整消息字符串。
      */
     suspend fun buildUserMessageContent(
@@ -71,7 +73,8 @@ object AIMessageManager {
         enableMemoryQuery: Boolean,
         enableWorkspaceAttachment: Boolean = false,
         workspacePath: String? = null,
-        replyToMessage: ChatMessage? = null // 新增回复消息参数
+        replyToMessage: ChatMessage? = null, // 新增回复消息参数
+        enableDirectImageProcessing: Boolean = false // 是否启用直接图片处理
     ): String {
         // 1. 构建回复标签（如果有回复消息）
         val replyTag = replyToMessage?.let { message ->
@@ -102,16 +105,36 @@ object AIMessageManager {
         // 4. 构建附件标签
         val attachmentTags = if (attachments.isNotEmpty()) {
             attachments.joinToString(" ") { attachment ->
-                val attributes = buildString {
-                    append("id=\"${attachment.filePath}\" ")
-                    append("filename=\"${attachment.fileName}\" ")
-                    append("type=\"${attachment.mimeType}\"")
-                    if (attachment.fileSize > 0) {
-                        append(" size=\"${attachment.fileSize}\"")
+                // 如果启用直接图片处理且附件是图片，转换为link标签
+                if (enableDirectImageProcessing && attachment.mimeType.startsWith("image/", ignoreCase = true)) {
+                    try {
+                        val imageId = ImagePoolManager.addImage(attachment.filePath)
+                        "<link type=\"image\" id=\"$imageId\"></link>"
+                    } catch (e: Exception) {
+                        Log.e(TAG, "添加图片到池失败: ${attachment.filePath}", e)
+                        // 失败时回退到普通附件格式
+                        val attributes = buildString {
+                            append("id=\"${attachment.filePath}\" ")
+                            append("filename=\"${attachment.fileName}\" ")
+                            append("type=\"${attachment.mimeType}\"")
+                            if (attachment.fileSize > 0) {
+                                append(" size=\"${attachment.fileSize}\"")
+                            }
+                        }
+                        "<attachment $attributes>${attachment.content}</attachment>"
                     }
+                } else {
+                    // 非图片或未启用直接图片处理，使用普通附件格式
+                    val attributes = buildString {
+                        append("id=\"${attachment.filePath}\" ")
+                        append("filename=\"${attachment.fileName}\" ")
+                        append("type=\"${attachment.mimeType}\"")
+                        if (attachment.fileSize > 0) {
+                            append(" size=\"${attachment.fileSize}\"")
+                        }
+                    }
+                    "<attachment $attributes>${attachment.content}</attachment>"
                 }
-                
-                "<attachment $attributes>${attachment.content}</attachment>"
             }
         } else ""
 

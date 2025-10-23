@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.SummaryMessageComposable
-import com.ai.assistance.operit.ui.features.chat.components.style.cursor.SystemMessageComposable
 import com.ai.assistance.operit.util.stream.Stream
 
 /**
@@ -40,13 +39,6 @@ fun BubbleStyleChatMessage(
                 backgroundColor = aiMessageColor,
                 textColor = aiTextColor,
                 isHidden = isHidden
-            )
-        }
-        "system" -> {
-            SystemMessageComposable(
-                message = message,
-                backgroundColor = systemMessageColor,
-                textColor = systemTextColor
             )
         }
         "summary" -> {

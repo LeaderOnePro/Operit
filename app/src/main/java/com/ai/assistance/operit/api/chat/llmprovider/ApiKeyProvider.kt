@@ -1,8 +1,6 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.util.Log
-import com.ai.assistance.operit.data.model.ApiKeyInfo
-import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

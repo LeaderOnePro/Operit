@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import java.net.URL
 

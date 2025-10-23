@@ -271,6 +271,7 @@
     <string name="generating_image">Generating image...</string>
     <string name="share_failed">Share failed</string>
     <string name="image_generated">Image generated</string>
+    <string name="image_preview">Image Preview</string>
     <string name="load_more_history">Load more history messages...</string>
 
     <!-- Theme Settings Screen -->
@@ -2414,6 +2415,8 @@
     <string name="select_api_provider">Click to select API provider</string>
     <string name="select">Select</string>
     <string name="default_config_model_restriction">When using default configuration, only deepseek-chat model can be used</string>
+    <string name="enable_direct_image_processing">Enable Direct Image Processing</string>
+    <string name="enable_direct_image_processing_desc">When enabled, images will be sent directly to the AI for processing instead of using OCR tools to read them</string>
     <string name="api_settings_saved">API settings saved</string>
     <string name="save_api_settings">Save API Settings</string>
     <string name="available_models_list">Available Models List</string>
@@ -2698,9 +2701,11 @@
 
     <!-- Function Types -->
     <string name="function_type_translation">Translation Function</string>
+    <string name="function_type_image_recognition">Image Recognition</string>
 
     <!-- Function Descriptions -->
     <string name="function_desc_translation">Provides multi-language translation functionality, supporting language conversion of text content. It is recommended to use models that support multiple languages.</string>
+    <string name="function_desc_image_recognition">Used for image content recognition and analysis, supports intent parameter when calling read_file tool for deep understanding. Recommend using multimodal models with vision capabilities.</string>
     <!-- Model Configuration -->
     <string name="overseas_provider_warning">Detected that you are in mainland China but selected an overseas service provider. Please confirm whether you have enabled proxy tools</string>
 

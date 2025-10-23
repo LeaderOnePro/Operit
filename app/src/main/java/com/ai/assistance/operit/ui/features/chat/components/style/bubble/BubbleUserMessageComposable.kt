@@ -1,7 +1,13 @@
 
 package com.ai.assistance.operit.ui.features.chat.components.style.bubble
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,23 +29,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.stringResource
-import com.ai.assistance.operit.R
 import coil.compose.rememberAsyncImagePainter
-import android.net.Uri
-import android.util.Log
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.util.ImagePoolManager
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,6 +93,7 @@ fun BubbleUserMessageComposable(
     val textContent = parseResult.processedText
     val trailingAttachments = parseResult.trailingAttachments
     val replyInfo = parseResult.replyInfo
+    val imageLinks = parseResult.imageLinks
 
     Column(
         modifier = Modifier
@@ -126,6 +133,49 @@ fun BubbleUserMessageComposable(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Display image links from pool
+        if (imageLinks.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp, start = 64.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                imageLinks.forEach { imageLink ->
+                    imageLink.bitmap?.let { bitmap ->
+                        // 图片还在池子里，显示图片
+                        Card(
+                            modifier = Modifier
+                                .size(120.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "用户上传的图片",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } ?: run {
+                        // 图片已过期，显示为附件标签
+                        AttachmentTag(
+                            attachment = AttachmentData(
+                                id = imageLink.id,
+                                filename = "图片 (已过期)",
+                                type = "image/*",
+                                size = 0L,
+                                content = ""
+                            ),
+                            textColor = textColor,
+                            backgroundColor = backgroundColor
                         )
                     }
                 }
@@ -317,7 +367,8 @@ fun BubbleUserMessageComposable(
 data class MessageParseResult(
     val processedText: String,
     val trailingAttachments: List<AttachmentData>,
-    val replyInfo: ReplyInfo? = null // 新增回复信息
+    val replyInfo: ReplyInfo? = null, // 新增回复信息
+    val imageLinks: List<ImageLinkData> = emptyList() // 图片链接数据
 )
 
 /** Data class for reply information */
@@ -325,6 +376,12 @@ data class ReplyInfo(
     val sender: String,
     val timestamp: Long,
     val content: String
+)
+
+/** Data class for image link information */
+data class ImageLinkData(
+    val id: String,
+    val bitmap: Bitmap? // null表示图片已过期
 )
 
 /**
@@ -335,6 +392,28 @@ private fun parseMessageContent(content: String): MessageParseResult {
     // First, strip out any <memory> tags so they are not displayed in the UI.
     var cleanedContent =
         content.replace(Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL), "").trim()
+
+    // Extract image link tags and load from pool
+    val imageLinkRegex = Regex("""<link\s+type="image"\s+id="([^"]+)"\s*>.*?</link>""", RegexOption.DOT_MATCHES_ALL)
+    val imageLinks = mutableListOf<ImageLinkData>()
+    imageLinkRegex.findAll(cleanedContent).forEach { match ->
+        val id = match.groupValues[1]
+        if (id != "error") {
+            val imageData = ImagePoolManager.getImage(id)
+            if (imageData != null) {
+                val bitmap = try {
+                    val bytes = Base64.decode(imageData.base64, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } catch (e: Exception) {
+                    Log.e("BubbleUserMessage", "解码图片失败: $id", e)
+                    null
+                }
+                imageLinks.add(ImageLinkData(id, bitmap))
+            }
+        }
+    }
+    // Remove image link tags from content
+    cleanedContent = cleanedContent.replace(imageLinkRegex, "").trim()
 
     // Extract reply information
     val replyRegex = Regex("<reply_to\\s+sender=\"([^\"]+)\"\\s+timestamp=\"([^\"]+)\">([^<]*)</reply_to>")
@@ -385,7 +464,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
 
     // 先用简单的分割方式检测有没有附件标签
     if (!cleanedContent.contains("<attachment")) {
-        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
+        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo, imageLinks)
     }
 
     try {
@@ -419,7 +498,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
         }
         
         if (matches.isEmpty()) {
-                return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
+                return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo, imageLinks)
         }
 
         // Determine which attachments form a contiguous block at the end
@@ -499,11 +578,11 @@ private fun parseMessageContent(content: String): MessageParseResult {
         }
 
         trailingAttachments.addAll(0, workspaceAttachments)
-        return MessageParseResult(messageText.toString(), trailingAttachments, replyInfo)
+        return MessageParseResult(messageText.toString(), trailingAttachments, replyInfo, imageLinks)
     } catch (e: Exception) {
         // 如果解析失败，返回原始内容
         android.util.Log.e("BubbleUserMessageComposable", "解析消息内容失败", e)
-        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo)
+        return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo, imageLinks)
     }
 }
 

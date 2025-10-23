@@ -70,7 +70,10 @@ data class ModelConfigData(
         // MNN特定配置
         // 注意：MNN模型路径会根据modelName自动构建，不需要单独存储
         val mnnForwardType: Int = 0, // 前向计算类型 (CPU/GPU等)
-        val mnnThreadCount: Int = 4 // 推理线程数
+        val mnnThreadCount: Int = 4, // 推理线程数
+
+        // 图片处理配置
+        val enableDirectImageProcessing: Boolean = false // 是否启用直接图片处理
 )
 
 /** 简化版的模型配置数据，用于列表显示 */

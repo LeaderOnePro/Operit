@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
@@ -12,7 +12,6 @@ import com.ai.assistance.operit.util.stream.stream
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -24,12 +23,13 @@ import org.json.JSONObject
 
 /** OpenAI API格式的实现，支持标准OpenAI接口和兼容此格式的其他提供商 */
 open class OpenAIProvider(
-        private val apiEndpoint: String,
-        private val apiKeyProvider: ApiKeyProvider,
-        private val modelName: String,
-        private val client: OkHttpClient,
-        private val customHeaders: Map<String, String> = emptyMap(),
-        private val providerType: ApiProviderType = ApiProviderType.OPENAI
+    private val apiEndpoint: String,
+    private val apiKeyProvider: ApiKeyProvider,
+    private val modelName: String,
+    private val client: OkHttpClient,
+    private val customHeaders: Map<String, String> = emptyMap(),
+    private val providerType: ApiProviderType = ApiProviderType.OPENAI,
+    protected val supportsVision: Boolean = false // 是否支持图片处理
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -107,9 +107,9 @@ open class OpenAIProvider(
     override suspend fun getModelsList(): Result<List<ModelOption>> {
         // 调用ModelListFetcher获取模型列表
         return ModelListFetcher.getModelsList(
-                apiKey = apiKeyProvider.getApiKey(),
-                apiEndpoint = apiEndpoint,
-                apiProviderType = ApiProviderType.OPENAI // 默认为OpenAI类型
+            apiKey = apiKeyProvider.getApiKey(),
+            apiEndpoint = apiEndpoint,
+            apiProviderType = ApiProviderType.OPENAI // 默认为OpenAI类型
         )
     }
 
@@ -187,6 +187,54 @@ open class OpenAIProvider(
     }
 
     /**
+     * 构建content字段（可能是字符串或数组）
+     * @param text 要处理的文本内容
+     * @return 纯文本字符串或包含图片和文本的JSONArray
+     */
+    private fun buildContentField(text: String): Any {
+        // 如果模型不支持图片，移除所有图片链接，只保留文本
+        if (!supportsVision) {
+            if (ImageLinkParser.hasImageLinks(text)) {
+                val textWithoutLinks = ImageLinkParser.removeImageLinks(text).trim()
+                Log.w("AIService", "模型不支持图片处理，已移除图片链接。原始文本长度: ${text.length}, 处理后: ${textWithoutLinks.length}")
+                return if (textWithoutLinks.isEmpty()) "[图片内容已省略，当前模型不支持图片处理]" else textWithoutLinks
+            }
+            return text
+        }
+        
+        // 模型支持图片，正常处理图片链接
+        if (ImageLinkParser.hasImageLinks(text)) {
+            val imageLinks = ImageLinkParser.extractImageLinks(text)
+            val textWithoutLinks = ImageLinkParser.removeImageLinks(text).trim()
+            
+            val contentArray = JSONArray()
+            
+            // 添加图片
+            imageLinks.forEach { link ->
+                contentArray.put(JSONObject().apply {
+                    put("type", "image_url")
+                    put("image_url", JSONObject().apply {
+                        put("url", "data:${link.mimeType};base64,${link.base64Data}")
+                    })
+                })
+            }
+            
+            // 添加文本（如果有）
+            if (textWithoutLinks.isNotEmpty()) {
+                contentArray.put(JSONObject().apply {
+                    put("type", "text")
+                    put("text", textWithoutLinks)
+                })
+            }
+            
+            return contentArray
+        } else {
+            // 纯文本消息
+            return text
+        }
+    }
+
+    /**
      * 构建消息列表并计算token（核心逻辑）
      * @param message 用户消息
      * @param chatHistory 聊天历史
@@ -223,7 +271,7 @@ open class OpenAIProvider(
             for ((role, content) in mergedHistory) {
                 val historyMessage = JSONObject()
                 historyMessage.put("role", role)
-                historyMessage.put("content", content)
+                historyMessage.put("content", buildContentField(content))
                 messagesArray.put(historyMessage)
             }
         }
@@ -237,13 +285,15 @@ open class OpenAIProvider(
         if (lastMessageRole != "user") {
             val messageObject = JSONObject()
             messageObject.put("role", "user")
-            messageObject.put("content", message)
+            messageObject.put("content", buildContentField(message))
             messagesArray.put(messageObject)
         } else {
             val lastMessage = messagesArray.getJSONObject(messagesArray.length() - 1)
-            if (lastMessage.getString("content") != message) {
-                val combinedContent = lastMessage.getString("content") + "\n" + message
-                lastMessage.put("content", combinedContent)
+            val lastContent = lastMessage.get("content")
+            val lastText = if (lastContent is String) lastContent else ""
+            if (lastText != message) {
+                val combinedContent = lastText + "\n" + message
+                lastMessage.put("content", buildContentField(combinedContent))
             }
         }
         return Pair(messagesArray, tokenCount)

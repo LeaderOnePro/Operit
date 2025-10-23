@@ -154,6 +154,7 @@ class ConversationService(
      * @param promptFunctionType 提示函数类型
      * @param thinkingGuidance 是否需要思考指导
      * @param enableMemoryQuery Whether the AI is allowed to query memories.
+     * @param hasImageRecognition Whether image recognition service is configured
      * @return 准备好的对话历史列表
      */
     suspend fun prepareConversationHistory(
@@ -164,7 +165,8 @@ class ConversationService(
             promptFunctionType: PromptFunctionType,
             thinkingGuidance: Boolean = false,
             customSystemPromptTemplate: String? = null,
-            enableMemoryQuery: Boolean = true
+            enableMemoryQuery: Boolean = true,
+            hasImageRecognition: Boolean = false
     ): List<Pair<String, String>> {
         val preparedHistory = mutableListOf<Pair<String, String>>()
         conversationMutex.withLock {
@@ -195,7 +197,7 @@ class ConversationService(
                 // 获取工具启用状态
                 val enableTools = apiPreferences.enableToolsFlow.first()
 
-                // 获取系统提示词，现在传入workspacePath
+                // 获取系统提示词，现在传入workspacePath和识图配置状态
                 val systemPrompt =
                         SystemPromptConfig.getSystemPromptWithCustomPrompts(
                         packageManager,
@@ -204,7 +206,8 @@ class ConversationService(
                                 thinkingGuidance,
                                 finalCustomSystemPromptTemplate,
                                 enableTools,
-                                enableMemoryQuery
+                                enableMemoryQuery,
+                                hasImageRecognition
                 )
 
                 // 构建waifu特殊规则
@@ -945,6 +948,57 @@ $toolList
         } catch (e: Exception) {
             Log.e(TAG, "生成工具包描述时出错", e)
             return ""
+        }
+    }
+
+    /**
+     * 使用识图模型分析图片
+     * @param imagePath 图片路径
+     * @param userIntent 用户意图，例如"这个图片里面有什么"、"图片的题目公式是什么"等
+     * @param multiServiceManager 多服务管理器
+     * @return AI分析结果
+     */
+    suspend fun analyzeImageWithIntent(
+        imagePath: String,
+        userIntent: String?,
+        multiServiceManager: MultiServiceManager
+    ): String {
+        return try {
+            val service = multiServiceManager.getServiceForFunction(FunctionType.IMAGE_RECOGNITION)
+            
+            // 添加图片到池子并获取ID
+            val imageId = com.ai.assistance.operit.util.ImagePoolManager.addImage(imagePath)
+            if (imageId == "error") {
+                return "无法加载图片: $imagePath"
+            }
+            
+            // 构建提示词，包含用户意图和图片链接
+            val prompt = if (userIntent.isNullOrBlank()) {
+                "<link type=\"image\" id=\"$imageId\">图片</link>\n请分析这张图片。"
+            } else {
+                "<link type=\"image\" id=\"$imageId\">图片</link>\n$userIntent"
+            }
+            
+            // 获取模型参数
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.IMAGE_RECOGNITION)
+            
+            // 调用AI服务分析图片
+            val result = StringBuilder()
+            service.sendMessage(
+                message = prompt,
+                chatHistory = emptyList(),
+                modelParameters = modelParameters
+            ).collect { chunk ->
+                result.append(chunk)
+            }
+            
+            // 清理图片缓存
+            com.ai.assistance.operit.util.ImagePoolManager.removeImage(imageId)
+            
+            result.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "识图分析失败", e)
+            "识图分析失败: ${e.message}"
         }
     }
 }

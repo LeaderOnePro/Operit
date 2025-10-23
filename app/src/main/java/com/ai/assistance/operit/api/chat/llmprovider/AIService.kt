@@ -1,9 +1,8 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.util.stream.Stream
-import okhttp3.*
 
 /** AI服务接口，定义与不同AI提供商进行交互的标准方法 */
 interface AIService {

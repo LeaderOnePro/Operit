@@ -44,13 +44,6 @@ fun CursorStyleChatMessage(
                     enableDialogs = enableDialogs  // 传递弹窗启用状态
             )
         }
-        "system" -> {
-            SystemMessageComposable(
-                    message = message,
-                    backgroundColor = systemMessageColor,
-                    textColor = systemTextColor
-            )
-        }
         "summary" -> {
             SummaryMessageComposable(
                     message = message,

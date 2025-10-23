@@ -2,19 +2,17 @@ package com.ai.assistance.operit.api.chat.library
 
 import android.content.Context
 import android.util.Log
-import com.ai.assistance.operit.api.chat.AIService
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.Memory
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryRepository
-import com.ai.assistance.operit.services.EmbeddingService
 import com.ai.assistance.operit.util.ChatUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
-import com.ai.assistance.operit.data.model.FunctionType
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -22,8 +20,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import com.ai.assistance.operit.services.OnnxEmbeddingService
-import java.util.*
+
 /**
  * 问题库管理类 - 提供分析对话内容并存储为结构化记忆图谱的功能。
  */
@@ -458,11 +455,11 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
      * Generates a structured analysis of the conversation for graph creation.
      */
     private suspend fun generateAnalysis(
-            aiService: AIService,
-            query: String,
-            solution: String,
-            conversationHistory: List<Pair<String, String>>,
-            memoryRepository: MemoryRepository
+        aiService: AIService,
+        query: String,
+        solution: String,
+        conversationHistory: List<Pair<String, String>>,
+        memoryRepository: MemoryRepository
     ): ParsedAnalysis {
         try {
             val currentPreferences = withContext(Dispatchers.IO) {

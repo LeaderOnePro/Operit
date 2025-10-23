@@ -364,6 +364,14 @@ class ModelConfigManager(private val context: Context) {
         saveConfigToDataStore(updatedConfig)
     }
 
+    // 更新图片直接处理配置
+    suspend fun updateDirectImageProcessing(configId: String, enableDirectImageProcessing: Boolean): ModelConfigData {
+        val config = getModelConfigFlow(configId).first()
+        val updatedConfig = config.copy(enableDirectImageProcessing = enableDirectImageProcessing)
+        saveConfigToDataStore(updatedConfig)
+        return updatedConfig
+    }
+
     /**
      * 根据配置ID获取完整的模型参数列表（包括标准和自定义参数）
      * @param configId 配置ID

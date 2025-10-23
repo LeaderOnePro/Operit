@@ -1,7 +1,6 @@
 package com.ai.assistance.operit.ui.features.settings.sections
 
 import android.annotation.SuppressLint
-import android.os.Environment
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.AnimatedVisibility
@@ -19,8 +18,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,9 +31,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.api.chat.EndpointCompleter
+import com.ai.assistance.operit.api.chat.llmprovider.EndpointCompleter
 import com.ai.assistance.operit.api.chat.EnhancedAIService
-import com.ai.assistance.operit.api.chat.ModelListFetcher
+import com.ai.assistance.operit.api.chat.llmprovider.ModelListFetcher
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelOption
@@ -44,7 +41,6 @@ import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.util.LocationUtils
 import kotlinx.coroutines.launch
-import java.io.File
 
 val TAG = "ModelApiSettings"
 
@@ -100,6 +96,9 @@ fun ModelApiSettingsSection(
     // MNN特定配置状态
     var mnnForwardTypeInput by remember(config.id) { mutableStateOf(config.mnnForwardType) }
     var mnnThreadCountInput by remember(config.id) { mutableStateOf(config.mnnThreadCount.toString()) }
+    
+    // 图片处理配置状态
+    var enableDirectImageProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectImageProcessing) }
 
     // 根据API提供商获取默认的API端点URL
     fun getDefaultApiEndpoint(providerType: ApiProviderType): String {
@@ -712,6 +711,33 @@ fun ModelApiSettingsSection(
                 )
             }
 
+            // 图片直接处理开关（仅在非MNN提供商时显示）
+            if (selectedApiProvider != ApiProviderType.MNN) {
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(R.string.enable_direct_image_processing),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                                text = stringResource(R.string.enable_direct_image_processing_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                        )
+                    }
+                    Switch(
+                            checked = enableDirectImageProcessingInput,
+                            onCheckedChange = { enableDirectImageProcessingInput = it }
+                    )
+                }
+            }
+
             // 显示模型限制信息
             if (showModelRestrictionInfo) {
                 Text(
@@ -749,6 +775,12 @@ fun ModelApiSettingsSection(
                                         apiProviderType = selectedApiProvider,
                                         mnnForwardType = mnnForwardTypeInput,
                                         mnnThreadCount = mnnThreadCountInput.toIntOrNull() ?: 4
+                                )
+
+                                // 更新图片直接处理配置
+                                configManager.updateDirectImageProcessing(
+                                        configId = config.id,
+                                        enableDirectImageProcessing = enableDirectImageProcessingInput
                                 )
 
                                 // 刷新所有AI服务实例，确保使用最新配置

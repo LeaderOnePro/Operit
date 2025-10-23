@@ -998,6 +998,7 @@
     <string name="generating_image">正在生成图片...</string>
     <string name="share_failed">分享失败</string>
     <string name="image_generated">图片已生成</string>
+    <string name="image_preview">图片预览</string>
     <string name="load_more_history">加载更多历史消息...</string>
 
     <!-- Permission Guide Screen -->
@@ -1914,6 +1915,7 @@
     <string name="function_type_file_binding">文件绑定处理</string>
     <string name="function_type_ui_controller">UI 控制器</string>
     <string name="function_type_translation">翻译功能</string>
+    <string name="function_type_image_recognition">图像识别</string>
     
     <!-- Function Descriptions -->
     <string name="function_desc_chat">主要的对话功能，用于与用户进行日常对话交互</string>
@@ -1922,6 +1924,7 @@
     <string name="function_desc_file_binding">处理文件内容的智能绑定与混合，提供更精确的代码处理能力。建议使用快速的廉价模型如Gemini Flash，不建议使用DeepSeek R1</string>
     <string name="function_desc_ui_controller">用于UI界面的自动遍历与操作，会被主模型调用。建议使用廉价快速模型。</string>
     <string name="function_desc_translation">提供多语言翻译功能，支持文本内容的语言转换。建议使用支持多语言的模型。</string>
+    <string name="function_desc_image_recognition">用于图像内容识别和分析，调用read_file工具读取图片时支持intent参数进行深度理解。建议使用支持视觉的多模态模型。</string>
     
     <!-- Functional Prompt Config Screen -->
     <string name="advanced_config_notice">如需修改系统提示模板等高级配置，请前往「管理所有提示词」页面。</string>
@@ -2413,6 +2416,8 @@
     <string name="select_api_provider">点击选择API提供商</string>
     <string name="select">选择</string>
     <string name="default_config_model_restriction">使用默认配置时，只能使用deepseek-chat模型</string>
+    <string name="enable_direct_image_processing">启用直接图片处理</string>
+    <string name="enable_direct_image_processing_desc">启用后，图片将直接发送给AI处理，而不是让AI通过OCR工具读取</string>
     <string name="api_settings_saved">API设置已保存</string>
     <string name="save_api_settings">保存API设置</string>
     <string name="available_models_list">可用模型列表</string>

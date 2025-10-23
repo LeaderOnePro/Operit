@@ -27,6 +27,7 @@ import com.ai.assistance.operit.services.OnnxEmbeddingService
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.language.LanguageFactory
 import com.ai.assistance.operit.util.GlobalExceptionHandler
+import com.ai.assistance.operit.util.ImagePoolManager
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.util.SerializationSetup
 import com.ai.assistance.operit.util.TextSegmenter
@@ -184,6 +185,10 @@ class OperitApplication : Application() {
                         }
                         .build()
         Log.d(TAG, "【启动计时】全局图片加载器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+        
+        // 初始化图片池管理器，支持本地持久化缓存
+        ImagePoolManager.initialize(filesDir)
+        Log.d(TAG, "【启动计时】图片池管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
         
         val totalTime = System.currentTimeMillis() - startTime
         Log.d(TAG, "【启动计时】应用启动全部完成 - 总耗时: ${totalTime}ms")

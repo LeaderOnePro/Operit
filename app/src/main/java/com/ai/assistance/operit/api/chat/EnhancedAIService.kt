@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import android.view.WindowManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationMarkupManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationRoundManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationService
@@ -12,6 +11,7 @@ import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.api.chat.enhance.InputProcessor
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
 import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.application.ActivityLifecycleManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.StringResultData
@@ -35,14 +35,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.StateFlow
@@ -378,7 +374,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     promptFunctionType,
                                     thinkingGuidance,
                                     customSystemPromptTemplate,
-                                    enableMemoryQuery
+                                    enableMemoryQuery,
+                                    isSubTask
                             )
                     
                     // 关键修复：用准备好的历史记录（包含了系统提示）去同步更新内部的 conversationHistory 状态
@@ -1206,8 +1203,13 @@ class EnhancedAIService private constructor(private val context: Context) {
             promptFunctionType: PromptFunctionType,
             thinkingGuidance: Boolean,
             customSystemPromptTemplate: String? = null,
-            enableMemoryQuery: Boolean
+            enableMemoryQuery: Boolean,
+            isSubTask: Boolean = false
     ): List<Pair<String, String>> {
+        // Check if image recognition service is configured
+        // For subtasks, always disable image recognition (only support OCR)
+        val hasImageRecognition = if (isSubTask) false else multiServiceManager.hasImageRecognitionConfigured()
+        
         return conversationService.prepareConversationHistory(
                 chatHistory,
                 processedInput,
@@ -1216,7 +1218,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 promptFunctionType,
                 thinkingGuidance,
                 customSystemPromptTemplate,
-                enableMemoryQuery
+                enableMemoryQuery,
+                hasImageRecognition
         )
     }
 
@@ -1353,5 +1356,15 @@ class EnhancedAIService private constructor(private val context: Context) {
                     throw e
                 }
         }
+    }
+
+    /**
+     * 使用识图模型分析图片
+     * @param imagePath 图片路径
+     * @param userIntent 用户意图，例如"这个图片里面有什么"、"图片的题目公式是什么"等
+     * @return AI分析结果
+     */
+    suspend fun analyzeImageWithIntent(imagePath: String, userIntent: String?): String {
+        return conversationService.analyzeImageWithIntent(imagePath, userIntent, multiServiceManager)
     }
 }

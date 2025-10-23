@@ -2,8 +2,8 @@ package com.ai.assistance.operit.api.chat.enhance
 
 import android.content.Context
 import android.util.Log
-import com.ai.assistance.operit.api.chat.AIService
-import com.ai.assistance.operit.api.chat.AIServiceFactory
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
+import com.ai.assistance.operit.api.chat.llmprovider.AIServiceFactory
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
@@ -136,4 +136,17 @@ class MultiServiceManager(private val context: Context) {
         val configId = functionalConfigManager.getConfigIdForFunction(functionType)
         return modelConfigManager.getModelParametersForConfig(configId)
     }
+
+    /**
+     * 检查识图功能是否已配置
+     * @return 如果识图功能配置启用了直接图片处理则返回true
+     */
+    suspend fun hasImageRecognitionConfigured(): Boolean {
+        val configId = functionalConfigManager.getConfigIdForFunction(FunctionType.IMAGE_RECOGNITION)
+        val config = modelConfigManager.getModelConfigFlow(configId).first()
+        
+        // 检查模型配置是否启用了直接图片处理
+        return config.enableDirectImageProcessing
+    }
+
 }

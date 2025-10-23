@@ -1,9 +1,8 @@
-package com.ai.assistance.operit.api.chat
+package com.ai.assistance.operit.api.chat.llmprovider
 
 import android.util.Log
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.util.stream.Stream
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
@@ -19,8 +18,9 @@ class QwenAIProvider(
     modelName: String,
     client: OkHttpClient,
     customHeaders: Map<String, String> = emptyMap(),
-    providerType: com.ai.assistance.operit.data.model.ApiProviderType = com.ai.assistance.operit.data.model.ApiProviderType.ALIYUN
-) : OpenAIProvider(apiEndpoint, apiKeyProvider, modelName, client, customHeaders, providerType) {
+    providerType: com.ai.assistance.operit.data.model.ApiProviderType = com.ai.assistance.operit.data.model.ApiProviderType.ALIYUN,
+    supportsVision: Boolean = false
+) : OpenAIProvider(apiEndpoint, apiKeyProvider, modelName, client, customHeaders, providerType, supportsVision) {
 
     /**
      * 重写创建请求体的方法，以支持Qwen的`enable_thinking`参数。
