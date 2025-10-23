@@ -2,6 +2,7 @@ package com.ai.assistance.operit.widget
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -28,6 +29,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.ui.floating.FloatingMode
 
 /**
@@ -35,6 +37,9 @@ import com.ai.assistance.operit.ui.floating.FloatingMode
  * 
  * This widget provides a quick launcher for the voice assistant fullscreen mode.
  * Users can add it to their home screen and tap to instantly launch the voice assistant.
+ * 
+ * The widget directly starts the FloatingChatService without going through MainActivity,
+ * which simplifies the launch process and improves performance.
  */
 class VoiceAssistantGlanceWidget : GlanceAppWidget() {
 
@@ -60,16 +65,17 @@ fun VoiceAssistantWidgetContent(context: Context) {
                 )
                 .padding(16.dp)
                 .clickable {
-                    // 创建启动 MainActivity 的 Intent，并指示它启动全屏语音模式
-                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                        putExtra("LAUNCH_VOICE_ASSISTANT", true)
+                    // 直接启动 FloatingChatService，不需要经过 MainActivity
+                    val intent = Intent(context, FloatingChatService::class.java).apply {
+                        // 设置初始模式为全屏语音模式
                         putExtra("INITIAL_MODE", FloatingMode.FULLSCREEN.name)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     }
                     
-                    // 启动 MainActivity
-                    if (intent != null) {
-                        context.startActivity(intent)
+                    // 启动前台服务
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
                     }
                 },
             contentAlignment = Alignment.Center

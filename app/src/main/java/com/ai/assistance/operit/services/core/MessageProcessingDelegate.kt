@@ -1,8 +1,7 @@
-package com.ai.assistance.operit.ui.features.chat.viewmodel
+package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
@@ -34,7 +33,7 @@ import kotlinx.coroutines.withContext
 /** 委托类，负责处理消息处理相关功能 */
 class MessageProcessingDelegate(
         private val context: Context,
-        private val viewModelScope: CoroutineScope,
+        private val coroutineScope: CoroutineScope,
         private val getEnhancedAiService: () -> EnhancedAIService?,
         private val getChatHistory: () -> List<ChatMessage>,
         private val addMessageToChat: (String, ChatMessage) -> Unit,
@@ -139,7 +138,7 @@ class MessageProcessingDelegate(
         _activeStreamingChatId.value = chatId
         _inputProcessingState.value = EnhancedInputProcessingState.Processing("正在处理消息...")
 
-        viewModelScope.launch(Dispatchers.IO) {
+        coroutineScope.launch(Dispatchers.IO) {
             // 检查这是否是聊天中的第一条用户消息（忽略AI的开场白）
             val isFirstMessage = getChatHistory().none { it.sender == "user" }
             if (isFirstMessage && chatId != null) {
@@ -235,7 +234,7 @@ class MessageProcessingDelegate(
                 // 将字符串流共享，以便多个收集器可以使用
                 val sharedCharStream =
                     responseStream.share(
-                        scope = viewModelScope,
+                        scope = coroutineScope,
                         replay = 0, // 不重放历史消息
                         onComplete = {
                             deferred.complete(Unit)
@@ -283,7 +282,7 @@ class MessageProcessingDelegate(
                 
                 // 启动一个独立的协程来收集流内容并持续更新数据库
                 streamCollectionJob =
-                    viewModelScope.launch(Dispatchers.IO) {
+                    coroutineScope.launch(Dispatchers.IO) {
                         val contentBuilder = StringBuilder()
                         sharedCharStream.collect { chunk ->
                             contentBuilder.append(chunk)
@@ -342,7 +341,7 @@ class MessageProcessingDelegate(
                             // 不需要显示空的AI消息
                             
                             // 启动一个协程来创建独立的句子消息
-                            viewModelScope.launch(Dispatchers.IO) {
+                            coroutineScope.launch(Dispatchers.IO) {
                                 Log.d(TAG, "开始Waifu独立消息创建，字符延迟: ${charDelay}ms/字符，移除标点: $removePunctuation")
                                 
                                 // 分割句子
@@ -442,7 +441,7 @@ class MessageProcessingDelegate(
     }
 
     fun cancelCurrentMessage() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             _isLoading.value = false
             _inputProcessingState.value = EnhancedInputProcessingState.Idle
             // 取消时清除活跃会话标记
@@ -473,7 +472,7 @@ class MessageProcessingDelegate(
      * @param state 输入处理状态
      */
     fun handleInputProcessingState(state: EnhancedInputProcessingState) {
-        viewModelScope.launch(Dispatchers.Main) {
+        coroutineScope.launch(Dispatchers.Main) {
             _inputProcessingState.value = state
             _isLoading.value = state !is EnhancedInputProcessingState.Idle && state !is EnhancedInputProcessingState.Completed
             // 当服务状态进入空闲或完成，清理活跃会话标记

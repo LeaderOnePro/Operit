@@ -1,8 +1,7 @@
-package com.ai.assistance.operit.ui.features.chat.viewmodel
+package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.preferences.ApiPreferences
@@ -19,7 +18,7 @@ import kotlinx.coroutines.withContext
 /** 委托类，负责管理用户偏好配置和API密钥 */
 class ApiConfigDelegate(
         private val context: Context,
-        private val viewModelScope: CoroutineScope,
+        private val coroutineScope: CoroutineScope,
         private val onConfigChanged: (EnhancedAIService) -> Unit
 ) {
     companion object {
@@ -93,7 +92,7 @@ class ApiConfigDelegate(
 
     init {
         // 异步初始化ModelConfigManager和加载配置
-        viewModelScope.launch {
+        coroutineScope.launch {
             try {
                 modelConfigManager.initializeIfNeeded()
                 
@@ -117,7 +116,7 @@ class ApiConfigDelegate(
         initializeSettingsCollection()
 
         // 异步创建AI服务实例，避免在主线程上执行阻塞操作
-        viewModelScope.launch(Dispatchers.IO) {
+        coroutineScope.launch(Dispatchers.IO) {
             Log.d(TAG, "开始在后台线程创建EnhancedAIService")
             val enhancedAiService = EnhancedAIService.getInstance(context)
             Log.d(TAG, "EnhancedAIService创建完成")
@@ -129,84 +128,84 @@ class ApiConfigDelegate(
 
     private fun initializeSettingsCollection() {
         // Collect AI planning setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableAiPlanningFlow.collect { enableAiPlanningValue ->
                 _enableAiPlanning.value = enableAiPlanningValue
             }
         }
 
         // Collect thinking mode setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableThinkingModeFlow.collect { enabled ->
                 _enableThinkingMode.value = enabled
             }
         }
 
         // Collect thinking guidance setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableThinkingGuidanceFlow.collect { enabled ->
                 _enableThinkingGuidance.value = enabled
             }
         }
 
         // Collect memory attachment setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableMemoryQueryFlow.collect { enabled ->
                 _enableMemoryQuery.value = enabled
             }
         }
 
         // Collect auto read setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableAutoReadFlow.collect { enabled ->
                 _enableAutoRead.value = enabled
             }
         }
 
         // Collect keep screen on setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.keepScreenOnFlow.collect { enabled ->
                 _keepScreenOn.value = enabled
             }
         }
 
         // Collect context length setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.contextLengthFlow.collect { length ->
                 _contextLength.value = length
             }
         }
 
         // Collect summary token threshold setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.summaryTokenThresholdFlow.collect { threshold ->
                 _summaryTokenThreshold.value = threshold
             }
         }
 
         // Collect enable summary setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableSummaryFlow.collect { enabled ->
                 _enableSummary.value = enabled
             }
         }
 
         // Collect enable summary by message count setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableSummaryByMessageCountFlow.collect { enabled ->
                 _enableSummaryByMessageCount.value = enabled
             }
         }
 
         // Collect summary message count threshold setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.summaryMessageCountThresholdFlow.collect { threshold ->
                 _summaryMessageCountThreshold.value = threshold
             }
         }
 
         // Collect enable tools setting
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.enableToolsFlow.collect { enabled ->
                 _enableTools.value = enabled
             }
@@ -219,7 +218,7 @@ class ApiConfigDelegate(
      */
     fun useDefaultConfig(): Boolean {
         // 异步创建服务，避免阻塞
-        viewModelScope.launch(Dispatchers.IO) {
+        coroutineScope.launch(Dispatchers.IO) {
             Log.d(TAG, "使用默认配置初始化服务")
             val enhancedAiService = EnhancedAIService.getInstance(context)
             withContext(Dispatchers.Main) {
@@ -252,7 +251,7 @@ class ApiConfigDelegate(
 
     /** 保存API设置 */
     fun saveApiSettings() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             try {
                 // 获取当前配置
                 val currentConfig = modelConfigManager.getModelConfigFlow(DEFAULT_CONFIG_ID).first()
@@ -286,7 +285,7 @@ class ApiConfigDelegate(
 
     /** 切换AI计划功能 */
     fun toggleAiPlanning() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableAiPlanning.value
             apiPreferences.saveEnableAiPlanning(newValue)
             _enableAiPlanning.value = newValue
@@ -295,7 +294,7 @@ class ApiConfigDelegate(
 
     /** 切换思考模式 */
     fun toggleThinkingMode() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableThinkingMode.value
             apiPreferences.saveEnableThinkingMode(newValue)
             _enableThinkingMode.value = newValue
@@ -304,7 +303,7 @@ class ApiConfigDelegate(
 
     /** 切换思考引导 */
     fun toggleThinkingGuidance() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableThinkingGuidance.value
             apiPreferences.saveEnableThinkingGuidance(newValue)
             _enableThinkingGuidance.value = newValue
@@ -313,7 +312,7 @@ class ApiConfigDelegate(
 
     /** 切换记忆附着 */
     fun toggleMemoryQuery() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableMemoryQuery.value
             apiPreferences.saveEnableMemoryQuery(newValue)
             _enableMemoryQuery.value = newValue
@@ -322,7 +321,7 @@ class ApiConfigDelegate(
 
     /** 切换自动朗读 */
     fun toggleAutoRead() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableAutoRead.value
             apiPreferences.saveEnableAutoRead(newValue)
             _enableAutoRead.value = newValue
@@ -331,14 +330,14 @@ class ApiConfigDelegate(
 
     /** 更新上下文长度 */
     fun updateContextLength(length: Float) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.saveContextLength(length)
             _contextLength.value = length
         }
     }
 
     fun updateSummaryTokenThreshold(threshold: Float) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.saveSummaryTokenThreshold(threshold)
             _summaryTokenThreshold.value = threshold
         }
@@ -346,7 +345,7 @@ class ApiConfigDelegate(
 
     /** 切换启用总结功能 */
     fun toggleEnableSummary() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableSummary.value
             apiPreferences.saveEnableSummary(newValue)
             _enableSummary.value = newValue
@@ -355,7 +354,7 @@ class ApiConfigDelegate(
 
     /** 切换按消息数量启用总结 */
     fun toggleEnableSummaryByMessageCount() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableSummaryByMessageCount.value
             apiPreferences.saveEnableSummaryByMessageCount(newValue)
             _enableSummaryByMessageCount.value = newValue
@@ -364,7 +363,7 @@ class ApiConfigDelegate(
 
     /** 更新总结消息数量阈值 */
     fun updateSummaryMessageCountThreshold(threshold: Int) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             apiPreferences.saveSummaryMessageCountThreshold(threshold)
             _summaryMessageCountThreshold.value = threshold
         }
@@ -372,7 +371,7 @@ class ApiConfigDelegate(
 
     /** 切换工具启用/禁用 */
     fun toggleTools() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val newValue = !_enableTools.value
             apiPreferences.saveEnableTools(newValue)
             _enableTools.value = newValue

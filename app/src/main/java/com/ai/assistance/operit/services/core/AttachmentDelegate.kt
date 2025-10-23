@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.ui.features.chat.attachments
+package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import android.net.Uri
@@ -21,9 +21,9 @@ import java.io.File
  * Manages attachment operations for the chat feature Handles adding, removing, and referencing
  * attachments
  */
-class AttachmentManager(private val context: Context, private val toolHandler: AIToolHandler) {
+class AttachmentDelegate(private val context: Context, private val toolHandler: AIToolHandler) {
     companion object {
-        private const val TAG = "AttachmentManager"
+        private const val TAG = "AttachmentDelegate"
     }
 
     // State for attachments

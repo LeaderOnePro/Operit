@@ -9,11 +9,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
-import androidx.lifecycle.viewModelScope
-import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.InputProcessingState
-import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.toSerializable
 import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.ui.floating.FloatingMode
@@ -27,13 +24,9 @@ import kotlinx.coroutines.launch
 /** 委托类，负责管理悬浮窗交互 */
 class FloatingWindowDelegate(
     private val context: Context,
-    private val viewModelScope: CoroutineScope,
-    private val onMessageReceived: (String, PromptFunctionType) -> Unit,
-    private val onAttachmentRequested: (String) -> Unit,
-    private val onAttachmentRemoveRequested: (String) -> Unit,
-    private val onCancelMessageRequested: () -> Unit,
+    private val coroutineScope: CoroutineScope,
     private val inputProcessingState: StateFlow<InputProcessingState>,
-    private val chatHistoryFlow: StateFlow<List<ChatMessage>>? = null // 新增：聊天历史流
+    private val chatHistoryFlow: StateFlow<List<ChatMessage>>? = null
 ) {
     companion object {
         private const val TAG = "FloatingWindowDelegate"
@@ -56,8 +49,6 @@ class FloatingWindowDelegate(
                     binder.setCloseCallback {
                         closeFloatingWindow()
                     }
-                    // 设置消息收集
-                    setupMessageCollection()
                     // 订阅聊天历史更新
                     setupChatHistoryCollection()
                 }
@@ -150,7 +141,7 @@ class FloatingWindowDelegate(
     }
 
     private fun setupInputStateCollection() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             inputProcessingState.collect { state ->
                 val isUiToolExecuting = state is InputProcessingState.ExecutingTool &&
                         state.category == ToolCategory.UI_AUTOMATION
@@ -169,67 +160,10 @@ class FloatingWindowDelegate(
         }
     }
 
-    /** 设置消息收集 */
-    private fun setupMessageCollection() {
-        floatingService?.let { service ->
-            // 收集消息
-            viewModelScope.launch {
-                try {
-                    service.messageToSend.collect { messagePair ->
-                        Log.d(TAG, "从悬浮窗接收到消息: ${messagePair.first}，模式: ${messagePair.second}")
-                        // 处理消息
-                        onMessageReceived(messagePair.first, messagePair.second)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "从悬浮窗收集消息时出错", e)
-                }
-            }
-            
-            // 收集取消消息请求
-            viewModelScope.launch {
-                try {
-                    service.cancelMessageRequest.collect {
-                        Log.d(TAG, "从悬浮窗接收到取消消息请求")
-                        // 处理取消消息请求
-                        onCancelMessageRequested()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "从悬浮窗收集取消消息请求时出错", e)
-                }
-            }
-
-            // 收集附件请求
-            viewModelScope.launch {
-                try {
-                    service.attachmentRequest.collect { request ->
-                        Log.d(TAG, "从悬浮窗接收到附件请求: $request")
-                        // 处理附件请求
-                        onAttachmentRequested(request)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "从悬浮窗收集附件请求时出错", e)
-                }
-            }
-
-            // 收集附件删除请求
-            viewModelScope.launch {
-                try {
-                    service.attachmentRemoveRequest.collect { filePath ->
-                        Log.d(TAG, "从悬浮窗接收到附件删除请求: $filePath")
-                        // 处理附件删除请求
-                        onAttachmentRemoveRequested(filePath)
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "从悬浮窗收集附件删除请求时出错", e)
-                }
-            }
-        }
-    }
-
     /** 设置聊天历史收集 - 订阅ChatHistoryDelegate的chatHistory流 */
     private fun setupChatHistoryCollection() {
         chatHistoryFlow?.let { flow ->
-            viewModelScope.launch {
+            coroutineScope.launch {
                 try {
                     // 先立即同步当前的消息历史（服务刚连接时）
                     val currentMessages = flow.value
@@ -251,20 +185,6 @@ class FloatingWindowDelegate(
                 }
             }
         } ?: Log.w(TAG, "chatHistoryFlow为空，无法订阅聊天历史更新")
-    }
-
-    /** 更新悬浮窗消息 */
-    fun updateFloatingWindowMessages(messages: List<ChatMessage>) {
-        Log.d(TAG, "更新悬浮窗消息: ${messages.size} 条. 最后一条消息的 stream is null: ${messages.lastOrNull()?.contentStream == null}")
-        floatingService?.updateChatMessages(messages)
-    }
-
-    /** 更新悬浮窗附件 */
-    fun updateFloatingWindowAttachments(attachments: List<AttachmentInfo>) {
-        floatingService?.let { service ->
-            Log.d(TAG, "更新悬浮窗附件: ${attachments.size}项")
-            service.updateAttachments(attachments)
-        }
     }
 
     /** 清理资源 */

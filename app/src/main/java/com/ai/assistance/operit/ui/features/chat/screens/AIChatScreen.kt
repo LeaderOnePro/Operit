@@ -57,7 +57,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.sample
 import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
-import com.ai.assistance.operit.widget.WidgetLaunchManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clipToBounds
@@ -323,20 +322,6 @@ fun AIChatScreen(
                 // Log.e("AIChatScreen", "自动滚动失败", e)
             }
         }
-    }
-
-    // 当聊天记录变化时，更新悬浮窗内容（使用采样限流）
-    LaunchedEffect(Unit) {
-        snapshotFlow { chatHistory }
-                .sample(300L) // 每300毫秒采样一次，比debounce更适合流式场景
-                .distinctUntilChanged()
-                .collect { history ->
-                    // 在收集器内部直接从StateFlow获取最新状态，避免竞态问题
-                    if (actualViewModel.isFloatingMode.value) {
-                        val filteredMessages = history.filter { it.sender != "think" }
-                        actualViewModel.updateFloatingWindowMessages(filteredMessages)
-                    }
-                }
     }
 
     // 移除原有的 snackbar 错误处理
@@ -881,30 +866,6 @@ fun AIChatScreen(
         )
     }
 
-    // New Invitation Explanation Dialog
-    val showInvitationExplanation by actualViewModel.showInvitationExplanation.collectAsState()
-    if (showInvitationExplanation) {
-        InvitationExplanationDialog(
-                onDismiss = { actualViewModel.dismissInvitationExplanation() },
-                onConfirm = { actualViewModel.onInvitationExplanationConfirmed() }
-        )
-    }
-
-    // New Invitation Panel Dialog
-    val showInvitationPanel by actualViewModel.showInvitationPanel.collectAsState()
-    if (showInvitationPanel) {
-        val invitationCount by actualViewModel.invitationCount.collectAsState(initial = 0)
-        val invitationMessage by actualViewModel.generatedInvitationMessage.collectAsState()
-
-        InvitationPanelDialog(
-                invitationCount = invitationCount,
-                invitationMessage = invitationMessage,
-                onDismiss = { actualViewModel.dismissInvitationPanel() },
-                onShare = { message -> actualViewModel.shareInvitationMessage(message) },
-                onVerifyCode = { code -> actualViewModel.verifyAndHandleConfirmationCode(code) }
-        )
-    }
-
     // Check for overlay permission on resume
     LaunchedEffect(Unit) {
         canDrawOverlays.value = Settings.canDrawOverlays(context)
@@ -918,30 +879,6 @@ fun AIChatScreen(
                             Toast.LENGTH_SHORT
                     )
                     .show()
-        }
-    }
-    
-    // 检查是否有来自Widget的待处理启动请求
-    LaunchedEffect(Unit) {
-        WidgetLaunchManager.pendingLaunchRequest.collect { mode ->
-            if (mode != null) {
-                Log.d("AIChatScreen", "检测到Widget启动请求，模式: $mode")
-                // 清除待处理请求
-                WidgetLaunchManager.clearPendingLaunch()
-                
-                // 检查悬浮窗权限
-                if (Settings.canDrawOverlays(context)) {
-                    // 启动悬浮窗到指定模式
-                    actualViewModel.launchFloatingWindowInMode(mode)
-                } else {
-                    // 没有权限，显示提示
-                    Toast.makeText(
-                        context,
-                        "需要悬浮窗权限才能启动语音助手",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
         }
     }
     

@@ -14,7 +14,7 @@ import coil.request.CachePolicy
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.core.config.SystemPromptConfig
-import com.ai.assistance.operit.core.invitation.InvitationManager
+import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
@@ -189,6 +189,11 @@ class OperitApplication : Application() {
         // 初始化图片池管理器，支持本地持久化缓存
         ImagePoolManager.initialize(filesDir)
         Log.d(TAG, "【启动计时】图片池管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+        
+        // 初始化AIToolHandler并注册默认工具
+        val toolHandler = AIToolHandler.getInstance(this)
+        toolHandler.registerDefaultTools()
+        Log.d(TAG, "【启动计时】AIToolHandler初始化并注册工具完成 - ${System.currentTimeMillis() - startTime}ms")
         
         val totalTime = System.currentTimeMillis() - startTime
         Log.d(TAG, "【启动计时】应用启动全部完成 - 总耗时: ${totalTime}ms")

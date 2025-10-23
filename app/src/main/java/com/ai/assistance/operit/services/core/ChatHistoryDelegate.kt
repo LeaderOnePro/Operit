@@ -1,8 +1,7 @@
-package com.ai.assistance.operit.ui.features.chat.viewmodel
+package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.ChatHistory
@@ -24,7 +23,7 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 /** 委托类，负责管理聊天历史相关功能 */
 class ChatHistoryDelegate(
         private val context: Context,
-        private val viewModelScope: CoroutineScope,
+        private val coroutineScope: CoroutineScope,
         private val onChatHistoryLoaded: (List<ChatMessage>) -> Unit,
         private val onTokenStatisticsLoaded: (inputTokens: Int, outputTokens: Int, windowSize: Int) -> Unit,
 
@@ -72,17 +71,23 @@ class ChatHistoryDelegate(
             return
         }
 
-        viewModelScope.launch {
+        coroutineScope.launch {
             chatHistoryManager.chatHistoriesFlow.collect { histories ->
                 _chatHistories.value = histories
             }
         }
 
-        viewModelScope.launch {
-            val initialChatId = chatHistoryManager.currentChatIdFlow.first()
-            if (initialChatId != null) {
-                _currentChatId.value = initialChatId
-                loadChatMessages(initialChatId)
+        // 持续监听当前聊天ID的变化，实现跨界面同步
+        coroutineScope.launch {
+            chatHistoryManager.currentChatIdFlow.collect { chatId ->
+                if (chatId != null && chatId != _currentChatId.value) {
+                    Log.d(TAG, "检测到聊天ID变化: ${_currentChatId.value} -> $chatId")
+                    _currentChatId.value = chatId
+                    loadChatMessages(chatId)
+                } else if (chatId == null && _currentChatId.value == null) {
+                    // 首次初始化且没有当前聊天ID
+                    Log.d(TAG, "首次初始化，没有当前聊天")
+                }
             }
         }
     }
@@ -120,7 +125,7 @@ class ChatHistoryDelegate(
 
     /** 创建新的聊天 */
     fun createNewChat() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize) // 使用获取到的完整统计数据
 
@@ -158,7 +163,7 @@ class ChatHistoryDelegate(
 
     /** 切换聊天 */
     fun switchChat(chatId: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize) // 切换前使用正确的窗口大小保存
 
@@ -174,7 +179,7 @@ class ChatHistoryDelegate(
 
     /** 删除聊天历史 */
     fun deleteChatHistory(chatId: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             if (chatId == _currentChatId.value) {
                 chatHistoryManager.deleteChatHistory(chatId)
                 createNewChat()
@@ -186,7 +191,7 @@ class ChatHistoryDelegate(
 
     /** 删除单条消息 */
     fun deleteMessage(index: Int) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             historyUpdateMutex.withLock {
                 _currentChatId.value?.let { chatId ->
                     val currentMessages = _chatHistory.value.toMutableList()
@@ -226,7 +231,7 @@ class ChatHistoryDelegate(
 
     /** 清空当前聊天 */
     fun clearCurrentChat() {
-        viewModelScope.launch {
+        coroutineScope.launch {
             _currentChatId.value?.let { chatHistoryManager.deleteChatHistory(it) }
             createNewChat()
         }
@@ -238,7 +243,7 @@ class ChatHistoryDelegate(
         outputTokens: Int = 0,
         actualContextWindowSize: Int = 0
     ) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             _currentChatId.value?.let { chatId ->
                 if (_chatHistory.value.isNotEmpty()) {
                     chatHistoryManager.updateChatTokenCounts(
@@ -254,7 +259,7 @@ class ChatHistoryDelegate(
 
     /** 绑定聊天到工作区 */
     fun bindChatToWorkspace(chatId: String, workspace: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             // 1. Update the database
             chatHistoryManager.updateChatWorkspace(chatId, workspace)
 
@@ -272,7 +277,7 @@ class ChatHistoryDelegate(
 
     /** 解绑聊天的工作区 */
     fun unbindChatFromWorkspace(chatId: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             // 1. Update the database (set workspace to null)
             chatHistoryManager.updateChatWorkspace(chatId, null)
 
@@ -290,7 +295,7 @@ class ChatHistoryDelegate(
 
     /** 更新聊天标题 */
     fun updateChatTitle(chatId: String, title: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             // 更新数据库
             chatHistoryManager.updateChatTitle(chatId, title)
 
@@ -331,7 +336,7 @@ class ChatHistoryDelegate(
      *   - 不存在：追加到内存，并持久化。
      */
     fun addMessageToChat(message: ChatMessage, chatIdOverride: String? = null) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             historyUpdateMutex.withLock {
                 val targetChatId = chatIdOverride ?: _currentChatId.value ?: return@withLock
 
@@ -409,7 +414,7 @@ class ChatHistoryDelegate(
         movedItem: ChatHistory,
         targetGroup: String?
     ) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             try {
                 // The list is already reordered. We just need to update displayOrder and group.
                 val updatedList = reorderedHistories.mapIndexed { index, history ->
@@ -435,21 +440,21 @@ class ChatHistoryDelegate(
 
     /** 重命名分组 */
     fun updateGroupName(oldName: String, newName: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             chatHistoryManager.updateGroupName(oldName, newName)
         }
     }
 
     /** 删除分组 */
     fun deleteGroup(groupName: String, deleteChats: Boolean) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             chatHistoryManager.deleteGroup(groupName, deleteChats)
         }
     }
 
     /** 创建新分组（通过创建新聊天实现） */
     fun createGroup(groupName: String) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize)
 
@@ -469,7 +474,7 @@ class ChatHistoryDelegate(
      * @param insertPosition 预先计算好的插入索引。
      */
     fun addSummaryMessage(summaryMessage: ChatMessage, insertPosition: Int) {
-        viewModelScope.launch {
+        coroutineScope.launch {
             historyUpdateMutex.withLock {
                 val chatId = _currentChatId.value ?: return@withLock
                 val currentMessages = _chatHistory.value.toMutableList()

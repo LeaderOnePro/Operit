@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.ui.features.chat.viewmodel
+package com.ai.assistance.operit.services.core
 
 import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
@@ -12,7 +12,7 @@ import kotlinx.coroutines.Job
 
 /** 委托类，负责管理token统计相关功能 */
 class TokenStatisticsDelegate(
-    private val viewModelScope: CoroutineScope,
+    private val coroutineScope: CoroutineScope,
     private val getEnhancedAiService: () -> EnhancedAIService?
 ) {
     companion object {
@@ -40,7 +40,7 @@ class TokenStatisticsDelegate(
     fun setupCollectors() {
         tokenCollectorJob?.cancel() // Cancel previous collector if any
         val service = getEnhancedAiService() ?: return // Service not ready
-        tokenCollectorJob = viewModelScope.launch(Dispatchers.IO) {
+        tokenCollectorJob = coroutineScope.launch(Dispatchers.IO) {
             service.perRequestTokenCounts.collect { counts ->
                 _perRequestTokenCount.value = counts
                 counts?.let {

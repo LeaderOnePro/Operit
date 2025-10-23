@@ -52,7 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.core.tools.AIToolHandler
-import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentManager
+import com.ai.assistance.operit.services.core.AttachmentDelegate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,9 +76,9 @@ fun AttachmentSelectorPanel(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // 获取AttachmentManager实例
+    // 获取AttachmentDelegate实例
     val attachmentManager = remember {
-        AttachmentManager(context, AIToolHandler.getInstance(context))
+        AttachmentDelegate(context, AIToolHandler.getInstance(context))
     }
 
     // 文件/图片选择器启动器
