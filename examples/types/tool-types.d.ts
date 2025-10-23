@@ -12,7 +12,7 @@ import {
     DeviceInfoResultData, NotificationData, LocationData,
     UIPageResultData, UIActionResultData, CombinedOperationResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData,
-    FilePartContentData, FileApplyResultData
+    FilePartContentData, FileApplyResultData, TaskerResultData
 } from './results';
 
 // ============================================================================
@@ -74,10 +74,18 @@ export type FFmpegToolName =
     | 'ffmpeg_convert';
 
 /**
+ * Tasker tool names
+ * Available Tasker-related tools in the system
+ */
+export type TaskerToolName =
+    /** Trigger a Tasker event */
+    | 'trigger_tasker_event';
+
+/**
  * All tool names
  */
 export type ToolName = FileToolName | NetToolName | SystemToolName | UiToolName |
-    CalculatorToolName | ConnectionToolName | PackageToolName | FFmpegToolName | string;
+    CalculatorToolName | ConnectionToolName | PackageToolName | FFmpegToolName | TaskerToolName | string;
 
 /**
  * Maps tool names to their result data types
@@ -151,4 +159,7 @@ export interface ToolResultMap {
 
     // Terminal operations
     'execute_terminal': TerminalCommandResultData;
+
+    // Tasker operations
+    'trigger_tasker_event': TaskerResultData;
 } 

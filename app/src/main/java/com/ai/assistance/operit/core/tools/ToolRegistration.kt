@@ -12,6 +12,7 @@ import org.json.JSONArray
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.map
+import com.ai.assistance.operit.services.core.tasker.triggerAIAgentAction
 
 /**
  * This file contains all tool registrations centralized for easier maintenance and integration It
@@ -304,6 +305,48 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             executor = { tool ->
                 val deviceInfoTool = ToolGetter.getDeviceInfoToolExecutor(context)
                 deviceInfoTool.invoke(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "trigger_tasker_event",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val taskType = tool.parameters.find { it.name == "task_type" }?.value ?: ""
+                val arg1 = tool.parameters.find { it.name == "arg1" }?.value
+                if (!arg1.isNullOrBlank()) "触发Tasker事件: $taskType ($arg1)" else "触发Tasker事件: $taskType"
+            },
+            executor = { tool ->
+                val params = tool.parameters.associate { it.name to it.value }
+                val taskType = params["task_type"]
+                if (taskType.isNullOrBlank()) {
+                    ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = TaskerResultData(taskType = "", args = emptyMap()),
+                        error = "缺少必需参数: task_type"
+                    )
+                } else {
+                    val args = params.filterKeys { it != "task_type" }
+                    try {
+                        context.triggerAIAgentAction(
+                            taskType,
+                            args
+                        )
+                        ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result = TaskerResultData(taskType = taskType, args = args)
+                        )
+                    } catch (e: Exception) {
+                        ToolResult(
+                            toolName = tool.name,
+                            success = false,
+                            result = TaskerResultData(taskType = taskType, args = args),
+                            error = "Failed to trigger Tasker event: ${e.message}"
+                        )
+                    }
+                }
             }
     )
 

@@ -1089,3 +1089,25 @@ data class GrepResultData(
         return sb.toString()
     }
 }
+
+/** Tasker事件触发结果数据 */
+@Serializable
+data class TaskerResultData(
+    val taskType: String,
+    val args: Map<String, String>
+) : ToolResultData() {
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("Tasker事件触发结果:")
+        sb.appendLine("事件类型: $taskType")
+        
+        if (args.isNotEmpty()) {
+            sb.appendLine("参数:")
+            args.forEach { (key, value) ->
+                sb.appendLine("  $key: $value")
+            }
+        }
+        
+        return sb.toString()
+    }
+}

@@ -270,6 +270,15 @@ fun getJsToolsDefinition(): String {
                     };
                     return toolCall("ffmpeg_convert", params);
                 }
+            },
+            
+            // Tasker工具
+            Tasker: {
+                // 触发Tasker事件
+                trigger: (taskType, args = {}) => {
+                    const params = { task_type: taskType, ...args };
+                    return toolCall("trigger_tasker_event", params);
+                }
             }
         };
     """.trimIndent()

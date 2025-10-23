@@ -617,4 +617,26 @@ export interface DeviceInfoResult extends BaseResult {
 
 export interface CombinedOperationResult extends BaseResult {
     data: CombinedOperationResultData;
+}
+
+// ============================================================================
+// Tasker Types
+// ============================================================================
+
+/**
+ * Tasker event trigger result data
+ */
+export interface TaskerResultData {
+    /** The task type that was triggered */
+    taskType: string;
+
+    /** Arguments passed to the Tasker event */
+    args: Record<string, string>;
+
+    /** Returns a formatted string representation of the result */
+    toString(): string;
+}
+
+export interface TaskerResult extends BaseResult {
+    data: TaskerResultData;
 } 
