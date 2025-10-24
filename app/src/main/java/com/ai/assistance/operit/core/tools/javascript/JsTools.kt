@@ -186,6 +186,12 @@ fun getJsToolsDefinition(): String {
                     return toolCall("execute_intent", options);
                 }
             },
+            // Tasker event
+            Tasker: {
+                triggerEvent: (params) => {
+                    return toolCall("trigger_tasker_event", params || {});
+                }
+            },
             // UI操作
             UI: {
                 getPageInfo: () => toolCall("get_page_info"),

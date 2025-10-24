@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
+import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.google.gson.Gson
+import kotlinx.coroutines.flow.map
+import com.ai.assistance.operit.integrations.tasker.triggerAIAgentAction
 
 /**
  * This file contains all tool registrations centralized for easier maintenance and integration It
@@ -303,7 +307,51 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 deviceInfoTool.invoke(tool)
             }
     )
+    
+    // Tasker事件触发工具
+    handler.registerTool(
+            name = "trigger_tasker_event",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val taskType = tool.parameters.find { it.name == "task_type" }?.value ?: ""
+                val args = tool.parameters.filter { it.name.startsWith("arg1") }.joinToString(",")
+                "触发Tasker事件: $taskType ($args)"
+            },
+            executor = { tool ->
+                val params = tool.parameters.associate { it.name to it.value }
+                val taskType = params["task_type"]
+                if (taskType.isNullOrBlank()) {
+                    ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "缺少必需参数: task_type"
+                    )
+                } else {
+                    val args = params.filterKeys { it != "task_type" }
+                    try {
+                        context.triggerAIAgentAction(
+                            taskType,
+                            args
+                        )
+                        ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result = StringResultData("Triggered Tasker event: $taskType")
+                        )
+                    } catch (e: Exception) {
+                        ToolResult(
+                            toolName = tool.name,
+                            success = false,
+                            result = StringResultData(""),
+                            error = "Failed to trigger Tasker event: ${e.message}"
+                        )
+                    }
+                }
+            }
+    )
 
+    
     // 工作流工具
     val workflowTools = ToolGetter.getWorkflowTools(context)
 

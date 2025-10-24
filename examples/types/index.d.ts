@@ -52,6 +52,7 @@ import { System as SystemType } from './system';
 import { UI as UIType } from './ui';
 import { FFmpeg as FFmpegType } from './ffmpeg';
 import { Query as QueryType } from './query';
+import { Tasker as TaskerType } from './tasker';
 import { Workflow as WorkflowNamespace } from './workflow';
 
 export { Net } from './network';
@@ -59,6 +60,7 @@ export { System } from './system';
 export { UI, UINode } from './ui';
 export { FFmpegVideoCodec, FFmpegAudioCodec, FFmpegResolution, FFmpegBitrate } from './ffmpeg';
 export { Query } from './query';
+export { Tasker } from './tasker';
 export { Workflow } from './workflow';
 
 // Export Android utilities
@@ -117,6 +119,9 @@ declare global {
     type GrepFileMatch = _GrepFileMatch;
     type GrepLineMatch = _GrepLineMatch;
 
+    namespace Tasker {
+        export type TriggerTaskerEventParams = TaskerType.TriggerTaskerEventParams;
+    }
 
     // Global interface definitions
     interface ToolParams {
@@ -167,6 +172,7 @@ declare global {
         UI: typeof UIType;
         FFmpeg: typeof FFmpegType;
         Query: typeof QueryType;
+        Tasker: typeof TaskerType;
         Workflow: typeof WorkflowNamespace;
         calc: (expression: string) => Promise<CalculationResultData>;
     };
