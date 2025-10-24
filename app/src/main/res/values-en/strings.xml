@@ -426,6 +426,12 @@
 
     <string name="settings_keep_screen_on">Keep Screen On</string>
     <string name="settings_keep_screen_on_desc">Keep screen on during AI output to prevent screen from turning off</string>
+    <string name="settings_reply_notification">Reply Notification</string>
+    <string name="settings_reply_notification_desc">Send notification when AI completes a reply</string>
+    <string name="notification_ai_reply_title">AI Assistant</string>
+    <string name="notification_ai_reply_content">AI has completed the reply</string>
+    <string name="notification_permission_rationale">Notification permission is needed to notify you when AI completes a reply</string>
+    <string name="notification_permission_denied">Notification permission denied, you will not receive AI reply notifications</string>
     <string name="settings_auto_accessibility">Auto-grant Accessibility Permission</string>
     <string name="settings_auto_accessibility_desc">When disabled, manual authorization is required each time the app is opened</string>
     

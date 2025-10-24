@@ -62,6 +62,7 @@ class ApiPreferences private constructor(private val context: Context) {
         val SHOW_FPS_COUNTER = booleanPreferencesKey("show_fps_counter")
         val ENABLE_AI_PLANNING = booleanPreferencesKey("enable_ai_planning")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val ENABLE_REPLY_NOTIFICATION = booleanPreferencesKey("enable_reply_notification")
 
         // Keys for Thinking Mode and Thinking Guidance
         val ENABLE_THINKING_MODE = booleanPreferencesKey("enable_thinking_mode")
@@ -111,6 +112,7 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_SHOW_FPS_COUNTER = false
         const val DEFAULT_ENABLE_AI_PLANNING = false
         const val DEFAULT_KEEP_SCREEN_ON = true
+        const val DEFAULT_ENABLE_REPLY_NOTIFICATION = true
 
         // Default values for Thinking Mode and Thinking Guidance
         const val DEFAULT_ENABLE_THINKING_MODE = false
@@ -199,6 +201,12 @@ class ApiPreferences private constructor(private val context: Context) {
     val keepScreenOnFlow: Flow<Boolean> =
             context.apiDataStore.data.map { preferences ->
                 preferences[KEEP_SCREEN_ON] ?: DEFAULT_KEEP_SCREEN_ON
+            }
+
+    // Get Reply Notification setting as Flow
+    val enableReplyNotificationFlow: Flow<Boolean> =
+            context.apiDataStore.data.map { preferences ->
+                preferences[ENABLE_REPLY_NOTIFICATION] ?: DEFAULT_ENABLE_REPLY_NOTIFICATION
             }
 
     // Flow for Thinking Mode
@@ -349,6 +357,11 @@ class ApiPreferences private constructor(private val context: Context) {
     // Save Keep Screen On setting
     suspend fun saveKeepScreenOn(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences -> preferences[KEEP_SCREEN_ON] = isEnabled }
+    }
+
+    // Save Reply Notification setting
+    suspend fun saveEnableReplyNotification(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences -> preferences[ENABLE_REPLY_NOTIFICATION] = isEnabled }
     }
 
     // Save Thinking Mode setting

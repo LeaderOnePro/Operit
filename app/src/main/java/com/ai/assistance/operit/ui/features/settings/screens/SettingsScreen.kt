@@ -78,19 +78,22 @@ fun SettingsScreen(
         // Collect API settings as state
         val showFpsCounter = apiPreferences.showFpsCounterFlow.collectAsState(initial = ApiPreferences.DEFAULT_SHOW_FPS_COUNTER).value
         val keepScreenOn = apiPreferences.keepScreenOnFlow.collectAsState(initial = ApiPreferences.DEFAULT_KEEP_SCREEN_ON).value
+        val enableReplyNotification = apiPreferences.enableReplyNotificationFlow.collectAsState(initial = ApiPreferences.DEFAULT_ENABLE_REPLY_NOTIFICATION).value
 
         val hasBackgroundImage = userPreferences.useBackgroundImage.collectAsState(initial = false).value
 
         // Mutable state for editing
         var showFpsCounterInput by remember { mutableStateOf(showFpsCounter) }
         var keepScreenOnInput by remember { mutableStateOf(keepScreenOn) }
+        var enableReplyNotificationInput by remember { mutableStateOf(enableReplyNotification) }
         
         var showSaveSuccessMessage by remember { mutableStateOf(false) }
 
         // Update local state when preferences change
-        LaunchedEffect(showFpsCounter, keepScreenOn) {
+        LaunchedEffect(showFpsCounter, keepScreenOn, enableReplyNotification) {
                 showFpsCounterInput = showFpsCounter
                 keepScreenOnInput = keepScreenOn
+                enableReplyNotificationInput = enableReplyNotification
         }
 
         val cardContainerColor = if (hasBackgroundImage) {
@@ -260,6 +263,19 @@ fun SettingsScreen(
                                                 showFpsCounterInput = it
                                                 scope.launch {
                                                         apiPreferences.saveShowFpsCounter(it)
+                                                        showSaveSuccessMessage = true
+                                                }
+                                        }
+                                )
+                                Divider(modifier = Modifier.padding(vertical = 4.dp))
+                                CompactToggleWithDescription(
+                                        title = stringResource(id = R.string.settings_reply_notification),
+                                        description = stringResource(id = R.string.settings_reply_notification_desc),
+                                        checked = enableReplyNotificationInput,
+                                        onCheckedChange = {
+                                                enableReplyNotificationInput = it
+                                                scope.launch {
+                                                        apiPreferences.saveEnableReplyNotification(it)
                                                         showSaveSuccessMessage = true
                                                 }
                                         }

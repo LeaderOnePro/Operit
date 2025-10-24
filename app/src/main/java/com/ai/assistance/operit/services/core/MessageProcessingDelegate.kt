@@ -14,7 +14,9 @@ import com.ai.assistance.operit.util.stream.share
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -56,7 +58,7 @@ class MessageProcessingDelegate(
     private val modelConfigManager = ModelConfigManager(context)
     
     // 功能配置管理器，用于获取正确的模型配置ID
-    private val functionalConfigManager = com.ai.assistance.operit.data.preferences.FunctionalConfigManager(context)
+    private val functionalConfigManager = FunctionalConfigManager(context)
 
     private val _userMessage = MutableStateFlow("")
     val userMessage: StateFlow<String> = _userMessage.asStateFlow()
@@ -214,6 +216,17 @@ class MessageProcessingDelegate(
                 val startTime = System.currentTimeMillis()
                 val deferred = CompletableDeferred<Unit>()
 
+                // 获取角色信息用于通知
+                val (characterName, avatarUri) = try {
+                    val activeCard = characterCardManager.activeCharacterCardFlow.first()
+                    val userPreferencesManager = UserPreferencesManager(context)
+                    val avatar = userPreferencesManager.getAiAvatarForCharacterCardFlow(activeCard.id).first()
+                    Pair(activeCard.name, avatar)
+                } catch (e: Exception) {
+                    Log.e(TAG, "获取角色信息失败: ${e.message}", e)
+                    Pair(null, null)
+                }
+
                 // 2. 使用 AIMessageManager 发送消息
                 val responseStream = AIMessageManager.sendMessage(
                     enhancedAiService = service,
@@ -228,7 +241,9 @@ class MessageProcessingDelegate(
                     tokenUsageThreshold = tokenUsageThreshold,
                     onNonFatalError = { error ->
                         _nonFatalErrorEvent.emit(error)
-                    }
+                    },
+                    characterName = characterName,
+                    avatarUri = avatarUri
                 )
 
                 // 将字符串流共享，以便多个收集器可以使用

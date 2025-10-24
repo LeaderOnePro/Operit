@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.main
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -11,6 +12,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -81,6 +84,18 @@ class MainActivity : ComponentActivity() {
 
     // 是否已完成权限和迁移检查
     private var initialChecksDone = false
+
+    // 通知权限请求启动器
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d(TAG, "通知权限已授予")
+        } else {
+            Log.d(TAG, "通知权限被拒绝")
+            Toast.makeText(this, getString(R.string.notification_permission_denied), Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         // 获取当前设置的语言
@@ -190,10 +205,13 @@ class MainActivity : ComponentActivity() {
     // ======== 执行初始化检查 ========
     private fun performInitialChecks() {
         lifecycleScope.launch {
-            // 1. 检查权限级别设置
+            // 1. 检查通知权限（Android 13+）
+            checkNotificationPermission()
+
+            // 2. 检查权限级别设置
             checkPermissionLevelSet()
 
-            // 2. 检查是否需要数据迁移
+            // 3. 检查是否需要数据迁移
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
                 try {
                     val needsMigration = migrationManager.needsMigration()
@@ -318,6 +336,37 @@ class MainActivity : ComponentActivity() {
 
         // 初始化数据迁移管理器
         migrationManager = ChatHistoryMigrationManager(this)
+    }
+
+    // ======== 检查通知权限 ========
+    private fun checkNotificationPermission() {
+        // Android 13 (API 33) 及以上需要请求通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+            when {
+                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "通知权限已授予")
+                }
+                shouldShowRequestPermissionRationale(permission) -> {
+                    // 用户之前拒绝过，显示说明并再次请求
+                    Log.d(TAG, "需要显示通知权限说明")
+                    Toast.makeText(
+                        this,
+                        getString(R.string.notification_permission_rationale),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    notificationPermissionLauncher.launch(permission)
+                }
+                else -> {
+                    // 直接请求权限
+                    Log.d(TAG, "请求通知权限")
+                    notificationPermissionLauncher.launch(permission)
+                }
+            }
+        } else {
+            // Android 13 以下不需要运行时通知权限
+            Log.d(TAG, "Android 版本 < 13，无需请求通知权限")
+        }
     }
 
     // ======== 检查权限级别设置 ========

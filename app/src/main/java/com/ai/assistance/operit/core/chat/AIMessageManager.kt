@@ -155,6 +155,8 @@ object AIMessageManager {
      * @param enableThinking 是否启用思考过程。
      * @param thinkingGuidance 是否启用思考引导。
      * @param enableMemoryQuery 是否允许AI查询记忆。
+     * @param characterName 角色名称，用于通知。
+     * @param avatarUri 角色头像URI，用于通知。
      * @return 包含AI响应流的ChatMessage对象。
      */
     suspend fun sendMessage(
@@ -168,7 +170,9 @@ object AIMessageManager {
         enableMemoryQuery: Boolean,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        onNonFatalError: suspend (error: String) -> Unit
+        onNonFatalError: suspend (error: String) -> Unit,
+        characterName: String? = null,
+        avatarUri: String? = null
     ): SharedStream<String> {
         activeEnhancedAiService = enhancedAiService // Keep a reference to the service for cancellation
         val memory = getMemoryFromMessages(chatHistory)
@@ -221,7 +225,9 @@ object AIMessageManager {
                 enableMemoryQuery = enableMemoryQuery,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
-                onNonFatalError = onNonFatalError
+                onNonFatalError = onNonFatalError,
+                characterName = characterName,
+                avatarUri = avatarUri
             ).share(scope) // 使用.share()将其转换为共享流
         }
     }

@@ -37,6 +37,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -45,6 +46,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
 /**
  * Enhanced AI service that provides advanced conversational capabilities by integrating various
@@ -285,6 +288,9 @@ class EnhancedAIService private constructor(private val context: Context) {
 
     // Package manager for handling tool packages
     private val packageManager = PackageManager.getInstance(context, toolHandler)
+    
+    // 存储最后的回复内容，用于通知
+    private var lastReplyContent: String? = null
 
     init {
         toolHandler.registerDefaultTools()
@@ -332,7 +338,9 @@ class EnhancedAIService private constructor(private val context: Context) {
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit = {},
         customSystemPromptTemplate: String? = null,
-        isSubTask: Boolean = false
+        isSubTask: Boolean = false,
+        characterName: String? = null,
+        avatarUri: String? = null
     ): Stream<String> {
         Log.d(
                 TAG,
@@ -508,7 +516,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             } finally {
                 // 确保流处理完成后调用
                 val collector = this
-                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask) }
+                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri) }
             }
         }
     }
@@ -615,7 +623,9 @@ class EnhancedAIService private constructor(private val context: Context) {
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
             tokenUsageThreshold: Double,
-            isSubTask: Boolean
+            isSubTask: Boolean,
+            characterName: String? = null,
+            avatarUri: String? = null
     ) {
         try {
             val startTime = System.currentTimeMillis()
@@ -654,7 +664,7 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // Handle task completion marker
             if (ConversationMarkupManager.containsTaskCompletion(enhancedContent)) {
-                handleTaskCompletion(context, enhancedContent, enableMemoryQuery, isSubTask)
+                handleTaskCompletion(context, enhancedContent, enableMemoryQuery, isSubTask, characterName, avatarUri)
                 return
             }
 
@@ -712,7 +722,9 @@ class EnhancedAIService private constructor(private val context: Context) {
                         onNonFatalError,
                         maxTokens,
                         tokenUsageThreshold,
-                        isSubTask
+                        isSubTask,
+                        characterName,
+                        avatarUri
                 )
                 return
             }
@@ -727,7 +739,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     )
 
             // 处理为等待用户输入模式
-            handleWaitForUserNeed(context, userNeedContent, isSubTask)
+            handleWaitForUserNeed(context, userNeedContent, isSubTask, characterName, avatarUri)
             Log.d(TAG, "流完成处理耗时: ${System.currentTimeMillis() - startTime}ms")
         } catch (e: Exception) {
             // Catch any exceptions in the processing flow
@@ -739,12 +751,15 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** Handle task completion logic - simplified version without callbacks */
-    private suspend fun handleTaskCompletion(context: MessageExecutionContext, content: String, enableMemoryQuery: Boolean, isSubTask: Boolean) {
+    private suspend fun handleTaskCompletion(context: MessageExecutionContext, content: String, enableMemoryQuery: Boolean, isSubTask: Boolean, characterName: String? = null, avatarUri: String? = null) {
         // Mark conversation as complete
         context.isConversationActive.set(false)
 
         // 清除内容池
         // roundManager.clearContent()
+        
+        // 保存最后的回复内容用于通知
+        lastReplyContent = context.roundManager.getDisplayContent()
 
         // Ensure input processing state is updated to completed
         if (!isSubTask) {
@@ -767,18 +782,21 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         if (!isSubTask) {
-        // 在会话结束后停止服务
-        stopAiService()
+        // 在会话结束后停止服务（服务销毁时会自动发送通知）
+        stopAiService(characterName, avatarUri)
         }
     }
 
     /** Handle wait for user need logic - simplified version without callbacks */
-    private suspend fun handleWaitForUserNeed(context: MessageExecutionContext, content: String, isSubTask: Boolean) {
+    private suspend fun handleWaitForUserNeed(context: MessageExecutionContext, content: String, isSubTask: Boolean, characterName: String? = null, avatarUri: String? = null) {
         // Mark conversation as complete
         context.isConversationActive.set(false)
 
         // 清除内容池
         // roundManager.clearContent()
+        
+        // 保存最后的回复内容用于通知
+        lastReplyContent = context.roundManager.getDisplayContent()
 
         // Ensure input processing state is updated to completed
         if (!isSubTask) {
@@ -789,8 +807,8 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         Log.d(TAG, "Wait for user need - skipping problem library analysis")
         if (!isSubTask) {
-        // 在会话结束后停止服务
-        stopAiService()
+        // 在会话结束后停止服务（服务销毁时会自动发送通知）
+        stopAiService(characterName, avatarUri)
         }
     }
 
@@ -805,7 +823,9 @@ class EnhancedAIService private constructor(private val context: Context) {
         onNonFatalError: suspend (error: String) -> Unit,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        isSubTask: Boolean
+        isSubTask: Boolean,
+        characterName: String? = null,
+        avatarUri: String? = null
     ) {
         val startTime = System.currentTimeMillis()
 
@@ -872,7 +892,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
                 processToolResults(
                     allToolResults, context, functionType, collector, enableThinking,
-                    enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask
+                    enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask,
+                    characterName, avatarUri
                 )
             }
         }
@@ -965,7 +986,9 @@ class EnhancedAIService private constructor(private val context: Context) {
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
             tokenUsageThreshold: Double,
-            isSubTask: Boolean
+            isSubTask: Boolean,
+            characterName: String? = null,
+            avatarUri: String? = null
     ) {
         val startTime = System.currentTimeMillis()
         val toolNames = results.joinToString(", ") { it.toolName }
@@ -1037,7 +1060,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 withContext(Dispatchers.Main) {
                     _inputProcessingState.value = InputProcessingState.Completed
                 }
-                stopAiService()
+                stopAiService(characterName, avatarUri)
                 }
                 return // Stop further processing
             }
@@ -1114,7 +1137,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "工具结果AI处理完成，收到 $totalChars 字符，耗时: ${processingTime}ms")
 
                 // 流处理完成，处理完成逻辑
-                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask)
+                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri)
             } catch (e: Exception) {
                 Log.e(TAG, "处理工具执行结果时出错", e)
                 withContext(Dispatchers.Main) {
@@ -1279,10 +1302,38 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** 停止前台服务 */
-    private fun stopAiService() {
+    private fun stopAiService(characterName: String? = null, avatarUri: String? = null) {
         if (AIForegroundService.isRunning.get()) {
             Log.d(TAG, "请求停止AI前台服务...")
-            context.stopService(serviceIntent)
+            
+            // 准备通知数据
+            runBlocking {
+                try {
+                    // 将数据传递给服务
+                    val stopIntent = Intent(context, AIForegroundService::class.java).apply {
+                        putExtra(AIForegroundService.EXTRA_CHARACTER_NAME, characterName)
+                        putExtra(AIForegroundService.EXTRA_REPLY_CONTENT, lastReplyContent)
+                        putExtra(AIForegroundService.EXTRA_AVATAR_URI, avatarUri)
+                    }
+                    
+                    Log.d(TAG, "传递通知数据 - 角色: $characterName, 内容长度: ${lastReplyContent?.length}, 头像: $avatarUri")
+                    
+                    // 先发送更新的Intent，然后再停止服务
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(stopIntent)
+                    } else {
+                        context.startService(stopIntent)
+                    }
+                    
+                    // 稍微延迟后停止服务，确保数据已被接收
+                    delay(100)
+                    context.stopService(serviceIntent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "准备通知数据失败: ${e.message}", e)
+                    // 即使失败也要停止服务
+                    context.stopService(serviceIntent)
+                }
+            }
         } else {
             Log.d(TAG, "AI前台服务未在运行，无需重复停止。")
         }

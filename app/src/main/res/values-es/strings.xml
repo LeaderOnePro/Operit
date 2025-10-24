@@ -686,6 +686,10 @@
     <string name="settings_section_display">Visualización y Comportamiento</string>
     <string name="settings_keep_screen_on">Mantener Pantalla Encendida</string>
     <string name="settings_keep_screen_on_desc">Mantener pantalla encendida durante salida de IA para evitar que se apague</string>
+    <string name="settings_reply_notification">Notificación de Respuesta</string>
+    <string name="settings_reply_notification_desc">Enviar notificación cuando la IA complete una respuesta</string>
+    <string name="notification_ai_reply_title">Asistente IA</string>
+    <string name="notification_ai_reply_content">La IA ha completado la respuesta</string>
     <string name="settings_auto_accessibility">Auto-conceder Permiso de Accesibilidad</string>
     <string name="settings_auto_accessibility_desc">Cuando esté deshabilitado, se requiere autorización manual cada vez que se abre la aplicación</string>
     

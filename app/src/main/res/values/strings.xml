@@ -406,6 +406,12 @@
 
     <string name="settings_keep_screen_on">屏幕常亮</string>
     <string name="settings_keep_screen_on_desc">AI输出时保持屏幕常亮，避免屏幕熄灭</string>
+    <string name="settings_reply_notification">回复通知</string>
+    <string name="settings_reply_notification_desc">AI完成回复后发送通知提醒</string>
+    <string name="notification_ai_reply_title">AI助手</string>
+    <string name="notification_ai_reply_content">AI已完成回复</string>
+    <string name="notification_permission_rationale">为了在AI完成回复后及时通知您，需要授予通知权限</string>
+    <string name="notification_permission_denied">通知权限被拒绝，您将无法收到AI回复提醒</string>
     <string name="settings_auto_accessibility">自动授予无障碍权限</string>
     <string name="settings_auto_accessibility_desc">关闭后需每次打开软件手动授权</string>
     
