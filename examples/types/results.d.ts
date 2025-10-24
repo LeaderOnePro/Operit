@@ -620,23 +620,164 @@ export interface CombinedOperationResult extends BaseResult {
 }
 
 // ============================================================================
-// Tasker Types
+// Workflow Types
 // ============================================================================
 
 /**
- * Tasker event trigger result data
+ * 工作流基本信息结果数据
  */
-export interface TaskerResultData {
-    /** The task type that was triggered */
-    taskType: string;
-
-    /** Arguments passed to the Tasker event */
-    args: Record<string, string>;
-
-    /** Returns a formatted string representation of the result */
+export interface WorkflowResultData {
+    /** 工作流 ID */
+    id: string;
+    /** 工作流名称 */
+    name: string;
+    /** 工作流描述 */
+    description: string;
+    /** 节点数量 */
+    nodeCount: number;
+    /** 连接数量 */
+    connectionCount: number;
+    /** 是否启用 */
+    enabled: boolean;
+    /** 创建时间戳 */
+    createdAt: number;
+    /** 更新时间戳 */
+    updatedAt: number;
+    /** 最后执行时间 */
+    lastExecutionTime?: number | null;
+    /** 最后执行状态 */
+    lastExecutionStatus?: string | null;
+    /** 总执行次数 */
+    totalExecutions: number;
+    /** 成功执行次数 */
+    successfulExecutions: number;
+    /** 失败执行次数 */
+    failedExecutions: number;
+    /** Returns a formatted string representation of the workflow */
     toString(): string;
 }
 
-export interface TaskerResult extends BaseResult {
-    data: TaskerResultData;
+/**
+ * 工作流列表结果数据
+ */
+export interface WorkflowListResultData {
+    /** 工作流列表 */
+    workflows: WorkflowResultData[];
+    /** 工作流总数 */
+    totalCount: number;
+    /** Returns a formatted string representation of the workflow list */
+    toString(): string;
+}
+
+/**
+ * 工作流节点位置
+ */
+export interface NodePosition {
+    x: number;
+    y: number;
+}
+
+/**
+ * 触发节点
+ */
+export interface TriggerNode {
+    /** 节点 ID */
+    id: string;
+    /** 节点类型 */
+    type: 'trigger';
+    /** 节点名称 */
+    name: string;
+    /** 节点描述 */
+    description: string;
+    /** 节点位置 */
+    position: NodePosition;
+    /** 触发类型 */
+    triggerType: string;
+    /** 触发配置 */
+    triggerConfig: Record<string, string>;
+}
+
+/**
+ * 执行节点
+ */
+export interface ExecuteNode {
+    /** 节点 ID */
+    id: string;
+    /** 节点类型 */
+    type: 'execute';
+    /** 节点名称 */
+    name: string;
+    /** 节点描述 */
+    description: string;
+    /** 节点位置 */
+    position: NodePosition;
+    /** 动作类型（工具名称） */
+    actionType: string;
+    /** 动作配置（工具参数） */
+    actionConfig: Record<string, string>;
+    /** JavaScript 代码（可选） */
+    jsCode?: string | null;
+}
+
+/**
+ * 工作流节点（联合类型）
+ */
+export type WorkflowNode = TriggerNode | ExecuteNode;
+
+/**
+ * 工作流节点连接
+ */
+export interface WorkflowNodeConnection {
+    /** 连接 ID */
+    id: string;
+    /** 源节点 ID */
+    sourceNodeId: string;
+    /** 目标节点 ID */
+    targetNodeId: string;
+    /** 连接条件（可选） */
+    condition?: string | null;
+}
+
+/**
+ * 工作流详细信息结果数据（包含完整的节点和连接信息）
+ */
+export interface WorkflowDetailResultData {
+    /** 工作流 ID */
+    id: string;
+    /** 工作流名称 */
+    name: string;
+    /** 工作流描述 */
+    description: string;
+    /** 节点列表 */
+    nodes: WorkflowNode[];
+    /** 连接列表 */
+    connections: WorkflowNodeConnection[];
+    /** 是否启用 */
+    enabled: boolean;
+    /** 创建时间戳 */
+    createdAt: number;
+    /** 更新时间戳 */
+    updatedAt: number;
+    /** 最后执行时间 */
+    lastExecutionTime?: number | null;
+    /** 最后执行状态 */
+    lastExecutionStatus?: string | null;
+    /** 总执行次数 */
+    totalExecutions: number;
+    /** 成功执行次数 */
+    successfulExecutions: number;
+    /** 失败执行次数 */
+    failedExecutions: number;
+    /** Returns a formatted string representation of the workflow details */
+    toString(): string;
+}
+
+/**
+ * 字符串结果数据
+ */
+export interface StringResultData {
+    /** 字符串值 */
+    value: string;
+    /** Returns the string value */
+    toString(): string;
 } 

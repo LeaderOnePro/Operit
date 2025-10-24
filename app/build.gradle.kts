@@ -273,6 +273,9 @@ dependencies {
 
     // Tasker Plugin Library
     implementation("com.joaomgcd:taskerpluginlibrary:0.4.10")
+    
+    // WorkManager for scheduled workflows
+    implementation(libs.work.runtime.ktx)
 
     // Network dependencies
     implementation(libs.okhttp)

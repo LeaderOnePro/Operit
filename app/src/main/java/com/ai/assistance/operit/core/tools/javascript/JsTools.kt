@@ -272,12 +272,43 @@ fun getJsToolsDefinition(): String {
                 }
             },
             
-            // Tasker工具
-            Tasker: {
-                // 触发Tasker事件
-                trigger: (taskType, args = {}) => {
-                    const params = { task_type: taskType, ...args };
-                    return toolCall("trigger_tasker_event", params);
+            // 工作流工具
+            Workflow: {
+                // 获取所有工作流
+                getAll: () => {
+                    return toolCall("get_all_workflows", {});
+                },
+                // 创建新工作流
+                create: (name, description = "", nodes = null, connections = null, enabled = true) => {
+                    const params = { name, description, enabled: enabled.toString() };
+                    if (nodes) params.nodes = typeof nodes === 'string' ? nodes : JSON.stringify(nodes);
+                    if (connections) params.connections = typeof connections === 'string' ? connections : JSON.stringify(connections);
+                    return toolCall("create_workflow", params);
+                },
+                // 获取工作流详情
+                get: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("get_workflow", params);
+                },
+                // 更新工作流
+                update: (workflowId, updates = {}) => {
+                    const params = { workflow_id: workflowId };
+                    if (updates.name) params.name = updates.name;
+                    if (updates.description !== undefined) params.description = updates.description;
+                    if (updates.nodes) params.nodes = typeof updates.nodes === 'string' ? updates.nodes : JSON.stringify(updates.nodes);
+                    if (updates.connections) params.connections = typeof updates.connections === 'string' ? updates.connections : JSON.stringify(updates.connections);
+                    if (updates.enabled !== undefined) params.enabled = updates.enabled.toString();
+                    return toolCall("update_workflow", params);
+                },
+                // 删除工作流
+                delete: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("delete_workflow", params);
+                },
+                // 触发工作流执行
+                trigger: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("trigger_workflow", params);
                 }
             }
         };

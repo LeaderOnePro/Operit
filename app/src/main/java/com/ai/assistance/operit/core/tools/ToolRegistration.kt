@@ -9,10 +9,6 @@ import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
-import com.ai.assistance.operit.api.chat.EnhancedAIService
-import com.google.gson.Gson
-import kotlinx.coroutines.flow.map
-import com.ai.assistance.operit.services.core.tasker.triggerAIAgentAction
 
 /**
  * This file contains all tool registrations centralized for easier maintenance and integration It
@@ -308,46 +304,75 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
+    // 工作流工具
+    val workflowTools = ToolGetter.getWorkflowTools(context)
+
+    // 获取所有工作流
     handler.registerTool(
-            name = "trigger_tasker_event",
+            name = "get_all_workflows",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "获取所有工作流列表" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.getAllWorkflows(tool) } }
+    )
+
+    // 创建工作流
+    handler.registerTool(
+            name = "create_workflow",
             category = ToolCategory.SYSTEM_OPERATION,
             descriptionGenerator = { tool ->
-                val taskType = tool.parameters.find { it.name == "task_type" }?.value ?: ""
-                val arg1 = tool.parameters.find { it.name == "arg1" }?.value
-                if (!arg1.isNullOrBlank()) "触发Tasker事件: $taskType ($arg1)" else "触发Tasker事件: $taskType"
+                val name = tool.parameters.find { it.name == "name" }?.value ?: ""
+                "创建工作流: $name"
             },
-            executor = { tool ->
-                val params = tool.parameters.associate { it.name to it.value }
-                val taskType = params["task_type"]
-                if (taskType.isNullOrBlank()) {
-                    ToolResult(
-                        toolName = tool.name,
-                        success = false,
-                        result = TaskerResultData(taskType = "", args = emptyMap()),
-                        error = "缺少必需参数: task_type"
-                    )
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.createWorkflow(tool) } }
+    )
+
+    // 获取工作流详情
+    handler.registerTool(
+            name = "get_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "获取工作流详情: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.getWorkflow(tool) } }
+    )
+
+    // 更新工作流
+    handler.registerTool(
+            name = "update_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                val name = tool.parameters.find { it.name == "name" }?.value
+                if (name != null) {
+                    "更新工作流: $id (新名称: $name)"
                 } else {
-                    val args = params.filterKeys { it != "task_type" }
-                    try {
-                        context.triggerAIAgentAction(
-                            taskType,
-                            args
-                        )
-                        ToolResult(
-                            toolName = tool.name,
-                            success = true,
-                            result = TaskerResultData(taskType = taskType, args = args)
-                        )
-                    } catch (e: Exception) {
-                        ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result = TaskerResultData(taskType = taskType, args = args),
-                            error = "Failed to trigger Tasker event: ${e.message}"
-                        )
-                    }
+                    "更新工作流: $id"
                 }
-            }
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.updateWorkflow(tool) } }
+    )
+
+    // 删除工作流
+    handler.registerTool(
+            name = "delete_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "删除工作流: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.deleteWorkflow(tool) } }
+    )
+
+    // 触发工作流执行
+    handler.registerTool(
+            name = "trigger_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "触发工作流: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.triggerWorkflow(tool) } }
     )
 
     // 文件系统工具

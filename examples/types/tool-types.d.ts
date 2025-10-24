@@ -12,7 +12,8 @@ import {
     DeviceInfoResultData, NotificationData, LocationData,
     UIPageResultData, UIActionResultData, CombinedOperationResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData,
-    FilePartContentData, FileApplyResultData, TaskerResultData
+    FilePartContentData, FileApplyResultData, WorkflowListResultData, WorkflowResultData, WorkflowDetailResultData,
+    StringResultData
 } from './results';
 
 // ============================================================================
@@ -74,18 +75,28 @@ export type FFmpegToolName =
     | 'ffmpeg_convert';
 
 /**
- * Tasker tool names
- * Available Tasker-related tools in the system
+ * Workflow tool names
+ * Available workflow management tools in the system
  */
-export type TaskerToolName =
-    /** Trigger a Tasker event */
-    | 'trigger_tasker_event';
+export type WorkflowToolName =
+    /** Get all workflows */
+    | 'get_all_workflows'
+    /** Create a new workflow */
+    | 'create_workflow'
+    /** Get workflow details */
+    | 'get_workflow'
+    /** Update a workflow */
+    | 'update_workflow'
+    /** Delete a workflow */
+    | 'delete_workflow'
+    /** Trigger a workflow execution */
+    | 'trigger_workflow';
 
 /**
  * All tool names
  */
 export type ToolName = FileToolName | NetToolName | SystemToolName | UiToolName |
-    CalculatorToolName | ConnectionToolName | PackageToolName | FFmpegToolName | TaskerToolName | string;
+    CalculatorToolName | ConnectionToolName | PackageToolName | FFmpegToolName | WorkflowToolName | string;
 
 /**
  * Maps tool names to their result data types
@@ -160,6 +171,11 @@ export interface ToolResultMap {
     // Terminal operations
     'execute_terminal': TerminalCommandResultData;
 
-    // Tasker operations
-    'trigger_tasker_event': TaskerResultData;
+    // Workflow operations
+    'get_all_workflows': WorkflowListResultData;
+    'create_workflow': WorkflowDetailResultData;
+    'get_workflow': WorkflowDetailResultData;
+    'update_workflow': WorkflowDetailResultData;
+    'delete_workflow': StringResultData;
+    'trigger_workflow': StringResultData;
 } 

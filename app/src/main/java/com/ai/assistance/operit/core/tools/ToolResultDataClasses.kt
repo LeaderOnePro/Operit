@@ -13,7 +13,11 @@ sealed class ToolResultData {
     /** Converts the structured data to a string representation */
     abstract override fun toString(): String
     fun toJson(): String {
-        val json = Json.encodeToString(this)
+        val jsonConfig = Json {
+            ignoreUnknownKeys = true
+            classDiscriminator = "__type"
+        }
+        val json = jsonConfig.encodeToString(this)
         return json
     }
 }
@@ -1090,24 +1094,168 @@ data class GrepResultData(
     }
 }
 
-/** Tasker事件触发结果数据 */
+/** 工作流基本信息结果数据 */
 @Serializable
-data class TaskerResultData(
-    val taskType: String,
-    val args: Map<String, String>
+data class WorkflowResultData(
+    val id: String,
+    val name: String,
+    val description: String,
+    val nodeCount: Int,
+    val connectionCount: Int,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastExecutionTime: Long? = null,
+    val lastExecutionStatus: String? = null,
+    val totalExecutions: Int = 0,
+    val successfulExecutions: Int = 0,
+    val failedExecutions: Int = 0
 ) : ToolResultData() {
     override fun toString(): String {
         val sb = StringBuilder()
-        sb.appendLine("Tasker事件触发结果:")
-        sb.appendLine("事件类型: $taskType")
+        sb.appendLine("ID: $id")
+        sb.appendLine("名称: $name")
+        sb.appendLine("描述: $description")
+        sb.appendLine("状态: ${if (enabled) "启用" else "禁用"}")
+        sb.appendLine("节点数: $nodeCount")
+        sb.appendLine("连接数: $connectionCount")
+        sb.appendLine("总执行次数: $totalExecutions")
+        sb.appendLine("成功次数: $successfulExecutions")
+        sb.appendLine("失败次数: $failedExecutions")
+        if (lastExecutionTime != null) {
+            sb.appendLine("最后执行时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(lastExecutionTime))}")
+            sb.appendLine("最后执行状态: ${lastExecutionStatus ?: "未知"}")
+        }
+        return sb.toString().trim()
+    }
+}
+
+/** 工作流列表结果数据 */
+@Serializable
+data class WorkflowListResultData(
+    val workflows: List<WorkflowResultData>,
+    val totalCount: Int
+) : ToolResultData() {
+    override fun toString(): String {
+        if (workflows.isEmpty()) {
+            return "暂无工作流"
+        }
+        val sb = StringBuilder()
+        sb.appendLine("工作流列表 (共 $totalCount 个):")
+        sb.appendLine()
+        workflows.forEach { workflow ->
+            sb.appendLine("ID: ${workflow.id}")
+            sb.appendLine("名称: ${workflow.name}")
+            sb.appendLine("描述: ${workflow.description}")
+            sb.appendLine("状态: ${if (workflow.enabled) "启用" else "禁用"}")
+            sb.appendLine("节点数: ${workflow.nodeCount}")
+            sb.appendLine("连接数: ${workflow.connectionCount}")
+            sb.appendLine("总执行次数: ${workflow.totalExecutions}")
+            sb.appendLine("---")
+        }
+        return sb.toString().trim()
+    }
+    
+    companion object {
+        /**
+         * 创建一个空的WorkflowListResultData，用于错误情况
+         */
+        fun empty() = WorkflowListResultData(
+            workflows = emptyList(),
+            totalCount = 0
+        )
+    }
+}
+
+/** 工作流详细信息结果数据（包含完整的节点和连接信息） */
+@Serializable
+data class WorkflowDetailResultData(
+    val id: String,
+    val name: String,
+    val description: String,
+    val nodes: List<com.ai.assistance.operit.data.model.WorkflowNode>,
+    val connections: List<com.ai.assistance.operit.data.model.WorkflowNodeConnection>,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastExecutionTime: Long? = null,
+    val lastExecutionStatus: String? = null,
+    val totalExecutions: Int = 0,
+    val successfulExecutions: Int = 0,
+    val failedExecutions: Int = 0
+) : ToolResultData() {
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("工作流详情:")
+        sb.appendLine("ID: $id")
+        sb.appendLine("名称: $name")
+        sb.appendLine("描述: $description")
+        sb.appendLine("状态: ${if (enabled) "启用" else "禁用"}")
+        sb.appendLine()
         
-        if (args.isNotEmpty()) {
-            sb.appendLine("参数:")
-            args.forEach { (key, value) ->
-                sb.appendLine("  $key: $value")
+        sb.appendLine("节点 (${nodes.size}):")
+        nodes.forEach { node ->
+            when (node) {
+                is com.ai.assistance.operit.data.model.TriggerNode -> {
+                    sb.appendLine("  - [触发] ${node.name} (${node.id})")
+                    sb.appendLine("    类型: ${node.triggerType}")
+                    if (node.description.isNotBlank()) {
+                        sb.appendLine("    描述: ${node.description}")
+                    }
+                }
+                is com.ai.assistance.operit.data.model.ExecuteNode -> {
+                    sb.appendLine("  - [执行] ${node.name} (${node.id})")
+                    sb.appendLine("    动作: ${node.actionType}")
+                    if (node.description.isNotBlank()) {
+                        sb.appendLine("    描述: ${node.description}")
+                    }
+                }
             }
         }
+        sb.appendLine()
         
-        return sb.toString()
+        sb.appendLine("连接 (${connections.size}):")
+        connections.forEach { conn ->
+            val sourceName = nodes.find { it.id == conn.sourceNodeId }?.name ?: conn.sourceNodeId
+            val targetName = nodes.find { it.id == conn.targetNodeId }?.name ?: conn.targetNodeId
+            sb.append("  - $sourceName → $targetName")
+            if (conn.condition != null) {
+                sb.append(" (条件: ${conn.condition})")
+            }
+            sb.appendLine()
+        }
+        sb.appendLine()
+        
+        sb.appendLine("执行统计:")
+        sb.appendLine("  总执行次数: $totalExecutions")
+        sb.appendLine("  成功次数: $successfulExecutions")
+        sb.appendLine("  失败次数: $failedExecutions")
+        if (lastExecutionTime != null) {
+            sb.appendLine("  最后执行时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(lastExecutionTime))}")
+            sb.appendLine("  最后执行状态: ${lastExecutionStatus ?: "未知"}")
+        }
+        
+        return sb.toString().trim()
+    }
+    
+    companion object {
+        /**
+         * 创建一个空的WorkflowDetailResultData，用于错误情况
+         */
+        fun empty() = WorkflowDetailResultData(
+            id = "",
+            name = "",
+            description = "",
+            nodes = emptyList(),
+            connections = emptyList(),
+            enabled = false,
+            createdAt = 0L,
+            updatedAt = 0L,
+            lastExecutionTime = null,
+            lastExecutionStatus = null,
+            totalExecutions = 0,
+            successfulExecutions = 0,
+            failedExecutions = 0
+        )
     }
 }

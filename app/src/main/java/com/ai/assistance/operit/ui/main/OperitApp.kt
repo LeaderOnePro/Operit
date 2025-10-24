@@ -164,7 +164,7 @@ fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandl
                                     NavItem.TokenConfig
                             )
                     ),
-                    NavGroup("工具", listOf(NavItem.Toolbox, NavItem.ShizukuCommands)),
+                    NavGroup("工具", listOf(NavItem.Toolbox, NavItem.ShizukuCommands, NavItem.Workflow)),
                     NavGroup("系统", listOf(NavItem.Settings, NavItem.Help, NavItem.About, NavItem.UpdateHistory))
             )
 

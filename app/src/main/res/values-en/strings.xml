@@ -20,9 +20,34 @@
     <string name="nav_toolbox">Toolbox</string>
     <string name="nav_item_agreement">User Agreement</string>
     <string name="nav_help">User Manual</string>
+    <string name="nav_workflow">Workflow</string>
     <string name="menu">Menu</string>
     <string name="token_config">Get API Key</string>
     <string name="desktop_pet_start">Start Desktop Pet</string>
+    
+    <!-- Workflow related -->
+    <string name="workflow_list_title">Workflow List</string>
+    <string name="workflow_create">Create Workflow</string>
+    <string name="workflow_name">Workflow Name</string>
+    <string name="workflow_description">Description</string>
+    <string name="workflow_nodes">Nodes</string>
+    <string name="workflow_trigger">Trigger Execution</string>
+    <string name="workflow_delete">Delete Workflow</string>
+    <string name="workflow_empty_state">No workflows yet, click the button in the top right to create one</string>
+    <string name="workflow_nodes_empty">No nodes yet</string>
+    <string name="workflow_create_connection">Create Connection</string>
+    <string name="workflow_delete_connection">Delete Connection</string>
+    <string name="workflow_select_target_node">Select Target Node</string>
+    <string name="workflow_manage_connections">Manage Connections</string>
+    <string name="workflow_existing_connections">Existing Connections</string>
+    <string name="workflow_close">Close</string>
+    <string name="workflow_execution_running">Running…</string>
+    <string name="workflow_execution_success">Execution Successful</string>
+    <string name="workflow_execution_failed">Execution Failed</string>
+    <string name="workflow_node_pending">Pending</string>
+    <string name="workflow_node_running">Running</string>
+    <string name="workflow_node_success">Success</string>
+    <string name="workflow_node_failed">Failed</string>
     
     <!-- Attachment Panel -->
     <string name="screen_content">Screen Content</string>

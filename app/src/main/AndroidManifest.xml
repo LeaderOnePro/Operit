@@ -50,6 +50,10 @@
 
     <!-- 在<uses-permission>部分添加语音识别所需权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <!-- Workflow scheduling permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <queries>
         <!-- 允许查询和绑定到无障碍服务提供者应用 -->
@@ -157,16 +161,6 @@
             android:process=":crash"
             android:theme="@style/Theme.Operit" />
         
-        <activity
-            android:name=".services.core.tasker.ActivityConfigAIAgentAction"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:label="AI Agent Action">
-            <intent-filter>
-                <action android:name="net.dinglisch.android.tasker.ACTION_EDIT_EVENT" />
-            </intent-filter>
-        </activity>
-        
         <!-- Floating Chat Service -->
         <service
             android:name=".services.FloatingChatService"
@@ -207,6 +201,38 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/voice_assistant_widget_info" />
+        </receiver>
+        
+        <!-- Workflow Tasker Plugin Activity -->
+        <activity
+            android:name=".services.tasker.WorkflowTaskerActivityConfig"
+            android:exported="true"
+            android:label="Operit Workflow"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Workflow Tasker Receiver -->
+        <receiver
+            android:name=".services.tasker.WorkflowTaskerReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.ai.assistance.operit.TRIGGER_WORKFLOW" />
+                <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Boot Completed Receiver for rescheduling workflows -->
+        <receiver
+            android:name=".services.tasker.WorkflowBootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
         </receiver>
         
     </application>

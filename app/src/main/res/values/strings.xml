@@ -22,9 +22,27 @@
     <string name="nav_toolbox">工具箱</string>
     <string name="nav_item_agreement">用户协议</string>
     <string name="nav_help">使用手册</string>
+    <string name="nav_workflow">工作流</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
     <string name="desktop_pet_start">启动桌宠</string>
+    
+    <!-- 工作流相关 -->
+    <string name="workflow_list_title">工作流列表</string>
+    <string name="workflow_create">创建工作流</string>
+    <string name="workflow_name">工作流名称</string>
+    <string name="workflow_description">描述</string>
+    <string name="workflow_nodes">节点</string>
+    <string name="workflow_trigger">触发执行</string>
+    <string name="workflow_delete">删除工作流</string>
+    <string name="workflow_empty_state">暂无工作流，点击右上角创建</string>
+    <string name="workflow_nodes_empty">暂无节点</string>
+    <string name="workflow_create_connection">创建连接</string>
+    <string name="workflow_delete_connection">删除连接</string>
+    <string name="workflow_select_target_node">选择目标节点</string>
+    <string name="workflow_manage_connections">管理连接</string>
+    <string name="workflow_existing_connections">已有连接</string>
+    <string name="workflow_close">关闭</string>
 
     <!-- 附件面板 -->
     <string name="screen_content">屏幕内容</string>
@@ -2973,5 +2991,14 @@
     <string name="mnn_model_path_placeholder">输入MNN模型文件的完整路径</string>
     <string name="mnn_forward_type">计算类型</string>
     <string name="mnn_thread_count">线程数</string>
+    
+    <!-- 工作流执行状态 -->
+    <string name="workflow_execution_running">执行中…</string>
+    <string name="workflow_execution_success">执行成功</string>
+    <string name="workflow_execution_failed">执行失败</string>
+    <string name="workflow_node_pending">待执行</string>
+    <string name="workflow_node_running">执行中</string>
+    <string name="workflow_node_success">成功</string>
+    <string name="workflow_node_failed">失败</string>
 
 </resources>

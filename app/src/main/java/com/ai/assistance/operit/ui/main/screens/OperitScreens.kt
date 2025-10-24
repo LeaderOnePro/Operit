@@ -57,6 +57,8 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.speechtotext.SpeechT
 import com.ai.assistance.operit.ui.features.toolbox.screens.texttospeech.TextToSpeechToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.tooltester.ToolTesterScreen
 import com.ai.assistance.operit.ui.features.update.screens.UpdateScreen
+import com.ai.assistance.operit.ui.features.workflow.screens.WorkflowListScreen
+import com.ai.assistance.operit.ui.features.workflow.screens.WorkflowDetailScreen
 
 // 路由配置类
 typealias ScreenNavigationHandler = (Screen) -> Unit
@@ -394,6 +396,45 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             AssistantConfigScreen()
+        }
+    }
+
+    data object Workflow : Screen(navItem = NavItem.Workflow) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            WorkflowListScreen(
+                onNavigateToDetail = { workflowId ->
+                    navigateTo(WorkflowDetail(workflowId))
+                }
+            )
+        }
+    }
+
+    data class WorkflowDetail(val workflowId: String) : Screen(parentScreen = Workflow, navItem = NavItem.Workflow, titleRes = R.string.nav_workflow) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            WorkflowDetailScreen(
+                workflowId = workflowId,
+                onNavigateBack = onGoBack
+            )
         }
     }
 
@@ -1059,6 +1100,7 @@ object OperitRouter {
             NavItem.AssistantConfig -> Screen.AssistantConfig
             NavItem.Agreement -> Screen.Agreement
             NavItem.UpdateHistory -> Screen.UpdateHistory
+            NavItem.Workflow -> Screen.Workflow
             else -> Screen.AiChat
         }
     }

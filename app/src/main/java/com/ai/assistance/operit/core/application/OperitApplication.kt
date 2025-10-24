@@ -16,6 +16,7 @@ import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.core.config.SystemPromptConfig
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
+import com.ai.assistance.operit.core.workflow.WorkflowSchedulerInitializer
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
@@ -194,6 +195,13 @@ class OperitApplication : Application() {
         val toolHandler = AIToolHandler.getInstance(this)
         toolHandler.registerDefaultTools()
         Log.d(TAG, "【启动计时】AIToolHandler初始化并注册工具完成 - ${System.currentTimeMillis() - startTime}ms")
+        
+        // 初始化工作流调度器（异步）
+        applicationScope.launch {
+            val schedulerStartTime = System.currentTimeMillis()
+            WorkflowSchedulerInitializer.initialize(applicationContext)
+            Log.d(TAG, "【启动计时】WorkflowScheduler初始化完成（异步） - ${System.currentTimeMillis() - schedulerStartTime}ms")
+        }
         
         val totalTime = System.currentTimeMillis() - startTime
         Log.d(TAG, "【启动计时】应用启动全部完成 - 总耗时: ${totalTime}ms")
