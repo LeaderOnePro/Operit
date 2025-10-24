@@ -216,7 +216,7 @@
         
         <!-- Workflow Tasker Plugin Activity -->
         <activity
-            android:name=".services.tasker.WorkflowTaskerActivityConfig"
+            android:name=".integrations.tasker.WorkflowTaskerActivityConfig"
             android:exported="true"
             android:label="Operit Workflow"
             android:icon="@mipmap/ic_launcher">
@@ -227,7 +227,7 @@
         
         <!-- Workflow Tasker Receiver -->
         <receiver
-            android:name=".services.tasker.WorkflowTaskerReceiver"
+            android:name=".integrations.tasker.WorkflowTaskerReceiver"
             android:exported="true"
             android:enabled="true">
             <intent-filter>
@@ -238,7 +238,7 @@
         
         <!-- Boot Completed Receiver for rescheduling workflows -->
         <receiver
-            android:name=".services.tasker.WorkflowBootReceiver"
+            android:name=".integrations.tasker.WorkflowBootReceiver"
             android:exported="true"
             android:enabled="true">
             <intent-filter>

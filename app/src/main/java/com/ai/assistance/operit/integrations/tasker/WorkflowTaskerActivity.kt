@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.services.tasker
+package com.ai.assistance.operit.integrations.tasker
 
 import android.app.Activity
 import android.content.Context
@@ -9,8 +9,10 @@ import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResult
+import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultError
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultSucess
 import kotlinx.coroutines.runBlocking
+import java.util.ArrayList
 
 /**
  * Tasker Plugin Activity for triggering workflows
@@ -58,8 +60,7 @@ class WorkflowTaskerConfigHelper(config: TaskerPluginConfig<WorkflowTaskerInput>
  * Tasker Plugin Input Data
  */
 data class WorkflowTaskerInput(
-    var workflowId: String? = null,
-    var workflowName: String? = null
+    val params: ArrayList<String>? = arrayListOf()
 )
 
 /**
@@ -71,25 +72,22 @@ class WorkflowTaskerRunner : TaskerPluginRunnerAction<WorkflowTaskerInput, Unit>
         context: Context,
         input: TaskerInput<WorkflowTaskerInput>
     ): TaskerPluginResult<Unit> {
-        val workflowId = input.regular.workflowId
+        val params = input.regular.params
         
-        if (workflowId.isNullOrBlank()) {
+        if (params.isNullOrEmpty()) {
+            // No params passed from Tasker, nothing to do.
             return TaskerPluginResultSucess()
         }
 
         return try {
             val repository = WorkflowRepository(context)
-            val result = runBlocking {
-                repository.triggerWorkflow(workflowId)
+            // This new repository method will find and trigger workflows based on the passed params
+            runBlocking {
+                repository.triggerWorkflowsByTaskerEvent(params)
             }
-            
-            if (result.isSuccess) {
-                TaskerPluginResultSucess()
-            } else {
-                TaskerPluginResultSucess() // Still return success to not break Tasker task
-            }
+            TaskerPluginResultSucess()
         } catch (e: Exception) {
-            TaskerPluginResultSucess() // Still return success to not break Tasker task
+            TaskerPluginResultError(e) // Return error to Tasker for debugging
         }
     }
 }

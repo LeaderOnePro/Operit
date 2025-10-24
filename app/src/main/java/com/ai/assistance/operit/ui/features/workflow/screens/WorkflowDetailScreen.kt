@@ -488,7 +488,8 @@ fun NodeDialog(
     val triggerTypes = mapOf(
         "manual" to "手动触发",
         "schedule" to "定时触发",
-        "event" to "事件触发"
+        "tasker" to "Tasker 触发",
+        "intent" to "Intent 触发"
     )
 
     AlertDialog(
@@ -544,7 +545,8 @@ fun NodeDialog(
                                 "trigger" -> when (triggerType) {
                                     "manual" -> "如: 手动触发"
                                     "schedule" -> "如: 定时触发"
-                                    "event" -> "如: 事件触发"
+                                    "tasker" -> "如: Tasker 触发"
+                                    "intent" -> "如: Intent 触发"
                                     else -> "如: 触发器"
                                 }
                                 "execute" -> "如: ${actionType.takeIf { it.isNotBlank() } ?: "执行动作"}"
@@ -672,7 +674,8 @@ fun NodeDialog(
                                             // 设置默认配置示例
                                             triggerConfig = when (key) {
                                                 "schedule" -> """{"schedule_type":"interval","interval_ms":"900000","repeat":"true","enabled":"true"}"""
-                                                "event" -> """{"event_type": "app_launch"}"""
+                                                "tasker" -> """{"variable_name": "%evtprm()"}"""
+                                                "intent" -> """{"action": "com.example.MY_ACTION"}"""
                                                 else -> "{}"
                                             }
                                         }
@@ -723,7 +726,8 @@ fun NodeDialog(
                                 when (triggerType) {
                                     "manual" -> "手动触发"
                                     "schedule" -> "定时触发"
-                                    "event" -> "事件触发"
+                                    "tasker" -> "Tasker 触发"
+                                    "intent" -> "Intent 触发"
                                     else -> "触发器"
                                 }
                             }

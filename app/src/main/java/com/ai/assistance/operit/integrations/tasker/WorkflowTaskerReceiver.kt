@@ -1,8 +1,9 @@
-package com.ai.assistance.operit.services.tasker
+package com.ai.assistance.operit.integrations.tasker
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.util.Log
 import com.ai.assistance.operit.data.repository.WorkflowRepository
 import kotlinx.coroutines.CoroutineScope
@@ -19,15 +20,15 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "WorkflowTaskerReceiver"
         const val ACTION_TRIGGER_WORKFLOW = "com.ai.assistance.operit.TRIGGER_WORKFLOW"
-        const val EXTRA_WORKFLOW_ID = "workflow_id"
         
         /**
-         * Create an intent to trigger a workflow
+         * Creates an intent to trigger workflows based on intent data.
+         * This can be used by other parts of the app or external apps to trigger a check.
          */
-        fun createTriggerIntent(context: Context, workflowId: String): Intent {
+        fun createTriggerIntent(context: Context, extras: Bundle? = null): Intent {
             return Intent(ACTION_TRIGGER_WORKFLOW).apply {
                 setPackage(context.packageName)
-                putExtra(EXTRA_WORKFLOW_ID, workflowId)
+                extras?.let { putExtras(it) }
             }
         }
     }
@@ -37,13 +38,7 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
             return
         }
 
-        val workflowId = intent.getStringExtra(EXTRA_WORKFLOW_ID)
-        if (workflowId.isNullOrBlank()) {
-            Log.w(TAG, "Received trigger intent without workflow ID")
-            return
-        }
-
-        Log.d(TAG, "Received workflow trigger request: $workflowId")
+        Log.d(TAG, "Received generic workflow trigger request, checking for matching workflows.")
 
         // Use goAsync to allow async work
         val pendingResult = goAsync()
@@ -51,15 +46,11 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val repository = WorkflowRepository(context.applicationContext)
-                val result = repository.triggerWorkflow(workflowId)
-                
-                if (result.isSuccess) {
-                    Log.d(TAG, "Workflow triggered successfully: ${result.getOrNull()}")
-                } else {
-                    Log.e(TAG, "Failed to trigger workflow: ${result.exceptionOrNull()?.message}")
-                }
+                // New method to find and trigger workflows based on the intent's content (action, extras, etc.)
+                repository.triggerWorkflowsByIntentEvent(intent)
+                Log.d(TAG, "Finished processing intent trigger.")
             } catch (e: Exception) {
-                Log.e(TAG, "Error triggering workflow", e)
+                Log.e(TAG, "Error processing intent trigger for workflows", e)
             } finally {
                 pendingResult.finish()
             }
