@@ -29,6 +29,9 @@ class StreamPlanExecutionPlugin(private val includeTagsInOutput: Boolean = true)
         }
     )
 
+    // Allow a new <plan> start immediately after a closing </plan>, even mid-line
+    private var allowStartAfterEndTag: Boolean = false
+
     init {
         reset()
     }
@@ -46,6 +49,8 @@ class StreamPlanExecutionPlugin(private val includeTagsInOutput: Boolean = true)
                 is StreamKmpMatchResult.Match -> {
                     // End tag fully matched. Reset state and filter this last character if needed.
                     StreamLogger.i("StreamPlanExecutionPlugin", "Found end tag. Switching to IDLE.")
+                    // Enable one-time allowance for starting right after the end tag
+                    allowStartAfterEndTag = true
                     reset()
                     includeTagsInOutput
                 }
@@ -61,6 +66,15 @@ class StreamPlanExecutionPlugin(private val includeTagsInOutput: Boolean = true)
                 }
             }
         } else {
+            if (state == PluginState.IDLE && !atStartOfLine) {
+                if (!allowStartAfterEndTag) {
+                    return true
+                }
+                // Allow adjacent plan after an end tag even if separated by spaces/tabs
+                if (c == ' ' || c == '\t') {
+                    return true
+                }
+            }
             // We are in IDLE or TRYING state, looking for a start tag.
             val previousState = state
             when (startTagMatcher.processChar(c)) {
@@ -71,10 +85,13 @@ class StreamPlanExecutionPlugin(private val includeTagsInOutput: Boolean = true)
                     )
                     state = PluginState.PROCESSING
                     startTagMatcher.reset()
+                    // Consuming this as a new start clears the post-end allowance
+                    allowStartAfterEndTag = false
                     return includeTagsInOutput
                 }
                 is StreamKmpMatchResult.InProgress -> {
                     state = PluginState.TRYING
+                    // Keep the allowance during in-progress so subsequent characters can proceed
                     return includeTagsInOutput
                 }
                 is StreamKmpMatchResult.NoMatch -> {
@@ -82,6 +99,8 @@ class StreamPlanExecutionPlugin(private val includeTagsInOutput: Boolean = true)
                     if (previousState == PluginState.TRYING) {
                         reset()
                     }
+                    // Clear the allowance if we failed to start a new tag
+                    allowStartAfterEndTag = false
                     // This is a default character, not part of a tag managed by this plugin.
                     return true
                 }
