@@ -134,14 +134,32 @@ org.gradle.parallel=true
 环境准备就绪，现在开始编译项目。
 
 1. 克隆项目仓库并进入目录:  
-请务必将 你的用户名 替换为你在 GitHub 上的实际用户名。  
+请根据需要选择以下两种克隆方式（项目包含 Git 子模块）：
+
+**推荐：先 Fork 后克隆你的仓库**  
+在 GitHub 打开上游仓库并点击 Fork： [AAswordman/Operit](https://github.com/AAswordman/Operit)  
+克隆你的 Fork（注意使用 --recurse-submodules）：  
 ```bash
-git clone https://github.com/你的用户名/Operit.git
+git clone --recurse-submodules https://github.com/<你的 GitHub 用户名>/Operit.git
 cd Operit
-```
-2. **下载并放置依赖库 (关键步骤！):**
-   `README.md` 中提到，项目依赖一些需要手动下载的库。请从 [这个 Google Drive 链接](https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7?usp=sharing) 下载所有文件，并将它们解压或放置到项目根目录下对应的 `libs` 或有 `.keep` 文件的文件夹中。
-   **警告：** 如果跳过此步骤，编译将因缺少依赖而失败。下载到的三个压缩包解压覆盖这三个文件夹就可以了。
+```  
+（可选）添加上游仓库以便同步更新：  
+```bash
+git remote add upstream https://github.com/AAswordman/Operit.git
+```  
+
+**备选：不 Fork，直接克隆上游仓库（只读）**  
+```bash
+git clone --recurse-submodules https://github.com/AAswordman/Operit.git
+cd Operit
+```  
+
+如果你已克隆但忘记带 --recurse-submodules，可在仓库目录中执行：  
+```bash
+git submodule update --init --recursive
+```  
+2. **下载并放置依赖库 (关键步骤！):**  
+`README.md` 中提到，项目依赖一些需要手动下载的库。请从 [这个 Google Drive 链接](https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7?usp=sharing) 下载所有文件，并将它们解压或放置到项目根目录下对应的 `libs` 或有 `.keep` 文件的文件夹中。  **警告：** 如果跳过此步骤，编译将因缺少依赖而失败。下载到的三个压缩包解压覆盖这三个文件夹就可以了。  
 ```bash
 ./app/src/main/assets/models/.keep  
 ./app/src/main/assets/subpack/.keep  
