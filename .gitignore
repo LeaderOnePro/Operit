@@ -29,3 +29,11 @@ temp.json
 
 tmp
 AGENTS.md
+CLAUDE.md
+
+gradle/gradle-8.7-bin.zip
+gradle/gradle-8.7/*
+gradle/gradle-8.7
+
+mnn/build/*
+mnn/build
