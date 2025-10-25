@@ -483,6 +483,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -514,6 +515,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -540,6 +542,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -564,6 +567,13 @@ fun ModelParametersSection(
                         onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                         onEditClick = {
                             parameterToEdit = modelParameterToCustomParameterData(parameter)
+                        },
+                        onDeleteClick = {
+                            scope.launch {
+                                val updatedParameters = parameters.filterNot { it.id == parameter.id }
+                                parameters = updatedParameters
+                                configManager.updateParameters(config.id, updatedParameters)
+                            }
                         },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
@@ -717,6 +727,7 @@ private fun modelParameterToCustomParameterData(
         category = param.category.name
     )
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -935,34 +946,36 @@ private fun AddCustomParameterDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Category Dropdown
-                    ExposedDropdownMenuBox(
+                }
+
+                // Category Dropdown - 创建/编辑均显示
+                Spacer(modifier = Modifier.height(8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = categoryExpanded,
+                    onExpandedChange = { categoryExpanded = !categoryExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = category.toDisplayString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(parameterCategoryText) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
                         expanded = categoryExpanded,
-                        onExpandedChange = { categoryExpanded = !categoryExpanded }
+                        onDismissRequest = { categoryExpanded = false }
                     ) {
-                        OutlinedTextField(
-                            value = category.toDisplayString(),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(parameterCategoryText) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = categoryExpanded,
-                            onDismissRequest = { categoryExpanded = false }
-                        ) {
-                            ParameterCategory.values().forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat.toDisplayString()) },
-                                    onClick = {
-                                        category = cat
-                                        categoryExpanded = false
-                                    }
-                                )
-                            }
+                        ParameterCategory.values().forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat.toDisplayString()) },
+                                onClick = {
+                                    category = cat
+                                    categoryExpanded = false
+                                }
+                            )
                         }
                     }
                 }
@@ -1114,11 +1127,13 @@ private fun ParameterItem(
         onValueChange: (Any) -> Unit,
         onToggle: (Boolean) -> Unit,
         onEditClick: () -> Unit,
+        onDeleteClick: () -> Unit,
         error: String? = null,
         onErrorChange: (String?) -> Unit
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     
     val valueText = stringResource(R.string.parameter_value)
     val rangeFormatText = stringResource(R.string.parameter_range_format)
@@ -1185,6 +1200,14 @@ private fun ParameterItem(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                    IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_action),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
 
                 // 展开/收起按钮
@@ -1200,6 +1223,27 @@ private fun ParameterItem(
                     )
                 }
             }
+        }
+
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text(stringResource(R.string.confirm_delete)) },
+                text = { Text(parameter.name) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDeleteConfirm = false
+                        onDeleteClick()
+                    }) {
+                        Text(stringResource(R.string.delete_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
         }
 
         // 参数值设置（仅在展开时显示）
