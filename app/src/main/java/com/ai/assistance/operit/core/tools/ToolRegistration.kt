@@ -187,6 +187,23 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
+    // 注册链接记忆工具
+    handler.registerTool(
+            name = "link_memories",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val sourceTitle = tool.parameters.find { it.name == "source_title" }?.value ?: ""
+                val targetTitle = tool.parameters.find { it.name == "target_title" }?.value ?: ""
+                val linkType = tool.parameters.find { it.name == "link_type" }?.value ?: "related"
+                "链接记忆: '$sourceTitle' -> '$targetTitle' (类型: $linkType)"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
     // 系统操作工具
     handler.registerTool(
             name = "use_package",
@@ -421,6 +438,56 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 "触发工作流: $id"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.triggerWorkflow(tool) } }
+    )
+
+    // 对话管理工具
+    val chatManagerTool = ToolGetter.getChatManagerTool(context)
+
+    // 启动聊天服务
+    handler.registerTool(
+            name = "start_chat_service",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "启动对话服务（悬浮窗）" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.startChatService(tool) } }
+    )
+
+    // 新建对话
+    handler.registerTool(
+            name = "create_new_chat",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "创建新的对话" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.createNewChat(tool) } }
+    )
+
+    // 列出所有对话
+    handler.registerTool(
+            name = "list_chats",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "列出所有对话" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.listChats(tool) } }
+    )
+
+    // 切换对话
+    handler.registerTool(
+            name = "switch_chat",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val chatId = tool.parameters.find { it.name == "chat_id" }?.value ?: ""
+                "切换到对话: $chatId"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.switchChat(tool) } }
+    )
+
+    // 发送消息给AI
+    handler.registerTool(
+            name = "send_message_to_ai",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val message = tool.parameters.find { it.name == "message" }?.value ?: ""
+                val preview = if (message.length > 30) "${message.take(30)}..." else message
+                "发送消息给AI: $preview"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.sendMessageToAI(tool) } }
     )
 
     // 文件系统工具

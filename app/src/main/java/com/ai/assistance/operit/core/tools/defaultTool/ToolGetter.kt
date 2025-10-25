@@ -171,4 +171,13 @@ object ToolGetter {
     fun getWorkflowTools(context: Context): StandardWorkflowTools {
         return StandardWorkflowTools(context)
     }
+
+    /**
+     * 获取对话管理工具
+     * @param context 应用上下文
+     * @return 对话管理工具实现（只有标准版本）
+     */
+    fun getChatManagerTool(context: Context): StandardChatManagerTool {
+        return StandardChatManagerTool(context)
+    }
 }

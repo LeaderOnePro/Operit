@@ -51,17 +51,19 @@ import { Net as NetType } from './network';
 import { System as SystemType } from './system';
 import { UI as UIType } from './ui';
 import { FFmpeg as FFmpegType } from './ffmpeg';
-import { Query as QueryType } from './query';
 import { Tasker as TaskerType } from './tasker';
-import { Workflow as WorkflowNamespace } from './workflow';
+import { Workflow as WorkflowType } from './workflow';
+import { Chat as ChatType } from './chat';
+import { Memory as MemoryType } from './memory';
 
 export { Net } from './network';
 export { System } from './system';
 export { UI, UINode } from './ui';
 export { FFmpegVideoCodec, FFmpegAudioCodec, FFmpegResolution, FFmpegBitrate } from './ffmpeg';
-export { Query } from './query';
 export { Tasker } from './tasker';
 export { Workflow } from './workflow';
+export { Chat } from './chat';
+export { Memory } from './memory';
 
 // Export Android utilities
 export {
@@ -171,9 +173,10 @@ declare global {
         System: typeof SystemType;
         UI: typeof UIType;
         FFmpeg: typeof FFmpegType;
-        Query: typeof QueryType;
         Tasker: typeof TaskerType;
-        Workflow: typeof WorkflowNamespace;
+        Workflow: typeof WorkflowType;
+        Chat: typeof ChatType;
+        Memory: typeof MemoryType;
         calc: (expression: string) => Promise<CalculationResultData>;
     };
 

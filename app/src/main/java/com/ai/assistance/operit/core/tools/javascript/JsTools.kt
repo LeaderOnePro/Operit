@@ -251,10 +251,55 @@ fun getJsToolsDefinition(): String {
                 },
                 pressKey: (keyCode) => toolCall("press_key", { key_code: keyCode }),
             },
-            // 知识查询
-            Query: {
-                // 查询问题库
-                knowledge: (query) => toolCall("query_memory", { query })
+            // 记忆管理
+            Memory: {
+                // 查询记忆库
+                query: (query, folderPath, threshold, limit) => {
+                    const params = { query };
+                    if (folderPath) params.folder_path = folderPath;
+                    if (threshold !== undefined) params.threshold = threshold;
+                    if (limit !== undefined) params.limit = limit;
+                    return toolCall("query_memory", params);
+                },
+                // 通过标题获取记忆
+                getByTitle: (title, chunkIndex, chunkRange, query) => {
+                    const params = { title };
+                    if (chunkIndex !== undefined) params.chunk_index = chunkIndex;
+                    if (chunkRange) params.chunk_range = chunkRange;
+                    if (query) params.query = query;
+                    return toolCall("get_memory_by_title", params);
+                },
+                // 创建记忆
+                create: (title, content, contentType, source, folderPath) => {
+                    const params = { title, content };
+                    if (contentType) params.content_type = contentType;
+                    if (source) params.source = source;
+                    if (folderPath) params.folder_path = folderPath;
+                    return toolCall("create_memory", params);
+                },
+                // 更新记忆
+                update: (oldTitle, updates = {}) => {
+                    const params = { old_title: oldTitle };
+                    if (updates.newTitle) params.new_title = updates.newTitle;
+                    if (updates.content) params.content = updates.content;
+                    if (updates.contentType) params.content_type = updates.contentType;
+                    if (updates.source) params.source = updates.source;
+                    if (updates.credibility !== undefined) params.credibility = updates.credibility;
+                    if (updates.importance !== undefined) params.importance = updates.importance;
+                    if (updates.folderPath) params.folder_path = updates.folderPath;
+                    if (updates.tags) params.tags = updates.tags;
+                    return toolCall("update_memory", params);
+                },
+                // 删除记忆
+                deleteMemory: (title) => toolCall("delete_memory", { title }),
+                // 链接记忆
+                link: (sourceTitle, targetTitle, linkType, weight, description) => {
+                    const params = { source_title: sourceTitle, target_title: targetTitle };
+                    if (linkType) params.link_type = linkType;
+                    if (weight !== undefined) params.weight = weight;
+                    if (description) params.description = description;
+                    return toolCall("link_memories", params);
+                }
             },
             // 计算功能
             calc: (expression) => toolCall("calculate", { expression }),
@@ -315,6 +360,23 @@ fun getJsToolsDefinition(): String {
                 trigger: (workflowId) => {
                     const params = { workflow_id: workflowId };
                     return toolCall("trigger_workflow", params);
+                }
+            },
+            // 对话管理工具
+            Chat: {
+                // 启动对话服务
+                startService: () => toolCall("start_chat_service", {}),
+                // 创建新对话
+                createNew: () => toolCall("create_new_chat", {}),
+                // 列出所有对话
+                listAll: () => toolCall("list_chats", {}),
+                // 切换对话
+                switchTo: (chatId) => toolCall("switch_chat", { chat_id: chatId }),
+                // 发送消息给AI
+                sendMessage: (message, chatId) => {
+                    const params = { message };
+                    if (chatId) params.chat_id = chatId;
+                    return toolCall("send_message_to_ai", params);
                 }
             }
         };

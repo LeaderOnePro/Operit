@@ -1259,3 +1259,123 @@ data class WorkflowDetailResultData(
         )
     }
 }
+
+/** 对话服务启动结果数据 */
+@Serializable
+data class ChatServiceStartResultData(
+    val isConnected: Boolean,
+    val connectionTime: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (isConnected) {
+            "对话服务已启动并成功连接"
+        } else {
+            "对话服务连接失败"
+        }
+    }
+}
+
+/** 新建对话结果数据 */
+@Serializable
+data class ChatCreationResultData(
+    val chatId: String,
+    val createdAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return "已创建新对话\n对话ID: $chatId"
+    }
+}
+
+/** 对话列表结果数据 */
+@Serializable
+data class ChatListResultData(
+    val totalCount: Int,
+    val currentChatId: String?,
+    val chats: List<ChatInfo>
+) : ToolResultData() {
+    
+    @Serializable
+    data class ChatInfo(
+        val id: String,
+        val title: String,
+        val messageCount: Int,
+        val createdAt: String,
+        val updatedAt: String,
+        val isCurrent: Boolean,
+        val inputTokens: Int,
+        val outputTokens: Int
+    )
+    
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("对话列表 (共 $totalCount 个):")
+        if (currentChatId != null) {
+            sb.appendLine("当前对话ID: $currentChatId")
+        }
+        sb.appendLine()
+        
+        if (chats.isEmpty()) {
+            sb.appendLine("暂无对话")
+        } else {
+            chats.forEach { chat ->
+                val currentMarker = if (chat.isCurrent) " [当前]" else ""
+                sb.appendLine("ID: ${chat.id}$currentMarker")
+                sb.appendLine("标题: ${chat.title}")
+                sb.appendLine("消息数: ${chat.messageCount}")
+                sb.appendLine("Token统计: 输入 ${chat.inputTokens} / 输出 ${chat.outputTokens}")
+                sb.appendLine("创建时间: ${chat.createdAt}")
+                sb.appendLine("更新时间: ${chat.updatedAt}")
+                sb.appendLine("---")
+            }
+        }
+        
+        return sb.toString().trim()
+    }
+}
+
+/** 切换对话结果数据 */
+@Serializable
+data class ChatSwitchResultData(
+    val chatId: String,
+    val chatTitle: String = "",
+    val switchedAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (chatTitle.isNotBlank()) {
+            "已切换到对话: $chatTitle\n对话ID: $chatId"
+        } else {
+            "已切换到对话: $chatId"
+        }
+    }
+}
+
+/** 发送消息结果数据 */
+@Serializable
+data class MessageSendResultData(
+    val chatId: String,
+    val message: String,
+    val sentAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        val messagePreview = if (message.length > 50) {
+            "${message.take(50)}..."
+        } else {
+            message
+        }
+        return "消息已发送到对话: $chatId\n消息内容: $messagePreview"
+    }
+}
+
+/** 记忆链接结果数据 */
+@Serializable
+data class MemoryLinkResultData(
+    val sourceTitle: String,
+    val targetTitle: String,
+    val linkType: String,
+    val weight: Float,
+    val description: String
+) : ToolResultData() {
+    override fun toString(): String {
+        return "成功链接记忆: '$sourceTitle' -> '$targetTitle' (类型: $linkType, 强度: $weight)"
+    }
+}

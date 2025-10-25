@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.tools.defaultTool.standard
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.core.tools.MemoryQueryResultData
+import com.ai.assistance.operit.core.tools.MemoryLinkResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
 import com.ai.assistance.operit.data.model.AITool
@@ -41,6 +42,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             "update_memory" -> executeUpdateMemory(tool)
             "delete_memory" -> executeDeleteMemory(tool)
             "update_user_preferences" -> executeUpdateUserPreferences(tool)
+            "link_memories" -> executeLinkMemories(tool)
             else -> ToolResult(
                 toolName = tool.name,
                 success = false,
@@ -486,6 +488,86 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 success = false,
                 result = StringResultData(""),
                 error = "Failed to update user preferences: ${e.message}"
+            )
+        }
+    }
+
+    private suspend fun executeLinkMemories(tool: AITool): ToolResult {
+        val sourceTitle = tool.parameters.find { it.name == "source_title" }?.value
+        val targetTitle = tool.parameters.find { it.name == "target_title" }?.value
+        
+        if (sourceTitle.isNullOrBlank() || targetTitle.isNullOrBlank()) {
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Both source_title and target_title parameters are required"
+            )
+        }
+
+        Log.d(TAG, "Linking memories: '$sourceTitle' -> '$targetTitle'")
+
+        return try {
+            // 提取可选参数
+            val linkType = tool.parameters.find { it.name == "link_type" }?.value ?: "related"
+            val weight = tool.parameters.find { it.name == "weight" }?.value?.toFloatOrNull() ?: 0.7f
+            val description = tool.parameters.find { it.name == "description" }?.value ?: ""
+            
+            // 限制 weight 在有效范围内
+            val validWeight = weight.coerceIn(0.0f, 1.0f)
+            
+            // 查找源记忆和目标记忆
+            val sourceMemory = memoryRepository.findMemoryByTitle(sourceTitle)
+            if (sourceMemory == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Source memory not found with title: $sourceTitle"
+                )
+            }
+            
+            val targetMemory = memoryRepository.findMemoryByTitle(targetTitle)
+            if (targetMemory == null) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Target memory not found with title: $targetTitle"
+                )
+            }
+            
+            // 创建链接
+            memoryRepository.linkMemories(
+                source = sourceMemory,
+                target = targetMemory,
+                type = linkType,
+                weight = validWeight,
+                description = description
+            )
+            
+            val resultData = MemoryLinkResultData(
+                sourceTitle = sourceTitle,
+                targetTitle = targetTitle,
+                linkType = linkType,
+                weight = validWeight,
+                description = description
+            )
+            
+            Log.d(TAG, "Successfully linked memories: '$sourceTitle' -> '$targetTitle' (type: $linkType, weight: $validWeight)")
+            
+            ToolResult(
+                toolName = tool.name,
+                success = true,
+                result = resultData
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to link memories", e)
+            ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Failed to link memories: ${e.message}"
             )
         }
     }

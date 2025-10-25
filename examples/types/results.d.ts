@@ -780,4 +780,145 @@ export interface StringResultData {
     value: string;
     /** Returns the string value */
     toString(): string;
+}
+
+// ============================================================================
+// Chat Manager Types
+// ============================================================================
+
+/**
+ * Chat service start result data
+ */
+export interface ChatServiceStartResultData {
+    /** Whether the service is connected */
+    isConnected: boolean;
+    /** Connection timestamp */
+    connectionTime: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat creation result data
+ */
+export interface ChatCreationResultData {
+    /** The ID of the newly created chat */
+    chatId: string;
+    /** Creation timestamp */
+    createdAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat information
+ */
+export interface ChatInfo {
+    /** Chat ID */
+    id: string;
+    /** Chat title */
+    title: string;
+    /** Number of messages in the chat */
+    messageCount: number;
+    /** Creation timestamp */
+    createdAt: string;
+    /** Last updated timestamp */
+    updatedAt: string;
+    /** Whether this is the current active chat */
+    isCurrent: boolean;
+    /** Total input tokens used */
+    inputTokens: number;
+    /** Total output tokens used */
+    outputTokens: number;
+}
+
+/**
+ * Chat list result data
+ */
+export interface ChatListResultData {
+    /** Total number of chats */
+    totalCount: number;
+    /** The ID of the current active chat */
+    currentChatId: string | null;
+    /** List of chat information */
+    chats: ChatInfo[];
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat switch result data
+ */
+export interface ChatSwitchResultData {
+    /** The ID of the chat switched to */
+    chatId: string;
+    /** The title of the chat */
+    chatTitle: string;
+    /** Switch timestamp */
+    switchedAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Message send result data
+ */
+export interface MessageSendResultData {
+    /** The ID of the chat the message was sent to */
+    chatId: string;
+    /** The message content that was sent */
+    message: string;
+    /** Sent timestamp */
+    sentAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Result type wrappers for Chat Manager operations
+ */
+export interface ChatServiceStartResult extends BaseResult {
+    data: ChatServiceStartResultData;
+}
+
+export interface ChatCreationResult extends BaseResult {
+    data: ChatCreationResultData;
+}
+
+export interface ChatListResult extends BaseResult {
+    data: ChatListResultData;
+}
+
+export interface ChatSwitchResult extends BaseResult {
+    data: ChatSwitchResultData;
+}
+
+export interface MessageSendResult extends BaseResult {
+    data: MessageSendResultData;
+}
+
+// ============================================================================
+// Memory Management Types
+// ============================================================================
+
+/**
+ * Memory link result data
+ */
+export interface MemoryLinkResultData {
+    /** The title of the source memory */
+    sourceTitle: string;
+    /** The title of the target memory */
+    targetTitle: string;
+    /** The type of link (e.g., "related", "causes", "explains", "part_of") */
+    linkType: string;
+    /** The strength of the link (0.0-1.0) */
+    weight: number;
+    /** Optional description of the link */
+    description: string;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+export interface MemoryLinkResult extends BaseResult {
+    data: MemoryLinkResultData;
 } 

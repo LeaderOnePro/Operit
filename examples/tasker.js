@@ -2,7 +2,7 @@
 {
   "name": "tasker",
   "description": "集成 Tasker 插件事件触发工具，通过本包可向 Tasker 发送事件。",
-  "enabledByDefault": true,
+  "enabledByDefault": false,
   "tools": [
     {
       "name": "trigger_tasker_event",

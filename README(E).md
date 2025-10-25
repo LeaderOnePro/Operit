@@ -10,6 +10,11 @@
   <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
   <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
   <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
+  <br>
+  <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
+  <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ_Group-blue.svg" alt="QQ Group"></a>
+  <a href="https://discord.gg/YnV9MWurRF"><img src="https://img.shields.io/badge/🎮-Discord-5865F2.svg" alt="Discord"></a>
+  <a href="https://github.com/AAswordman/Operit/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
 </div>
 
 <div align="center">
@@ -148,15 +153,6 @@ If you encounter any problems or have suggestions for new features, we welcome y
 - If possible, provide screenshots or screen recordings to help us understand the issue.
 
 We do our best to address every reasonable issue, but please understand that open-source maintainers have limited time and energy. Also, we do not tolerate personal attacks or disrespectful comments; such issues will be closed immediately.
-
-## 📞 Contact Us
-
-If you have any questions, suggestions, or would like to connect, feel free to reach out through the following channels:
-
-- **📧 Email**: aaswordsman@foxmail.com
-- **💬 QQ Group**: [Join Now](https://qm.qq.com/q/Sa4fKEH7sO)
-- **🎮 Discord**: [Join Server](https://discord.gg/YnV9MWurRF)
-- **🐛 Issues**: [Issue Tracker](https://github.com/AAswordman/Operit/issues)
 
 ## 📄 License
 

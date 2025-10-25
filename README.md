@@ -10,6 +10,11 @@
   <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
   <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-用户指南-blue.svg" alt="User Guide"></a>
   <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
+  <br>
+  <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
+  <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ群-blue.svg" alt="QQ Group"></a>
+  <a href="https://discord.gg/YnV9MWurRF"><img src="https://img.shields.io/badge/🎮-Discord-5865F2.svg" alt="Discord"></a>
+  <a href="https://github.com/AAswordman/Operit/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
 </div>
 
 <div align="center">
@@ -140,15 +145,6 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 - 如有可能，提供截图或录屏帮助我们理解问题
 
 我们会尽力解决每一个合理的问题，但请理解开源项目维护者的时间和精力有限。同时，我们不接受任何形式的人身攻击或不尊重的言论，这样的Issue将被直接关闭。
-
-## 📞 联系我们
-
-如果您有任何问题、建议或想要交流，欢迎通过以下方式联系我们：
-
-- **📧 Email（电子邮件）**: aaswordsman@foxmail.com
-- **💬 QQ群**: [点击加入](https://qm.qq.com/q/Sa4fKEH7sO)
-- **🎮 Discord**: [加入服务器](https://discord.gg/YnV9MWurRF)
-- **🐛 问题反馈**: [Issue区](https://github.com/AAswordman/Operit/issues)
 
 ## 📄 许可证
 

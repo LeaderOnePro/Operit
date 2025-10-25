@@ -13,7 +13,8 @@ import {
     UIPageResultData, UIActionResultData, CombinedOperationResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData,
     FilePartContentData, FileApplyResultData, WorkflowListResultData, WorkflowResultData, WorkflowDetailResultData,
-    StringResultData
+    StringResultData, ChatServiceStartResultData, ChatCreationResultData, ChatListResultData,
+    ChatSwitchResultData, MessageSendResultData, MemoryLinkResultData
 } from './results';
 /**
  * Maps tool names to their result data types
@@ -96,4 +97,14 @@ export interface ToolResultMap {
     'update_workflow': WorkflowDetailResultData;
     'delete_workflow': StringResultData;
     'trigger_workflow': StringResultData;
+
+    // Chat Manager operations
+    'start_chat_service': ChatServiceStartResultData;
+    'create_new_chat': ChatCreationResultData;
+    'list_chats': ChatListResultData;
+    'switch_chat': ChatSwitchResultData;
+    'send_message_to_ai': MessageSendResultData;
+
+    // Memory operations
+    'link_memories': MemoryLinkResultData;
 } 

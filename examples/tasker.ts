@@ -2,7 +2,7 @@
 {
   "name": "tasker",
   "description": "集成 Tasker 插件事件触发工具，通过本包可向 Tasker 发送事件。",
-  "enabledByDefault": true,
+  "enabledByDefault": false,
   "tools": [
     {
       "name": "trigger_tasker_event",
@@ -23,28 +23,28 @@
 */
 /// <reference path="./types/index.d.ts" />
 const TaskerIntegration = (function () {
-    async function trigger_tasker_event(params: Tasker.TriggerTaskerEventParams) {
-        const data: string = await Tools.Tasker.triggerEvent(params);
-        return {
-            success: true,
-            message: "Tasker 事件已触发",
-            data
-        };
-    }
-
-    async function wrapToolExecution<T>(func: (params: any) => Promise<T>, params?: any) {
-        try {
-            const result = await func(params || {});
-            complete(result);
-        } catch (error: any) {
-            console.error(`Tool ${func.name} failed unexpectedly`, error);
-            complete({ success: false, message: String(error && error.message ? error.message : error) });
-        }
-    }
-
+  async function trigger_tasker_event(params: Tasker.TriggerTaskerEventParams) {
+    const data: string = await Tools.Tasker.triggerEvent(params);
     return {
-        trigger_tasker_event: (params?: Tasker.TriggerTaskerEventParams) => wrapToolExecution(trigger_tasker_event, params)
+      success: true,
+      message: "Tasker 事件已触发",
+      data
     };
+  }
+
+  async function wrapToolExecution<T>(func: (params: any) => Promise<T>, params?: any) {
+    try {
+      const result = await func(params || {});
+      complete(result);
+    } catch (error: any) {
+      console.error(`Tool ${func.name} failed unexpectedly`, error);
+      complete({ success: false, message: String(error && error.message ? error.message : error) });
+    }
+  }
+
+  return {
+    trigger_tasker_event: (params?: Tasker.TriggerTaskerEventParams) => wrapToolExecution(trigger_tasker_event, params)
+  };
 })();
 
 exports.trigger_tasker_event = TaskerIntegration.trigger_tasker_event;
