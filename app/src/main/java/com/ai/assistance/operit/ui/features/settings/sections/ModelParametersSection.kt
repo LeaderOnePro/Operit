@@ -216,6 +216,21 @@ fun ModelParametersSection(
                                     isCustom = true
                                 )
                             }
+                            ParameterValueType.OBJECT -> {
+                ModelParameter(
+                                    id = customParam.id,
+                                    name = customParam.name,
+                                    apiName = customParam.apiName,
+                                    description = customParam.description,
+                                    defaultValue = customParam.defaultValue,
+                                    currentValue = customParam.currentValue,
+                                    isEnabled = customParam.isEnabled,
+                                    valueType = ParameterValueType.OBJECT,
+                                    category =
+                                    ParameterCategory.valueOf(customParam.category),
+                                    isCustom = true
+                                )
+                            }
                         }
                     paramList.add(param)
                 }
@@ -253,6 +268,10 @@ fun ModelParametersSection(
                                 val boolParam = p as ModelParameter<Boolean>
                                 boolParam.copy(currentValue = newValue as Boolean)
                             }
+                            ParameterValueType.OBJECT -> {
+                                val objParam = p as ModelParameter<String>
+                                objParam.copy(currentValue = newValue as String)
+                            }
                         }
                     } else {
                         p
@@ -286,6 +305,10 @@ fun ModelParametersSection(
                             ParameterValueType.BOOLEAN -> {
                                 val boolParam = p as ModelParameter<Boolean>
                                 boolParam.copy(isEnabled = isEnabled)
+                            }
+                            ParameterValueType.OBJECT -> {
+                                val objParam = p as ModelParameter<String>
+                                objParam.copy(isEnabled = isEnabled)
                             }
                         }
                     } else {
@@ -332,6 +355,13 @@ fun ModelParametersSection(
                                     val boolParam = param as ModelParameter<Boolean>
                                     boolParam.copy(
                                             currentValue = boolParam.defaultValue,
+                                            isEnabled = false
+                                    )
+                                }
+                                ParameterValueType.OBJECT -> {
+                                    val objParam = param as ModelParameter<String>
+                                    objParam.copy(
+                                            currentValue = objParam.defaultValue,
                                             isEnabled = false
                                     )
                                 }
@@ -651,6 +681,21 @@ private fun convertCustomParameterDataToModelParameter(
                 isCustom = true
             )
         }
+
+        ParameterValueType.OBJECT -> {
+            ModelParameter(
+                id = customParam.id,
+                name = customParam.name,
+                apiName = customParam.apiName,
+                description = customParam.description,
+                defaultValue = customParam.defaultValue,
+                currentValue = customParam.currentValue,
+                isEnabled = customParam.isEnabled,
+                valueType = ParameterValueType.OBJECT,
+                category = ParameterCategory.valueOf(customParam.category),
+                isCustom = true
+            )
+        }
     }
 }
 
@@ -731,6 +776,7 @@ private fun AddCustomParameterDialog(
     val mustBeIntegerText = stringResource(R.string.must_be_integer)
     val mustBeFloatText = stringResource(R.string.must_be_float)
     val mustBeBooleanText = stringResource(R.string.must_be_boolean)
+    val mustBeJsonText = stringResource(R.string.must_be_valid_json)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -791,6 +837,7 @@ private fun AddCustomParameterDialog(
                                         ParameterValueType.FLOAT -> "0.0"
                                         ParameterValueType.STRING -> ""
                                         ParameterValueType.BOOLEAN -> "true"
+                                        ParameterValueType.OBJECT -> "{}"
                                     }
                                 }
                             )
@@ -802,7 +849,21 @@ private fun AddCustomParameterDialog(
                 // Default Value - 总是显示
                 OutlinedTextField(
                     value = defaultValue,
-                    onValueChange = { defaultValue = it },
+                    onValueChange = {
+                        defaultValue = it
+                        // 实时校验 JSON 格式（仅在对象类型时）
+                        if (valueType == ParameterValueType.OBJECT) {
+                            val isValid = try {
+                                Json.parseToJsonElement(it)
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+                            defaultValueError = if (isValid) null else mustBeJsonText
+                        } else {
+                            defaultValueError = null
+                        }
+                    },
                     label = { Text(parameterDefaultValueText) },
                     isError = defaultValueError != null,
                     modifier = Modifier.fillMaxWidth()
@@ -964,6 +1025,18 @@ private fun AddCustomParameterDialog(
                         ParameterValueType.STRING -> {
                             // No validation needed for string
                         }
+                        ParameterValueType.OBJECT -> {
+                            val isValid = try {
+                                kotlinx.serialization.json.Json.parseToJsonElement(defaultValue)
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+                            if (!isValid) {
+                                defaultValueError = mustBeJsonText
+                                hasError = true
+                            }
+                        }
                     }
 
                     if (hasError) return@Button
@@ -999,6 +1072,7 @@ private fun ParameterValueType.toDisplayString(): String {
         ParameterValueType.FLOAT -> stringResource(R.string.value_type_float)
         ParameterValueType.STRING -> stringResource(R.string.value_type_string)
         ParameterValueType.BOOLEAN -> stringResource(R.string.value_type_boolean)
+        ParameterValueType.OBJECT -> stringResource(R.string.value_type_object)
     }
 }
 
@@ -1236,6 +1310,34 @@ private fun ParameterItem(
                                     onCheckedChange = { onValueChange(it) }
                             )
                         }
+                    }
+                    ParameterValueType.OBJECT -> {
+                        val objParam = parameter as ModelParameter<String>
+                        var textValue by remember { mutableStateOf(objParam.currentValue) }
+                        val mustBeJsonTextLocal = stringResource(R.string.must_be_valid_json)
+                        OutlinedTextField(
+                                value = textValue,
+                                onValueChange = {
+                                    textValue = it
+                                    // 实时校验 JSON
+                                    val isValid = try {
+                                        Json.parseToJsonElement(it)
+                                        true
+                                    } catch (e: Exception) {
+                                        false
+                                    }
+                                    onErrorChange(if (isValid) null else mustBeJsonTextLocal)
+                                    onValueChange(it)
+                                },
+                                isError = error != null,
+                                supportingText = { if (error != null) Text(error) },
+                                label = { Text(valueText) },
+                                modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(120.dp),
+                                singleLine = false,
+                                maxLines = 6
+                        )
                     }
                 }
 

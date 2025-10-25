@@ -2506,6 +2506,7 @@
     <string name="value">值</string>
     <string name="range_format">范围: %1$s - %2$s</string>
     <string name="must_be_float">必须是浮点数</string>
+    <string name="must_be_valid_json">必须是有效的 JSON</string>
     <string name="default_value_format">默认值: %s</string>
     <string name="temperature_recommendation">温度推荐设置</string>
     <string name="parameter_value">参数值</string>
@@ -2545,6 +2546,7 @@
     <string name="value_type_float">小数</string>
     <string name="value_type_string">文本</string>
     <string name="value_type_boolean">布尔值</string>
+    <string name="value_type_object">对象(JSON)</string>
     <string name="other_parameters">其他参数</string>
     <string name="parameter_type">参数类型</string>
 

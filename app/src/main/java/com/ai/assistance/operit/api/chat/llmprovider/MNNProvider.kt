@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * MNN本地推理引擎的AI服务实现
@@ -441,6 +443,25 @@ class MNNProvider(
                                 ParameterValueType.STRING -> {
                                     configMap[param.apiName] = param.currentValue.toString()
                                 }
+                                ParameterValueType.OBJECT -> {
+                                    val raw = param.currentValue.toString().trim()
+                                    val parsed: Any? = try {
+                                        when {
+                                            raw.startsWith("{") -> JSONObject(raw)
+                                            raw.startsWith("[") -> JSONArray(raw)
+                                            else -> null
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "自定义OBJECT参数解析失败: ${param.apiName}", e)
+                                        null
+                                    }
+                                    if (parsed != null) {
+                                        configMap[param.apiName] = parsed
+                                    } else {
+                                        // 解析失败时回退为字符串，避免崩溃
+                                        configMap[param.apiName] = raw
+                                    }
+                                }
                             }
                         }
                     }
@@ -455,6 +476,8 @@ class MNNProvider(
                         if (index > 0) append(",")
                         append("\"${entry.key}\":")
                         when (val value = entry.value) {
+                            is JSONObject -> append(value.toString())
+                            is JSONArray -> append(value.toString())
                             is String -> append("\"$value\"")
                             is Number -> append(value)
                             is Boolean -> append(value)

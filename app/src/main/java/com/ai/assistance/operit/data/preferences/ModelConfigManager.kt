@@ -488,6 +488,19 @@ class ModelConfigManager(private val context: Context) {
                                                 category = category,
                                                 isCustom = true
                                         )
+                                ParameterValueType.OBJECT ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue,
+                                                currentValue = data.currentValue,
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                category = category,
+                                                isCustom = true
+                                        )
                             }
                     parameters.add(convertedParam)
                 }
