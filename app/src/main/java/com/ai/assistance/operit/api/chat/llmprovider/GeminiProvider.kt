@@ -4,6 +4,7 @@ import android.util.Log
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.data.model.ParameterCategory
 import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.TokenCacheManager
 import com.ai.assistance.operit.util.exceptions.UserCancellationException
@@ -465,7 +466,37 @@ class GeminiProvider(
                                     "maxOutputTokens",
                                     (param.currentValue as Number).toInt()
                             )
-                    else -> generationConfig.put(param.apiName, param.currentValue)
+                    else -> {
+                        when (param.valueType) {
+                            com.ai.assistance.operit.data.model.ParameterValueType.OBJECT -> {
+                                val raw = param.currentValue.toString().trim()
+                                val parsed: Any? = try {
+                                    when {
+                                        raw.startsWith("{") -> JSONObject(raw)
+                                        raw.startsWith("[") -> JSONArray(raw)
+                                        else -> null
+                                    }
+                                } catch (e: Exception) {
+                                    logError("Gemini OBJECT参数解析失败: ${param.apiName}", e)
+                                    null
+                                }
+                                if (param.category == ParameterCategory.OTHER) {
+                                    if (parsed != null) {
+                                        json.put(param.apiName, parsed)
+                                    } else {
+                                        json.put(param.apiName, raw)
+                                    }
+                                } else {
+                                    if (parsed != null) {
+                                        generationConfig.put(param.apiName, parsed)
+                                    } else {
+                                        generationConfig.put(param.apiName, raw)
+                                    }
+                                }
+                            }
+                            else -> generationConfig.put(param.apiName, param.currentValue)
+                        }
+                    }
                 }
             }
         }

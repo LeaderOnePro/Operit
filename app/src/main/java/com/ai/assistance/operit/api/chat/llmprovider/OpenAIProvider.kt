@@ -172,6 +172,25 @@ open class OpenAIProvider(
                             jsonObject.put(param.apiName, param.currentValue as String)
                     com.ai.assistance.operit.data.model.ParameterValueType.BOOLEAN ->
                             jsonObject.put(param.apiName, param.currentValue as Boolean)
+                    com.ai.assistance.operit.data.model.ParameterValueType.OBJECT -> {
+                        val raw = param.currentValue.toString().trim()
+                        val parsed: Any? = try {
+                            when {
+                                raw.startsWith("{") -> JSONObject(raw)
+                                raw.startsWith("[") -> JSONArray(raw)
+                                else -> null
+                            }
+                        } catch (e: Exception) {
+                            Log.w("AIService", "OBJECT参数解析失败: ${param.apiName}", e)
+                            null
+                        }
+                        if (parsed != null) {
+                            jsonObject.put(param.apiName, parsed)
+                        } else {
+                            // 解析失败则按字符串传递，避免崩溃
+                            jsonObject.put(param.apiName, raw)
+                        }
+                    }
                 }
                 Log.d("AIService", "添加参数 ${param.apiName} = ${param.currentValue}")
             }
