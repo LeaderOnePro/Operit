@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.DocumentChunk
+import com.ai.assistance.operit.data.model.Memory
 
 @Composable
 fun DocumentViewDialog(
@@ -43,7 +44,8 @@ fun DocumentViewDialog(
     onPerformSearch: () -> Unit,
     onDismiss: () -> Unit,
     onSave: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    folderPath: String = "" // 添加文件夹路径参数
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -51,13 +53,23 @@ fun DocumentViewDialog(
         modifier = Modifier.fillMaxHeight(0.85f),
         onDismissRequest = onDismiss,
         title = {
-            OutlinedTextField(
-                value = memoryTitle,
-                onValueChange = onTitleChange,
-                label = { Text("文档标题") },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyMedium
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedTextField(
+                    value = memoryTitle,
+                    onValueChange = onTitleChange,
+                    label = { Text("文档标题") },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                if (folderPath.isNotEmpty()) {
+                    Text(
+                        text = "文件夹: $folderPath",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
         },
         text = {
             Column(modifier = Modifier.fillMaxSize()) {

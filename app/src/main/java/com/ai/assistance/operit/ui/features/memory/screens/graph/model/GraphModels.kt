@@ -20,5 +20,6 @@ data class Edge(
     val targetId: String,
     val label: String? = null,
     val weight: Float = 1.0f,
-    val metadata: Map<String, String> = emptyMap()
+    val metadata: Map<String, String> = emptyMap(),
+    val isCrossFolderLink: Boolean = false // 标记是否为跨文件夹连接
 ) 

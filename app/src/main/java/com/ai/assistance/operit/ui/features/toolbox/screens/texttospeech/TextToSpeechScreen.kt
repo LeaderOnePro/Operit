@@ -17,7 +17,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.api.voice.VoiceService
 import kotlinx.coroutines.launch
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.ConnectException
+import java.net.ProtocolException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import com.ai.assistance.operit.api.voice.TtsException
 
 /** 文本转语音演示屏幕 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,7 +37,7 @@ fun TextToSpeechScreen(navController: NavController) {
 
         // 获取VoiceService实例
         val voiceService = remember { VoiceServiceFactory.getInstance(context) }
-
+        
         // 状态变量
         var inputText by remember { mutableStateOf("") }
         var speechRate by remember { mutableStateOf(1.0f) }
@@ -37,6 +45,8 @@ fun TextToSpeechScreen(navController: NavController) {
         var isInitialized by remember { mutableStateOf(false) }
         var isSpeaking by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
+        var errorDetails by remember { mutableStateOf<String?>(null) }
+        var debugInfo by remember { mutableStateOf<String?>(null) }
 
         // 监听语音服务状态
         LaunchedEffect(Unit) {
@@ -46,9 +56,12 @@ fun TextToSpeechScreen(navController: NavController) {
                                 isInitialized = voiceService.initialize()
                                 if (!isInitialized) {
                                         error = "初始化语音引擎失败"
+                                        errorDetails = "服务初始化方法返回 false，但未抛出异常。"
                                 }
                         } catch (e: Exception) {
-                                error = "初始化语音引擎错误: ${e.message}"
+                                error = "初始化语音引擎错误"
+                                errorDetails = handleTtsError(e)
+                                debugInfo = "服务类型: ${voiceService.javaClass.simpleName}"
                         }
                 }
 
@@ -60,8 +73,15 @@ fun TextToSpeechScreen(navController: NavController) {
         fun speakText() {
                 if (inputText.isBlank()) {
                         error = "请输入要转换为语音的文本"
+                        errorDetails = null
+                        debugInfo = null
                         return
                 }
+
+                // 清除之前的错误信息
+                error = null
+                errorDetails = null
+                debugInfo = null
 
                 coroutineScope.launch {
                         try {
@@ -69,9 +89,14 @@ fun TextToSpeechScreen(navController: NavController) {
                                         voiceService.speak(inputText, true, speechRate, speechPitch)
                                 if (!success) {
                                         error = "播放文本失败"
+                                        errorDetails = "TTS 服务返回失败状态，请检查配置和网络连接"
+                                        debugInfo = "请求参数: 文本='$inputText', 语速=${speechRate}x, 音调=${speechPitch}x"
                                 }
                         } catch (e: Exception) {
                                 error = "播放文本错误: ${e.message}"
+                                errorDetails = handleTtsError(e)
+                                debugInfo = "请求参数: 文本='$inputText', 语速=${speechRate}x, 音调=${speechPitch}x\n" +
+                                          "服务类型: ${voiceService.javaClass.simpleName}"
                         }
                 }
         }
@@ -303,27 +328,99 @@ fun TextToSpeechScreen(navController: NavController) {
                 // 错误提示
                 if (error != null) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Surface(
+                        Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                color = MaterialTheme.colorScheme.errorContainer,
+                                colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
                                 shape = RoundedCornerShape(8.dp)
                         ) {
-                                Row(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                        Icon(
-                                                imageVector = Icons.Default.Error,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(24.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                                Icon(
+                                                        imageVector = Icons.Default.Error,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(24.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(
+                                                        text = "错误",
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold
+                                                )
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        
                                         Text(
                                                 text = error ?: "",
-                                                color = MaterialTheme.colorScheme.error,
+                                                color = MaterialTheme.colorScheme.onErrorContainer,
                                                 style = MaterialTheme.typography.bodyMedium
                                         )
+                                        
+                                        // 错误详情
+                                        if (errorDetails != null) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                        text = "错误详情:",
+                                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                        text = errorDetails ?: "",
+                                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                                        style = MaterialTheme.typography.bodySmall
+                                                )
+                                        }
+                                        
+                                        // 调试信息
+                                        if (debugInfo != null) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                        text = "调试信息:",
+                                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                        text = debugInfo ?: "",
+                                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                                        style = MaterialTheme.typography.bodySmall
+                                                )
+                                        }
+                                        
+                                        // 清除错误按钮
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                        ) {
+                                                OutlinedButton(
+                                                        onClick = {
+                                                                error = null
+                                                                errorDetails = null
+                                                                debugInfo = null
+                                                        },
+                                                        colors = ButtonDefaults.outlinedButtonColors(
+                                                                contentColor = MaterialTheme.colorScheme.error
+                                                        )
+                                                ) {
+                                                        Icon(
+                                                                imageVector = Icons.Default.Clear,
+                                                                contentDescription = "清除错误",
+                                                                modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("清除错误信息")
+                                                }
+                                        }
                                 }
                         }
                 }
@@ -354,7 +451,9 @@ fun TextToSpeechScreen(navController: NavController) {
                                                 "1. 在输入框中输入要转换为语音的文本\n" +
                                                         "2. 调整语速和音调设置\n" +
                                                         "3. 点击「播放语音」按钮开始播放\n" +
-                                                        "4. 点击「停止播放」按钮停止播放",
+                                                        "4. 点击「停止播放」按钮停止播放\n" +
+                                                        "5. 如果出现错误，查看详细的错误信息和调试信息\n" +
+                                                        "6. 使用「清除错误信息」按钮清除错误显示",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -369,4 +468,35 @@ fun TextToSpeechScreen(navController: NavController) {
                         }
                 }
         }
+}
+
+/**
+ * 处理TTS异常并返回格式化的错误详情
+ *
+ * @param e 捕获到的异常
+ * @return 格式化后的错误详情字符串
+ */
+private fun handleTtsError(e: Exception): String {
+    return when (e) {
+        is TtsException -> {
+            // TTS 异常，优先显示服务器返回的具体信息
+            val code = e.httpStatusCode
+            val body = e.errorBody?.takeIf { it.isNotBlank() }
+            if (code != null && body != null) {
+                "TTS 服务错误 (HTTP $code): $body"
+            } else if (code != null) {
+                "TTS 服务返回错误，状态码: $code"
+            } else if (body != null) {
+                "TTS 服务返回错误: $body"
+            } else {
+                "TTS 服务发生未知异常: ${e.cause?.message ?: e.message}"
+            }
+        }
+        is UnknownHostException -> "网络错误: 无法访问主机，请检查网络连接和DNS设置。"
+        is SocketTimeoutException -> "网络超时: 服务器响应超时，请检查网络状况。"
+        is ConnectException -> "网络错误: 无法连接到服务器，请检查服务地址和端口。"
+        is ProtocolException -> "网络协议错误: ${e.message}"
+        is IOException -> "网络IO错误，请检查设备网络连接。"
+        else -> "发生未知错误: ${e.javaClass.simpleName}\n${e.stackTraceToString().take(300)}..."
+    }
 }

@@ -29,5 +29,6 @@ data class ProjectStructure(
         val packageJsonContent: String? = null,
         val tsConfigOutDir: String? = null,
         val tsConfigRootDir: String? = null,
-        val tsConfigContent: String? = null
+        val tsConfigContent: String? = null,
+        val pythonPackageName: String? = null  // 从 pyproject.toml 解析的包名
 )

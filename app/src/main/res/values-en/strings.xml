@@ -20,8 +20,34 @@
     <string name="nav_toolbox">Toolbox</string>
     <string name="nav_item_agreement">User Agreement</string>
     <string name="nav_help">User Manual</string>
+    <string name="nav_workflow">Workflow</string>
     <string name="menu">Menu</string>
     <string name="token_config">Get API Key</string>
+    <string name="desktop_pet_start">Start Desktop Pet</string>
+    
+    <!-- Workflow related -->
+    <string name="workflow_list_title">Workflow List</string>
+    <string name="workflow_create">Create Workflow</string>
+    <string name="workflow_name">Workflow Name</string>
+    <string name="workflow_description">Description</string>
+    <string name="workflow_nodes">Nodes</string>
+    <string name="workflow_trigger">Trigger Execution</string>
+    <string name="workflow_delete">Delete Workflow</string>
+    <string name="workflow_empty_state">No workflows yet, click the button in the top right to create one</string>
+    <string name="workflow_nodes_empty">No nodes yet</string>
+    <string name="workflow_create_connection">Create Connection</string>
+    <string name="workflow_delete_connection">Delete Connection</string>
+    <string name="workflow_select_target_node">Select Target Node</string>
+    <string name="workflow_manage_connections">Manage Connections</string>
+    <string name="workflow_existing_connections">Existing Connections</string>
+    <string name="workflow_close">Close</string>
+    <string name="workflow_execution_running">Running…</string>
+    <string name="workflow_execution_success">Execution Successful</string>
+    <string name="workflow_execution_failed">Execution Failed</string>
+    <string name="workflow_node_pending">Pending</string>
+    <string name="workflow_node_running">Running</string>
+    <string name="workflow_node_success">Success</string>
+    <string name="workflow_node_failed">Failed</string>
     
     <!-- Attachment Panel -->
     <string name="screen_content">Screen Content</string>
@@ -54,6 +80,7 @@
     <string name="importing_model">Importing model...</string>
     <string name="processing">Processing...</string>
     <string name="error_occurred">Error occurred: %1$s</string>
+    <string name="avatar_config">Avatar Configuration</string>
     <string name="dragon_bones_config">DragonBones Config</string>
     <string name="collapse">Collapse</string>
     <string name="expand">Expand</string>
@@ -66,18 +93,23 @@
     <string name="confirm_delete_model_message">This action cannot be undone. Are you sure you want to delete this model?</string>
     <string name="no_models_available">No models available</string>
     <string name="please_select_model">Please select a model</string>
+    <string name="unsupported_model_type">Unsupported model type: %1$s</string>
     <string name="how_to_import">How to create and import models?</string>
     <string name="enter">Enter</string>
+    <string name="about_avatar_formats">This app supports multiple avatar formats, including DragonBones. Here are instructions for creating and importing models.</string>
     <string name="dragon_bones_renamed">DragonBones has been renamed to LoongBones, and a new online editor has been launched.\nLoongBones supports professional animation features like IK, mesh deformation, and bone binding.</string>
     <string name="making_models">1. Creating Models:</string>
     <string name="making_models_desc">    · Recommended: Use the new online editor.\n    · Alternative: Download the old v5.6.3 offline editor from third-party archive sites.</string>
+    <string name="making_models_desc_general">    · You can use various tools to create your avatar models.\n    · For DragonBones, we recommend using the new online editor, or you can use the old v5.6.3 offline editor.</string>
     <string name="exporting_files">2. Exporting Files:</string>
     <string name="exporting_files_desc">    · Regardless of which version you use, when exporting data, select JSON for type and version 5.5 (current version doesn\'t support 6.0 runtime).\n    · The core export files are: *_ske.json, *_tex.json, *_tex.png.</string>
+    <string name="exporting_files_desc_general">    · Please follow the export guidelines for your chosen format.\n    · For DragonBones, when exporting data, select JSON for type and version 5.5 (current version doesn\'t support 6.0 runtime).\n    · The core export files are: *_ske.json, *_tex.json, *_tex.png.</string>
     <string name="configuring_interaction">3. Configuring Interaction:</string>
     <string name="configuring_interaction_desc">    · For head tracking, add an IK constraint and name the target bone \"ik_target\".\n    · idle animation: Make sure you have an animation named \"idle\" as the base idle animation, which will automatically loop.\n    · Random animations: You can add animations like blink, shake_head, wag_tail, etc.,\n      the system will randomly trigger these animations to enrich the pet\'s expression.</string>
     <string name="packaging_and_importing">4. Packaging and Importing:</string>
     <string name="packaging_and_importing_desc">    · Package the three exported files into one .zip file for import.</string>
     <string name="important_tip">Important Note: In the old editor download page, the Windows and Mac download links are reversed. Please make sure to select the correct link.</string>
+    <string name="dragonbones_important_tip">Important Note: In the old editor download page, the Windows and Mac download links are reversed. Please make sure to select the correct link.</string>
     <string name="download_old_editor">Download Old Editor</string>
     <string name="visit_online_editor">Visit Online Editor</string>
     
@@ -131,6 +163,10 @@
     <string name="about_contact">Contact Us: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
     <string name="about_copyright">© 2023-2024 Operit. All Rights Reserved.</string>
+    <string name="star_on_github">Star on GitHub</string>
+    <string name="update_log">Update Log</string>
+    <string name="app_logo_description">App Logo</string>
+    <string name="github_star_description">GitHub Star</string>
     
     <!-- AI Chat Screen -->
     <string name="configure_ai">Configure AI API</string>
@@ -216,16 +252,19 @@
     <string name="plugin_checking_env">Checking environment...</string>
     <string name="plugin_starting_plugins">Preparing to start plugins...</string>
     <string name="plugin_starting_number">Starting plugin (%1$d/%2$d)%3$s...</string>
-    <string name="plugin_disabled_suffix"> (plugin disabled)</string>
-    <string name="plugin_termux_not_running">Termux is not running, unable to start plugins</string>
-    <string name="plugin_termux_not_authorized">Termux is not authorized, please authorize Termux before using plugins</string>
-    <string name="plugin_nodejs_missing">Node.js not installed in Termux, please install Node.js before using plugins</string>
+    <string name="plugin_disabled_suffix"> (Plugin disabled)</string>
+    <string name="plugin_termux_not_running">Termux is not running, cannot start plugins</string>
+    <string name="plugin_termux_not_authorized">Termux not authorized, please authorize Termux before using plugins</string>
+    <string name="plugin_nodejs_missing">Node.js is not installed in Termux, please install Node.js before using plugins</string>
     <string name="plugin_bridge_failed">Bridge initialization failed, unable to start plugins</string>
     <string name="plugin_other_error">Error occurred while starting plugins, you can click \"Skip\" in the top right corner to continue</string>
     <string name="plugin_complete_with_failures">Startup completed, success rate: %1$d%%. Some plugins failed to load</string>
     <string name="plugin_complete_success">Startup completed, success rate: %1$d%%</string>
     <string name="plugin_no_plugins_to_start">No plugins to start</string>
     <string name="plugin_copyright">© 2023 AI Assistance</string>
+    <string name="plugin_registered">Registered</string>
+    <string name="plugin_registration_failed">Registration Failed</string>
+    <string name="plugin_verification_failed">Verification Failed</string>
 
     <!-- Permission Guide Screen -->
     <string name="permission_guide_intro_1_title">Voice-Driven UI Automation</string>
@@ -239,11 +278,25 @@
     <!-- Context Menu -->
     <string name="copy_message">Copy Message</string>
     <string name="read_message">Read Message</string>
+    <string name="auto_read_message">Auto Read</string>
+    <string name="auto_read_desc">When enabled, AI responses will be automatically read aloud</string>
+    <string name="auto_read_active">Auto read enabled</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
-    <string name="select_copy">Select Copy</string>
+    <string name="reply_message">Reply</string>
+    <string name="select_copy">Select &amp; Copy</string>
+
     <string name="modify_memory">Modify Memory</string>
     <string name="delete_from_here">Delete From Here</string>
+    <string name="multi_select">Multi-select</string>
+    <string name="exit_multi_select">Exit Multi-select</string>
+    <string name="delete_selected">Delete Selected</string>
+    <string name="share_selected">Share</string>
+    <string name="selected_count">%d selected</string>
+    <string name="generating_image">Generating image...</string>
+    <string name="share_failed">Share failed</string>
+    <string name="image_generated">Image generated</string>
+    <string name="image_preview">Image Preview</string>
     <string name="load_more_history">Load more history messages...</string>
 
     <!-- Theme Settings Screen -->
@@ -317,6 +370,9 @@
     <string name="tools_completed">Tool execution completed</string>
     <string name="tools_failed">Tool execution failed: %1$s</string>
     <string name="tool_result">Tool Execution Result</string>
+    <string name="disable_tools">Disable Tools</string>
+    <string name="disable_tools_desc">When disabled, AI cannot use regular tools like file system or HTTP. However, if \"Memory Attachment\" is enabled, AI can still access memory for knowledge queries and management</string>
+    <string name="tools_disabled">Tools Disabled</string>
     <string name="processing_input">Processing input...</string>
     <string name="references">References:</string>
     <string name="tool_weather">Weather Query</string>
@@ -358,10 +414,24 @@
     <string name="settings_functional_model_desc">Configure specialized models and API settings for different functions (such as chat, summarization, problem library, etc.)</string>
     <string name="settings_configure_function">Configure Function</string>
     
+    <string name="settings_section_context_summary">Context and Summary</string>
+    <string name="settings_enable_summary">Enable Conversation Summary</string>
+    <string name="settings_enable_summary_desc">Automatically generate conversation summaries when context is too long to save Token consumption</string>
+    <string name="settings_enable_summary_by_message_count">Trigger summary by message count</string>
+    <string name="settings_enable_summary_by_message_count_desc">Trigger summary when new message count reaches threshold</string>
+    <string name="settings_summary_message_count_threshold">Message Count Threshold</string>
+    <string name="settings_summary_message_count_threshold_subtitle">Number of new messages to trigger summary (1-20)</string>
+    
     <string name="settings_section_display">Display and Behavior</string>
 
     <string name="settings_keep_screen_on">Keep Screen On</string>
     <string name="settings_keep_screen_on_desc">Keep screen on during AI output to prevent screen from turning off</string>
+    <string name="settings_reply_notification">Reply Notification</string>
+    <string name="settings_reply_notification_desc">Send notification when AI completes a reply</string>
+    <string name="notification_ai_reply_title">AI Assistant</string>
+    <string name="notification_ai_reply_content">AI has completed the reply</string>
+    <string name="notification_permission_rationale">Notification permission is needed to notify you when AI completes a reply</string>
+    <string name="notification_permission_denied">Notification permission denied, you will not receive AI reply notifications</string>
     <string name="settings_auto_accessibility">Auto-grant Accessibility Permission</string>
     <string name="settings_auto_accessibility_desc">When disabled, manual authorization is required each time the app is opened</string>
     
@@ -372,6 +442,8 @@
     
     <string name="settings_section_usage">Usage Statistics</string>
     <string name="settings_token_statistics">Token Statistics</string>
+    <string name="settings_total_tokens_breakdown">Input: %1$d (Cached: %2$d) / Output: %3$d</string>
+    <string name="settings_cached_tokens">(Cached: %1$d)</string>
     <string name="settings_reset_analysis_count">Reset Preference Analysis Counter</string>
     <string name="settings_why_token_stats">Why Should I Care About Token Statistics?</string>
     <string name="settings_token_stats_explanation">Because it\'s like a restaurant bill, except the \'food\' is AI thinking and the \'money\' is calculated in RMB! Preference analysis is the AI observing your tastes to customize your next \'menu\'. Don\'t worry, even if you chat until your fingers cramp, these costs might not be enough to buy a bubble tea~</string>
@@ -388,7 +460,7 @@
     <string name="device_model">Device Model: %1$s %2$s</string>
     <string name="shizuku_status">Shizuku Status</string>
     <string name="refresh">Refresh</string>
-    <string name="installed">Installed: %1$s</string>
+    <string name="installed">Installed</string>
     <string name="service_running">Service Running: %1$s</string>
     <string name="permission_status">Permission Status: %1$s</string>
     <string name="yes">Yes</string>
@@ -539,7 +611,6 @@
     <!-- File Manager -->
     <string name="files_selected">%1$d files selected</string>
     <string name="file_count">%1$d items</string>
-    <string name="exit_multi_select">Exit multi-select</string>
     
     <!-- Search Dialog -->
     <string name="search_files">Search Files</string>
@@ -767,7 +838,7 @@
     <string name="overlay_permission">Overlay Permission</string>
     <string name="battery_optimization">Battery Optimization Exemption</string>
     <string name="location_permission">Location Permission</string>
-    <string name="termux_terminal">Termux Terminal</string>
+    <string name="operit_terminal">Operit Terminal</string>
     
     <!-- Permission Level Descriptions -->
     <string name="permission_level_standard">Standard Permission</string>
@@ -812,11 +883,11 @@
     <string name="input_tokens">Input: %1$s</string>
     <string name="output_tokens">Output: %1$s</string>
     <string name="context_window">Context: %1$s</string>
-    <string name="auto_approve">Auto-approve:</string>
+    <string name="auto_approve">Auto-approve</string>
     <string name="auto_approve_desc">Safe tools will be executed automatically without prompting. For specific group approvals, please go to Settings - Tool Permission Management.</string>
     <string name="enabled">Enabled</string>
     <string name="ask">Ask</string>
-    <string name="ai_planning_mode">AI Planning:</string>
+    <string name="ai_planning_mode">Deep Search</string>
     <string name="disabled">Disabled</string>
     
     <!-- Termux Related -->
@@ -892,6 +963,10 @@
     <string name="desktop_pet_function">Desktop Pet</string>
     <string name="desktop_pet_function_desc">Desktop pet function, customize pet personality and interaction style</string>
     
+    <!-- Desktop Pet Service Notification -->
+    <string name="pet_service_notification_title">Desktop Pet Service</string>
+    <string name="pet_service_notification_text">Desktop pet is running</string>
+    
     <!-- Settings Screen Additional Strings -->
     <string name="settings_prompt_section">Prompt Configuration</string>
     <string name="settings_prompt_title">Prompt Editor</string>
@@ -917,6 +992,7 @@
     <string name="ok">OK</string>
     <string name="select_download_source">Select Download Source</string>
     <string name="select_download_source_desc">Please select a download source suitable for your network:</string>
+    <string name="mirror_download">%1$s Mirror Download</string>
     <string name="china_mirror">China Accelerated Mirror</string>
     <string name="china_mirror_desc">Accelerated via ghfast.top, recommended for users in China</string>
     <string name="github_source">GitHub Original Link</string>
@@ -927,6 +1003,7 @@
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="license_format">License: %1$s</string>
     <string name="visit_project">Visit Project</string>
+    <string name="no_mirrors_found">No available mirror sources found</string>
 
     <!-- Accessibility Wizard -->
     <string name="accessibility_wizard_title">Accessibility Service Setup</string>
@@ -949,8 +1026,8 @@
     <string name="accessibility_risk_warning_message">While enabling the accessibility service can speed up UI operations, some apps may detect this service and impose restrictions, including account bans. Please enable only after understanding and accepting the associated risks.</string>
     
     <string name="accessibility_risk_warning_additional">Please note: Debug mode already has UI operation capabilities. Enabling the accessibility service only accelerates UI operations but increases the risk of account bans. Unless you need maximum speed, it\'s not recommended. If enabled, please disable it immediately after use.</string>
-    <string name="accessibility_risk_warning_input">Type \"ok\" to confirm</string>
-    <string name="accessibility_risk_warning_input_error">Please type \"ok\" to confirm you understand the risks</string>
+    <string name="accessibility_risk_warning_input">Type \"I understand and acknowledge the risks of account bans and restricted account functions caused by accessibility permissions, and I bear the consequences myself\" to confirm</string>
+    <string name="accessibility_risk_warning_input_error">Please type \"I understand and acknowledge the risks of account bans and restricted account functions caused by accessibility permissions, and I bear the consequences myself\" to confirm you understand the risks</string>
     <string name="accessibility_risk_warning_confirm">Confirm</string>
     <string name="accessibility_risk_warning_cancel">Cancel</string>
 
@@ -1024,6 +1101,7 @@
     <string name="send_message">Send Message</string>
     <string name="chat_with_pet">Chat with Pet</string>
     <string name="dragonbones_mode">DragonBones Mode</string>
+    <string name="avatar_mode">Avatar Mode</string>
     <string name="loading_failed">Loading failed: %1$s</string>
     <string name="loading">Loading...</string>
     <string name="floating_service_description">Display AI assistant floating window service</string>
@@ -1045,6 +1123,8 @@
     <string name="request_microphone_permission">Request Microphone Permission</string>
     <string name="recognition_result">Recognition Result</string>
     <string name="speech_recognition_result_placeholder">Speech recognition results will be displayed here</string>
+    <string name="copy_text">Copy Text</string>
+    <string name="no_text_to_copy">No text to copy</string>
     <string name="recognition_settings">Recognition Settings</string>
     <string name="recognition_engine">Recognition Engine</string>
     <string name="sherpa_ncnn_best">Sherpa-ncnn (Best)</string>
@@ -1163,6 +1243,19 @@
     <string name="update_history">Update History</string>
     <string name="nav_memory_base">Memory Base</string>
     
+    <!-- Manual Memory Update -->
+    <string name="manual_memory_update">Manual Memory Update</string>
+    <string name="manual_memory_update_desc">When AI forgets to summarize after task completion, manually trigger memory saving to store valuable content from this conversation into long-term memory.</string>
+    
+    <!-- Context and Summary Settings Screen -->
+    <string name="screen_title_context_summary_settings">Context and Summary Settings</string>
+    <string name="settings_context_title">Context Settings</string>
+    <string name="settings_summary_title">Summary Settings</string>
+    <string name="settings_context_summary_subtitle">Manage context length, summary and truncation settings</string>
+    
+    <!-- Details -->
+    <string name="details">Details</string>
+    
     <!-- MCP and Plugin Related -->
     <string name="uninstall">Uninstall</string>
     <string name="install">Install</string>
@@ -1181,8 +1274,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">Tool Test Center</string>
     <string name="tool_test_center_desc">Test the availability and functionality of AI tools</string>
-    <string name="tool_format_converter">Universal Format Converter</string>
-    <string name="tool_format_converter_desc">Support conversion between multiple file formats, convenient and fast</string>
     <string name="tool_file_manager">File Manager</string>
     <string name="tool_file_manager_desc">Browse and manage device files with various operations support</string>
     <string name="tool_tts">Text-to-Speech</string>
@@ -1222,6 +1313,7 @@
     <string name="service_metadata">Service Metadata</string>
     <string name="plugin_name">Plugin Name</string>
     <string name="my_mcp_plugin">My MCP Plugin</string>
+    <string name="repo">Repository</string>
     <string name="plugin_description">Plugin Description</string>
     <string name="this_is_mcp_plugin">This is an MCP plugin</string>
     <string name="plugin_already_exists">Plugin \'%1$s\' already exists, please use a different name.</string>
@@ -1294,6 +1386,8 @@
     <string name="theme_statusbar_color">Status Bar Color</string>
     <string name="theme_use_custom_statusbar_color">Custom Status Bar Color</string>
     <string name="theme_use_custom_statusbar_color_desc">When enabled, you can customize the status bar color</string>
+    <string name="theme_statusbar_hidden">Hide Status Bar</string>
+    <string name="theme_statusbar_hidden_desc">When enabled, the status bar will be completely hidden for more display space</string>
     <string name="theme_statusbar_transparent">Transparent Status Bar</string>
     <string name="theme_statusbar_transparent_desc">When enabled, the status bar will become transparent and blend with the background</string>
     <string name="theme_chat_history_selector_transparent">Transparent History Selector</string>
@@ -1307,11 +1401,14 @@
     <string name="theme_toolbar_transparent">Toolbar Settings</string>
     <string name="theme_toolbar_transparent_desc">Transparent Toolbar</string>
     <string name="theme_toolbar_transparent_desc_desc">When enabled, the toolbar will become transparent</string>
+    <string name="theme_appbar_color">App Bar Color</string>
+    <string name="theme_use_custom_appbar_color">Custom App Bar Color</string>
+    <string name="theme_use_custom_appbar_color_desc">When enabled, you can customize the app bar color</string>
 
     <!-- Toast Messages -->
     <string name="confirmation_code_copied">Confirmation code copied!</string>
     <string name="message_copied">Message copied to clipboard</string>
-    <string name="selection_copied">Selection copied</string>
+
     <string name="requesting_root">Requesting Root permission...</string>
     <string name="root_granted">Root permission granted</string>
     <string name="root_denied">Root permission denied</string>
@@ -1390,13 +1487,6 @@
     <string name="permission_group_other_denied">Other denied permissions</string>
     <string name="permission_group_other">Other permissions</string>
     
-    <!-- Format Converter -->
-    <string name="format_converter_no_file_path">Cannot get file path</string>
-    <string name="format_converter_select_file_error">File selection failed: %s</string>
-    <string name="format_converter_complete_selection">Please complete all necessary selections</string>
-    <string name="format_converter_failed">Conversion failed, please try again</string>
-    <string name="format_converter_open_file_error">Cannot open file: %s</string>
-    <string name="format_converter_select_format">Select conversion format</string>
     <string name="target_format">Target format</string>
     <string name="start_conversion">Start conversion</string>
     <string name="conversion_success">Conversion successful</string>
@@ -1646,6 +1736,86 @@
     <string name="stt_result_saved">Recognition result saved</string>
     <string name="stt_save_failed">Failed to save result</string>
     
+    <!-- Speech Services Settings -->
+    <string name="speech_services_tts_title">Text-to-Speech (TTS) Settings</string>
+    <string name="speech_services_tts_desc">Configure how text is converted to voice output</string>
+    <string name="speech_services_stt_title">Speech-to-Text (STT) Settings</string>
+    <string name="speech_services_stt_desc">Configure how speech is converted to text</string>
+    <string name="speech_services_service_type">Service Type</string>
+    <string name="speech_services_tts_engine">TTS Engine</string>
+    <string name="speech_services_stt_engine">STT Engine</string>
+    <string name="speech_services_dropdown_expand">Expand dropdown menu</string>
+    
+    <!-- TTS Service Types -->
+    <string name="speech_services_tts_type_simple">System TTS (Simple)</string>
+    <string name="speech_services_tts_type_http">HTTP API (Remote)</string>
+    <string name="speech_services_tts_type_siliconflow">SiliconFlow TTS</string>
+    
+    <!-- STT Service Types -->
+    <string name="speech_services_stt_type_sherpa">Sherpa NCNN (Local)</string>
+    
+    <!-- TTS Cleaner Regex -->
+    <string name="speech_services_tts_cleaner_title">TTS Cleaner Regex List</string>
+    <string name="speech_services_tts_cleaner_desc">Remove matched text using these regular expressions before speaking.</string>
+    <string name="speech_services_tts_cleaner_placeholder">e.g.: \\[.*?\\]</string>
+    <string name="speech_services_tts_cleaner_delete">Delete regex</string>
+    <string name="speech_services_tts_cleaner_add">Add</string>
+    <string name="speech_services_tts_cleaner_template">Templates</string>
+    <string name="speech_services_tts_cleaner_template_asterisk">Remove *xxxx*</string>
+    <string name="speech_services_tts_cleaner_template_double_asterisk">Remove **xxxx**</string>
+    <string name="speech_services_tts_cleaner_template_parenthesis">Remove (xxx)</string>
+    <string name="speech_services_tts_cleaner_template_chinese_parenthesis">Remove （xxxx）</string>
+    <string name="speech_services_tts_cleaner_template_xml">Remove XML tags</string>
+    
+    <!-- HTTP TTS Configuration -->
+    <string name="speech_services_http_tts_config">HTTP TTS Configuration</string>
+    <string name="speech_services_http_url_template">URL Template</string>
+    <string name="speech_services_http_url_placeholder">e.g.: https://api.example.com/tts?text={text}</string>
+    <string name="speech_services_http_api_key">API Key</string>
+    <string name="speech_services_http_api_key_placeholder">Optional, required by some services</string>
+    <string name="speech_services_http_headers">HTTP Headers (JSON)</string>
+    <string name="speech_services_http_headers_placeholder">{\"Content-Type\": \"application/json\"}</string>
+    <string name="speech_services_http_headers_error">Invalid JSON format</string>
+    <string name="speech_services_http_method">HTTP Method</string>
+    <string name="speech_services_http_method_select">Select HTTP method</string>
+    <string name="speech_services_http_content_type">Content-Type</string>
+    <string name="speech_services_http_content_type_placeholder">application/json</string>
+    <string name="speech_services_http_request_body">Request Body Template</string>
+    <string name="speech_services_http_request_body_placeholder">{\"text\": \"{text}\"}</string>
+    
+    <!-- SiliconFlow TTS Configuration -->
+    <string name="speech_services_siliconflow_config">SiliconFlow TTS Configuration</string>
+    <string name="speech_services_siliconflow_api_key">API Key</string>
+    <string name="speech_services_siliconflow_api_key_placeholder">Enter your SiliconFlow API key</string>
+    <string name="speech_services_siliconflow_model_settings">Model Settings</string>
+    <string name="speech_services_siliconflow_model_name">TTS Model</string>
+    <string name="speech_services_siliconflow_model_name_placeholder">e.g.: FunAudioLLM/CosyVoice2-0.5B</string>
+    <string name="speech_services_siliconflow_model_name_hint">Leave blank to use default model FunAudioLLM/CosyVoice2-0.5B, supports fishaudio/fish-speech-1.4 and more</string>
+    <string name="speech_services_siliconflow_voice_settings">Voice Settings</string>
+    <string name="speech_services_siliconflow_voice_select">Select preset voice</string>
+    <string name="speech_services_siliconflow_voice_select_icon">Select voice</string>
+    <string name="speech_services_siliconflow_voice_custom">Custom Voice</string>
+    <string name="speech_services_siliconflow_voice_id">Voice ID</string>
+    <string name="speech_services_siliconflow_voice_id_placeholder">e.g.: charles or speech:kll:32w2b3aj5b:orvmnmpjkqchqalegwvi</string>
+    <string name="speech_services_siliconflow_voice_id_hint">Enter voice name (e.g. charles) or full voice ID (e.g. custom voice starting with speech:)</string>
+    
+    <!-- STT Configuration -->
+    <string name="speech_services_stt_info">Currently only supports local Sherpa-NCNN engine.</string>
+    
+    <!-- Save Actions -->
+    <string name="speech_services_save_button">Save Settings</string>
+    <string name="speech_services_saving">Saving...</string>
+    <string name="speech_services_save_success">Settings saved</string>
+    <string name="speech_services_save_error">Save failed: %1$s</string>
+    <string name="speech_services_test_tts">Test TTS Feature</string>
+    
+    <!-- Info Card -->
+    <string name="speech_services_info_title">About Speech Services</string>
+    <string name="speech_services_info_tts_title">Text-to-Speech (TTS)</string>
+    <string name="speech_services_info_tts_desc">TTS service converts text to speech. You can use the built-in system TTS engine or connect to a remote HTTP API.</string>
+    <string name="speech_services_info_stt_title">Speech-to-Text (STT)</string>
+    <string name="speech_services_info_stt_desc">STT service converts speech to text. Currently only supports the built-in Sherpa NCNN engine, which runs on local device without network connection.</string>
+    
     <!-- UI Debugger -->
     <string name="ui_debugger_title">UI Debugger</string>
     <string name="ui_debugger_start">Start debugging</string>
@@ -1820,7 +1990,6 @@
     <string name="move_file_test">Move File</string>
     <string name="zip_files_test">Zip Files</string>
     <string name="unzip_files_test">Unzip Files</string>
-    <string name="convert_file_test">Convert File</string>
     <string name="list_apps_test">List Apps</string>
     <string name="get_notifications_test">Get Notifications</string>
     <string name="device_location_test">Device Location</string>
@@ -1845,7 +2014,7 @@
     <string name="manage_cookies_test_desc">Get google.com cookies</string>
     <string name="visit_web_test_desc">Visit Baidu and extract content</string>
     <string name="use_package_test_desc">Test activating a non-existent package</string>
-    <string name="query_knowledge_test_desc">Test querying knowledge base</string>
+    <string name="query_knowledge_test_desc">Test querying memory library</string>
     <string name="list_files_test_desc">List files in test directory</string>
     <string name="file_exists_test_desc">Check if test file exists</string>
     <string name="ocr_read_test_desc">Read test image content</string>
@@ -1856,7 +2025,6 @@
     <string name="move_file_test_desc">Move and rename file</string>
     <string name="zip_files_test_desc">Compress test directory</string>
     <string name="unzip_files_test_desc">Extract test files</string>
-    <string name="convert_file_test_desc">Convert PNG to JPG</string>
     <string name="list_apps_test_desc">Get user installed app list</string>
     <string name="get_notifications_test_desc">Get latest 5 notifications</string>
     <string name="device_location_test_desc">Get low-precision device location</string>
@@ -1937,12 +2105,11 @@
     <string name="memory_desc">Memory selection includes user preferences and memory base under that preference. To create a new memory base, go to settings to create a new user preference and select it here</string>
     <string name="memory_attachment">Memory Attachment</string>
     <string name="memory_attachment_desc">When enabled, relevant content will be automatically retrieved from the memory base and attached when sending messages, but this may affect AI response focus.</string>
-    <string name="ai_planning_desc">Can generate a series of plans for execution (mediocre effectiveness, not recommended, will be replaced in the future).</string>
+    <string name="ai_planning_desc">Will perform task decomposition and trigger multiple sub-agents to collect information, then summarize. Sub-agents have the same tool-calling capabilities as the chat agent. This can be very time-consuming, only recommended when collecting information.</string>
     <string name="thinking_mode">Thinking Mode</string>
-    <string name="thinking_mode_desc">Currently only supports Gemini, Qwen3 and Claude, enabling built-in thinking.</string>
+    <string name="thinking_mode_desc">Currently supports Gemini, Qwen3, Claude, SiliconFlow and MNN local models, enabling built-in thinking.</string>
     <string name="thinking_guidance">Thinking Guidance</string>
     <string name="thinking_guidance_desc">Can force models that can\'t think to perform thinking. This option is not recommended for thinking models.</string>
-    <string name="details">Details</string>
     <string name="model_selection">Model Selection</string>
     <string name="prompt_selection">Prompt Selection</string>
     <string name="memory_selection">Memory Selection</string>
@@ -1979,6 +2146,8 @@
     <string name="settings_user_preferences_subtitle">Personal preferences and behavior settings</string>
     <string name="settings_language_subtitle">Interface language switching</string>
     <string name="settings_theme_subtitle">Theme and appearance customization</string>
+    <string name="layout_adjustment">Layout Adjustment</string>
+    <string name="layout_adjustment_subtitle">Adjust UI element positions and margins</string>
     <string name="settings_model_params_subtitle">Model parameters and API configuration</string>
     <string name="settings_functional_model_subtitle">Functional model specific configuration</string>
     <string name="settings_speech_services">Speech Services Configuration</string>
@@ -1991,15 +2160,65 @@
     <string name="settings_context_length_subtitle">Model memory conversation length (k tokens)</string>
     <string name="settings_summary_threshold">Summary Token Threshold</string>
     <string name="settings_summary_threshold_subtitle">Threshold for triggering chat summary (0.1-0.95)</string>
+    
+    <!-- Truncation Settings -->
+    <string name="settings_truncation_title">File and Response Truncation Settings</string>
+    <string name="settings_max_file_size">Max File Read Bytes</string>
+    <string name="settings_max_file_size_subtitle">Maximum byte limit for single file read operations</string>
+    <string name="settings_part_size">Partial Read Line Count</string>
+    <string name="settings_part_size_subtitle">Number of lines per section when reading files partially</string>
+    <string name="settings_max_text_result">Max Text Result Length</string>
+    <string name="settings_max_text_result_subtitle">Maximum character limit for general text results</string>
+    <string name="settings_max_http_response">Max HTTP Response Length</string>
+    <string name="settings_max_http_response_subtitle">Maximum character limit for network request responses</string>
+    <string name="settings_reset_truncation">Reset Truncation Settings</string>
+    <string name="settings_reset_truncation_desc">Reset all truncation settings to default values</string>
+    
+    <!-- Layout Adjustment Settings -->
+    <string name="layout_adjustment_settings_title">Layout Adjustment Settings</string>
+    <string name="layout_adjustment_description">Adjust the position and spacing of UI elements to customize your experience</string>
+    <string name="chat_settings_bar_section">Chat Settings Bar</string>
+    <string name="chat_settings_bar_right_margin">Right Margin</string>
+    <string name="chat_settings_bar_right_margin_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="chat_settings_button_end_padding">Chat Settings Button End Padding</string>
+    <string name="chat_settings_button_end_padding_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="current_value">Current Value</string>
+    <string name="closer_to_edge">Closer to Edge</string>
+    <string name="farther_from_edge">Farther from Edge</string>
+    <string name="invalid_value_range">Invalid value. Please enter a number between %.1f and %.1f</string>
+    <string name="reset_to_default">Reset to Default</string>
+    <string name="layout_reset_settings">Reset Layout Settings</string>
+    <string name="layout_reset_settings_desc">Reset all layout adjustment settings to default values</string>
+    
     <string name="settings_data_permissions">Data and Permissions</string>
     <string name="settings_tool_permissions_subtitle">Tool permissions and security settings</string>
     <string name="settings_data_backup_subtitle">Chat history backup management</string>
     <string name="settings_token_usage_stats">Token Usage Statistics</string>
     <string name="settings_function_label">Function</string>
+    <string name="settings_model_label">Model</string>
     <string name="settings_no_token_records">No token usage records for functional modules yet.</string>
     <string name="settings_reset_all_counts">Reset All Counts</string>
-    <string name="settings_input_tokens">Input</string>
-    <string name="settings_output_tokens">Output</string>
+    <string name="settings_token_usage_subtitle">View detailed token usage statistics and custom pricing</string>
+    <string name="settings_usage_summary">Usage Summary</string>
+    <string name="settings_total_tokens">Total Tokens</string>
+    <string name="settings_total_cost">Total Cost</string>
+    <string name="settings_model_details">Model Details</string>
+    <string name="settings_click_to_edit_pricing">Click to edit pricing</string>
+    <string name="settings_edit_model_pricing">Edit Model Pricing - %1$s</string>
+    <string name="settings_pricing_description">Set RMB price per million tokens</string>
+    <string name="settings_input_price_per_million">Input Price (per million tokens)</string>
+    <string name="settings_output_price_per_million">Output Price (per million tokens)</string>
+    <string name="settings_cached_input_price_per_million">Cached Input Price (per million tokens)</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_reset_confirmation">Reset Confirmation</string>
+    <string name="settings_reset_warning">This will clear all token usage records. This action cannot be undone.</string>
+    <string name="settings_reset">Reset</string>
+    <string name="settings_edit_pricing">Edit Pricing</string>
+    <string name="settings_input_tokens">Input Tokens</string>
+    <string name="settings_output_tokens">Output Tokens</string>
+    <string name="settings_cached_tokens_label">Cached Tokens</string>
+    <string name="settings_price_format">$%.2f/1M</string>
     <string name="settings_cost">Cost</string>
     
     <!-- User Preferences Guide Screen -->
@@ -2122,7 +2341,17 @@
     <string name="enter_new_profile_name">Please enter new profile name</string>
     <string name="confirm_rename">Confirm Rename</string>
     <string name="confirm_delete_profile">Confirm Delete Profile</string>
-    <string name="delete_profile_warning">Are you sure you want to delete this preference profile? This operation will also delete its bound knowledge base data and cannot be recovered.\n\nWe recommend backing up important content beforehand.</string>
+    <string name="delete_profile_warning">Are you sure you want to delete this preference profile? This operation will also delete its bound memory library data and cannot be recovered.\n\nWe recommend backing up important content beforehand.</string>
+    
+    <!-- Profile Selection for Import/Export -->
+    <string name="select_profile">Select Profile</string>
+    <string name="export_from_profile">Export from Profile</string>
+    <string name="import_to_profile">Import to Profile</string>
+    <string name="source_profile">Source Profile</string>
+    <string name="target_profile">Target Profile</string>
+    <string name="current_profile">Current Profile</string>
+    <string name="select_export_profile">Select profile to export from</string>
+    <string name="select_import_profile">Select profile to import to</string>
 
     
     <!-- User Preferences Guide Screen Dialog -->
@@ -2217,6 +2446,8 @@
     <string name="select_api_provider">Click to select API provider</string>
     <string name="select">Select</string>
     <string name="default_config_model_restriction">When using default configuration, only deepseek-chat model can be used</string>
+    <string name="enable_direct_image_processing">Enable Direct Image Processing</string>
+    <string name="enable_direct_image_processing_desc">When enabled, images will be sent directly to the AI for processing instead of using OCR tools to read them</string>
     <string name="api_settings_saved">API settings saved</string>
     <string name="save_api_settings">Save API Settings</string>
     <string name="available_models_list">Available Models List</string>
@@ -2241,7 +2472,9 @@
     <string name="provider_siliconflow">SiliconFlow</string>
     <string name="provider_openrouter">OpenRouter (Multi-model Hub)</string>
     <string name="provider_infiniai">InfiniAI</string>
+    <string name="provider_alipay_bailing">Alipay Bailing Model</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">PPInfra Cloud</string>
     <string name="provider_other">Other Providers</string>
     <string name="select_api_provider_title">Select API Provider</string>
     <string name="search_providers">Search providers</string>
@@ -2347,9 +2580,9 @@
     <string name="screen_title_model_prompts_settings">Model Prompts Settings</string>
     <string name="screen_title_functional_config">Functional Model Configuration</string>
     <string name="screen_title_theme_settings">Theme Settings</string>
+    <string name="screen_title_layout_adjustment">Layout Adjustment</string>
     <string name="screen_title_chat_history_settings">Chat History Management</string>
     <string name="screen_title_language_settings">Language Settings</string>
-    <string name="screen_title_format_converter">Universal Format Converter</string>
     <string name="screen_title_file_manager">File Manager</string>
     <string name="screen_title_terminal">Command Terminal</string>
     <string name="screen_title_terminal_auto_config">Terminal Auto Configuration</string>
@@ -2362,6 +2595,9 @@
     <string name="screen_title_tool_tester">Tool Testing Center</string>
     <string name="screen_title_text_to_speech">Text to Speech</string>
     <string name="screen_title_speech_to_text">Speech Recognition</string>
+    <string name="screen_title_mcp_market">MCP Market</string>
+    <string name="screen_title_mcp_publish">Publish MCP Plugin</string>
+    <string name="screen_title_mcp_manage">Manage My Plugins</string>
     
     <!-- Model Prompts Settings Screen -->
     <string name="unknown_error">Unknown error</string>
@@ -2370,10 +2606,12 @@
     <string name="tags">Tags</string>
     <string name="old_config">Old Config</string>
     <string name="save_successful">Save successful</string>
+    <string name="duplicate_successful">Duplicate created successfully</string>
     <string name="character_card_management">Card Management</string>
     <string name="create_new">Create</string>
     <string name="ai_creation">AI Creation</string>
     <string name="edit">Edit</string>
+    <string name="duplicate">Duplicate</string>
     <string name="delete">Delete</string>
     <string name="character_setting_preview">Character Setting: %1$s...</string>
     <string name="other_content_preview">Other Content: %1$s...</string>
@@ -2395,7 +2633,6 @@
     <string name="other_content_prompt">Other Content (Prompt)</string>
     <string name="select_tags">Select Tags</string>
     <string name="system_tags_auto_added">System Tags (Auto-added)</string>
-    <string name="advanced_custom_prompt">Advanced Custom (Prompt)</string>
     <string name="notes_info_not_appended">Notes (Not appended to prompts)</string>
     <string name="notes_placeholder">Record character card source, author info, etc.</string>
     <string name="save">Save</string>
@@ -2446,7 +2683,6 @@
     <string name="settings_saved_message">Settings saved</string>
     
     <!-- Character Card Dialog -->
-    <string name="character_card_name">Name</string>
     <string name="character_card_description">Description</string>
     <string name="character_card_character_setting">Character Setting</string>
     <string name="character_card_character_setting_placeholder">Describe the character\'s personality traits...</string>
@@ -2477,9 +2713,301 @@
     <string name="character_card_add">Add</string>
 
     <!-- Crash Report Screen -->
-    <string name="delete_character_card">Delete Character Card</string>
     <string name="delete_character_card_confirm">Are you sure you want to delete character card "%1$s"? This action cannot be undone.</string>
     <string name="delete_tag">Delete Tag</string>
     <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
 
-</resources> 
+    <!-- OperitTerminal Wizard Card -->
+    <string name="operit_terminal_wizard_title">OperitTerminal Setup Wizard</string>
+    <string name="operit_terminal_not_installed">OperitTerminal not installed</string>
+    <string name="operit_terminal_update_available">OperitTerminal update available</string>
+    <string name="operit_terminal_up_to_date">OperitTerminal is up to date</string>
+    <string name="operit_terminal_install_description">OperitTerminal is a powerful terminal application that provides a complete Linux environment and package management capabilities. We need to install this application first.</string>
+    <string name="operit_terminal_install_button">Install OperitTerminal</string>
+    <string name="operit_terminal_update_description">A new version of OperitTerminal is available. It is recommended to update for better features and compatibility.</string>
+    <string name="operit_terminal_release_notes">Release Notes: %1$s</string>
+    <string name="operit_terminal_update_button">Update OperitTerminal</string>
+    <string name="operit_terminal_latest_description">Congratulations! You have installed the latest version of OperitTerminal and can start using its powerful terminal features.</string>
+    <string name="operit_terminal_open_button">Open OperitTerminal</string>
+
+    <!-- Function Types -->
+    <string name="function_type_translation">Translation Function</string>
+    <string name="function_type_image_recognition">Image Recognition</string>
+
+    <!-- Function Descriptions -->
+    <string name="function_desc_translation">Provides multi-language translation functionality, supporting language conversion of text content. It is recommended to use models that support multiple languages.</string>
+    <string name="function_desc_image_recognition">Used for image content recognition and analysis, supports intent parameter when calling read_file tool for deep understanding. Recommend using multimodal models with vision capabilities.</string>
+    <!-- Model Configuration -->
+    <string name="overseas_provider_warning">Detected that you are in mainland China but selected an overseas service provider. Please confirm whether you have enabled proxy tools</string>
+
+        <!-- Token Config WebView & URL Config Dialog -->
+    <string name="custom_url_config">Custom URL Configuration</string>
+    <string name="config_name_label">Configuration Name</string>
+    <string name="signin_url">Sign-in URL</string>
+    <string name="tab_config">Tab Configuration</string>
+    <string name="tab_number">Tab %1$d</string>
+    <string name="title_label">Title</string>
+    <string name="url_label">URL</string>
+    <string name="settings_config">Settings</string>
+    
+    <!-- Terminal Environment Wizard -->
+    <string name="configure_terminal_environment">Configure Terminal Environment</string>
+    <string name="nodejs_pip_environment_ready">NodeJS and pip environment ready</string>
+    <string name="pnpm_installed_need_pip">pnpm installed, need to configure pip</string>
+    <string name="pip_installed_need_pnpm">pip installed, need to configure pnpm</string>
+    <string name="need_configure_nodejs_pip">Need to configure NodeJS and pip environment</string>
+    <string name="terminal_environment_setup_description">Need to configure NodeJS (pnpm) and pip environment in terminal to support MCP plugins. Click the button below to enter terminal configuration interface.</string>
+    <string name="go_to_terminal_config">Go to Terminal Configuration</string>
+    <string name="nodejs_pip_environment_configured">NodeJS and pip environment are configured and ready to use MCP plugins.</string>
+    <string name="open_terminal">Open Terminal</string>
+    
+    <!-- MCP Market Screen -->
+    <string name="login_github_to_manage_mcp_plugins">Login to GitHub to publish and manage your MCP plugins</string>
+    <string name="browse">Browse</string>
+    <string name="my_tab">My</string>
+    <string name="user_avatar">User Avatar</string>
+    <string name="clear_search">Clear Search</string>
+    <string name="available_mcp_plugins">Available MCP Plugins</string>
+    <string name="no_matching_plugins_found">No matching plugins found</string>
+    <string name="no_available_mcp_plugins">No available MCP plugins</string>
+    <string name="refresh_or_try_later">Refresh or try again later</string>
+    <string name="recommended_feature">Recommended</string>
+    <string name="premium_mcp_plugins_coming_soon">Premium quality MCP plugins coming soon</string>
+    <string name="please_login_github_first">Please login to GitHub first</string>
+    <string name="login_to_view_manage_mcp_plugins">Login to view and manage your published MCP plugins</string>
+    <string name="publish_new_plugin">Publish New Plugin</string>
+    <string name="manage_my_plugins">Manage My Plugins</string>
+    <string name="logout">Logout</string>
+    <string name="author_avatar">Author Avatar</string>
+    <string name="sharer_avatar">Sharer Avatar</string>
+    <string name="available">Available</string>
+    <string name="closed">Closed</string>
+
+    <string name="github_account">GitHub Account</string>
+    <string name="login_github">Login to GitHub</string>
+    <string name="publish_mcp_plugins_to_market">• Publish your MCP plugins to the market</string>
+    <string name="manage_published_plugins">• Manage your published plugins</string>
+    <string name="better_installation_experience">• Get better installation experience</string>
+    
+    <!-- MCP Publish Screen -->
+    <string name="edit_description">Edit Description</string>
+    <string name="publish_description">Publish Description</string>
+    <string name="only_alphanumeric_underscore_plugin_id">Only alphanumeric characters and underscores allowed, this name will be used as plugin ID</string>
+    <string name="install_command">Install Command</string>
+    <string name="install_config">Install Config</string>
+    <string name="please_fill_all_required_fields">Please fill in all required fields</string>
+    <string name="update_plugin">Update Plugin</string>
+    <string name="publish_to_market">Publish to Market</string>
+    <string name="confirm_update">Confirm Update</string>
+    <string name="confirm_publish">Confirm Publish</string>
+    <string name="confirm_mcp_git_import_deployment">I confirm that this MCP can be imported via git and deployed and run normally</string>
+    <string name="update_failed_check_network">Update failed, please check network connection</string>
+    <string name="publish_failed_check_network_repo">Publish failed, please check network connection and repository address</string>
+    <string name="update_success">Update Successful</string>
+    <string name="publish_success">Publish Successful</string>
+
+    
+    <!-- MCP Config Screen -->
+    <string name="mcp_community_resources">MCP Community Resources</string>
+    <string name="mcp_official_repo">MCP Official Repository</string>
+    <string name="anthropic_official_mcp_servers">Official MCP server collection maintained by Anthropic</string>
+    <string name="link_copied">Link copied</string>
+    <string name="mcp_server_directory">MCP Server Directory</string>
+    <string name="complete_mcp_server_list_177">Complete MCP server list with 177+ servers</string>
+    <string name="claude_mcp_community">Claude MCP Community</string>
+    <string name="claude_mcp_community_website">Community website focused on Claude MCP</string>
+    <string name="modelscope_community">ModelScope Community</string>
+    <string name="modelscope_ai_community_mcp_resources">ModelScope AI community with MCP related resources</string>
+    <string name="github_awesome_mcp_resources">Curated MCP resources and tools on GitHub</string>
+    <string name="mcp_market">MCP Market</string>
+    <string name="more">More</string>
+    <string name="copy_link">Copy Link</string>
+    
+    <!-- MCP Manage Screen -->
+    <string name="need_login_github_manage_plugins">Need to login to GitHub to manage your published plugins</string>
+    <string name="no_published_plugins_yet">No published plugins yet</string>
+    <string name="click_button_publish_first_mcp_plugin">Click the button above to publish your first MCP plugin</string>
+    <string name="confirm_delete_action">Confirm Delete</string>
+    <string name="published">Published</string>
+    <string name="removed">Removed</string>
+    <string name="remove">Remove</string>
+    <string name="republish">Republish</string>
+    
+    <!-- Additional strings -->
+    <string name="author_colon">Author:</string>
+    <string name="share_colon">Share:</string>
+    <string name="downloading_progress">Downloading %1$s</string>
+    <string name="extracting_progress">Extracting...</string>
+    <string name="installing_progress">Installing...</string>
+    <string name="after_logging_in_you_can">After logging in to GitHub, you can:</string>
+    <string name="publish_your_mcp_plugin_to_the_market">Publish your MCP plugins to the market</string>
+    <string name="manage_your_published_plugins">Manage your published plugins</string>
+    <string name="no_mcp_plugins_available">No available MCP plugins</string>
+    <string name="try_changing_keywords">Try changing keywords</string>
+    <string name="refresh_or_try_again_later">Refresh or try again later</string>
+    <string name="recommended_features">Recommended</string>
+    <string name="coming_soon_for_mcp_plugins">Premium quality MCP plugins coming soon</string>
+    <string name="after_logging_in_you_can_view_and_manage_your_mcp_plugins">Login to view and manage your published MCP plugins</string>
+    <string name="get_mcp">Get MCP</string>
+    <string name="plugin_name_description">Only alphanumeric characters and underscores allowed, this name will be used as plugin ID</string>
+    <string name="choose_mcp_community_to_get_plugins">Choose the following quality MCP communities to get plugins:</string>
+    <string name="awesome_mcp">Awesome MCP</string>
+    <string name="loading_your_plugins">Loading your plugins...</string>
+    <string name="confirm_remove_plugin_from_market">Are you sure you want to remove plugin "%1$s" from the market? This will close the corresponding Issue but will not delete your code repository.</string>
+    
+    <!-- MCPPublishScreen additional strings -->
+    <string name="edit_plugin_info_description">You are editing published plugin information. Modified information will be updated to the corresponding Issue in the market repository.</string>
+    <string name="publish_plugin_info_description">Your plugin information will be published as a GitHub Issue to the market repository. Please ensure the information is accurate and complete. Form content will be automatically saved as a draft until successfully published.</string>
+    <string name="plugin_name_required">Plugin Name *</string>
+    <string name="plugin_description_required">Plugin Description *</string>
+    <string name="github_repo_address_required">GitHub Repository Address *</string>
+    <string name="install_command_example">e.g.: pnpm install xxx@xxxx</string>
+    <string name="install_command_optional_description">If not filled, the software will automatically identify the project structure. Recommended to leave empty.</string>
+    <string name="install_config_example">{\"mcpServers\": {\"example\": {\"command\": \"npx\", \"args\": [\"example@latest\"]}}}</string>
+    <string name="install_config_optional_description">Provide MCP configuration JSON for users to import directly. Optional.</string>
+    <string name="install_config_colon">Install Config: %1$s</string>
+    <string name="updating_progress">Updating...</string>
+    <string name="publishing_progress">Publishing...</string>
+    <string name="please_check_submitted_info">Please check the information you submitted:</string>
+    <string name="name_colon">Name: %1$s</string>
+    <string name="description_colon">Description: %1$s</string>
+    <string name="repository_colon">Repository: %1$s</string>
+    <string name="install_command_colon">Install Command: %1$s</string>
+    <string name="update_failed_with_error">Update failed: %1$s</string>
+    <string name="publish_failed_with_error">Publish failed: %1$s</string>
+    <string name="mcp_plugin_update_success_message">Your MCP plugin information has been successfully updated.</string>
+    <string name="mcp_plugin_publish_success_message">Your MCP plugin has been successfully published to the market and is awaiting approval before being discoverable by other users.</string>
+    
+    <!-- MCP Plugin Detail Screen -->
+    <string name="mcp_plugin_detail_title">Plugin Details</string>
+    <string name="mcp_plugin_author">Author: %1$s</string>
+    <string name="mcp_plugin_shared_by">Shared by: %1$s</string>
+    <string name="mcp_plugin_repository">View Repository</string>
+    <string name="mcp_plugin_install">Install Plugin</string>
+    <string name="mcp_plugin_installed">Installed</string>
+    <string name="mcp_plugin_description_title">Plugin Description</string>
+    <string name="mcp_plugin_metadata">Plugin Information</string>
+    <string name="mcp_plugin_status_available">Available</string>
+    <string name="mcp_plugin_status_closed">Closed</string>
+    <string name="mcp_plugin_stars">%1$d Stars</string>
+    <string name="mcp_plugin_created_at">Created: %1$s</string>
+    <string name="mcp_plugin_updated_at">Updated: %1$s</string>
+    <string name="mcp_plugin_community_feedback">Community Feedback</string>
+    <string name="mcp_plugin_login_required">Please login to GitHub to participate</string>
+    <string name="mcp_plugin_comments">Comments (%1$d)</string>
+    <string name="mcp_plugin_no_comments">No comments yet</string>
+    <string name="mcp_plugin_be_first_comment">Be the first to comment!</string>
+    <string name="mcp_plugin_add_comment">Add Comment</string>
+    <string name="mcp_plugin_comment_hint">Share your thoughts or ask questions...</string>
+    <string name="mcp_plugin_post_comment">Post</string>
+    <string name="mcp_plugin_cancel">Cancel</string>
+    <string name="mcp_plugin_refresh_comments">Refresh Comments</string>
+    <string name="mcp_plugin_unknown_author">Unknown</string>
+    
+    <!-- Advanced Settings Section -->
+    <string name="advanced_settings">Advanced Settings</string>
+    <string name="use_api_key_pool">Use API Key Pool</string>
+    <string name="api_key_pool_desc">Enable to manage multiple API keys with automatic rotation</string>
+    <string name="api_key_pool_empty">API key pool is empty, click the button below to add keys</string>
+    <string name="add_api_key">Add API Key</string>
+    <string name="edit_api_key">Edit API Key</string>
+    <string name="delete_api_key">Delete API Key</string>
+    <string name="advanced_settings_saved">Advanced settings saved</string>
+    <string name="batch_import_keys">Batch Import Keys</string>
+    <string name="batch_import_keys_desc">Import keys from text file, one key per line</string>
+    <string name="select_txt_file">Select Text File</string>
+    <string name="batch_import_success">Batch Import Successful</string>
+    <string name="batch_import_failed">Batch Import Failed</string>
+    <string name="import_format_desc">Please select a text file containing API keys, one key per line</string>
+    <string name="imported_keys_count">Successfully imported %1$d keys</string>
+    <string name="invalid_file_format">Invalid file format, please select a text file</string>
+    <string name="no_valid_keys_found">No valid keys found</string>
+
+    <!-- Custom Emoji Management -->
+    <string name="manage_custom_emoji">Manage Custom Emojis</string>
+    <string name="add_emoji">Add Emoji</string>
+    <string name="delete_emoji">Delete Emoji</string>
+    <string name="create_category">Create Category</string>
+    <string name="delete_category">Delete Category</string>
+    <string name="category_name">Category Name</string>
+    <string name="category_name_hint">Only lowercase letters, numbers, and underscores allowed</string>
+    <string name="select_category">Select Category</string>
+    <string name="confirm_delete_category">Are you sure you want to delete category \"%1$s\" and all its emojis?</string>
+    <string name="confirm_delete_emoji">Are you sure you want to delete this emoji?</string>
+    <string name="custom_emoji_desc">Add your favorite emoji images, AI will use them in Waifu mode</string>
+    <string name="emoji_added_success">Successfully added %1$d emojis</string>
+    <string name="emoji_deleted_success">Emoji deleted</string>
+    <string name="category_created">Category created</string>
+    <string name="invalid_category_name">Category name can only contain lowercase letters, numbers, and underscores</string>
+    
+    <!-- Voice Assistant Widget -->
+    <string name="voice_assistant_widget_description">Quick launch Operit voice assistant</string>
+
+    <!-- Persona Card Generation Screen -->
+    <string name="persona_card_generation_title">Character Card to Edit</string>
+    <string name="no_character_card">No Character Card</string>
+    <string name="character_card_config">Character Card Configuration</string>
+    <string name="current_character_card">Current Character Card</string>
+    <string name="create_new_character_card">+ Create New Card</string>
+    <string name="delete_current_character_card">Delete Current Card</string>
+    <string name="new_character_card">New Character Card</string>
+    <string name="character_card_name">Character Card Name</string>
+    <string name="character_card_name_example">e.g.: Xiaoxi-School Edition</string>
+    <string name="delete_character_card">Delete Character Card</string>
+    <string name="confirm_delete_character_card">Are you sure you want to delete the current character card? This action cannot be undone.</string>
+    <string name="current_character_card_content">Current Character Card Content</string>
+    <string name="character_name">Character Name</string>
+    <string name="character_description">Character Description</string>
+    <string name="character_setting">Character Setting</string>
+    <string name="opening_statement">Opening Statement</string>
+    <string name="other_content">Other Content</string>
+    <string name="advanced_custom_prompt">Advanced Custom Prompt</string>
+    <string name="character_marks">Notes (Not included in prompts)</string>
+    <string name="please_select_or_create_card">Please select or create a character card from the sidebar to begin.</string>
+    <string name="persona_generation_welcome">🎭 Welcome to the Character Card Generation Assistant!\n\nLet\'s edit \'%1$s\' together!\nPlease tell me what character you want to create or what aspect you\'d like to modify?</string>
+    <string name="new_character">New Character</string>
+    <string name="generating">Generating…</string>
+    <string name="send_failed">Send failed: %1$s</string>
+    <string name="currently_generating">Generating…</string>
+    <string name="describe_character_hint">Describe the character you want…</string>
+    <string name="character_card_complete">🎉 Character card generation complete! All information has been saved.</string>
+    <string name="confirm_clear_chat_history">Are you sure you want to clear the chat history for the current character card? This action cannot be undone.</string>
+    <string name="message_limit_reached_title">Message Limit Reached</string>
+    <string name="message_limit_reached_message">The current conversation has reached the limit of %1$d messages.\nTo maintain conversation quality and performance, please clear the history to continue.</string>
+    <string name="go_clear">Clear Now</string>
+    
+    <!-- MNN Local Inference -->
+    <string name="provider_mnn">MNN (Local Inference)</string>
+    <string name="screen_title_mnn_model_download">MNN Model Download</string>
+    <string name="mnn_model_download">Download MNN Model</string>
+    <string name="mnn_model_management">Model Management</string>
+    <string name="mnn_download_from_modelscope">Download from ModelScope</string>
+    <string name="mnn_model_size">Model Size: %1$.2f GB</string>
+    <string name="mnn_downloading">Downloading</string>
+    <string name="mnn_download_speed">Speed: %1$s</string>
+    <string name="mnn_download_complete">Download Complete</string>
+    <string name="mnn_download_failed">Download Failed: %1$s</string>
+    <string name="mnn_no_models_downloaded">No models downloaded yet</string>
+    <string name="mnn_select_downloaded_model">Select downloaded model</string>
+    <string name="mnn_model_name_only">Model Name</string>
+    <string name="mnn_download_progress">Progress: %1$d%%</string>
+    <string name="mnn_pause_download">Pause Download</string>
+    <string name="mnn_resume_download">Resume Download</string>
+    <string name="mnn_delete_model">Delete Model</string>
+    <string name="mnn_confirm_delete">Confirm to delete this model?</string>
+    <string name="mnn_loading_models">Loading model list...</string>
+    <string name="mnn_connecting">Connecting...</string>
+    <string name="mnn_load_failed">Load Failed</string>
+    <string name="mnn_retry">Retry</string>
+    <string name="mnn_start_download">Start Download</string>
+    <string name="mnn_no_local_models">No models downloaded yet</string>
+    <string name="mnn_go_download">Go to Download</string>
+    <string name="mnn_search_models">Search models...</string>
+    <string name="mnn_no_search_results">No matching models found</string>
+    <string name="mnn_local_model_tip">Local models have limited understanding. It\'s recommended to disable memory links and enable tool restrictions for conversations</string>
+    <string name="mnn_model_path">Model File Path</string>
+    <string name="mnn_model_path_placeholder">Enter the full path to MNN model file</string>
+    <string name="mnn_forward_type">Forward Type</string>
+    <string name="mnn_thread_count">Thread Count</string>
+
+</resources>

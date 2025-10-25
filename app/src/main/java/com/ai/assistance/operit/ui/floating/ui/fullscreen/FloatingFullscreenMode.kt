@@ -71,9 +71,12 @@ import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.ui.common.WaveVisualizer
 import com.ai.assistance.operit.ui.floating.FloatContext
 import com.ai.assistance.operit.ui.floating.FloatingMode
+import com.ai.assistance.operit.util.TtsCleaner
+import com.ai.assistance.operit.util.WaifuMessageProcessor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -96,7 +99,6 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     var latestPartialText by remember { mutableStateOf("") }
     var aiMessage by remember { mutableStateOf("长按下方麦克风开始说话") }
     val coroutineScope = rememberCoroutineScope()
-    var activeMessage by remember { mutableStateOf<ChatMessage?>(null) }
     val isInitialLoad = remember { mutableStateOf(true) }
     
     // 波浪可视化相关状态
@@ -124,6 +126,10 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     val preferencesManager = remember { UserPreferencesManager(context) }
     val aiAvatarUri by preferencesManager.customAiAvatarUri.collectAsState(initial = null)
     val avatarShape = CircleShape
+    
+    // TTS Cleaner preferences
+    val speechServicesPrefs = remember { SpeechServicesPreferences(context) }
+    val ttsCleanerRegexs by speechServicesPrefs.ttsCleanerRegexsFlow.collectAsState(initial = emptyList())
 
     // 创建语音识别和TTS服务
     val speechService = remember {
@@ -136,6 +142,24 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     val volumeLevel by speechService.volumeLevelFlow.collectAsState()
 
     val voiceService = remember { VoiceServiceFactory.getInstance(context) }
+    
+    // 辅助函数：同时应用 TTS cleaner 和 waifu clean
+    // 注意：先执行 TTS Cleaner（处理用户自定义的 Markdown 等正则），再执行 WaifuMessageProcessor（清理 XML 标签和其他 Markdown）
+    val cleanTextForTts: (String) -> String = { text ->
+        val regexCleaned = TtsCleaner.clean(text, ttsCleanerRegexs)
+        WaifuMessageProcessor.cleanContentForWaifu(regexCleaned)
+    }
+    
+    // 安全的 speak 函数，包装异常处理
+    val safeSpeak: (String, Boolean, Float, Float) -> Unit = { text, interrupt, rate, pitch ->
+        coroutineScope.launch {
+            try {
+                voiceService.speak(text, interrupt, rate, pitch)
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS播放失败", e)
+            }
+        }
+    }
     
     val sendCurrentUtteranceAndContinue = {
         coroutineScope.launch {
@@ -181,7 +205,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                 )
             } else {
                 aiMessage = "无法开始录音，无法获取焦点"
-                voiceService.speak(aiMessage, rate = speed)
+                safeSpeak(cleanTextForTts(aiMessage), false, speed, 1.0f)
             }
         }
     }
@@ -217,7 +241,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                 aiMessage = "思考中..."
                             } else {
                                 aiMessage = "没有听清，请再试一次"
-                                voiceService.speak(aiMessage, rate = speed)
+                                safeSpeak(cleanTextForTts(aiMessage), false, speed, 1.0f)
                             }
                             accumulatedText = ""
                             latestPartialText = ""
@@ -281,7 +305,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                     } else {
                         Log.d(TAG, "Final text is blank.")
                         aiMessage = "没有听清，请再试一次"
-                        voiceService.speak(aiMessage, rate = speed)
+                        safeSpeak(cleanTextForTts(aiMessage), false, speed, 1.0f)
                     }
                     accumulatedText = ""
                     latestPartialText = ""
@@ -298,7 +322,6 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
         accumulatedText = ""
         latestPartialText = ""
         aiMessage = "长按下方麦克风开始说话"
-        activeMessage = null
         isInitialLoad.value = true // 确保每次进入都重置
         timeoutJob?.cancel()
         silenceTimeoutJob?.cancel()
@@ -308,8 +331,12 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
         editableText = ""
 
         // 初始化语音服务
-        speechService.initialize()
-        voiceService.initialize()
+        try {
+            speechService.initialize()
+            voiceService.initialize()
+        } catch (e: Exception) {
+            Log.e(TAG, "初始化语音服务失败", e)
+        }
 
         // 请求输入法焦点以在后台保持录音能力
         val composeView = floatContext.chatService?.getComposeView()
@@ -332,12 +359,11 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
     // The logic is now handled directly in the onToggleActive lambda.
 
     // 监听最新的AI消息
-    LaunchedEffect(floatContext.messages) {
+    LaunchedEffect(floatContext.messages.lastOrNull()?.timestamp) {
         val lastMessage = floatContext.messages.lastOrNull()
 
         // 只处理新消息
-        if (lastMessage === activeMessage || lastMessage == null) return@LaunchedEffect
-        activeMessage = lastMessage
+        if (lastMessage == null) return@LaunchedEffect
 
         // 如果是首次加载，只更新UI，不朗读
         if (isInitialLoad.value) {
@@ -378,10 +404,11 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                 if (sentenceToSpeak.isNotBlank()) {
                                     didSpeak = true
                                     // 第一句中断播放，后续句子加入队列
-                                    voiceService.speak(
-                                            sentenceToSpeak,
-                                            interrupt = isFirstSentence,
-                                            rate = speed
+                                    safeSpeak(
+                                            cleanTextForTts(sentenceToSpeak),
+                                            isFirstSentence,
+                                            speed,
+                                            1.0f
                                     )
                                     isFirstSentence = false
                                 }
@@ -393,10 +420,11 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                         val finalSentence = sentenceBuffer.toString().trim()
                         if (finalSentence.isNotBlank()) {
                             didSpeak = true
-                            voiceService.speak(
-                                    finalSentence,
-                                    interrupt = isFirstSentence,
-                                    rate = speed
+                            safeSpeak(
+                                    cleanTextForTts(finalSentence),
+                                    isFirstSentence,
+                                    speed,
+                                    1.0f
                             )
                         }
                     }
@@ -406,7 +434,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                 // 一次性使用TTS播放AI回复
                                 if (aiMessage.isNotBlank()) {
                                     didSpeak = true
-                                    voiceService.speak(aiMessage, rate = speed)
+                                    safeSpeak(cleanTextForTts(aiMessage), false, speed, 1.0f)
                                 }
                             }
                 }
@@ -535,7 +563,7 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
                                     showBottomControls = false
                                 } else {
                                     aiMessage = "无法开始录音，无法获取焦点"
-                                    voiceService.speak(aiMessage, rate = speed)
+                                    safeSpeak(cleanTextForTts(aiMessage), false, speed, 1.0f)
                                 }
                             }
                         }

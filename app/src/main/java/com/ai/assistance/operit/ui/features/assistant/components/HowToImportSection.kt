@@ -73,7 +73,7 @@ fun HowToImportSection() {
                 val primaryColor = MaterialTheme.colorScheme.primary
                 val annotatedString = buildAnnotatedString {
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append(stringResource(R.string.dragon_bones_renamed))
+                        append(stringResource(R.string.about_avatar_formats))
                         append("\n\n")
                     }
                     
@@ -81,14 +81,14 @@ fun HowToImportSection() {
                         append(stringResource(R.string.making_models))
                     }
                     append("\n")
-                    append(stringResource(R.string.making_models_desc))
+                    append(stringResource(R.string.making_models_desc_general))
                     append("\n\n")
                     
                     withStyle(style = SpanStyle(color = primaryColor, fontWeight = FontWeight.Bold)) {
                         append(stringResource(R.string.exporting_files))
                     }
                     append("\n")
-                    append(stringResource(R.string.exporting_files_desc))
+                    append(stringResource(R.string.exporting_files_desc_general))
                     append("\n\n")
                     
                     withStyle(style = SpanStyle(color = primaryColor, fontWeight = FontWeight.Bold)) {
@@ -118,7 +118,7 @@ fun HowToImportSection() {
                         shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                            text = stringResource(R.string.important_tip),
+                            text = stringResource(R.string.dragonbones_important_tip),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(all = 8.dp)

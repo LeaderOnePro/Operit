@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.SummaryMessageComposable
-import com.ai.assistance.operit.ui.features.chat.components.style.cursor.SystemMessageComposable
 import com.ai.assistance.operit.util.stream.Stream
 
 /**
@@ -23,7 +22,8 @@ fun BubbleStyleChatMessage(
     systemTextColor: Color,
     isHidden: Boolean = false,
     onDeleteMessage: ((Int) -> Unit)? = null,
-    index: Int = -1
+    index: Int = -1,
+    enableDialogs: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     when (message.sender) {
         "user" -> {
@@ -41,13 +41,6 @@ fun BubbleStyleChatMessage(
                 isHidden = isHidden
             )
         }
-        "system" -> {
-            SystemMessageComposable(
-                message = message,
-                backgroundColor = systemMessageColor,
-                textColor = systemTextColor
-            )
-        }
         "summary" -> {
             SummaryMessageComposable(
                 message = message,
@@ -57,7 +50,8 @@ fun BubbleStyleChatMessage(
                     if (index != -1) {
                         onDeleteMessage?.invoke(index)
                     }
-                }
+                },
+                enableDialog = enableDialogs  // 传递弹窗启用状态
             )
         }
     }

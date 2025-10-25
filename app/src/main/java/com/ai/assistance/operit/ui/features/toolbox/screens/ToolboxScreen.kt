@@ -39,14 +39,16 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.ffmpegtoolbox.FFmpeg
 import com.ai.assistance.operit.ui.features.toolbox.screens.filemanager.FileManagerScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.logcat.LogcatScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.shellexecutor.ShellExecutorScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.screens.TerminalScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminalconfig.TerminalAutoConfigScreen
+import com.ai.assistance.operit.terminal.view.TerminalScreen as TerminalViewScreen
+// import com.ai.assistance.operit.ui.features.toolbox.screens.terminalconfig.TerminalAutoConfigScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.uidebugger.UIDebuggerScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.content.Context
 import com.ai.assistance.operit.R
 import androidx.compose.ui.res.stringResource
+import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.terminal.rememberTerminalEnv
 
 // 工具类别
 enum class ToolCategory {
@@ -78,16 +80,13 @@ data class Tool(
 @Composable
 fun ToolboxScreen(
         navController: NavController,
-        onFormatConverterSelected: () -> Unit,
         onFileManagerSelected: () -> Unit,
         onTerminalSelected: () -> Unit,
-        onTerminalAutoConfigSelected: () -> Unit,
         onAppPermissionsSelected: () -> Unit,
         onUIDebuggerSelected: () -> Unit,
         onFFmpegToolboxSelected: () -> Unit,
         onShellExecutorSelected: () -> Unit,
         onLogcatSelected: () -> Unit,
-        onMarkdownDemoSelected: () -> Unit,
         onTextToSpeechSelected: () -> Unit,
         onSpeechToTextSelected: () -> Unit,
         onToolTesterSelected: () -> Unit,
@@ -116,13 +115,6 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_test_center_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onToolTesterSelected
-                        ),
-                        Tool(
-                                name = stringResource(R.string.tool_format_converter),
-                                icon = Icons.Rounded.Transform,
-                                description = stringResource(R.string.tool_format_converter_desc),
-                                category = ToolCategory.FILE_MANAGEMENT,
-                                onClick = onFormatConverterSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_file_manager),
@@ -167,13 +159,6 @@ fun ToolboxScreen(
                                 onClick = onTerminalSelected
                         ),
                         Tool(
-                                name = stringResource(R.string.tool_terminal_auto_config),
-                                icon = Icons.Rounded.Build,
-                                description = stringResource(R.string.tool_terminal_auto_config_desc),
-                                category = ToolCategory.DEVELOPMENT,
-                                onClick = onTerminalAutoConfigSelected
-                        ),
-                        Tool(
                                 name = stringResource(R.string.tool_ui_debugger),
                                 icon = Icons.Default.DeviceHub,
                                 description = stringResource(R.string.tool_ui_debugger_desc),
@@ -186,13 +171,6 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_ffmpeg_toolbox_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onFFmpegToolboxSelected
-                        ),
-                        Tool(
-                                name = stringResource(R.string.tool_stream_markdown_demo),
-                                icon = Icons.Default.FormatAlignLeft,
-                                description = stringResource(R.string.tool_stream_markdown_demo_desc),
-                                category = ToolCategory.DEVELOPMENT,
-                                onClick = onMarkdownDemoSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_shell_executor),
@@ -449,16 +427,6 @@ fun ToolCard(tool: Tool) {
         }
 }
 
-/** 显示格式转换工具屏幕 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FormatConverterToolScreen(navController: NavController) {
-        CustomScaffold() { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) {
-                        FormatConverterScreen(navController = navController)
-                }
-        }
-}
 
 /** 显示文件管理器工具屏幕 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -474,9 +442,12 @@ fun FileManagerToolScreen(navController: NavController) {
 /** 显示终端工具屏幕 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TerminalToolScreen(navController: NavController) {
+fun TerminalToolScreen(navController: NavController, forceShowSetup: Boolean = false) {
+        val context = LocalContext.current
+        val terminalManager = remember { TerminalManager.getInstance(context) }
+        val terminalEnv = rememberTerminalEnv(terminalManager = terminalManager, forceShowSetup = forceShowSetup)
         CustomScaffold() { paddingValues ->
-                Box(modifier = Modifier.padding(paddingValues)) { TerminalScreen() }
+                Box(modifier = Modifier.padding(paddingValues)) { TerminalViewScreen(env = terminalEnv) }
         }
 }
 
@@ -486,7 +457,12 @@ fun TerminalToolScreen(navController: NavController) {
 fun TerminalAutoConfigToolScreen(navController: NavController) {
         CustomScaffold() { paddingValues ->
                 Box(modifier = Modifier.padding(paddingValues)) {
-                        TerminalAutoConfigScreen(navController = navController)
+                        // TODO: 需要重构以适配新的终端架构
+                        // TerminalAutoConfigScreen(navController = navController)
+                        Text(
+                            text = "终端自动配置功能正在重构中...",
+                            modifier = Modifier.padding(16.dp)
+                        )
                 }
         }
 }

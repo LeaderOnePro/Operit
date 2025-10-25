@@ -140,6 +140,12 @@ fun ThemeSettingsScreen() {
     // Collect toolbar transparency setting
     val toolbarTransparent =
             preferencesManager.toolbarTransparent.collectAsState(initial = false).value
+    
+    // Collect AppBar custom color settings
+    val useCustomAppBarColor =
+            preferencesManager.useCustomAppBarColor.collectAsState(initial = false).value
+    val customAppBarColor =
+            preferencesManager.customAppBarColor.collectAsState(initial = null).value
 
     // Collect status bar color settings
     val useCustomStatusBarColor =
@@ -148,6 +154,8 @@ fun ThemeSettingsScreen() {
             preferencesManager.customStatusBarColor.collectAsState(initial = null).value
     val statusBarTransparent =
             preferencesManager.statusBarTransparent.collectAsState(initial = false).value
+    val statusBarHidden =
+            preferencesManager.statusBarHidden.collectAsState(initial = false).value
     val chatHeaderTransparent =
             preferencesManager.chatHeaderTransparent.collectAsState(initial = false).value
     val chatInputTransparent =
@@ -240,11 +248,16 @@ fun ThemeSettingsScreen() {
 
     // Toolbar transparency state
     var toolbarTransparentInput by remember { mutableStateOf(toolbarTransparent) }
+    
+    // AppBar custom color state
+    var useCustomAppBarColorInput by remember { mutableStateOf(useCustomAppBarColor) }
+    var customAppBarColorInput by remember { mutableStateOf(customAppBarColor ?: defaultPrimaryColor) }
 
     // Status bar color state
     var useCustomStatusBarColorInput by remember { mutableStateOf(useCustomStatusBarColor) }
     var customStatusBarColorInput by remember { mutableStateOf(customStatusBarColor ?: defaultPrimaryColor) }
     var statusBarTransparentInput by remember { mutableStateOf(statusBarTransparent) }
+    var statusBarHiddenInput by remember { mutableStateOf(statusBarHidden) }
     var chatHeaderTransparentInput by remember { mutableStateOf(chatHeaderTransparent) }
     var chatInputTransparentInput by remember { mutableStateOf(chatInputTransparent) }
     var chatHeaderOverlayModeInput by remember { mutableStateOf(chatHeaderOverlayMode) }
@@ -290,7 +303,16 @@ fun ThemeSettingsScreen() {
     // On color mode state
     var onColorModeInput by remember { mutableStateOf(onColorMode) }
 
+    // 字体设置状态
+    val useCustomFont = preferencesManager.useCustomFont.collectAsState(initial = false).value
+    val fontType = preferencesManager.fontType.collectAsState(initial = UserPreferencesManager.FONT_TYPE_SYSTEM).value
+    val systemFontName = preferencesManager.systemFontName.collectAsState(initial = UserPreferencesManager.SYSTEM_FONT_DEFAULT).value
+    val customFontPath = preferencesManager.customFontPath.collectAsState(initial = null).value
 
+    var useCustomFontInput by remember { mutableStateOf(useCustomFont) }
+    var fontTypeInput by remember { mutableStateOf(fontType) }
+    var systemFontNameInput by remember { mutableStateOf(systemFontName) }
+    var customFontPathInput by remember { mutableStateOf(customFontPath) }
 
     var showColorPicker by remember { mutableStateOf(false) }
     var currentColorPickerMode by remember { mutableStateOf("primary") }
@@ -619,6 +641,7 @@ fun ThemeSettingsScreen() {
             useCustomStatusBarColor,
             customStatusBarColor,
             statusBarTransparent,
+            statusBarHidden,
             chatHeaderTransparent,
             chatInputTransparent,
             chatHeaderOverlayMode,
@@ -638,7 +661,11 @@ fun ThemeSettingsScreen() {
             avatarCornerRadius,
             onColorMode,
             globalUserAvatarUri,
-            globalUserName
+            globalUserName,
+            useCustomFont,
+            fontType,
+            systemFontName,
+            customFontPath
     ) {
         themeModeInput = themeMode
         useSystemThemeInput = useSystemTheme
@@ -655,6 +682,7 @@ fun ThemeSettingsScreen() {
         useCustomStatusBarColorInput = useCustomStatusBarColor
         if (customStatusBarColor != null) customStatusBarColorInput = customStatusBarColor
         statusBarTransparentInput = statusBarTransparent
+        statusBarHiddenInput = statusBarHidden
         chatHeaderTransparentInput = chatHeaderTransparent
         chatInputTransparentInput = chatInputTransparent
         chatHeaderOverlayModeInput = chatHeaderOverlayMode
@@ -679,7 +707,35 @@ fun ThemeSettingsScreen() {
         onColorModeInput = onColorMode
         globalUserAvatarUriInput = globalUserAvatarUri
         globalUserNameInput = globalUserName
+        useCustomFontInput = useCustomFont
+        fontTypeInput = fontType
+        systemFontNameInput = systemFontName
+        customFontPathInput = customFontPath
     }
+
+    // 字体文件选择器 launcher
+    val fontPickerLauncher =
+        rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? ->
+            if (uri != null) {
+                scope.launch {
+                    // 复制字体文件到内部存储
+                    val internalUri = FileUtils.copyFileToInternalStorage(context, uri, "custom_font")
+                    if (internalUri != null) {
+                        Log.d("ThemeSettings", "Font file saved to: $internalUri")
+                        customFontPathInput = internalUri.toString()
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(
+                                customFontPath = internalUri.toString(),
+                                fontType = UserPreferencesManager.FONT_TYPE_FILE
+                            )
+                        }
+                        Toast.makeText(context, "字体文件已保存", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "字体文件保存失败", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
 
     // Avatar picker and cropper launcher
     var avatarPickerMode by remember { mutableStateOf("user") }
@@ -941,6 +997,36 @@ fun ThemeSettingsScreen() {
                         modifier = Modifier.padding(bottom = 8.dp)
                 )
 
+                // Status bar hidden switch
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(id = R.string.theme_statusbar_hidden),
+                                style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                                text = stringResource(id = R.string.theme_statusbar_hidden_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = statusBarHiddenInput,
+                            onCheckedChange = {
+                                statusBarHiddenInput = it
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(statusBarHidden = it)
+                                }
+                            }
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+
                 // Status bar transparent switch
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -950,16 +1036,18 @@ fun ThemeSettingsScreen() {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                                 text = stringResource(id = R.string.theme_statusbar_transparent),
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (statusBarHiddenInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                                 text = stringResource(id = R.string.theme_statusbar_transparent_desc),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (statusBarHiddenInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
                             checked = statusBarTransparentInput,
+                            enabled = !statusBarHiddenInput,
                             onCheckedChange = {
                                 statusBarTransparentInput = it
                                 saveThemeSettingsWithCharacterCard {
@@ -981,17 +1069,17 @@ fun ThemeSettingsScreen() {
                         Text(
                                 text = stringResource(id = R.string.theme_use_custom_statusbar_color),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (statusBarTransparentInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+                                color = if (statusBarTransparentInput || statusBarHiddenInput) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                                 text = stringResource(id = R.string.theme_use_custom_statusbar_color_desc),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (statusBarTransparentInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (statusBarTransparentInput || statusBarHiddenInput) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
                             checked = useCustomStatusBarColorInput,
-                            enabled = !statusBarTransparentInput,
+                            enabled = !statusBarTransparentInput && !statusBarHiddenInput,
                             onCheckedChange = {
                                 useCustomStatusBarColorInput = it
                                 saveThemeSettingsWithCharacterCard {
@@ -1007,10 +1095,10 @@ fun ThemeSettingsScreen() {
                     ColorSelectionItem(
                             title = stringResource(id = R.string.theme_statusbar_color),
                             color = Color(customStatusBarColorInput),
-                            enabled = !statusBarTransparentInput,
+                            enabled = !statusBarTransparentInput && !statusBarHiddenInput,
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
-                                if (!statusBarTransparentInput) {
+                                if (!statusBarTransparentInput && !statusBarHiddenInput) {
                                     currentColorPickerMode = "statusBar"
                                     showColorPicker = true
                                 }
@@ -1051,6 +1139,49 @@ fun ThemeSettingsScreen() {
                                 saveThemeSettingsWithCharacterCard {
                                     preferencesManager.saveThemeSettings(toolbarTransparent = it)
                                 }
+                            }
+                    )
+                }
+                
+                // Custom AppBar Color
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(id = R.string.theme_use_custom_appbar_color),
+                                style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                                text = stringResource(id = R.string.theme_use_custom_appbar_color_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                            checked = useCustomAppBarColorInput,
+                            enabled = !toolbarTransparentInput,
+                            onCheckedChange = {
+                                useCustomAppBarColorInput = it
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(useCustomAppBarColor = it)
+                                }
+                            }
+                    )
+                }
+                
+                // AppBar Color Picker
+                if (useCustomAppBarColorInput && !toolbarTransparentInput) {
+                    ColorSelectionItem(
+                            title = stringResource(id = R.string.theme_appbar_color),
+                            color = Color(customAppBarColorInput),
+                            enabled = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                currentColorPickerMode = "appBar"
+                                showColorPicker = true
                             }
                     )
                 }
@@ -1593,6 +1724,208 @@ fun ThemeSettingsScreen() {
                                 }
                             }
                     )
+                }
+            }
+        }
+
+        // ======= SECTION: FONT SETTINGS =======
+        ThemeSectionTitle(
+            title = "字体设置",
+            icon = Icons.Default.TextFields
+        )
+
+        Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = cardModifier) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // 启用自定义字体开关
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "启用自定义字体",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "使用系统字体或自定义字体文件",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = useCustomFontInput,
+                        onCheckedChange = {
+                            useCustomFontInput = it
+                            saveThemeSettingsWithCharacterCard {
+                                preferencesManager.saveThemeSettings(useCustomFont = it)
+                            }
+                        }
+                    )
+                }
+
+                // 字体设置只在启用自定义字体时显示
+                if (useCustomFontInput) {
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // 字体类型选择
+                    Text(
+                        text = "字体类型",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 系统字体按钮
+                        FilterChip(
+                            selected = fontTypeInput == UserPreferencesManager.FONT_TYPE_SYSTEM,
+                            onClick = {
+                                fontTypeInput = UserPreferencesManager.FONT_TYPE_SYSTEM
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(
+                                        fontType = UserPreferencesManager.FONT_TYPE_SYSTEM
+                                    )
+                                }
+                            },
+                            label = { Text("系统字体") }
+                        )
+
+                        // 自定义文件按钮
+                        FilterChip(
+                            selected = fontTypeInput == UserPreferencesManager.FONT_TYPE_FILE,
+                            onClick = {
+                                fontTypeInput = UserPreferencesManager.FONT_TYPE_FILE
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(
+                                        fontType = UserPreferencesManager.FONT_TYPE_FILE
+                                    )
+                                }
+                            },
+                            label = { Text("自定义文件") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 根据选择的类型显示不同的设置
+                    when (fontTypeInput) {
+                        UserPreferencesManager.FONT_TYPE_SYSTEM -> {
+                            // 系统字体选择
+                            Text(
+                                text = "选择系统字体",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(
+                                    UserPreferencesManager.SYSTEM_FONT_DEFAULT to "默认字体",
+                                    UserPreferencesManager.SYSTEM_FONT_SERIF to "衬线体 (Serif)",
+                                    UserPreferencesManager.SYSTEM_FONT_SANS_SERIF to "无衬线体 (Sans Serif)",
+                                    UserPreferencesManager.SYSTEM_FONT_MONOSPACE to "等宽字体 (Monospace)",
+                                    UserPreferencesManager.SYSTEM_FONT_CURSIVE to "手写体 (Cursive)"
+                                ).forEach { (fontName, displayName) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = systemFontNameInput == fontName,
+                                            onClick = {
+                                                systemFontNameInput = fontName
+                                                saveThemeSettingsWithCharacterCard {
+                                                    preferencesManager.saveThemeSettings(
+                                                        systemFontName = fontName
+                                                    )
+                                                }
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = displayName,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        UserPreferencesManager.FONT_TYPE_FILE -> {
+                            // 自定义字体文件
+                            Text(
+                                text = "自定义字体文件",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            Text(
+                                text = "支持 .ttf 和 .otf 字体文件",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        fontPickerLauncher.launch("font/*")
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("选择字体文件")
+                                }
+
+                                if (!customFontPathInput.isNullOrEmpty()) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            customFontPathInput = null
+                                            saveThemeSettingsWithCharacterCard {
+                                                preferencesManager.saveThemeSettings(
+                                                    customFontPath = ""
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Clear,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("清除字体")
+                                    }
+                                }
+                            }
+
+                            if (!customFontPathInput.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "当前字体文件:\n${customFontPathInput?.substringAfterLast("/") ?: ""}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2347,9 +2680,12 @@ fun ThemeSettingsScreen() {
                         videoBackgroundMutedInput = true
                         videoBackgroundLoopInput = true
                         toolbarTransparentInput = false
+                        useCustomAppBarColorInput = false
+                        customAppBarColorInput = defaultPrimaryColor
                         useCustomStatusBarColorInput = false
                         customStatusBarColorInput = defaultPrimaryColor
                         statusBarTransparentInput = false
+                        statusBarHiddenInput = false
                         chatHeaderTransparentInput = false
                         chatInputTransparentInput = false
                         chatHeaderOverlayModeInput = false
@@ -2399,6 +2735,7 @@ fun ThemeSettingsScreen() {
                     primaryColorInput = primaryColorInput,
                     secondaryColorInput = secondaryColorInput,
                     statusBarColorInput = customStatusBarColorInput,
+                    appBarColorInput = customAppBarColorInput,
                     historyIconColorInput = chatHeaderHistoryIconColorInput,
                     pipIconColorInput = chatHeaderPipIconColorInput,
                     recentColors = recentColors,
@@ -2406,11 +2743,13 @@ fun ThemeSettingsScreen() {
                         primaryColor,
                         secondaryColor,
                         statusBarColor,
+                        appBarColor,
                         historyIconColor,
                         pipIconColor ->
                         primaryColor?.let { primaryColorInput = it }
                         secondaryColor?.let { secondaryColorInput = it }
                         statusBarColor?.let { customStatusBarColorInput = it }
+                        appBarColor?.let { customAppBarColorInput = it }
                         historyIconColor?.let { chatHeaderHistoryIconColorInput = it }
                         pipIconColor?.let { chatHeaderPipIconColorInput = it }
 
@@ -2419,6 +2758,7 @@ fun ThemeSettingsScreen() {
                                 primaryColor
                                         ?: secondaryColor
                                         ?: statusBarColor
+                                        ?: appBarColor
                                         ?: historyIconColor
                                         ?: pipIconColor
                         newColor?.let { scope.launch { preferencesManager.addRecentColor(it) } }
@@ -2442,6 +2782,12 @@ fun ThemeSettingsScreen() {
                                         statusBarColor?.let {
                                             preferencesManager.saveThemeSettings(
                                                     customStatusBarColor = it
+                                            )
+                                        }
+                                "appBar" ->
+                                        appBarColor?.let {
+                                            preferencesManager.saveThemeSettings(
+                                                    customAppBarColor = it
                                             )
                                         }
                                 "historyIcon" ->

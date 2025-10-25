@@ -2,13 +2,10 @@ package com.ai.assistance.operit.ui.features.settings.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,10 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.api.chat.AIServiceFactory
+import com.ai.assistance.operit.api.chat.llmprovider.AIServiceFactory
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
+import com.ai.assistance.operit.ui.features.settings.sections.AdvancedSettingsSection
 import com.ai.assistance.operit.ui.features.settings.sections.ModelApiSettingsSection
 import com.ai.assistance.operit.ui.features.settings.sections.ModelParametersSection
 import kotlinx.coroutines.flow.first
@@ -36,7 +34,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
+fun ModelConfigScreen(
+    onBackPressed: () -> Unit = {},
+    navigateToMnnModelDownload: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val configManager = remember { ModelConfigManager(context) }
             val apiPreferences = remember { ApiPreferences.getInstance(context) }
@@ -243,11 +244,10 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                                                 val customHeadersJson = apiPreferences.getCustomHeaders()
                                                 val service =
                                                         AIServiceFactory.createService(
-                                                                apiProviderType = config.apiProviderType,
-                                                                apiEndpoint = config.apiEndpoint,
-                                                                apiKey = config.apiKey,
-                                                                modelName = config.modelName,
-                                                                customHeadersJson = customHeadersJson
+                                                                config = config,
+                                                                customHeadersJson = customHeadersJson,
+                                                                modelConfigManager = configManager,
+                                                                context = context
                                                         )
                                                 testResult = service.testConnection()
                                             } ?: run {
@@ -417,7 +417,17 @@ fun ModelConfigScreen(onBackPressed: () -> Unit = {}) {
                 ModelApiSettingsSection(
                         config = config,
                         configManager = configManager,
-                        showNotification = { message -> showNotification(message) }
+                        showNotification = { message -> showNotification(message) },
+                        navigateToMnnModelDownload = navigateToMnnModelDownload
+                )
+            }
+
+            // 高级设置区域（API密钥池配置）
+            selectedConfig.value?.let { config ->
+                AdvancedSettingsSection(
+                    config = config,
+                    configManager = configManager,
+                    showNotification = { message -> showNotification(message) }
                 )
             }
 

@@ -52,6 +52,7 @@ class UserPreferencesManager(private val context: Context) {
 
         // 分类锁定状态
         private val BIRTH_DATE_LOCKED = booleanPreferencesKey("birth_date_locked")
+        private val GENDER_LOCKED = booleanPreferencesKey("gender_locked")
         private val PERSONALITY_LOCKED = booleanPreferencesKey("personality_locked")
         private val IDENTITY_LOCKED = booleanPreferencesKey("identity_locked")
         private val OCCUPATION_LOCKED = booleanPreferencesKey("occupation_locked")
@@ -74,11 +75,16 @@ class UserPreferencesManager(private val context: Context) {
 
         // 工具栏透明度设置
         private val TOOLBAR_TRANSPARENT = booleanPreferencesKey("toolbar_transparent")
+        
+        // AppBar 自定义颜色设置
+        private val USE_CUSTOM_APP_BAR_COLOR = booleanPreferencesKey("use_custom_app_bar_color")
+        private val CUSTOM_APP_BAR_COLOR = intPreferencesKey("custom_app_bar_color")
 
         // 状态栏颜色设置
         private val USE_CUSTOM_STATUS_BAR_COLOR = booleanPreferencesKey("use_custom_status_bar_color")
         private val CUSTOM_STATUS_BAR_COLOR = intPreferencesKey("custom_status_bar_color")
         private val STATUS_BAR_TRANSPARENT = booleanPreferencesKey("status_bar_transparent")
+        private val STATUS_BAR_HIDDEN = booleanPreferencesKey("status_bar_hidden")
         private val CHAT_HEADER_TRANSPARENT = booleanPreferencesKey("chat_header_transparent")
         private val CHAT_INPUT_TRANSPARENT = booleanPreferencesKey("chat_input_transparent")
 
@@ -94,6 +100,12 @@ class UserPreferencesManager(private val context: Context) {
         // 背景模糊设置
         private val USE_BACKGROUND_BLUR = booleanPreferencesKey("use_background_blur")
         private val BACKGROUND_BLUR_RADIUS = floatPreferencesKey("background_blur_radius")
+
+        // 字体设置
+        private val USE_CUSTOM_FONT = booleanPreferencesKey("use_custom_font")
+        private val FONT_TYPE = stringPreferencesKey("font_type")  // "system" or "file"
+        private val SYSTEM_FONT_NAME = stringPreferencesKey("system_font_name")
+        private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
 
         // Chat style preference
         private val CHAT_STYLE = stringPreferencesKey("chat_style")
@@ -137,6 +149,8 @@ class UserPreferencesManager(private val context: Context) {
         // 全局用户名称设置
         private val KEY_GLOBAL_USER_NAME = stringPreferencesKey("global_user_name")
 
+        // 布局调整设置
+        private val CHAT_SETTINGS_BUTTON_END_PADDING = floatPreferencesKey("chat_settings_button_end_padding")
 
         // 最近使用颜色
         private val RECENT_COLORS = stringPreferencesKey("recent_colors")
@@ -148,6 +162,17 @@ class UserPreferencesManager(private val context: Context) {
         const val ON_COLOR_MODE_AUTO = "auto"
         const val ON_COLOR_MODE_LIGHT = "light"
         const val ON_COLOR_MODE_DARK = "dark"
+
+        // 字体类型常量
+        const val FONT_TYPE_SYSTEM = "system"
+        const val FONT_TYPE_FILE = "file"
+        
+        // 系统字体名称常量
+        const val SYSTEM_FONT_DEFAULT = "default"
+        const val SYSTEM_FONT_SERIF = "serif"
+        const val SYSTEM_FONT_SANS_SERIF = "sans-serif"
+        const val SYSTEM_FONT_MONOSPACE = "monospace"
+        const val SYSTEM_FONT_CURSIVE = "cursive"
     }
 
     // 获取应用语言设置
@@ -256,6 +281,16 @@ class UserPreferencesManager(private val context: Context) {
             context.userPreferencesDataStore.data.map { preferences ->
                 preferences[TOOLBAR_TRANSPARENT] ?: false
             }
+    
+    val useCustomAppBarColor: Flow<Boolean> =
+            context.userPreferencesDataStore.data.map { preferences ->
+                preferences[USE_CUSTOM_APP_BAR_COLOR] ?: false
+            }
+    
+    val customAppBarColor: Flow<Int?> =
+            context.userPreferencesDataStore.data.map { preferences ->
+                preferences[CUSTOM_APP_BAR_COLOR]
+            }
 
     val useCustomStatusBarColor: Flow<Boolean> =
             context.userPreferencesDataStore.data.map { preferences ->
@@ -270,6 +305,11 @@ class UserPreferencesManager(private val context: Context) {
     val statusBarTransparent: Flow<Boolean> =
             context.userPreferencesDataStore.data.map { preferences ->
                 preferences[STATUS_BAR_TRANSPARENT] ?: false
+            }
+
+    val statusBarHidden: Flow<Boolean> =
+            context.userPreferencesDataStore.data.map { preferences ->
+                preferences[STATUS_BAR_HIDDEN] ?: false
             }
 
     val chatHeaderTransparent: Flow<Boolean> =
@@ -386,6 +426,33 @@ class UserPreferencesManager(private val context: Context) {
             preferences[KEY_SHOW_INPUT_PROCESSING_STATUS] ?: true
         }
 
+    // 字体设置相关Flow
+    val useCustomFont: Flow<Boolean> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[USE_CUSTOM_FONT] ?: false
+        }
+
+    val fontType: Flow<String> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[FONT_TYPE] ?: FONT_TYPE_SYSTEM
+        }
+
+    val systemFontName: Flow<String> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[SYSTEM_FONT_NAME] ?: SYSTEM_FONT_DEFAULT
+        }
+
+    val customFontPath: Flow<String?> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[CUSTOM_FONT_PATH]
+        }
+
+    // 布局调整设置
+    val chatSettingsButtonEndPadding: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[CHAT_SETTINGS_BUTTON_END_PADDING] ?: 2f // 默认2dp
+        }
+
     // 获取最近使用颜色
     val recentColorsFlow: Flow<List<Int>> =
         context.userPreferencesDataStore.data.map { preferences ->
@@ -417,6 +484,20 @@ class UserPreferencesManager(private val context: Context) {
             val trimmedColors = currentColors.take(14)
 
             preferences[RECENT_COLORS] = trimmedColors.joinToString(",")
+        }
+    }
+
+    // 保存聊天设置按钮右边距
+    suspend fun saveChatSettingsButtonEndPadding(padding: Float) {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences[CHAT_SETTINGS_BUTTON_END_PADDING] = padding
+        }
+    }
+
+    // 重置布局设置
+    suspend fun resetLayoutSettings() {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences.remove(CHAT_SETTINGS_BUTTON_END_PADDING)
         }
     }
 
@@ -474,9 +555,12 @@ class UserPreferencesManager(private val context: Context) {
             videoBackgroundMuted: Boolean? = null,
             videoBackgroundLoop: Boolean? = null,
             toolbarTransparent: Boolean? = null,
+            useCustomAppBarColor: Boolean? = null,
+            customAppBarColor: Int? = null,
             useCustomStatusBarColor: Boolean? = null,
             customStatusBarColor: Int? = null,
             statusBarTransparent: Boolean? = null,
+            statusBarHidden: Boolean? = null,
             chatHeaderTransparent: Boolean? = null,
             chatInputTransparent: Boolean? = null,
             forceAppBarContentColor: Boolean? = null,
@@ -497,7 +581,11 @@ class UserPreferencesManager(private val context: Context) {
             customChatTitle: String? = null,
             showInputProcessingStatus: Boolean? = null,
             globalUserAvatarUri: String? = null,
-            globalUserName: String? = null
+            globalUserName: String? = null,
+            useCustomFont: Boolean? = null,
+            fontType: String? = null,
+            systemFontName: String? = null,
+            customFontPath: String? = null
     ) {
         context.userPreferencesDataStore.edit { preferences ->
             themeMode?.let { preferences[THEME_MODE] = it }
@@ -516,9 +604,12 @@ class UserPreferencesManager(private val context: Context) {
             videoBackgroundMuted?.let { preferences[VIDEO_BACKGROUND_MUTED] = it }
             videoBackgroundLoop?.let { preferences[VIDEO_BACKGROUND_LOOP] = it }
             toolbarTransparent?.let { preferences[TOOLBAR_TRANSPARENT] = it }
+            useCustomAppBarColor?.let { preferences[USE_CUSTOM_APP_BAR_COLOR] = it }
+            customAppBarColor?.let { preferences[CUSTOM_APP_BAR_COLOR] = it }
             useCustomStatusBarColor?.let { preferences[USE_CUSTOM_STATUS_BAR_COLOR] = it }
             customStatusBarColor?.let { preferences[CUSTOM_STATUS_BAR_COLOR] = it }
             statusBarTransparent?.let { preferences[STATUS_BAR_TRANSPARENT] = it }
+            statusBarHidden?.let { preferences[STATUS_BAR_HIDDEN] = it }
             chatHeaderTransparent?.let { preferences[CHAT_HEADER_TRANSPARENT] = it }
             chatInputTransparent?.let { preferences[CHAT_INPUT_TRANSPARENT] = it }
             forceAppBarContentColor?.let { preferences[FORCE_APP_BAR_CONTENT_COLOR_ENABLED] = it }
@@ -542,6 +633,11 @@ class UserPreferencesManager(private val context: Context) {
             globalUserAvatarUri?.let { preferences[KEY_GLOBAL_USER_AVATAR_URI] = it }
             // 全局用户名称单独保存，不跟随角色卡主题
             globalUserName?.let { preferences[KEY_GLOBAL_USER_NAME] = it }
+            // 字体设置
+            useCustomFont?.let { preferences[USE_CUSTOM_FONT] = it }
+            fontType?.let { preferences[FONT_TYPE] = it }
+            systemFontName?.let { preferences[SYSTEM_FONT_NAME] = it }
+            customFontPath?.let { preferences[CUSTOM_FONT_PATH] = it }
         }
     }
 
@@ -563,6 +659,7 @@ class UserPreferencesManager(private val context: Context) {
             preferences.remove(USE_CUSTOM_STATUS_BAR_COLOR)
             preferences.remove(CUSTOM_STATUS_BAR_COLOR)
             preferences.remove(STATUS_BAR_TRANSPARENT)
+            preferences.remove(STATUS_BAR_HIDDEN)
             preferences.remove(CHAT_HEADER_TRANSPARENT)
             preferences.remove(CHAT_INPUT_TRANSPARENT)
             preferences.remove(FORCE_APP_BAR_CONTENT_COLOR_ENABLED)
@@ -586,6 +683,11 @@ class UserPreferencesManager(private val context: Context) {
             preferences.remove(KEY_GLOBAL_USER_AVATAR_URI)
             // 重置全局用户名称
             preferences.remove(KEY_GLOBAL_USER_NAME)
+            // 重置字体设置
+            preferences.remove(USE_CUSTOM_FONT)
+            preferences.remove(FONT_TYPE)
+            preferences.remove(SYSTEM_FONT_NAME)
+            preferences.remove(CUSTOM_FONT_PATH)
         }
     }
 
@@ -634,6 +736,7 @@ class UserPreferencesManager(private val context: Context) {
             context.userPreferencesDataStore.data.map { preferences ->
                 mapOf(
                         "birthDate" to (preferences[BIRTH_DATE_LOCKED] ?: false),
+                        "gender" to (preferences[GENDER_LOCKED] ?: false),
                         "personality" to (preferences[PERSONALITY_LOCKED] ?: false),
                         "identity" to (preferences[IDENTITY_LOCKED] ?: false),
                         "occupation" to (preferences[OCCUPATION_LOCKED] ?: false),
@@ -654,6 +757,7 @@ class UserPreferencesManager(private val context: Context) {
         context.userPreferencesDataStore.edit { preferences ->
             when (category) {
                 "birthDate" -> preferences[BIRTH_DATE_LOCKED] = locked
+                "gender" -> preferences[GENDER_LOCKED] = locked
                 "personality" -> preferences[PERSONALITY_LOCKED] = locked
                 "identity" -> preferences[IDENTITY_LOCKED] = locked
                 "occupation" -> preferences[OCCUPATION_LOCKED] = locked
@@ -808,7 +912,7 @@ class UserPreferencesManager(private val context: Context) {
                 preferences[ACTIVE_PROFILE_ID] = DEFAULT_PROFILE_ID
             }
         }
-        // 删除对应的知识库数据库
+        // 删除对应的记忆库数据库
         ObjectBoxManager.delete(context, profileId)
     }
 
@@ -830,7 +934,7 @@ class UserPreferencesManager(private val context: Context) {
         return listOf(
             THEME_MODE, BACKGROUND_IMAGE_URI, BACKGROUND_MEDIA_TYPE, APP_BAR_CONTENT_COLOR_MODE,
             CHAT_STYLE, KEY_CUSTOM_USER_AVATAR_URI, KEY_CUSTOM_AI_AVATAR_URI, KEY_AVATAR_SHAPE,
-            KEY_ON_COLOR_MODE, KEY_CUSTOM_CHAT_TITLE
+            KEY_ON_COLOR_MODE, KEY_CUSTOM_CHAT_TITLE, FONT_TYPE, SYSTEM_FONT_NAME, CUSTOM_FONT_PATH
             // 注意：KEY_GLOBAL_USER_AVATAR_URI 和 KEY_GLOBAL_USER_NAME 不包含在内，因为全局设置不跟随角色卡主题切换
         )
     }
@@ -838,17 +942,17 @@ class UserPreferencesManager(private val context: Context) {
     private fun getAllBooleanThemeKeys(): List<Preferences.Key<Boolean>> {
         return listOf(
             USE_SYSTEM_THEME, USE_CUSTOM_COLORS, USE_BACKGROUND_IMAGE, VIDEO_BACKGROUND_MUTED,
-            VIDEO_BACKGROUND_LOOP, TOOLBAR_TRANSPARENT, USE_CUSTOM_STATUS_BAR_COLOR,
-            STATUS_BAR_TRANSPARENT, CHAT_HEADER_TRANSPARENT, CHAT_INPUT_TRANSPARENT,
+            VIDEO_BACKGROUND_LOOP, TOOLBAR_TRANSPARENT, USE_CUSTOM_APP_BAR_COLOR, USE_CUSTOM_STATUS_BAR_COLOR,
+            STATUS_BAR_TRANSPARENT, STATUS_BAR_HIDDEN, CHAT_HEADER_TRANSPARENT, CHAT_INPUT_TRANSPARENT,
             FORCE_APP_BAR_CONTENT_COLOR_ENABLED, CHAT_HEADER_OVERLAY_MODE, USE_BACKGROUND_BLUR,
-            KEY_SHOW_THINKING_PROCESS, KEY_SHOW_STATUS_TAGS, KEY_SHOW_INPUT_PROCESSING_STATUS
+            KEY_SHOW_THINKING_PROCESS, KEY_SHOW_STATUS_TAGS, KEY_SHOW_INPUT_PROCESSING_STATUS, USE_CUSTOM_FONT
         )
     }
 
     private fun getAllIntThemeKeys(): List<Preferences.Key<Int>> {
         return listOf(
-            CUSTOM_PRIMARY_COLOR, CUSTOM_SECONDARY_COLOR, CUSTOM_STATUS_BAR_COLOR,
-            CHAT_HEADER_HISTORY_ICON_COLOR, CHAT_HEADER_PIP_ICON_COLOR
+            CUSTOM_PRIMARY_COLOR, CUSTOM_SECONDARY_COLOR, CUSTOM_APP_BAR_COLOR,
+            CUSTOM_STATUS_BAR_COLOR, CHAT_HEADER_HISTORY_ICON_COLOR, CHAT_HEADER_PIP_ICON_COLOR
         )
     }
 

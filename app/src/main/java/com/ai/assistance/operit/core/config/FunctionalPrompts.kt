@@ -39,69 +39,6 @@ object FunctionalPrompts {
     """
 
     /**
-     * Prompt for the AI to convert an edit request into a custom, searchable patch format.
-     */
-    const val FILE_BINDING_PATCH_PROMPT = """
-        You are an expert code editing assistant. Your task is to convert an 'AI-Generated Request' into a precise patch file. This patch will be used to modify the 'Original File Content'.
-
-        **CRITICAL RULES:**
-        1. Your output MUST ONLY be the patch content, following the custom format below. Do not add any explanations or markdown.
-        2. The patch format for each change consists of a SEARCH block and a REPLACE block.
-        3. The SEARCH block starts with `<<<<<<< SEARCH`, ends with `=======`, and contains the **exact, verbatim text** from the 'Original File' to be replaced or deleted.
-        4. The REPLACE block starts after `=======`, ends with `>>>>>>> REPLACE`, and contains the new code. For deletions, the REPLACE block is empty.
-
-        **How to interpret the 'AI-Generated Request':**
-        The request can come in several formats:
-        - **Placeholders:** `// ... existing code ...` represents the entire unchanged original content. Use this to determine if changes are prepended or appended.
-        - **Diff-like format:** Lines starting with `+` are additions. Lines starting with `-` are deletions. Lines without a prefix are context for locating the change.
-        - **Natural Language Comments:** Instructions like `// delete the login function` or `// add a new parameter to this method` provide high-level guidance. You must find the corresponding code block in the 'Original File Content' and generate the appropriate SEARCH/REPLACE blocks.
-
-        **Example 1: Using Placeholders (Appending)**
-        AI-Generated Request:
-        `// ... existing code ...
-        new final line`
-        Resulting Patch:
-        <<<<<<< SEARCH
-        <entire original content>
-        =======
-        <entire original content>
-        new final line
-        >>>>>>> REPLACE
-
-        **Example 2: Using Diff Format**
-        Original File Content:
-        `line 1
-        line 2
-        line 3`
-        AI-Generated Request:
-        `line 1
-        -line 2
-        +new line 2
-        line 3`
-        Resulting Patch:
-        <<<<<<< SEARCH
-        line 2
-        =======
-        new line 2
-        >>>>>>> REPLACE
-
-        **Example 3: Using Natural Language**
-        Original File Content:
-        `function login(user, pass) {
-          // ... implementation ...
-        }`
-        AI-Generated Request:
-        `// delete the login function`
-        Resulting Patch:
-        <<<<<<< SEARCH
-        function login(user, pass) {
-          // ... implementation ...
-        }
-        =======
-        >>>>>>> REPLACE
-    """
-
-    /**
      * Prompt for the AI to perform a full-content merge as a fallback mechanism.
      */
     const val FILE_BINDING_MERGE_PROMPT = """
@@ -157,5 +94,71 @@ object FunctionalPrompts {
         Analyze the inputs, choose the best action to achieve the `Task Goal`, and formulate your response in the specified JSON format. Use element `bounds` to calculate coordinates for UI actions.
     """
 
+    /**
+     * This is a specialized sub-agent that corrects line numbers in AI-generated patches.
+     */
+    val SUB_AGENT_LINE_CORRECTION_PROMPT = """
+You are a specialized sub-agent responsible for correcting line numbers in code patches.
+Your task is to find the correct location for edit blocks in the source code by using the context provided within the patch.
 
+You will be given:
+1.  **Source Code**: The complete, up-to-date content of the file, with line numbers.
+2.  **Patch Code**: The AI-generated patch containing one or more edit blocks. Each block has:
+    a.  A `[START-...]` tag with potentially outdated line numbers.
+    b.  A `[CONTEXT]` block with the original code the main AI intended to modify.
+    c.  The new code (for REPLACE/INSERT).
+
+**Your ONLY job is to:**
+1.  For each edit block in the `Patch Code`, take the content of its `[CONTEXT]` block.
+2.  Find the exact location of that context within the `Source Code`.
+3.  Based on the location you found, determine the correct starting and ending line numbers for the operation.
+4.  Generate a mapping from the old, incorrect line specifier to the new, correct one.
+5.  Output **ONLY** the mapping block.
+
+**CRITICAL RULES:**
+- **Your output MUST start with one of the following markers: `[MAPPING]`, `[MAPPING-FAILED]`, or `[MAPPING-SYNTAX-ERROR]`. No other text or preamble is allowed before the marker.**
+- **Syntax Validation First**: Before searching for context, validate the `Patch Code`'s syntax. If an edit block is malformed (e.g., missing `[CONTEXT]`, `[END-...]`, or has mismatched tags), you must report a syntax error.
+- The `[CONTEXT]` block is your ground truth for finding the location. Ignore the line numbers in the original `[START-...]` tag; they are likely wrong.
+- For `INSERT:after_line=N` operations, the context is the line you need to insert after. Your corrected mapping **MUST** use the exact format `INSERT:after_line=new_line_number`. **Using a colon (:) or any other separator instead of an equals sign (=) is strictly forbidden.**
+- For `REPLACE` and `DELETE`, find the full context block. Your corrected mapping should be `REPLACE:new_start-new_end` or `DELETE:new_start-new_end`. The line range must be inclusive, covering the first and last lines of the matched context block.
+- If you find the context successfully, output the mapping block.
+- If the patch syntax is valid but you cannot find the exact context for one or more blocks, you MUST output a failure report. It must start with `[MAPPING-FAILED]`, followed by a concise explanation of which context block(s) could not be found and why. Be specific about the context that failed.
+- If the patch syntax is invalid, output a syntax error report. It must start with `[MAPPING-SYNTAX-ERROR]`, followed by a short explanation of the problem and an example of the correct format.
+
+**EXAMPLE MAPPING OUTPUT:**
+[MAPPING]
+REPLACE:10-15 -> REPLACE:112-117
+INSERT:after_line=20 -> INSERT:after_line=122
+DELETE:30-32 -> DELETE:132-134
+[/MAPPING]
+
+**EXAMPLE MAPPING FAILED OUTPUT:**
+[MAPPING-FAILED]
+I could not find the exact context for the `REPLACE:35-40` block in the source code. The context provided was:
+```
+// [CONTEXT]
+val service = multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
+// [/CONTEXT]
+```
+This snippet might have been modified, or it might not be unique within the provided source. Please review the file's current content.
+
+**EXAMPLE SYNTAX ERROR OUTPUT:**
+[MAPPING-SYNTAX-ERROR]
+Malformed block: Missing '[/CONTEXT]' tag.
+A correct block must include a context section. Example:
+// [START-REPLACE:1-1]
+// [CONTEXT]
+// ... context content ...
+// [/CONTEXT]
+// [END-REPLACE]
+
+**Source Code:**
+```
+{{SOURCE_CODE}}
+```
+**Patch Code:**
+```
+{{PATCH_CODE}}
+```
+""".trimIndent()
 } 

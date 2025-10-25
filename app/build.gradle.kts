@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,18 +8,35 @@ plugins {
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.parcelize)
     id("io.objectbox")
+    id("kotlin-kapt")
+}
+
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
 }
 
 android {
     namespace = "com.ai.assistance.operit"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.keystore") // 项目根目录下的自定义密钥
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.ai.assistance.operit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 21
-        versionName = "1.4.0"
+        versionCode = 27
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -27,8 +47,11 @@ android {
             // Explicitly specify the ABIs to support. This ensures that native libraries
             // for both 32-bit and 64-bit ARM devices are included in the APK,
             // resolving conflicts between dependencies with different native library sets.
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
+
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${localProperties.getProperty("GITHUB_CLIENT_ID")}\"")
+        buildConfigField("String", "GITHUB_CLIENT_SECRET", "\"${localProperties.getProperty("GITHUB_CLIENT_SECRET")}\"")
     }
 
     buildTypes {
@@ -39,7 +62,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -53,12 +79,17 @@ android {
     buildFeatures {
         compose = true
         aidl = true
+        buildConfig = true
     }
     
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
+        
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/LICENSE-EPL-1.0.txt"
@@ -97,6 +128,8 @@ android {
 dependencies {
     implementation("com.github.jelmerk:hnswlib-core:1.2.1")
     implementation(project(":dragonbones"))
+    implementation(project(":terminal"))
+    implementation(project(":mnn"))
     implementation(libs.androidx.ui.graphics.android)
     implementation(files("libs\\ffmpegkit.jar"))
     implementation(files("libs\\arsc.jar"))
@@ -104,6 +137,7 @@ dependencies {
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.animation.android)
     implementation(libs.androidx.ui.android)
+    implementation(libs.androidx.activity.ktx)
 
     // Desugaring support for modern Java APIs on older Android
     coreLibraryDesugaring(libs.desugar.jdk)
@@ -201,6 +235,9 @@ dependencies {
     // 用于向量嵌入的TF Lite (如果需要自定义嵌入)
     implementation(libs.tensorflow.lite)
     implementation(libs.mediapipe.tasks.text)
+    
+    // ONNX Runtime for Android - 支持更强大的多语言Embedding模型
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
 
     // Room 数据库
     implementation(libs.room.runtime)
@@ -233,6 +270,12 @@ dependencies {
     // Shizuku dependencies
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+
+    // Tasker Plugin Library
+    implementation("com.joaomgcd:taskerpluginlibrary:0.4.10")
+    
+    // WorkManager for scheduled workflows
+    implementation(libs.work.runtime.ktx)
 
     // Network dependencies
     implementation(libs.okhttp)
@@ -325,4 +368,21 @@ dependencies {
             force("io.ktor:ktor-serialization-kotlinx-json:2.3.5")
         }
     }
+
+    // Security
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
+    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+
+
+    // Accompanist
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
+
+    // Glance for Widgets (Compose for Widgets)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 }

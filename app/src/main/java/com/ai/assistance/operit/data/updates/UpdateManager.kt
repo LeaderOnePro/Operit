@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.util.GithubReleaseUtil
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -40,14 +41,6 @@ class UpdateManager private constructor(private val context: Context) {
     companion object {
         @Volatile private var INSTANCE: UpdateManager? = null
 
-        // 可用的GitHub加速镜像站点列表
-        private val GITHUB_PROXY_URLS = listOf(
-            "https://ghfast.top/",         // 目前国内可访问的最佳选择
-            "https://hub.gitmirror.com/",  // 备选源
-            "https://github.moeyy.xyz/",   // 另一个备选
-            "https://github.abskoop.workers.dev/"  // 最后的备选
-        )
-        
         fun getInstance(context: Context): UpdateManager {
             return INSTANCE
                     ?: synchronized(this) {
@@ -87,28 +80,6 @@ class UpdateManager private constructor(private val context: Context) {
             val manager = getInstance(context)
             return manager.checkForUpdatesInternal(currentVersion)
         }
-        
-        /**
-         * 获取给定原始GitHub URL的加速下载URL
-         * @param originalUrl 从GitHub获取的原始URL
-         * @return 加速的下载URL
-         */
-        fun getAcceleratedDownloadUrl(version: String, originalUrl: String): String {
-            // 直接使用第一个加速镜像
-            val proxyUrl = GITHUB_PROXY_URLS[0]
-            
-            // 确认URL是GitHub的下载链接
-            if (originalUrl.contains("github.com") && 
-                (originalUrl.contains("/releases/download/") || 
-                 originalUrl.contains("/archive/") ||
-                 originalUrl.contains("/blob/"))) {
-                // 返回加速链接
-                return "$proxyUrl$originalUrl"
-            }
-            
-            // 如果不是GitHub下载链接，则返回原始链接
-            return originalUrl
-        }
     }
 
     /** 开始更新检查流程 */
@@ -143,63 +114,22 @@ class UpdateManager private constructor(private val context: Context) {
                             Pair("AAswordman", "Operit") // 默认值
                         }
 
-                val allReleasesUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases"
-                var tagName = ""
-                var htmlUrl = ""
-                var body = ""
-                var downloadUrl = ""
+                val githubReleaseUtil = GithubReleaseUtil(context)
+                val releaseInfo = githubReleaseUtil.fetchLatestReleaseInfo(repoOwner, repoName)
 
-                // 尝试获取所有发布版本
-                val allReleasesConn = URL(allReleasesUrl).openConnection() as HttpURLConnection
-                allReleasesConn.requestMethod = "GET"
-                allReleasesConn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-
-                if (allReleasesConn.responseCode == HttpURLConnection.HTTP_OK) {
-                    val response =
-                            allReleasesConn.inputStream.bufferedReader().use { it.readText() }
-                    val jsonArray = JSONArray(response)
-
-                    if (jsonArray.length() > 0) {
-                        // 获取第一个发布（最新的）
-                        val latestRelease = jsonArray.getJSONObject(0)
-                        tagName = latestRelease.getString("tag_name")
-                        htmlUrl = latestRelease.getString("html_url")
-                        body = latestRelease.optString("body", "")
-
-                        // 寻找APK下载地址
-                        val assets = latestRelease.optJSONArray("assets")
-                        if (assets != null && assets.length() > 0) {
-                            // 查找apk文件
-                            for (i in 0 until assets.length()) {
-                                val asset = assets.getJSONObject(i)
-                                val name = asset.getString("name")
-                                if (name.endsWith(".apk")) {
-                                    downloadUrl = asset.getString("browser_download_url")
-                                    break
-                                }
-                            }
-                        }
-
-                        // 如果找到版本但没找到下载链接
-                        if (downloadUrl.isEmpty()) {
-                            downloadUrl = htmlUrl // 退回到使用发布页面
-                        }
-
-                        // 比较版本
-                        return@withContext if (compareVersions(tagName, currentVersion) > 0) {
-                            UpdateStatus.Available(tagName, htmlUrl, body, downloadUrl)
-                        } else {
-                            UpdateStatus.UpToDate
-                        }
+                if (releaseInfo != null) {
+                    if (compareVersions(releaseInfo.version, currentVersion) > 0) {
+                        UpdateStatus.Available(
+                            newVersion = releaseInfo.version,
+                            updateUrl = releaseInfo.releasePageUrl,
+                            releaseNotes = releaseInfo.releaseNotes,
+                            downloadUrl = releaseInfo.downloadUrl
+                        )
                     } else {
-                        return@withContext UpdateStatus.Error("仓库 $repoOwner/$repoName 没有发布版本")
+                        UpdateStatus.UpToDate
                     }
-                } else if (allReleasesConn.responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                    return@withContext UpdateStatus.Error("仓库不存在或无法访问: $repoOwner/$repoName")
                 } else {
-                    return@withContext UpdateStatus.Error(
-                            "API请求失败: HTTP ${allReleasesConn.responseCode}"
-                    )
+                    UpdateStatus.Error("无法获取更新信息。")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking for updates", e)

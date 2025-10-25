@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.main
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -11,6 +12,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -25,8 +28,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.core.invitation.InvitationManager
-import com.ai.assistance.operit.core.invitation.ProcessInvitationResult
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.migration.ChatHistoryMigrationManager
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
@@ -46,9 +47,9 @@ import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.content.ClipboardManager
-import android.content.ClipData
 import com.ai.assistance.operit.data.mcp.MCPRepository
+import com.ai.assistance.operit.data.preferences.GitHubAuthBus
+import android.content.Intent
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -57,14 +58,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var toolHandler: AIToolHandler
     private lateinit var preferencesManager: UserPreferencesManager
     private lateinit var agreementPreferences: AgreementPreferences
-    private lateinit var invitationManager: InvitationManager // Add InvitationManager instance
     private var updateCheckPerformed = false
     private lateinit var anrMonitor: AnrMonitor
     private lateinit var mcpRepository: MCPRepository
-
-    // ======== 对话框状态 ========
-    private var showConfirmationDialogState by mutableStateOf<String?>(null)
-    private var showReminderDialogState by mutableStateOf<String?>(null)
 
     // ======== 导航状态 ========
     private var showPreferencesGuide by mutableStateOf(false)
@@ -88,6 +84,18 @@ class MainActivity : ComponentActivity() {
 
     // 是否已完成权限和迁移检查
     private var initialChecksDone = false
+
+    // 通知权限请求启动器
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d(TAG, "通知权限已授予")
+        } else {
+            Log.d(TAG, "通知权限被拒绝")
+            Toast.makeText(this, getString(R.string.notification_permission_denied), Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         // 获取当前设置的语言
@@ -117,6 +125,9 @@ class MainActivity : ComponentActivity() {
 
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
+
+        // Handle the intent that started the activity
+        handleIntent(intent)
 
         // 语言设置已在Application中初始化，这里无需重复
 
@@ -154,15 +165,53 @@ class MainActivity : ComponentActivity() {
         setupBackPressHandler()
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent) // 重要：更新当前Intent
+        Log.d(TAG, "onNewIntent: Received intent")
+        intent?.data?.let { uri ->
+            if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
+                val code = uri.getQueryParameter("code")
+                if (code != null) {
+                    Log.d(TAG, "GitHub OAuth code received: $code")
+                    GitHubAuthBus.postAuthCode(code)
+                } else {
+                    val error = uri.getQueryParameter("error")
+                    Log.e(TAG, "GitHub OAuth error: $error")
+                }
+            }
+        }
+        
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
+                val code = uri.getQueryParameter("code")
+                if (code != null) {
+                    Log.d(TAG, "GitHub OAuth code received from onCreate: $code")
+                    GitHubAuthBus.postAuthCode(code)
+                } else {
+                    val error = uri.getQueryParameter("error")
+                    Log.e(TAG, "GitHub OAuth error from onCreate: $error")
+                }
+            }
+        }
+    }
+
     // ======== 设置初始占位内容 ========
 
     // ======== 执行初始化检查 ========
     private fun performInitialChecks() {
         lifecycleScope.launch {
-            // 1. 检查权限级别设置
+            // 1. 检查通知权限（Android 13+）
+            checkNotificationPermission()
+
+            // 2. 检查权限级别设置
             checkPermissionLevelSet()
 
-            // 2. 检查是否需要数据迁移
+            // 3. 检查是否需要数据迁移
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
                 try {
                     val needsMigration = migrationManager.needsMigration()
@@ -245,50 +294,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    override fun onResume() {
-        super.onResume()
-        Log.d(TAG, "onResume called")
-
-        // Check clipboard for invitation code when the app resumes
-        checkClipboardForInvitation()
-    }
-
-    private fun checkClipboardForInvitation() {
-        lifecycleScope.launch {
-            // 等待一小段时间，确保应用完全获得焦点，避免因Android 10+剪贴板限制导致读取失败
-            delay(500)
-
-            Log.d(TAG, "检查剪贴板中的邀请码...")
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clipData = clipboard?.primaryClip
-            if (clipData != null && clipData.itemCount > 0) {
-                val text = clipData.getItemAt(0).coerceToText(this@MainActivity).toString()
-                if (text.isNotBlank()) {
-                    Log.d(TAG, "剪贴板内容: '$text'")
-                    when (val result = invitationManager.processInvitationFromText(text)) {
-                        is ProcessInvitationResult.Success -> {
-                            Log.d(TAG, "邀请码处理成功: ${result.confirmationCode}")
-                            // Clear clipboard to prevent re-triggering
-                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                            showConfirmationDialogState = result.confirmationCode
-                        }
-                        is ProcessInvitationResult.Reminder -> {
-                            Log.d(TAG, "邀请码提醒: ${result.confirmationCode}")
-                            // Clear clipboard to prevent re-triggering
-                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                            showReminderDialogState = result.confirmationCode
-                        }
-                        is ProcessInvitationResult.Failure -> Log.d(TAG, "Clipboard check failed: ${result.reason}")
-                        is ProcessInvitationResult.AlreadyInvited -> Log.d(TAG, "Device already invited by someone else.")
-                    }
-                } else {
-                    Log.d(TAG, "剪贴板内容为空白。")
-                }
-            } else {
-                Log.d(TAG, "剪贴板为空或无项目。")
-            }
-        }
-    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -310,15 +315,11 @@ class MainActivity : ComponentActivity() {
 
     // ======== 初始化组件 ========
     private fun initializeComponents() {
-        // 初始化工具处理器
+        // 初始化工具处理器（工具注册已在Application中完成）
         toolHandler = AIToolHandler.getInstance(this)
-        toolHandler.registerDefaultTools()
 
         // 初始化MCP仓库
         mcpRepository = MCPRepository(this)
-
-        // Initialize InvitationManager
-        invitationManager = InvitationManager(this)
 
         anrMonitor = AnrMonitor(this, lifecycleScope)
 
@@ -335,6 +336,37 @@ class MainActivity : ComponentActivity() {
 
         // 初始化数据迁移管理器
         migrationManager = ChatHistoryMigrationManager(this)
+    }
+
+    // ======== 检查通知权限 ========
+    private fun checkNotificationPermission() {
+        // Android 13 (API 33) 及以上需要请求通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+            when {
+                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "通知权限已授予")
+                }
+                shouldShowRequestPermissionRationale(permission) -> {
+                    // 用户之前拒绝过，显示说明并再次请求
+                    Log.d(TAG, "需要显示通知权限说明")
+                    Toast.makeText(
+                        this,
+                        getString(R.string.notification_permission_rationale),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    notificationPermissionLauncher.launch(permission)
+                }
+                else -> {
+                    // 直接请求权限
+                    Log.d(TAG, "请求通知权限")
+                    notificationPermissionLauncher.launch(permission)
+                }
+            }
+        } else {
+            // Android 13 以下不需要运行时通知权限
+            Log.d(TAG, "Android 版本 < 13，无需请求通知权限")
+        }
     }
 
     // ======== 检查权限级别设置 ========
@@ -471,25 +503,6 @@ class MainActivity : ComponentActivity() {
                             loadingState = pluginLoadingState,
                             modifier = Modifier.zIndex(10f) // 确保加载界面在最上层
                     )
-
-                    // 显示邀请结果对话框
-                    showConfirmationDialogState?.let { code ->
-                        InvitationResultDialog(
-                            title = "邀请已接受！",
-                            message = "请将以下返回码发送给你的朋友，以完成最终邀请步骤：\n\n$code",
-                            confirmationCode = code,
-                            onDismiss = { showConfirmationDialogState = null }
-                        )
-                    }
-
-                    showReminderDialogState?.let { code ->
-                        InvitationResultDialog(
-                            title = "是不是忘记了什么？",
-                            message = "你好像又被同一个人邀请了呢，是不是忘记把下面的返回码发给他了？拿稳！\n\n$code",
-                            confirmationCode = code,
-                            onDismiss = { showReminderDialogState = null }
-                        )
-                    }
                 }
             }
         }
@@ -630,37 +643,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-@Composable
-private fun InvitationResultDialog(
-    title: String,
-    message: String,
-    confirmationCode: String,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = title) },
-        text = { Text(text = message) },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Confirmation Code", confirmationCode)
-                    clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, context.getString(R.string.confirmation_code_copied), Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                }
-            ) {
-                Text("复制返回码")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
 }

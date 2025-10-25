@@ -7,82 +7,135 @@ fun getJsToolsDefinition(): String {
         var Tools = {
             // 文件系统操作
             Files: {
-                list: (path) => toolCall("list_files", { path }),
-                read: (path) => toolCall("read_file", { path }),
-                // 分段读取文件内容
-                readPart: (path, partIndex) => toolCall("read_file_part", { path, partIndex }),
-                // 读取完整文件内容
-                readFull: (path) => toolCall("read_file_full", { path }),
-                write: (path, content, append) => {
+                list: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("list_files", params);
+                },
+                read: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("read_file_full", params);
+                },
+                write: (path, content, append, environment) => {
                     const params = { path, content };
                     if (append !== undefined) params.append = append ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("write_file", params);
                 },
-                writeBinary: (path, base64Content) => {
-                    return toolCall("write_file_binary", { path, base64Content });
+                writeBinary: (path, base64Content, environment) => {
+                    const params = { path, base64Content };
+                    if (environment) params.environment = environment;
+                    return toolCall("write_file_binary", params);
                 },
-                deleteFile: (path, recursive) => {
+                deleteFile: (path, recursive, environment) => {
                     const params = { path };
                     if (recursive !== undefined) params.recursive = recursive ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("delete_file", params);
                 },
-                exists: (path) => toolCall("file_exists", { path }),
-                move: (source, destination) => toolCall("move_file", { source, destination }),
-                copy: (source, destination, recursive) => {
+                exists: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("file_exists", params);
+                },
+                move: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("move_file", params);
+                },
+                copy: (source, destination, recursive, environment) => {
                     const params = { source, destination };
                     if (recursive !== undefined) params.recursive = recursive ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("copy_file", params);
                 },
-                mkdir: (path, create_parents) => {
+                mkdir: (path, create_parents, environment) => {
                     const params = { path };
                     if (create_parents !== undefined) params.create_parents = create_parents ? "true" : "false";
+                    if (environment) params.environment = environment;
                     return toolCall("make_directory", params);
                 },
-                find: (path, pattern, options = {}) => {
+                find: (path, pattern, options = {}, environment) => {
                     const params = { path, pattern, ...options };
+                    if (environment) params.environment = environment;
                     return toolCall("find_files", params);
                 },
-                info: (path) => toolCall("file_info", { path }),
+                grep: (path, pattern, options = {}) => {
+                    const params = { path, pattern, ...options };
+                    // environment can be included in options
+                    return toolCall("grep_code", params);
+                },
+                info: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("file_info", params);
+                },
                 // 智能应用文件绑定
-                apply: (path, content) => toolCall("apply_file", { path, content }),
-                zip: (source, destination) => toolCall("zip_files", { source, destination }),
-                unzip: (source, destination) => toolCall("unzip_files", { source, destination }),
-                open: (path) => toolCall("open_file", { path }),
-                share: (path, title) => {
+                apply: (path, content, environment) => {
+                    const params = { path, content };
+                    if (environment) params.environment = environment;
+                    return toolCall("apply_file", params);
+                },
+                zip: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("zip_files", params);
+                },
+                unzip: (source, destination, environment) => {
+                    const params = { source, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("unzip_files", params);
+                },
+                open: (path, environment) => {
+                    const params = { path };
+                    if (environment) params.environment = environment;
+                    return toolCall("open_file", params);
+                },
+                share: (path, title, environment) => {
                     const params = { path };
                     if (title) params.title = title;
+                    if (environment) params.environment = environment;
                     return toolCall("share_file", params);
                 },
-                download: (url, destination) => toolCall("download_file", { url, destination }),
-                convert: (sourcePath, targetPath, options = {}) => {
-                    const params = {
-                        source_path: sourcePath,
-                        target_path: targetPath,
-                        ...options
-                    };
-                    return toolCall("convert_file", params);
+                download: (url, destination, environment) => {
+                    const params = { url, destination };
+                    if (environment) params.environment = environment;
+                    return toolCall("download_file", params);
                 },
-                // 获取支持的文件转换格式
-                getSupportedConversions: (formatType = null) => {
-                    const params = formatType ? { format_type: formatType } : {};
-                    return toolCall("get_supported_conversions", params);
-                }
             },
             // 网络操作
             Net: {
                 httpGet: (url) => toolCall("http_request", { url, method: "GET" }),
-                httpPost: (url, data) => toolCall("http_request", { url, method: "POST", data }),
+                httpPost: (url, body) => {
+                    const params = { url, method: "POST", body };
+                    if (typeof body === 'object') {
+                        params.body = JSON.stringify(body);
+                    }
+                    return toolCall("http_request", params);
+                },
                 visit: (url) => toolCall("visit_web", { url }),
                 // 新增增强版HTTP请求
-                http: (options) => toolCall("http_request", options),
+                http: (options) => {
+                    const params = { ...options };
+                    if (params.body !== undefined && typeof params.body === 'object') {
+                        params.body = JSON.stringify(params.body);
+                    }
+                    if (params.headers !== undefined && typeof params.headers === 'object') {
+                        params.headers = JSON.stringify(params.headers);
+                    }
+                    return toolCall("http_request", params);
+                },
                 // 新增文件上传
-                uploadFile: (url, files, formData = {}, options = {}) => {
+                uploadFile: (options) => {
                     const params = {
-                        url,
-                        files: Array.isArray(files) ? JSON.stringify(files) : files,
-                        form_data: JSON.stringify(formData),
-                        ...options
+                        ...options,
+                        files: JSON.stringify(options.files || []),
+                        form_data: JSON.stringify(options.form_data || {})
                     };
+                    if (options.headers !== undefined && typeof options.headers === 'object') {
+                        params.headers = JSON.stringify(options.headers);
+                    }
                     return toolCall("multipart_request", params);
                 },
                 // 新增Cookie管理
@@ -95,8 +148,8 @@ fun getJsToolsDefinition(): String {
             // 系统操作
             System: {
                 sleep: (milliseconds) => toolCall("sleep", { duration_ms: parseInt(milliseconds) }),
-                getSetting: (key, namespace) => toolCall("get_system_setting", { key, namespace }),
-                setSetting: (key, value, namespace) => toolCall("modify_system_setting", { key, value, namespace }),
+                getSetting: (setting, namespace) => toolCall("get_system_setting", { setting, namespace }),
+                setSetting: (setting, value, namespace) => toolCall("modify_system_setting", { setting, value, namespace }),
                 getDeviceInfo: () => toolCall("device_info"),
                 // 使用工具包
                 usePackage: (packageName) => toolCall("use_package", { package_name: packageName }),
@@ -119,15 +172,24 @@ fun getJsToolsDefinition(): String {
                     toolCall("get_device_location", { high_accuracy: !!highAccuracy, timeout: parseInt(timeout) }),
                 shell: (command) => toolCall("execute_shell", { command }),
                 // 执行终端命令 - 一次性收集输出
-                terminal: (command, sessionId, timeoutMs) => {
-                    const params = { command };
-                    if (sessionId) params.session_id = sessionId;
-                    if (timeoutMs) params.timeout_ms = timeoutMs;
-                    return toolCall("execute_terminal", params);
+                terminal: {
+                    create: (sessionName) => toolCall("create_terminal_session", { session_name: sessionName }),
+                    exec: (sessionId, command, timeoutMs) => {
+                        const params = { session_id: sessionId, command };
+                        if (timeoutMs) params.timeout_ms = timeoutMs;
+                        return toolCall("execute_in_terminal_session", params);
+                    },
+                    close: (sessionId) => toolCall("close_terminal_session", { session_id: sessionId })
                 },
                 // 执行Intent
                 intent: (options = {}) => {
                     return toolCall("execute_intent", options);
+                }
+            },
+            // Tasker event
+            Tasker: {
+                triggerEvent: (params) => {
+                    return toolCall("trigger_tasker_event", params || {});
                 }
             },
             // UI操作
@@ -189,10 +251,55 @@ fun getJsToolsDefinition(): String {
                 },
                 pressKey: (keyCode) => toolCall("press_key", { key_code: keyCode }),
             },
-            // 知识查询
-            Query: {
-                // 查询问题库
-                knowledge: (query) => toolCall("query_knowledge_library", { query })
+            // 记忆管理
+            Memory: {
+                // 查询记忆库
+                query: (query, folderPath, threshold, limit) => {
+                    const params = { query };
+                    if (folderPath) params.folder_path = folderPath;
+                    if (threshold !== undefined) params.threshold = threshold;
+                    if (limit !== undefined) params.limit = limit;
+                    return toolCall("query_memory", params);
+                },
+                // 通过标题获取记忆
+                getByTitle: (title, chunkIndex, chunkRange, query) => {
+                    const params = { title };
+                    if (chunkIndex !== undefined) params.chunk_index = chunkIndex;
+                    if (chunkRange) params.chunk_range = chunkRange;
+                    if (query) params.query = query;
+                    return toolCall("get_memory_by_title", params);
+                },
+                // 创建记忆
+                create: (title, content, contentType, source, folderPath) => {
+                    const params = { title, content };
+                    if (contentType) params.content_type = contentType;
+                    if (source) params.source = source;
+                    if (folderPath) params.folder_path = folderPath;
+                    return toolCall("create_memory", params);
+                },
+                // 更新记忆
+                update: (oldTitle, updates = {}) => {
+                    const params = { old_title: oldTitle };
+                    if (updates.newTitle) params.new_title = updates.newTitle;
+                    if (updates.content) params.content = updates.content;
+                    if (updates.contentType) params.content_type = updates.contentType;
+                    if (updates.source) params.source = updates.source;
+                    if (updates.credibility !== undefined) params.credibility = updates.credibility;
+                    if (updates.importance !== undefined) params.importance = updates.importance;
+                    if (updates.folderPath) params.folder_path = updates.folderPath;
+                    if (updates.tags) params.tags = updates.tags;
+                    return toolCall("update_memory", params);
+                },
+                // 删除记忆
+                deleteMemory: (title) => toolCall("delete_memory", { title }),
+                // 链接记忆
+                link: (sourceTitle, targetTitle, linkType, weight, description) => {
+                    const params = { source_title: sourceTitle, target_title: targetTitle };
+                    if (linkType) params.link_type = linkType;
+                    if (weight !== undefined) params.weight = weight;
+                    if (description) params.description = description;
+                    return toolCall("link_memories", params);
+                }
             },
             // 计算功能
             calc: (expression) => toolCall("calculate", { expression }),
@@ -213,6 +320,63 @@ fun getJsToolsDefinition(): String {
                         ...options
                     };
                     return toolCall("ffmpeg_convert", params);
+                }
+            },
+            
+            // 工作流工具
+            Workflow: {
+                // 获取所有工作流
+                getAll: () => {
+                    return toolCall("get_all_workflows", {});
+                },
+                // 创建新工作流
+                create: (name, description = "", nodes = null, connections = null, enabled = true) => {
+                    const params = { name, description, enabled: enabled.toString() };
+                    if (nodes) params.nodes = typeof nodes === 'string' ? nodes : JSON.stringify(nodes);
+                    if (connections) params.connections = typeof connections === 'string' ? connections : JSON.stringify(connections);
+                    return toolCall("create_workflow", params);
+                },
+                // 获取工作流详情
+                get: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("get_workflow", params);
+                },
+                // 更新工作流
+                update: (workflowId, updates = {}) => {
+                    const params = { workflow_id: workflowId };
+                    if (updates.name) params.name = updates.name;
+                    if (updates.description !== undefined) params.description = updates.description;
+                    if (updates.nodes) params.nodes = typeof updates.nodes === 'string' ? updates.nodes : JSON.stringify(updates.nodes);
+                    if (updates.connections) params.connections = typeof updates.connections === 'string' ? updates.connections : JSON.stringify(updates.connections);
+                    if (updates.enabled !== undefined) params.enabled = updates.enabled.toString();
+                    return toolCall("update_workflow", params);
+                },
+                // 删除工作流
+                delete: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("delete_workflow", params);
+                },
+                // 触发工作流执行
+                trigger: (workflowId) => {
+                    const params = { workflow_id: workflowId };
+                    return toolCall("trigger_workflow", params);
+                }
+            },
+            // 对话管理工具
+            Chat: {
+                // 启动对话服务
+                startService: () => toolCall("start_chat_service", {}),
+                // 创建新对话
+                createNew: () => toolCall("create_new_chat", {}),
+                // 列出所有对话
+                listAll: () => toolCall("list_chats", {}),
+                // 切换对话
+                switchTo: (chatId) => toolCall("switch_chat", { chat_id: chatId }),
+                // 发送消息给AI
+                sendMessage: (message, chatId) => {
+                    const params = { message };
+                    if (chatId) params.chat_id = chatId;
+                    return toolCall("send_message_to_ai", params);
                 }
             }
         };

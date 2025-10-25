@@ -141,7 +141,7 @@ fun FFmpegToolboxScreen(navController: NavController) {
                                     toolName = "ffmpeg_execute",
                                     success = false,
                                     result = com.ai.assistance.operit.core.tools.StringResultData(""),
-                                    error = context.getString(R.string.format_converter_failed) + ": ${e.message}"
+                                    error = "FFmpeg execution failed: ${e.message}"
                                 )
                             } finally {
                                 isProcessing = false

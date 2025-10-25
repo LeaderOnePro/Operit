@@ -21,9 +21,15 @@ import com.ai.assistance.operit.ui.features.demo.screens.ShizukuDemoScreen
 import com.ai.assistance.operit.ui.features.help.screens.HelpScreen
 import com.ai.assistance.operit.ui.features.memory.screens.MemoryScreen
 import com.ai.assistance.operit.ui.features.packages.screens.PackageManagerScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPMarketScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPManageScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPPublishScreen
+import com.ai.assistance.operit.ui.features.packages.screens.MCPPluginDetailScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ChatHistorySettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.ContextSummarySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.FunctionalConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.LanguageSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.LayoutAdjustmentSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ModelConfigScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ModelPromptsSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.TagMarketScreen
@@ -34,10 +40,11 @@ import com.ai.assistance.operit.ui.features.settings.screens.ToolPermissionSetti
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesGuideScreen
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.CustomHeadersSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.MnnModelDownloadScreen
+import com.ai.assistance.operit.ui.features.settings.screens.TokenUsageStatisticsScreen
 import com.ai.assistance.operit.ui.features.token.TokenConfigWebViewScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.AppPermissionsToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.FileManagerToolScreen
-import com.ai.assistance.operit.ui.features.toolbox.screens.FormatConverterToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.LogcatToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.ShellExecutorToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.StreamMarkdownDemoScreen
@@ -50,6 +57,8 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.speechtotext.SpeechT
 import com.ai.assistance.operit.ui.features.toolbox.screens.texttospeech.TextToSpeechToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.tooltester.ToolTesterScreen
 import com.ai.assistance.operit.ui.features.update.screens.UpdateScreen
+import com.ai.assistance.operit.ui.features.workflow.screens.WorkflowListScreen
+import com.ai.assistance.operit.ui.features.workflow.screens.WorkflowDetailScreen
 
 // 路由配置类
 typealias ScreenNavigationHandler = (Screen) -> Unit
@@ -141,7 +150,89 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            PackageManagerScreen()
+            PackageManagerScreen(
+                onNavigateToMCPMarket = { navigateTo(MCPMarket) }
+            )
+        }
+    }
+
+    data object MCPMarket : Screen(parentScreen = Packages, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_market) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPMarketScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToPublish = { navigateTo(MCPPublish) },
+                onNavigateToManage = { navigateTo(MCPManage) },
+                onNavigateToDetail = { issue ->
+                    navigateTo(MCPPluginDetail(issue))
+                }
+            )
+        }
+    }
+
+    data object MCPPublish : Screen(parentScreen = MCPMarket, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_publish) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPublishScreen(onNavigateBack = onGoBack)
+        }
+    }
+
+    data object MCPManage : Screen(parentScreen = MCPMarket, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_manage) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPManageScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToEdit = { issue ->
+                    navigateTo(MCPEditPlugin(issue))
+                },
+                onNavigateToPublish = { navigateTo(MCPPublish) }
+            )
+        }
+    }
+
+    data class MCPEditPlugin(val editingIssue: com.ai.assistance.operit.data.api.GitHubIssue) : Screen(parentScreen = MCPManage, navItem = NavItem.Packages, titleRes = R.string.screen_title_mcp_publish) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPublishScreen(
+                onNavigateBack = onGoBack,
+                editingIssue = editingIssue
+            )
         }
     }
 
@@ -159,16 +250,13 @@ sealed class Screen(
         ) {
             ToolboxScreen(
                     navController = navController,
-                    onFormatConverterSelected = { navigateTo(FormatConverter) },
                     onFileManagerSelected = { navigateTo(FileManager) },
                     onTerminalSelected = { navigateTo(Terminal) },
-                    onTerminalAutoConfigSelected = { navigateTo(TerminalAutoConfig) },
                     onAppPermissionsSelected = { navigateTo(AppPermissions) },
                     onUIDebuggerSelected = { navigateTo(UIDebugger) },
                     onFFmpegToolboxSelected = { navigateTo(FFmpegToolbox) },
                     onShellExecutorSelected = { navigateTo(ShellExecutor) },
                     onLogcatSelected = { navigateTo(Logcat) },
-                    onMarkdownDemoSelected = { navigateTo(MarkdownDemo) },
                     onTextToSpeechSelected = { navigateTo(TextToSpeech) },
                     onSpeechToTextSelected = { navigateTo(SpeechToText) },
                     onToolTesterSelected = { navigateTo(ToolTester) },
@@ -189,7 +277,7 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            ShizukuDemoScreen()
+            ShizukuDemoScreen(navigateTo = navigateTo)
         }
     }
 
@@ -217,7 +305,10 @@ sealed class Screen(
                     navigateToSpeechServicesSettings = { navigateTo(SpeechServicesSettings) },
                     navigateToCustomHeadersSettings = { navigateTo(CustomHeadersSettings) },
                     navigateToPersonaCardGeneration = { navigateTo(PersonaCardGeneration) },
-                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) }
+                    navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
+                    navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) },
+                    navigateToContextSummarySettings = { navigateTo(ContextSummarySettings) },
+                    navigateToLayoutAdjustmentSettings = { navigateTo(LayoutAdjustmentSettings) }
             )
         }
     }
@@ -304,11 +395,45 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            AssistantConfigScreen(
-                    navigateToModelConfig = { navigateTo(ModelConfig) },
-                    navigateToModelPrompts = { navigateTo(ModelPromptsSettings) },
-                    navigateToFunctionalConfig = { navigateTo(FunctionalConfig) },
-                    navigateToUserPreferences = { navigateTo(UserPreferencesSettings) }
+            AssistantConfigScreen()
+        }
+    }
+
+    data object Workflow : Screen(navItem = NavItem.Workflow) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            WorkflowListScreen(
+                onNavigateToDetail = { workflowId ->
+                    navigateTo(WorkflowDetail(workflowId))
+                }
+            )
+        }
+    }
+
+    data class WorkflowDetail(val workflowId: String) : Screen(parentScreen = Workflow, navItem = NavItem.Workflow, titleRes = R.string.nav_workflow) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            WorkflowDetailScreen(
+                workflowId = workflowId,
+                onNavigateBack = onGoBack
             )
         }
     }
@@ -407,7 +532,10 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            ModelConfigScreen(onBackPressed = onGoBack)
+            ModelConfigScreen(
+                onBackPressed = onGoBack,
+                navigateToMnnModelDownload = { navigateTo(MnnModelDownload) }
+            )
         }
     }
     // 添加SpeechServicesSettings屏幕定义
@@ -424,7 +552,10 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            SpeechServicesSettingsScreen(onBackPressed = onGoBack)
+            SpeechServicesSettingsScreen(
+                onBackPressed = onGoBack,
+                onNavigateToTextToSpeech = { navigateTo(TextToSpeech) }
+            )
         }
     }
     
@@ -443,6 +574,24 @@ sealed class Screen(
             onGestureConsumed: (Boolean) -> Unit
         ) {
             CustomHeadersSettingsScreen(onBackPressed = onGoBack)
+        }
+    }
+    
+    // MNN模型下载屏幕
+    data object MnnModelDownload :
+        Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_mnn_model_download) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MnnModelDownloadScreen(onBackPressed = onGoBack)
         }
     }
     
@@ -484,6 +633,27 @@ sealed class Screen(
             onGestureConsumed: (Boolean) -> Unit
         ) {
             com.ai.assistance.operit.ui.features.settings.screens.WaifuModeSettingsScreen(
+                onNavigateBack = onGoBack,
+                onNavigateToCustomEmoji = { navigateTo(CustomEmojiManagement) }
+            )
+        }
+    }
+    
+    // 自定义表情管理页面
+    data object CustomEmojiManagement :
+        Screen(parentScreen = WaifuModeSettings, navItem = NavItem.Settings, titleRes = R.string.manage_custom_emoji) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            com.ai.assistance.operit.ui.features.settings.screens.CustomEmojiManagementScreen(
                 onNavigateBack = onGoBack
             )
         }
@@ -564,6 +734,23 @@ sealed class Screen(
         }
     }
 
+    data object LayoutAdjustmentSettings :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_layout_adjustment) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            LayoutAdjustmentSettingsScreen(onNavigateBack = onGoBack)
+        }
+    }
+
     data object ChatHistorySettings :
             Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_chat_history_settings) {
         @Composable
@@ -598,9 +785,8 @@ sealed class Screen(
         }
     }
 
-    // Toolbox secondary screens
-    data object FormatConverter :
-            Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_format_converter) {
+    data object TokenUsageStatistics :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.settings_token_usage_stats) {
         @Composable
         override fun Content(
                 navController: NavController,
@@ -612,9 +798,28 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            FormatConverterToolScreen(navController = navController)
+            TokenUsageStatisticsScreen(onBackPressed = onGoBack)
         }
     }
+
+    data object ContextSummarySettings :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_context_summary_settings) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            ContextSummarySettingsScreen(onBackPressed = onGoBack)
+        }
+    }
+
+    // Toolbox secondary screens
 
     data object FileManager :
             Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_file_manager) {
@@ -647,6 +852,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             TerminalToolScreen(navController = navController)
+        }
+    }
+
+    data object TerminalSetup :
+            Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_terminal) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            TerminalToolScreen(navController = navController, forceShowSetup = true)
         }
     }
 
@@ -825,6 +1047,27 @@ sealed class Screen(
         }
     }
 
+    // MCP 插件详情页面
+    data class MCPPluginDetail(val issue: com.ai.assistance.operit.data.api.GitHubIssue) :
+            Screen(parentScreen = Packages, navItem = NavItem.Packages) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            MCPPluginDetailScreen(
+                issue = issue,
+                onNavigateBack = onGoBack
+            )
+        }
+    }
+
     // 获取屏幕标题
     @Composable
     fun getTitle(): String = titleRes?.let { stringResource(it) } ?: ""
@@ -857,6 +1100,7 @@ object OperitRouter {
             NavItem.AssistantConfig -> Screen.AssistantConfig
             NavItem.Agreement -> Screen.Agreement
             NavItem.UpdateHistory -> Screen.UpdateHistory
+            NavItem.Workflow -> Screen.Workflow
             else -> Screen.AiChat
         }
     }

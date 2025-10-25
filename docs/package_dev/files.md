@@ -4,7 +4,27 @@
 
 ## 概述
 
-所有文件系统相关的功能都封装在全局的 `Tools.Files` 命名空间下。这个模块涵盖了从基本的读写、移动、删除，到更高级的压缩、下载和文件转换等操作。
+所有文件系统相关的功能都封装在全局的 `Tools.Files` 命名空间下。这个模块涵盖了从基本的读写、移动、删除，到更高级的压缩、下载等操作。
+
+### Environment 参数
+
+**重要**：所有文件操作函数都支持可选的 `environment` 参数，用于指定执行环境：
+
+- `"android"` (默认): Android文件系统环境，路径使用Android格式（如 `/sdcard/Download`）
+- `"linux"`: Ubuntu终端环境，路径使用Linux格式（如 `/home/user/file.txt`, `/etc/hosts`）
+
+当使用 `"linux"` 环境时，系统会自动将Linux路径映射到Android文件系统中的实际位置：
+- Ubuntu根目录位于：`/data/data/<应用包名>/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu`
+- 例如：`/home/user/test.txt` 会被映射到 `{filesDir}/usr/var/lib/proot-distro/installed-rootfs/ubuntu/home/user/test.txt`
+
+**使用示例**：
+```typescript
+// 在Android环境读取文件
+await Tools.Files.read("/sdcard/test.txt", "android");
+
+// 在Linux环境读取文件
+await Tools.Files.read("/home/user/config.txt", "linux");
+```
 
 ---
 
@@ -31,6 +51,8 @@
 ### 高级文件操作
 
 -   `find(path: string, pattern: string): Promise<FindFilesResultData>`: 在指定目录下根据模式（pattern）查找文件。
+-   `grep(path: string, pattern: string, options?: object): Promise<GrepResultData>`: 在文件中搜索匹配正则表达式的代码内容。返回带行号和上下文的匹配结果。
+    -   **`options`** 对象可以包含 `file_pattern`（文件过滤，如 `"*.kt"`）, `case_insensitive`（忽略大小写）, `context_lines`（匹配行前后的上下文行数，默认3）, `max_results`（最大匹配数，默认100）等参数。
 -   `zip(source: string, destination: string): Promise<FileOperationData>`: 将指定的文件或目录压缩成一个 zip 文件。
 -   `unzip(source: string, destination: string): Promise<FileOperationData>`: 将一个 zip 压缩包解压到指定目录。
 -   `download(url: string, destination: string): Promise<FileOperationData>`: 从给定的 URL 下载文件并保存到本地。
@@ -40,14 +62,6 @@
 
 -   `open(path: string): Promise<FileOperationData>`: 请求系统使用默认的应用打开指定文件。
 -   `share(path: string): Promise<FileOperationData>`: 调用系统的分享菜单来分享指定文件。
-
-### 文件格式转换
-
--   `convert(sourcePath: string, targetPath: string, options?: object): Promise<FileConversionResultData>`:
-    转换文件格式。这是一个强大的功能，底层可能调用 FFmpeg 或其他库。
-    -   **`options`** 对象可以包含 `quality`, `video_codec`, `audio_codec`, `resolution`, `bitrate` 等参数。
--   `getSupportedConversions(formatType?: string): Promise<FileFormatConversionsResultData>`:
-    获取当前环境支持的文件格式转换类型。可以按 `image`, `audio`, `video`, `document` 等进行过滤。
 
 **示例: 读写文件**
 ```typescript
@@ -84,6 +98,36 @@ async function downloadAndUnzip() {
         complete({ success: true, message: "文件已下载并解压。" });
     } catch (error) {
         complete({ success: false, message: `处理失败: ${error.message}` });
+    }
+}
+```
+
+**示例: 搜索代码**
+```typescript
+async function searchCodeExample() {
+    const projectPath = "/sdcard/MyProject";
+    
+    try {
+        // 在所有 Kotlin 文件中搜索包含 "ViewModel" 的代码
+        const result = await Tools.Files.grep(projectPath, "ViewModel", {
+            file_pattern: "*.kt",
+            case_insensitive: false,
+            max_results: 50
+        });
+        
+        console.log(`找到 ${result.totalMatches} 个匹配项，分布在 ${result.matches.length} 个文件中`);
+        
+        // 处理搜索结果
+        result.matches.forEach(fileMatch => {
+            console.log(`文件: ${fileMatch.filePath}`);
+            fileMatch.lineMatches.forEach(line => {
+                console.log(`  ${line.lineNumber}: ${line.lineContent}`);
+            });
+        });
+        
+        complete({ success: true, result });
+    } catch (error) {
+        complete({ success: false, message: `搜索失败: ${error.message}` });
     }
 }
 ``` 

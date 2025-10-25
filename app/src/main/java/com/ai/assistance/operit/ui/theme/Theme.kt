@@ -56,6 +56,8 @@ import com.google.android.exoplayer2.ui.StyledPlayerView
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 private val DarkColorScheme =
         darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
@@ -119,10 +121,29 @@ fun OperitTheme(content: @Composable () -> Unit) {
             preferencesManager.customStatusBarColor.collectAsState(initial = null)
     val statusBarTransparent by
             preferencesManager.statusBarTransparent.collectAsState(initial = false)
+    val statusBarHidden by
+            preferencesManager.statusBarHidden.collectAsState(initial = false)
 
     // 获取背景模糊设置
     val useBackgroundBlur by preferencesManager.useBackgroundBlur.collectAsState(initial = false)
     val backgroundBlurRadius by preferencesManager.backgroundBlurRadius.collectAsState(initial = 10f)
+
+    // 获取字体设置
+    val useCustomFont by preferencesManager.useCustomFont.collectAsState(initial = false)
+    val fontType by preferencesManager.fontType.collectAsState(initial = UserPreferencesManager.FONT_TYPE_SYSTEM)
+    val systemFontName by preferencesManager.systemFontName.collectAsState(initial = UserPreferencesManager.SYSTEM_FONT_DEFAULT)
+    val customFontPath by preferencesManager.customFontPath.collectAsState(initial = null)
+
+    // 创建自定义 Typography
+    val customTypography = remember(useCustomFont, fontType, systemFontName, customFontPath) {
+        createCustomTypography(
+            context = context,
+            useCustomFont = useCustomFont,
+            fontType = fontType,
+            systemFontName = systemFontName,
+            customFontPath = customFontPath
+        )
+    }
 
     // 确定是否使用暗色主题
     val systemDarkTheme = isSystemInDarkTheme()
@@ -165,23 +186,43 @@ fun OperitTheme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            val insetsController = ViewCompat.getWindowInsetsController(view)
             
             // 始终保持沉浸式模式，让Compose处理状态栏背景
             WindowCompat.setDecorFitsSystemWindows(window, false)
 
-            // 状态栏颜色和图标颜色控制
-            val statusBarColor = when {
-                statusBarTransparent -> Color.Transparent.toArgb()
-                useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
-                else -> colorScheme.primary.toArgb()
-            }
-            window.statusBarColor = statusBarColor
+            // 隐藏或显示状态栏
+            if (statusBarHidden) {
+                // 隐藏状态栏
+                insetsController?.hide(WindowInsetsCompat.Type.statusBars())
+                insetsController?.systemBarsBehavior = 
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                // 显示状态栏
+                insetsController?.show(WindowInsetsCompat.Type.statusBars())
+                
+                // 状态栏颜色和图标颜色控制
+                val statusBarColor = when {
+                    statusBarTransparent -> Color.Transparent.toArgb()
+                    useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
+                    else -> colorScheme.primary.toArgb()
+                }
+                window.statusBarColor = statusBarColor
 
-            // 根据状态栏背景色动态设置状态栏图标颜色
-            // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
-            // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
-            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars =
-                !isColorLight(Color(statusBarColor))
+                // 根据状态栏背景色动态设置状态栏图标颜色
+                // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
+                // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
+                insetsController?.isAppearanceLightStatusBars = !isColorLight(Color(statusBarColor))
+            }
+            
+            // 设置导航栏颜色（底部小白条所在的区域）
+            // 使用软件背景色作为导航栏背景色
+            window.navigationBarColor = colorScheme.background.toArgb()
+            
+            // 根据导航栏背景色动态设置导航栏图标颜色
+            // isAppearanceLightNavigationBars = true 表示图标为深色（适用于浅色背景）
+            // isAppearanceLightNavigationBars = false 表示图标为浅色（适用于深色背景）
+            insetsController?.isAppearanceLightNavigationBars = !isColorLight(colorScheme.background)
         }
     }
 
@@ -432,13 +473,13 @@ fun OperitTheme(content: @Composable () -> Unit) {
                                         surfaceContainerLowest =
                                                 colorScheme.surfaceContainerLowest.copy(alpha = 1f)
                                 ),
-                        typography = Typography,
+                        typography = customTypography,
                         content = content
                 )
             }
         } else {
             // 不使用背景图片时，直接应用主题
-            MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+            MaterialTheme(colorScheme = colorScheme, typography = customTypography, content = content)
         }
     }
 }

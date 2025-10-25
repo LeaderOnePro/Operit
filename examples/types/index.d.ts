@@ -28,7 +28,10 @@ import {
     VisitWebResultData as _VisitWebResultData,
     CombinedOperationResultData as _CombinedOperationResultData,
     FilePartContentData as _FilePartContentData,
-    FileApplyResultData as _FileApplyResultData
+    FileApplyResultData as _FileApplyResultData,
+    GrepResultData as _GrepResultData,
+    GrepFileMatch as _GrepFileMatch,
+    GrepLineMatch as _GrepLineMatch
 } from './results';
 import { Intent as AndroidIntent, IntentFlag as AndroidIntentFlag, IntentAction as AndroidIntentAction, IntentCategory as AndroidIntentCategory } from './android';
 import { UINode as UINodeClass, UI as UINamespace } from './ui';
@@ -48,13 +51,19 @@ import { Net as NetType } from './network';
 import { System as SystemType } from './system';
 import { UI as UIType } from './ui';
 import { FFmpeg as FFmpegType } from './ffmpeg';
-import { Query as QueryType } from './query';
+import { Tasker as TaskerType } from './tasker';
+import { Workflow as WorkflowType } from './workflow';
+import { Chat as ChatType } from './chat';
+import { Memory as MemoryType } from './memory';
 
 export { Net } from './network';
 export { System } from './system';
 export { UI, UINode } from './ui';
 export { FFmpegVideoCodec, FFmpegAudioCodec, FFmpegResolution, FFmpegBitrate } from './ffmpeg';
-export { Query } from './query';
+export { Tasker } from './tasker';
+export { Workflow } from './workflow';
+export { Chat } from './chat';
+export { Memory } from './memory';
 
 // Export Android utilities
 export {
@@ -108,7 +117,13 @@ declare global {
     type CombinedOperationResultData = _CombinedOperationResultData;
     type FilePartContentData = _FilePartContentData;
     type FileApplyResultData = _FileApplyResultData;
+    type GrepResultData = _GrepResultData;
+    type GrepFileMatch = _GrepFileMatch;
+    type GrepLineMatch = _GrepLineMatch;
 
+    namespace Tasker {
+        export type TriggerTaskerEventParams = TaskerType.TriggerTaskerEventParams;
+    }
 
     // Global interface definitions
     interface ToolParams {
@@ -158,7 +173,10 @@ declare global {
         System: typeof SystemType;
         UI: typeof UIType;
         FFmpeg: typeof FFmpegType;
-        Query: typeof QueryType;
+        Tasker: typeof TaskerType;
+        Workflow: typeof WorkflowType;
+        Chat: typeof ChatType;
+        Memory: typeof MemoryType;
         calc: (expression: string) => Promise<CalculationResultData>;
     };
 

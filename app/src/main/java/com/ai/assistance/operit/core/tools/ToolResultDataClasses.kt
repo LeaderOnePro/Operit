@@ -13,7 +13,11 @@ sealed class ToolResultData {
     /** Converts the structured data to a string representation */
     abstract override fun toString(): String
     fun toJson(): String {
-        val json = Json.encodeToString(this)
+        val jsonConfig = Json {
+            ignoreUnknownKeys = true
+            classDiscriminator = "__type"
+        }
+        val json = jsonConfig.encodeToString(this)
         return json
     }
 }
@@ -245,14 +249,21 @@ data class FileOperationData(
 
 /** Represents the result of an 'apply_file' operation, including the AI-generated diff */
 @Serializable
-data class FileApplyResultData(val operation: FileOperationData, val aiDiffInstructions: String) :
-        ToolResultData() {
+data class FileApplyResultData(
+    val operation: FileOperationData, 
+    val aiDiffInstructions: String,
+    val syntaxCheckResult: String? = null
+) : ToolResultData() {
     override fun toString(): String {
         val sb = StringBuilder()
         sb.appendLine(operation.details)
         if (aiDiffInstructions.isNotEmpty() && !aiDiffInstructions.startsWith("Error")) {
             sb.appendLine("\n--- AI-Generated Diff ---")
             sb.appendLine(aiDiffInstructions)
+        }
+        if (!syntaxCheckResult.isNullOrEmpty()) {
+            sb.appendLine("\n--- Syntax Check ---")
+            sb.appendLine(syntaxCheckResult)
         }
         return sb.toString()
     }
@@ -639,94 +650,7 @@ data class FFmpegResultData(
     }
 }
 
-/** 文件转换结果数据 */
-@Serializable
-data class FileConversionResultData(
-        val sourcePath: String,
-        val targetPath: String,
-        val sourceFormat: String,
-        val targetFormat: String,
-        val conversionType: String, // "document", "image", "audio", "video", "archive"
-        val quality: String? = null,
-        val fileSize: Long = 0, // Size of the output file in bytes
-        val duration: Long = 0, // Time taken for conversion in ms
-        val metadata: Map<String, String> =
-                emptyMap() // Any additional metadata about the conversion
-) : ToolResultData() {
-    override fun toString(): String {
-        val sb = StringBuilder()
-        sb.appendLine("文件转换结果:")
-        sb.appendLine("源文件: $sourcePath")
-        sb.appendLine("目标文件: $targetPath")
-        sb.appendLine("格式转换: .$sourceFormat → .$targetFormat")
-        sb.appendLine("转换类型: $conversionType")
 
-        quality?.let { sb.appendLine("质量设置: $it") }
-
-        if (fileSize > 0) {
-            val sizeInKB = fileSize / 1024.0
-            val sizeInMB = sizeInKB / 1024.0
-
-            val sizeStr =
-                    when {
-                        sizeInMB >= 1.0 -> String.format("%.2f MB", sizeInMB)
-                        sizeInKB >= 1.0 -> String.format("%.2f KB", sizeInKB)
-                        else -> "$fileSize bytes"
-                    }
-            sb.appendLine("文件大小: $sizeStr")
-        }
-
-        if (duration > 0) {
-            sb.appendLine("处理时间: ${duration}ms")
-        }
-
-        if (metadata.isNotEmpty()) {
-            sb.appendLine("\n元数据:")
-            metadata.forEach { (key, value) -> sb.appendLine("  $key: $value") }
-        }
-
-        return sb.toString()
-    }
-}
-
-/** 文件格式转换支持数据 */
-@Serializable
-data class FileFormatConversionsResultData(
-        val formatType: String? = null, // null means all formats
-        val conversions: Map<String, List<String>>, // source format -> list of target formats
-        val fileTypes: Map<String, List<String>> = emptyMap() // category -> list of formats
-) : ToolResultData() {
-    override fun toString(): String {
-        val sb = StringBuilder()
-
-        if (formatType != null) {
-            sb.appendLine("支持的$formatType 格式转换:")
-
-            // Only show conversions for the specified format type
-            val formatsForType = fileTypes[formatType] ?: emptyList()
-            formatsForType.forEach { sourceFormat ->
-                val targetFormats = conversions[sourceFormat]
-                if (targetFormats != null && targetFormats.isNotEmpty()) {
-                    sb.appendLine(".$sourceFormat → ${targetFormats.joinToString(", ") { ".$it" }}")
-                }
-            }
-        } else {
-            sb.appendLine("所有支持的格式转换:")
-            conversions.forEach { (sourceFormat, targetFormats) ->
-                sb.appendLine(".$sourceFormat → ${targetFormats.joinToString(", ") { ".$it" }}")
-            }
-
-            if (fileTypes.isNotEmpty()) {
-                sb.appendLine("\n按类型分组:")
-                fileTypes.forEach { (type, formats) ->
-                    sb.appendLine("$type: ${formats.joinToString(", ") { ".$it" }}")
-                }
-            }
-        }
-
-        return sb.toString()
-    }
-}
 
 /** 通知数据结构 */
 @Serializable
@@ -869,7 +793,9 @@ data class MemoryQueryResultData(
         val content: String,
         val source: String,
         val tags: List<String>,
-        val createdAt: String
+        val createdAt: String,
+        val chunkInfo: String? = null,
+        val chunkIndices: List<Int>? = null
     )
 
     override fun toString(): String {
@@ -1065,5 +991,391 @@ data class AutomationFunctionListResult(
         }
         
         return sb.toString()
+    }
+}
+
+/** 终端会话创建结果数据 */
+@Serializable
+data class TerminalSessionCreationResultData(
+    val sessionId: String,
+    val sessionName: String,
+    val isNewSession: Boolean
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (isNewSession) {
+            "成功创建新的终端会话。会话名称: '$sessionName', 会话ID: $sessionId"
+        } else {
+            "成功获取现有的终端会话。会话名称: '$sessionName', 会话ID: $sessionId"
+        }
+    }
+}
+
+/** 终端会话关闭结果数据 */
+@Serializable
+data class TerminalSessionCloseResultData(
+    val sessionId: String,
+    val success: Boolean,
+    val message: String
+) : ToolResultData() {
+    override fun toString(): String = message
+}
+
+/** Grep代码搜索结果数据 */
+@Serializable
+data class GrepResultData(
+    val searchPath: String,
+    val pattern: String,
+    val matches: List<FileMatch>,
+    val totalMatches: Int,
+    val filesSearched: Int
+) : ToolResultData() {
+    
+    @Serializable
+    data class FileMatch(
+        val filePath: String,
+        val lineMatches: List<LineMatch>
+    )
+    
+    @Serializable
+    data class LineMatch(
+        val lineNumber: Int,
+        val lineContent: String,
+        val matchContext: String? = null
+    )
+    
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("Grep搜索结果:")
+        sb.appendLine("搜索路径: $searchPath")
+        sb.appendLine("搜索模式: $pattern")
+        sb.appendLine("匹配总数: $totalMatches (在 ${matches.size} 个文件中)")
+        sb.appendLine("搜索文件数: $filesSearched")
+        sb.appendLine()
+        
+        if (matches.isEmpty()) {
+            sb.appendLine("未找到匹配项")
+        } else {
+            matches.forEach { fileMatch ->
+                sb.appendLine("文件: ${fileMatch.filePath}")
+                fileMatch.lineMatches.forEach { lineMatch ->
+                    // 如果有上下文，显示完整的上下文
+                    if (lineMatch.matchContext != null && lineMatch.matchContext.isNotBlank()) {
+                        val contextLines = lineMatch.matchContext.lines()
+                        val centerIndex = contextLines.size / 2
+                        
+                        contextLines.forEachIndexed { idx, contextLine ->
+                            // 计算每行的实际行号
+                            val actualLineNum = lineMatch.lineNumber - centerIndex + idx
+                            val lineNumStr = String.format("%6d", actualLineNum)
+                            
+                            // 匹配行用 > 标记
+                            if (idx == centerIndex) {
+                                sb.appendLine("$lineNumStr|>${contextLine}")
+                            } else {
+                                sb.appendLine("$lineNumStr| ${contextLine}")
+                            }
+                        }
+                        sb.appendLine() // 在每个匹配块后添加空行
+                    } else {
+                        // 没有上下文，只显示匹配行
+                        val lineNumStr = String.format("%6d", lineMatch.lineNumber)
+                        sb.appendLine("$lineNumStr| ${lineMatch.lineContent}")
+                    }
+                }
+                sb.appendLine()
+            }
+            
+            if (matches.size > 20) {
+                sb.appendLine("... 结果过多，仅显示前20个文件的匹配")
+            }
+        }
+        
+        return sb.toString()
+    }
+}
+
+/** 工作流基本信息结果数据 */
+@Serializable
+data class WorkflowResultData(
+    val id: String,
+    val name: String,
+    val description: String,
+    val nodeCount: Int,
+    val connectionCount: Int,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastExecutionTime: Long? = null,
+    val lastExecutionStatus: String? = null,
+    val totalExecutions: Int = 0,
+    val successfulExecutions: Int = 0,
+    val failedExecutions: Int = 0
+) : ToolResultData() {
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("ID: $id")
+        sb.appendLine("名称: $name")
+        sb.appendLine("描述: $description")
+        sb.appendLine("状态: ${if (enabled) "启用" else "禁用"}")
+        sb.appendLine("节点数: $nodeCount")
+        sb.appendLine("连接数: $connectionCount")
+        sb.appendLine("总执行次数: $totalExecutions")
+        sb.appendLine("成功次数: $successfulExecutions")
+        sb.appendLine("失败次数: $failedExecutions")
+        if (lastExecutionTime != null) {
+            sb.appendLine("最后执行时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(lastExecutionTime))}")
+            sb.appendLine("最后执行状态: ${lastExecutionStatus ?: "未知"}")
+        }
+        return sb.toString().trim()
+    }
+}
+
+/** 工作流列表结果数据 */
+@Serializable
+data class WorkflowListResultData(
+    val workflows: List<WorkflowResultData>,
+    val totalCount: Int
+) : ToolResultData() {
+    override fun toString(): String {
+        if (workflows.isEmpty()) {
+            return "暂无工作流"
+        }
+        val sb = StringBuilder()
+        sb.appendLine("工作流列表 (共 $totalCount 个):")
+        sb.appendLine()
+        workflows.forEach { workflow ->
+            sb.appendLine("ID: ${workflow.id}")
+            sb.appendLine("名称: ${workflow.name}")
+            sb.appendLine("描述: ${workflow.description}")
+            sb.appendLine("状态: ${if (workflow.enabled) "启用" else "禁用"}")
+            sb.appendLine("节点数: ${workflow.nodeCount}")
+            sb.appendLine("连接数: ${workflow.connectionCount}")
+            sb.appendLine("总执行次数: ${workflow.totalExecutions}")
+            sb.appendLine("---")
+        }
+        return sb.toString().trim()
+    }
+    
+    companion object {
+        /**
+         * 创建一个空的WorkflowListResultData，用于错误情况
+         */
+        fun empty() = WorkflowListResultData(
+            workflows = emptyList(),
+            totalCount = 0
+        )
+    }
+}
+
+/** 工作流详细信息结果数据（包含完整的节点和连接信息） */
+@Serializable
+data class WorkflowDetailResultData(
+    val id: String,
+    val name: String,
+    val description: String,
+    val nodes: List<com.ai.assistance.operit.data.model.WorkflowNode>,
+    val connections: List<com.ai.assistance.operit.data.model.WorkflowNodeConnection>,
+    val enabled: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val lastExecutionTime: Long? = null,
+    val lastExecutionStatus: String? = null,
+    val totalExecutions: Int = 0,
+    val successfulExecutions: Int = 0,
+    val failedExecutions: Int = 0
+) : ToolResultData() {
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("工作流详情:")
+        sb.appendLine("ID: $id")
+        sb.appendLine("名称: $name")
+        sb.appendLine("描述: $description")
+        sb.appendLine("状态: ${if (enabled) "启用" else "禁用"}")
+        sb.appendLine()
+        
+        sb.appendLine("节点 (${nodes.size}):")
+        nodes.forEach { node ->
+            when (node) {
+                is com.ai.assistance.operit.data.model.TriggerNode -> {
+                    sb.appendLine("  - [触发] ${node.name} (${node.id})")
+                    sb.appendLine("    类型: ${node.triggerType}")
+                    if (node.description.isNotBlank()) {
+                        sb.appendLine("    描述: ${node.description}")
+                    }
+                }
+                is com.ai.assistance.operit.data.model.ExecuteNode -> {
+                    sb.appendLine("  - [执行] ${node.name} (${node.id})")
+                    sb.appendLine("    动作: ${node.actionType}")
+                    if (node.description.isNotBlank()) {
+                        sb.appendLine("    描述: ${node.description}")
+                    }
+                }
+            }
+        }
+        sb.appendLine()
+        
+        sb.appendLine("连接 (${connections.size}):")
+        connections.forEach { conn ->
+            val sourceName = nodes.find { it.id == conn.sourceNodeId }?.name ?: conn.sourceNodeId
+            val targetName = nodes.find { it.id == conn.targetNodeId }?.name ?: conn.targetNodeId
+            sb.append("  - $sourceName → $targetName")
+            if (conn.condition != null) {
+                sb.append(" (条件: ${conn.condition})")
+            }
+            sb.appendLine()
+        }
+        sb.appendLine()
+        
+        sb.appendLine("执行统计:")
+        sb.appendLine("  总执行次数: $totalExecutions")
+        sb.appendLine("  成功次数: $successfulExecutions")
+        sb.appendLine("  失败次数: $failedExecutions")
+        if (lastExecutionTime != null) {
+            sb.appendLine("  最后执行时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(java.util.Date(lastExecutionTime))}")
+            sb.appendLine("  最后执行状态: ${lastExecutionStatus ?: "未知"}")
+        }
+        
+        return sb.toString().trim()
+    }
+    
+    companion object {
+        /**
+         * 创建一个空的WorkflowDetailResultData，用于错误情况
+         */
+        fun empty() = WorkflowDetailResultData(
+            id = "",
+            name = "",
+            description = "",
+            nodes = emptyList(),
+            connections = emptyList(),
+            enabled = false,
+            createdAt = 0L,
+            updatedAt = 0L,
+            lastExecutionTime = null,
+            lastExecutionStatus = null,
+            totalExecutions = 0,
+            successfulExecutions = 0,
+            failedExecutions = 0
+        )
+    }
+}
+
+/** 对话服务启动结果数据 */
+@Serializable
+data class ChatServiceStartResultData(
+    val isConnected: Boolean,
+    val connectionTime: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (isConnected) {
+            "对话服务已启动并成功连接"
+        } else {
+            "对话服务连接失败"
+        }
+    }
+}
+
+/** 新建对话结果数据 */
+@Serializable
+data class ChatCreationResultData(
+    val chatId: String,
+    val createdAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return "已创建新对话\n对话ID: $chatId"
+    }
+}
+
+/** 对话列表结果数据 */
+@Serializable
+data class ChatListResultData(
+    val totalCount: Int,
+    val currentChatId: String?,
+    val chats: List<ChatInfo>
+) : ToolResultData() {
+    
+    @Serializable
+    data class ChatInfo(
+        val id: String,
+        val title: String,
+        val messageCount: Int,
+        val createdAt: String,
+        val updatedAt: String,
+        val isCurrent: Boolean,
+        val inputTokens: Int,
+        val outputTokens: Int
+    )
+    
+    override fun toString(): String {
+        val sb = StringBuilder()
+        sb.appendLine("对话列表 (共 $totalCount 个):")
+        if (currentChatId != null) {
+            sb.appendLine("当前对话ID: $currentChatId")
+        }
+        sb.appendLine()
+        
+        if (chats.isEmpty()) {
+            sb.appendLine("暂无对话")
+        } else {
+            chats.forEach { chat ->
+                val currentMarker = if (chat.isCurrent) " [当前]" else ""
+                sb.appendLine("ID: ${chat.id}$currentMarker")
+                sb.appendLine("标题: ${chat.title}")
+                sb.appendLine("消息数: ${chat.messageCount}")
+                sb.appendLine("Token统计: 输入 ${chat.inputTokens} / 输出 ${chat.outputTokens}")
+                sb.appendLine("创建时间: ${chat.createdAt}")
+                sb.appendLine("更新时间: ${chat.updatedAt}")
+                sb.appendLine("---")
+            }
+        }
+        
+        return sb.toString().trim()
+    }
+}
+
+/** 切换对话结果数据 */
+@Serializable
+data class ChatSwitchResultData(
+    val chatId: String,
+    val chatTitle: String = "",
+    val switchedAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        return if (chatTitle.isNotBlank()) {
+            "已切换到对话: $chatTitle\n对话ID: $chatId"
+        } else {
+            "已切换到对话: $chatId"
+        }
+    }
+}
+
+/** 发送消息结果数据 */
+@Serializable
+data class MessageSendResultData(
+    val chatId: String,
+    val message: String,
+    val sentAt: Long = System.currentTimeMillis()
+) : ToolResultData() {
+    override fun toString(): String {
+        val messagePreview = if (message.length > 50) {
+            "${message.take(50)}..."
+        } else {
+            message
+        }
+        return "消息已发送到对话: $chatId\n消息内容: $messagePreview"
+    }
+}
+
+/** 记忆链接结果数据 */
+@Serializable
+data class MemoryLinkResultData(
+    val sourceTitle: String,
+    val targetTitle: String,
+    val linkType: String,
+    val weight: Float,
+    val description: String
+) : ToolResultData() {
+    override fun toString(): String {
+        return "成功链接记忆: '$sourceTitle' -> '$targetTitle' (类型: $linkType, 强度: $weight)"
     }
 }

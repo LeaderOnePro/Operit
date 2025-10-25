@@ -119,7 +119,7 @@ fun WorkspaceManager(
                 val currentFile = File(fileInfo.path)
                 if (currentFile.exists() && currentFile.lastModified() > fileInfo.lastModified) {
                     // 文件已在外部被修改，重新加载内容
-                    val tool = AITool("read_file", listOf(ToolParameter("path", fileInfo.path)))
+                    val tool = AITool("read_file_full", listOf(ToolParameter("path", fileInfo.path)))
                     val result = toolHandler.executeTool(tool)
                     if (result.success && result.result is com.ai.assistance.operit.core.tools.FileContentData) {
                         val newContent = (result.result as com.ai.assistance.operit.core.tools.FileContentData).content

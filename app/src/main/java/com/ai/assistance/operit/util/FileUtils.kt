@@ -45,6 +45,13 @@ object FileUtils {
         "vcf", "ics", "gpx", "kml", "opml"
     )
 
+    // Common text files without extensions
+    private val TEXT_BASED_FILENAMES = setOf(
+        "readme", "makefile", "dockerfile", "license", "changelog", "authors", 
+        "contributors", "copying", "install", "news", "todo", "version",
+        "gemfile", "rakefile", "vagrantfile", "buildfile"
+    )
+
     /**
      * Checks if a file extension corresponds to a text-based file format.
      * @param extension The file extension without the dot (e.g., "txt", "java").
@@ -52,6 +59,21 @@ object FileUtils {
      */
     fun isTextBasedExtension(extension: String): Boolean {
         return extension.lowercase() in TEXT_BASED_EXTENSIONS
+    }
+
+    /**
+     * Checks if a file is a text-based file, considering both extension and filename.
+     * @param file The file to check.
+     * @return True if the file is likely a text-based file, false otherwise.
+     */
+    fun isTextBasedFile(file: File): Boolean {
+        val extension = file.extension
+        return if (extension.isEmpty()) {
+            // Files without extension - check common text filenames
+            file.name.lowercase() in TEXT_BASED_FILENAMES
+        } else {
+            isTextBasedExtension(extension)
+        }
     }
 
     /**

@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import android.view.WindowManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationMarkupManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationRoundManager
 import com.ai.assistance.operit.api.chat.enhance.ConversationService
@@ -12,13 +11,13 @@ import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.api.chat.enhance.InputProcessor
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
 import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.application.ActivityLifecycleManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.InputProcessingState
-import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolResult
@@ -36,19 +35,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
 /**
  * Enhanced AI service that provides advanced conversational capabilities by integrating various
@@ -197,13 +196,28 @@ class EnhancedAIService private constructor(private val context: Context) {
                     instance.multiServiceManager
             )
         }
+
+        /**
+         * 自动生成工具包描述（非实例化方式）
+         * @param context 应用上下文
+         * @param pluginName 工具包名称
+         * @param toolDescriptions 工具描述列表
+         * @return 生成的工具包描述
+         */
+        suspend fun generatePackageDescription(
+            context: Context,
+            pluginName: String,
+            toolDescriptions: List<String>
+        ): String {
+            return getInstance(context).generatePackageDescription(pluginName, toolDescriptions)
+        }
     }
 
     // MultiServiceManager 管理不同功能的 AIService 实例
     private val multiServiceManager = MultiServiceManager(context)
 
     // 添加ConversationService实例
-    private val conversationService = ConversationService(context)
+    private val conversationService = ConversationService(context, CustomEmojiRepository.getInstance(context))
 
     // 添加FileBindingService实例
     private val fileBindingService = FileBindingService(context)
@@ -228,28 +242,39 @@ class EnhancedAIService private constructor(private val context: Context) {
             MutableStateFlow<InputProcessingState>(InputProcessingState.Idle)
     val inputProcessingState = _inputProcessingState.asStateFlow()
 
+    /**
+     * 设置当前的输入处理状态
+     * @param newState 新的状态
+     */
+    fun setInputProcessingState(newState: com.ai.assistance.operit.data.model.InputProcessingState) {
+        _inputProcessingState.value = newState
+    }
+
     // Per-request token counts
     private val _perRequestTokenCounts = MutableStateFlow<Pair<Int, Int>?>(null)
     val perRequestTokenCounts: StateFlow<Pair<Int, Int>?> = _perRequestTokenCounts.asStateFlow()
 
-    // Plan items tracking
-    private val _planItems = MutableStateFlow<List<PlanItem>>(emptyList())
-    val planItems = _planItems.asStateFlow()
-
     // Conversation management
-    private val streamBuffer = StringBuilder()
-    private val roundManager = ConversationRoundManager()
-    private val isConversationActive = AtomicBoolean(false)
+    // private val streamBuffer = StringBuilder() // Moved to MessageExecutionContext
+    // private val roundManager = ConversationRoundManager() // Moved to MessageExecutionContext
+    // private val isConversationActive = AtomicBoolean(false) // Moved to MessageExecutionContext
 
     // Api Preferences for settings
     private val apiPreferences = ApiPreferences.getInstance(context)
 
+    // Execution context for a single sendMessage call to achieve concurrency
+    private data class MessageExecutionContext(
+        val streamBuffer: StringBuilder = StringBuilder(),
+        val roundManager: ConversationRoundManager = ConversationRoundManager(),
+        val isConversationActive: AtomicBoolean = AtomicBoolean(true),
+        val conversationHistory: MutableList<Pair<String, String>>,
+    )
 
     // Coroutine management
     private val toolProcessingScope = CoroutineScope(Dispatchers.IO)
     private val toolExecutionJobs = ConcurrentHashMap<String, Job>()
-    private val conversationHistory = mutableListOf<Pair<String, String>>()
-    private val conversationMutex = Mutex()
+    // private val conversationHistory = mutableListOf<Pair<String, String>>() // Moved to MessageExecutionContext
+    // private val conversationMutex = Mutex() // Moved to MessageExecutionContext
 
     // 为服务管理创建独立的Intent实例，避免重复创建
     private val serviceIntent by lazy { Intent(context, AIForegroundService::class.java) }
@@ -263,6 +288,9 @@ class EnhancedAIService private constructor(private val context: Context) {
 
     // Package manager for handling tool packages
     private val packageManager = PackageManager.getInstance(context, toolHandler)
+    
+    // 存储最后的回复内容，用于通知
+    private var lastReplyContent: String? = null
 
     init {
         toolHandler.registerDefaultTools()
@@ -296,110 +324,6 @@ class EnhancedAIService private constructor(private val context: Context) {
         return InputProcessor.processUserInput(input)
     }
 
-    /** Extract and update plan items from content */
-    private fun extractPlanItems(content: String) {
-        // Only extract plan items if planning is enabled
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (planningEnabled) {
-                    Log.d(TAG, "计划模式已启用，开始提取计划项")
-
-                    // 获取当前的计划项
-                    val existingItems = _planItems.value
-
-                    // 始终传入现有的计划项，让PlanItemParser处理合并和更新
-                    val updatedPlanItems =
-                            ConversationMarkupManager.extractPlanItems(content, existingItems)
-
-                    if (updatedPlanItems.isNotEmpty()) {
-                        // 检查计划项是否有变化
-                        if (updatedPlanItems != existingItems) {
-                            Log.d(TAG, "计划项有变化，更新状态流")
-                            _planItems.value = updatedPlanItems
-                        }
-                    } else if (_planItems.value.isNotEmpty()) {
-                        // 即使没有提取到新的计划项，也保留现有的计划项
-                        Log.d(TAG, "保留现有计划项")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "提取计划项时发生错误: ${e.message}")
-                // 错误时也保留现有计划项，避免因为异常导致UI丢失显示
-            }
-        }
-    }
-
-    /** Clear all plan items */
-    fun clearPlanItems() {
-        toolProcessingScope.launch {
-            try {
-                Log.d(TAG, "清除所有计划项")
-                _planItems.value = emptyList()
-            } catch (e: Exception) {
-                Log.e(TAG, "清除计划项时发生错误", e)
-            }
-        }
-    }
-
-    /**
-     * Re-extract plan items from the entire chat history This helps recover plan items in case they
-     * were lost due to UI state issues
-     */
-    private fun reExtractPlanItems(chatHistory: List<Pair<String, String>>) {
-        if (chatHistory.isEmpty()) {
-            Log.d(TAG, "空聊天历史，跳过计划项重新提取")
-            return
-        }
-
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (!planningEnabled) {
-                    Log.d(TAG, "计划模式未启用，跳过计划项重新提取")
-                    return@launch
-                }
-
-                // 如果当前已有计划项，不进行重新提取
-                if (_planItems.value.isNotEmpty()) {
-                    Log.d(
-                            TAG,
-                            "当前已有计划项，无需重新提取: ${_planItems.value.map { "${it.id}: ${it.status}" }}"
-                    )
-                    return@launch
-                }
-
-                Log.d(TAG, "开始从历史聊天中重新提取计划项")
-                // 获取所有助手消息内容
-                val assistantMessages =
-                        chatHistory.filter { it.first == "assistant" }.map { it.second }
-
-                // 合并提取所有计划项的逻辑
-                var accumulatedItems = _planItems.value
-
-                for (content in assistantMessages) {
-                    // 使用新的带有现有计划项参数的方法
-                    accumulatedItems =
-                            ConversationMarkupManager.extractPlanItems(content, accumulatedItems)
-                }
-
-                // 只有在找到计划项时才更新状态流
-                if (accumulatedItems.isNotEmpty() && accumulatedItems != _planItems.value) {
-                    Log.d(
-                            TAG,
-                            "从历史聊天中重新提取到计划项: ${accumulatedItems.map { "${it.id}: ${it.status}" }}"
-                    )
-                    _planItems.value = accumulatedItems
-                    Log.d(TAG, "已更新计划项状态流")
-                } else if (accumulatedItems.isEmpty()) {
-                    Log.d(TAG, "未从历史聊天中提取到任何计划项")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "重新提取计划项时发生错误: ${e.message}", e)
-            }
-        }
-    }
-
     /** Send a message to the AI service */
     suspend fun sendMessage(
         message: String,
@@ -409,10 +333,14 @@ class EnhancedAIService private constructor(private val context: Context) {
         promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
         enableThinking: Boolean = false,
         thinkingGuidance: Boolean = false,
-        enableMemoryAttachment: Boolean = true,
+        enableMemoryQuery: Boolean = true,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        onNonFatalError: suspend (error: String) -> Unit = {}
+        onNonFatalError: suspend (error: String) -> Unit = {},
+        customSystemPromptTemplate: String? = null,
+        isSubTask: Boolean = false,
+        characterName: String? = null,
+        avatarUri: String? = null
     ): Stream<String> {
         Log.d(
                 TAG,
@@ -422,19 +350,13 @@ class EnhancedAIService private constructor(private val context: Context) {
         accumulatedOutputTokenCount = 0
 
         return stream {
+            val context = MessageExecutionContext(conversationHistory = chatHistory.toMutableList())
             try {
                 // 确保所有操作都在IO线程上执行
                 withContext(Dispatchers.IO) {
                     // 仅当会话首次启动时开启服务
+                    if (!isSubTask) {
                     startAiService()
-
-                    // Mark conversation as active
-                    isConversationActive.set(true)
-
-                    // 在新一轮对话开始时，重置并初始化内部对话历史
-                    conversationMutex.withLock {
-                        conversationHistory.clear()
-                        conversationHistory.addAll(chatHistory)
                     }
 
                     // Process the input message for any conversation markup (e.g., for AI planning)
@@ -442,34 +364,37 @@ class EnhancedAIService private constructor(private val context: Context) {
                     val processedInput = InputProcessor.processUserInput(message)
 
                     // 将当前用户输入添加到内部历史记录中，以便进行后续处理
-                    conversationMutex.withLock {
-                        conversationHistory.add(Pair("user", processedInput))
-                    }
+                    context.conversationHistory.add(Pair("user", processedInput))
 
                     // Update state to show we're processing
+                    if (!isSubTask) {
                     withContext(Dispatchers.Main) {
                         _inputProcessingState.value = InputProcessingState.Processing("正在处理消息...")
+                        }
                     }
 
                     // Prepare conversation history with system prompt
                     val preparedHistory =
                             prepareConversationHistory(
-                                    conversationHistory, // 始终使用内部历史记录
+                                    context.conversationHistory, // 始终使用内部历史记录
                                     processedInput,
                                     workspacePath,
                                     promptFunctionType,
-                                    thinkingGuidance
+                                    thinkingGuidance,
+                                    customSystemPromptTemplate,
+                                    enableMemoryQuery,
+                                    isSubTask
                             )
                     
                     // 关键修复：用准备好的历史记录（包含了系统提示）去同步更新内部的 conversationHistory 状态
-                    conversationMutex.withLock {
-                        conversationHistory.clear()
-                        conversationHistory.addAll(preparedHistory)
-                    }
+                    context.conversationHistory.clear()
+                    context.conversationHistory.addAll(preparedHistory)
 
                     // Update UI state to connecting
+                    if (!isSubTask) {
                     withContext(Dispatchers.Main) {
                         _inputProcessingState.value = InputProcessingState.Connecting("正在连接AI服务...")
+                        }
                     }
 
                     // Get all model parameters from preferences (with enabled state)
@@ -489,7 +414,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     chatHistory = preparedHistory,
                                     modelParameters = modelParameters,
                                     enableThinking = enableThinking,
-                                    onTokensUpdated = { input, output ->
+                                    onTokensUpdated = { input, cachedInput, output ->
                                         _perRequestTokenCounts.value = Pair(input, output)
                                     },
                                     onNonFatalError = onNonFatalError
@@ -499,8 +424,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                     var isFirstChunk = true
 
                     // 创建一个新的轮次来管理内容
-                    roundManager.startNewRound()
-                    streamBuffer.clear()
+                    context.roundManager.startNewRound()
+                    context.streamBuffer.clear()
 
                     // 从原始stream收集内容并处理
                     var chunkCount = 0
@@ -511,9 +436,11 @@ class EnhancedAIService private constructor(private val context: Context) {
                     stream.collect { content ->
                         // 第一次收到响应，更新状态
                         if (isFirstChunk) {
+                            if (!isSubTask) {
                             withContext(Dispatchers.Main) {
                                 _inputProcessingState.value =
                                         InputProcessingState.Receiving("正在接收AI响应...")
+                                }
                             }
                             isFirstChunk = false
                             Log.d(TAG, "首次响应耗时: ${System.currentTimeMillis() - streamStartTime}ms")
@@ -531,10 +458,10 @@ class EnhancedAIService private constructor(private val context: Context) {
                         }
 
                         // 更新streamBuffer，保持与原有逻辑一致
-                        streamBuffer.append(content)
+                        context.streamBuffer.append(content)
 
                         // 更新内容到轮次管理器
-                        roundManager.updateContent(streamBuffer.toString())
+                        context.roundManager.updateContent(context.streamBuffer.toString())
 
                         // 发射当前内容片段
                         emit(content)
@@ -542,10 +469,11 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // Update accumulated token counts and persist them
                     val inputTokens = serviceForFunction.inputTokenCount
+                    val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                     val outputTokens = serviceForFunction.outputTokenCount
                     accumulatedInputTokenCount += inputTokens
                     accumulatedOutputTokenCount += outputTokens
-                    apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                    apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                     Log.d(
                             TAG,
@@ -573,16 +501,22 @@ class EnhancedAIService private constructor(private val context: Context) {
                         _inputProcessingState.value =
                                 InputProcessingState.Error(message = "错误: ${e.message}")
                     }
+                    // 将致命错误也通过回调传递给调用方，以便UI（如桌宠）可以提示用户
+                    try {
+                        onNonFatalError(e.message ?: "发生未知错误")
+                    } catch (_: Exception) {
+                        // 忽略回调中的任何异常，避免影响后续清理流程
+                    }
                 }
 
                 // 发生无法处理的错误时，也应停止服务，但用户取消除外
                 if (e.message?.contains("Socket closed", ignoreCase = true) != true) {
-                    stopAiService()
+                    if (!isSubTask) stopAiService()
                 }
             } finally {
                 // 确保流处理完成后调用
                 val collector = this
-                withContext(Dispatchers.IO) { processStreamCompletion(functionType, collector, enableThinking, enableMemoryAttachment, onNonFatalError, maxTokens, tokenUsageThreshold) }
+                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri) }
             }
         }
     }
@@ -681,31 +615,35 @@ class EnhancedAIService private constructor(private val context: Context) {
 
     /** 在处理完流后调用，使用增强的工具检测功能 */
     private suspend fun processStreamCompletion(
+            context: MessageExecutionContext,
             functionType: FunctionType = FunctionType.CHAT,
             collector: StreamCollector<String>,
             enableThinking: Boolean = false,
-            enableMemoryAttachment: Boolean = true,
+            enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
-            tokenUsageThreshold: Double
+            tokenUsageThreshold: Double,
+            isSubTask: Boolean,
+            characterName: String? = null,
+            avatarUri: String? = null
     ) {
         try {
             val startTime = System.currentTimeMillis()
             // If conversation is no longer active, return immediately
-            if (!isConversationActive.get()) {
+            if (!context.isConversationActive.get()) {
                 return
             }
 
             // Get response content
-            val content = streamBuffer.toString().trim()
+            val content = context.streamBuffer.toString().trim()
 
             // If content is empty, it means an error likely occurred or the model returned nothing.
             // We must still finalize the conversation to reset the state correctly.
             if (content.isEmpty()) {
                 Log.d(TAG, "Stream content is empty. Finalizing conversation state.")
                 // We call handleTaskCompletion to properly set the conversation as inactive and update the UI state.
-                // We pass enableMemoryAttachment = false because there's no content to analyze or save.
-                handleWaitForUserNeed(content)
+                // We pass enableMemoryQuery = false because there's no content to analyze or save.
+                handleWaitForUserNeed(context, content, isSubTask)
                 return
             }
 
@@ -718,40 +656,33 @@ class EnhancedAIService private constructor(private val context: Context) {
             val enhancedContent = enhanceToolDetection(content)
             // 如果内容被增强修改了，更新到streamBuffer
             if (enhancedContent != content) {
-                streamBuffer.setLength(0)
-                streamBuffer.append(enhancedContent)
+                context.streamBuffer.setLength(0)
+                context.streamBuffer.append(enhancedContent)
                 // 更新轮次管理器显示内容
-                roundManager.updateContent(enhancedContent)
+                context.roundManager.updateContent(enhancedContent)
             }
-
-            // 提取计划项
-            extractPlanItems(enhancedContent)
 
             // Handle task completion marker
             if (ConversationMarkupManager.containsTaskCompletion(enhancedContent)) {
-                handleTaskCompletion(enhancedContent, enableMemoryAttachment)
+                handleTaskCompletion(context, enhancedContent, enableMemoryQuery, isSubTask, characterName, avatarUri)
                 return
             }
 
             // Check again if conversation is active
-            if (!isConversationActive.get()) {
+            if (!context.isConversationActive.get()) {
                 return
             }
 
             // Add current assistant message to conversation history
             try {
-                conversationMutex.withLock {
-                    conversationHistory.add(
-                            Pair("assistant", roundManager.getCurrentRoundContent())
-                    )
-                }
+                context.conversationHistory.add(Pair("assistant", context.roundManager.getCurrentRoundContent()))
             } catch (e: Exception) {
                 Log.e(TAG, "添加助手消息到历史记录失败", e)
                 return
             }
 
             // Check again if conversation is active
-            if (!isConversationActive.get()) {
+            if (!context.isConversationActive.get()) {
                 return
             }
 
@@ -766,12 +697,10 @@ class EnhancedAIService private constructor(private val context: Context) {
                             ConversationMarkupManager.createWarningStatus(
                                     "警告：工具调用和等待用户响应不能同时存在。工具调用被处理了，但这是极具危险性的。",
                             )
-                    roundManager.appendContent(userNeedContent)
+                    context.roundManager.appendContent(userNeedContent)
                     collector.emit(userNeedContent)
                     try {
-                        conversationMutex.withLock {
-                            conversationHistory.add(Pair("tool", userNeedContent))
-                        }
+                        context.conversationHistory.add(Pair("tool", userNeedContent))
                     } catch (e: Exception) {
                         Log.e(TAG, "添加工具调用警告到历史记录失败", e)
                     }
@@ -785,14 +714,17 @@ class EnhancedAIService private constructor(private val context: Context) {
                 )
                 handleToolInvocation(
                         toolInvocations,
-                        roundManager.getDisplayContent(),
+                        context,
                         functionType,
                         collector,
                         enableThinking,
-                        enableMemoryAttachment,
+                        enableMemoryQuery,
                         onNonFatalError,
                         maxTokens,
-                        tokenUsageThreshold
+                        tokenUsageThreshold,
+                        isSubTask,
+                        characterName,
+                        avatarUri
                 )
                 return
             }
@@ -803,11 +735,11 @@ class EnhancedAIService private constructor(private val context: Context) {
             // 创建等待用户输入的内容
             val userNeedContent =
                     ConversationMarkupManager.createWaitForUserNeedContent(
-                            roundManager.getDisplayContent()
+                            context.roundManager.getDisplayContent()
                     )
 
             // 处理为等待用户输入模式
-            handleWaitForUserNeed(userNeedContent)
+            handleWaitForUserNeed(context, userNeedContent, isSubTask, characterName, avatarUri)
             Log.d(TAG, "流完成处理耗时: ${System.currentTimeMillis() - startTime}ms")
         } catch (e: Exception) {
             // Catch any exceptions in the processing flow
@@ -819,79 +751,96 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** Handle task completion logic - simplified version without callbacks */
-    private suspend fun handleTaskCompletion(content: String, enableMemoryAttachment: Boolean) {
+    private suspend fun handleTaskCompletion(context: MessageExecutionContext, content: String, enableMemoryQuery: Boolean, isSubTask: Boolean, characterName: String? = null, avatarUri: String? = null) {
         // Mark conversation as complete
-        isConversationActive.set(false)
+        context.isConversationActive.set(false)
 
         // 清除内容池
         // roundManager.clearContent()
+        
+        // 保存最后的回复内容用于通知
+        lastReplyContent = context.roundManager.getDisplayContent()
 
         // Ensure input processing state is updated to completed
+        if (!isSubTask) {
         withContext(Dispatchers.Main) {
             _inputProcessingState.value = InputProcessingState.Completed
+            }
         }
 
-        if (enableMemoryAttachment) {
+        if (enableMemoryQuery) {
             // 保存问题记录到库
             toolProcessingScope.launch {
                 com.ai.assistance.operit.api.chat.library.ProblemLibrary.saveProblemAsync(
-                        context,
+                        this@EnhancedAIService.context,
                         toolHandler,
-                        conversationHistory,
+                        context.conversationHistory,
                         content,
                         multiServiceManager.getServiceForFunction(FunctionType.PROBLEM_LIBRARY)
                 )
             }
         }
 
-        // 在会话结束后停止服务
-        stopAiService()
+        if (!isSubTask) {
+        // 在会话结束后停止服务（服务销毁时会自动发送通知）
+        stopAiService(characterName, avatarUri)
+        }
     }
 
     /** Handle wait for user need logic - simplified version without callbacks */
-    private suspend fun handleWaitForUserNeed(content: String) {
+    private suspend fun handleWaitForUserNeed(context: MessageExecutionContext, content: String, isSubTask: Boolean, characterName: String? = null, avatarUri: String? = null) {
         // Mark conversation as complete
-        isConversationActive.set(false)
+        context.isConversationActive.set(false)
 
         // 清除内容池
         // roundManager.clearContent()
+        
+        // 保存最后的回复内容用于通知
+        lastReplyContent = context.roundManager.getDisplayContent()
 
         // Ensure input processing state is updated to completed
+        if (!isSubTask) {
         withContext(Dispatchers.Main) {
             _inputProcessingState.value = InputProcessingState.Completed
+            }
         }
 
         Log.d(TAG, "Wait for user need - skipping problem library analysis")
-
-        // 在会话结束后停止服务
-        stopAiService()
+        if (!isSubTask) {
+        // 在会话结束后停止服务（服务销毁时会自动发送通知）
+        stopAiService(characterName, avatarUri)
+        }
     }
 
     /** Handle tool invocation processing - simplified version without callbacks */
     private suspend fun handleToolInvocation(
-            toolInvocations: List<ToolInvocation>,
-            displayContent: String,
-            functionType: FunctionType = FunctionType.CHAT,
-            collector: StreamCollector<String>,
-            enableThinking: Boolean = false,
-            enableMemoryAttachment: Boolean = true,
-            onNonFatalError: suspend (error: String) -> Unit,
-            maxTokens: Int,
-            tokenUsageThreshold: Double
+        toolInvocations: List<ToolInvocation>,
+        context: MessageExecutionContext,
+        functionType: FunctionType = FunctionType.CHAT,
+        collector: StreamCollector<String>,
+        enableThinking: Boolean = false,
+        enableMemoryQuery: Boolean = true,
+        onNonFatalError: suspend (error: String) -> Unit,
+        maxTokens: Int,
+        tokenUsageThreshold: Double,
+        isSubTask: Boolean,
+        characterName: String? = null,
+        avatarUri: String? = null
     ) {
         val startTime = System.currentTimeMillis()
-        
-        withContext(Dispatchers.Main) {
-            val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
-            val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
-            _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
+
+        if (!isSubTask) {
+            withContext(Dispatchers.Main) {
+                val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
+                val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
+                _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
+            }
         }
 
         val processToolJob = toolProcessingScope.launch {
-            // 权限检查前置，串行进行
+            // 1. 权限检查
             val permittedInvocations = mutableListOf<ToolInvocation>()
             val permissionDeniedResults = mutableListOf<ToolResult>()
-
             for (invocation in toolInvocations) {
                 val (hasPermission, errorResult) = ToolExecutionManager.checkToolPermission(toolHandler, invocation)
                 if (hasPermission) {
@@ -899,78 +848,52 @@ class EnhancedAIService private constructor(private val context: Context) {
                 } else {
                     permissionDeniedResults.add(errorResult!!)
                     val errorStatusContent = ConversationMarkupManager.createErrorStatus("权限拒绝", "操作 '${invocation.tool.name}' 未授权")
-                    roundManager.appendContent(errorStatusContent)
+                    context.roundManager.appendContent(errorStatusContent)
                     collector.emit(errorStatusContent)
                     val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(errorResult)
-                    roundManager.appendContent(toolResultStatusContent)
+                    context.roundManager.appendContent(toolResultStatusContent)
                     collector.emit(toolResultStatusContent)
                 }
             }
-            
-            val executionResults = mutableListOf<ToolResult>()
-            for (invocation in permittedInvocations) {
-                val executor = toolHandler.getToolExecutor(invocation.tool.name)
-                if (executor == null) {
-                    val toolName = invocation.tool.name
-                    val errorMessage = when {
-                        toolName.contains('.') && !toolName.contains(':') -> {
-                            val parts = toolName.split('.', limit = 2)
-                            "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
-                        }
-                        toolName.contains(':') -> {
-                            val parts = toolName.split(':', limit = 2)
-                            val packName = parts[0]
-                            val packageManager = toolHandler.getOrCreatePackageManager()
-                            val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
-                            if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
-                            else "工具包 '$packName' 不存在。"
-                        }
-                        else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
-                    }
 
-                    val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
-                    roundManager.appendContent(notAvailableContent)
-                    collector.emit(notAvailableContent)
+            // 2. 按并行/串行对工具进行分组
+            val parallelizableToolNames = setOf(
+                "list_files", "read_file", "read_file_part", "read_file_full", "file_exists",
+                "find_files", "file_info", "grep_code", "query_memory", "calculate", "ffmpeg_info"
+            )
+            val (parallelInvocations, serialInvocations) = permittedInvocations.partition { parallelizableToolNames.contains(it.tool.name) }
 
-                    executionResults.add(ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage))
-                    continue
-                }
+            // 3. 执行工具并收集聚合结果
+            val executionResults = ConcurrentHashMap<ToolInvocation, ToolResult>()
 
-                val collectedResults = mutableListOf<ToolResult>()
-                ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
-                    collectedResults.add(result)
-                    val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
-                    roundManager.appendContent(toolResultStatusContent)
-                    collector.emit(toolResultStatusContent)
-                }
-
-                if (collectedResults.isNotEmpty()) {
-                    val lastResult = collectedResults.last()
-                    val combinedResultString = collectedResults.joinToString("\n") { res ->
-                        if (res.success) res.result.toString() else "Error in step: ${res.error ?: "Unknown error"}"
-                    }
-                    executionResults.add(ToolResult(
-                            toolName = invocation.tool.name,
-                            success = lastResult.success,
-                            result = StringResultData(combinedResultString),
-                            error = lastResult.error
-                    ))
+            // 启动并行工具
+            val parallelJobs = parallelInvocations.map { invocation ->
+                async {
+                    val result = executeAndEmitTool(invocation, context, collector)
+                    executionResults[invocation] = result
                 }
             }
 
-            val allToolResults = permissionDeniedResults + executionResults
+            // 顺序执行串行工具
+            for (invocation in serialInvocations) {
+                val result = executeAndEmitTool(invocation, context, collector)
+                executionResults[invocation] = result
+            }
 
+            // 等待所有并行任务完成
+            parallelJobs.awaitAll()
+
+            // 4. 按原始顺序重新排序结果
+            val orderedAggregated = permittedInvocations.mapNotNull { executionResults[it] }
+
+            // 5. 组合所有结果并进行最终处理
+            val allToolResults = permissionDeniedResults + orderedAggregated
             if (allToolResults.isNotEmpty()) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
                 processToolResults(
-                        allToolResults,
-                        functionType,
-                        collector,
-                        enableThinking,
-                        enableMemoryAttachment,
-                        onNonFatalError,
-                        maxTokens,
-                        tokenUsageThreshold
+                    allToolResults, context, functionType, collector, enableThinking,
+                    enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask,
+                    characterName, avatarUri
                 )
             }
         }
@@ -987,28 +910,99 @@ class EnhancedAIService private constructor(private val context: Context) {
         Log.d(TAG, "工具调用处理耗时: ${System.currentTimeMillis() - startTime}ms")
     }
 
+    /**
+     * 封装单个工具的执行、实时输出和结果聚合的辅助函数
+     */
+    private suspend fun executeAndEmitTool(
+        invocation: ToolInvocation,
+        context: MessageExecutionContext,
+        collector: StreamCollector<String>
+    ): ToolResult {
+        val executor = toolHandler.getToolExecutor(invocation.tool.name)
+        if (executor == null) {
+            val toolName = invocation.tool.name
+            val errorMessage = buildToolNotAvailableErrorMessage(toolName)
+            val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
+            context.roundManager.appendContent(notAvailableContent)
+            collector.emit(notAvailableContent)
+            return ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage)
+        }
+
+        val collectedResults = mutableListOf<ToolResult>()
+        ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
+            collectedResults.add(result)
+            // 实时输出每个结果
+            val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
+            context.roundManager.appendContent(toolResultStatusContent)
+            collector.emit(toolResultStatusContent)
+        }
+
+        // 为此调用聚合最终结果
+        if (collectedResults.isEmpty()) {
+            return ToolResult(toolName = invocation.tool.name, success = false, result = StringResultData(""), error = "工具执行后未返回任何结果。")
+        }
+
+        val lastResult = collectedResults.last()
+        val combinedResultString = collectedResults.joinToString("\n") { res ->
+            (if (res.success) res.result.toString() else "步骤错误: ${res.error ?: "未知错误"}").trim()
+        }.trim()
+
+        return ToolResult(
+            toolName = invocation.tool.name,
+            success = lastResult.success,
+            result = StringResultData(combinedResultString),
+            error = lastResult.error
+        )
+    }
+
+    /**
+     * 构建工具不可用的错误信息，统一逻辑避免重复
+     */
+    private fun buildToolNotAvailableErrorMessage(toolName: String): String {
+        return when {
+            toolName.contains('.') && !toolName.contains(':') -> {
+                val parts = toolName.split('.', limit = 2)
+                "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
+            }
+            toolName.contains(':') -> {
+                val parts = toolName.split(':', limit = 2)
+                val packName = parts[0]
+                val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
+                if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
+                else "工具包 '$packName' 不存在。"
+            }
+            else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+        }
+    }
+
     /** Process tool execution result - simplified version without callbacks */
     private suspend fun processToolResults(
             results: List<ToolResult>,
+            context: MessageExecutionContext,
             functionType: FunctionType = FunctionType.CHAT,
             collector: StreamCollector<String>,
             enableThinking: Boolean = false,
-            enableMemoryAttachment: Boolean = true,
+            enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
             maxTokens: Int,
-            tokenUsageThreshold: Double
+            tokenUsageThreshold: Double,
+            isSubTask: Boolean,
+            characterName: String? = null,
+            avatarUri: String? = null
     ) {
         val startTime = System.currentTimeMillis()
         val toolNames = results.joinToString(", ") { it.toolName }
         Log.d(TAG, "开始处理工具结果: $toolNames, 成功: ${results.all { it.success }}")
 
         // Add transition state
+        if (!isSubTask) {
         withContext(Dispatchers.Main) {
             _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
+            }
         }
 
         // Check if conversation is still active
-        if (!isConversationActive.get()) {
+        if (!context.isConversationActive.get()) {
             return
         }
 
@@ -1018,21 +1012,24 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         // Add tool result to conversation history
-        conversationMutex.withLock { conversationHistory.add(Pair("tool", toolResultMessage)) }
+        context.conversationHistory.add(Pair("tool", toolResultMessage))
 
-        // Get current conversation history
-        val currentChatHistory = conversationMutex.withLock { conversationHistory }
+        // Get current conversation history is now just the context's history
+        val currentChatHistory = context.conversationHistory
 
-        // Append tool result to current round
-        roundManager.appendContent(toolResultMessage)
+        // 不再需要，因为结果在调用时已实时输出
+        // context.roundManager.appendContent(toolResultMessage)
+        // try { collector.emit(toolResultMessage) } catch (_: Exception) {}
 
         // Start new round - ensure tool execution response will be shown in a new message
-        roundManager.startNewRound()
-        streamBuffer.clear() // Clear buffer to ensure a new message will be created
+        context.roundManager.startNewRound()
+        context.streamBuffer.clear() // Clear buffer to ensure a new message will be created
 
         // Clearly show we're preparing to send tool result to AI
+        if (!isSubTask) {
         withContext(Dispatchers.Main) {
             _inputProcessingState.value = InputProcessingState.ProcessingToolResult(toolNames)
+            }
         }
 
         // Add short delay to make state change more visible
@@ -1055,14 +1052,16 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 val warningMessage = ConversationMarkupManager.createWarningStatus("已达到单次对话Token限制。请继续对话以触发历史压缩")
                 collector.emit(warningMessage)
-                roundManager.appendContent(warningMessage)
-                conversationMutex.withLock { conversationHistory.add(Pair("assistant", warningMessage)) }
+                context.roundManager.appendContent(warningMessage)
+                context.conversationHistory.add(Pair("assistant", warningMessage))
 
-                isConversationActive.set(false)
+                context.isConversationActive.set(false)
+                if (!isSubTask) {
                 withContext(Dispatchers.Main) {
                     _inputProcessingState.value = InputProcessingState.Completed
                 }
-                stopAiService()
+                stopAiService(characterName, avatarUri)
+                }
                 return // Stop further processing
             }
         }
@@ -1081,16 +1080,18 @@ class EnhancedAIService private constructor(private val context: Context) {
                                 chatHistory = currentChatHistory,
                                 modelParameters = modelParameters,
                                 enableThinking = enableThinking,
-                                onTokensUpdated = { input, output ->
+                                onTokensUpdated = { input, cachedInput, output ->
                                     _perRequestTokenCounts.value = Pair(input, output)
                                 },
                                 onNonFatalError = onNonFatalError
                         )
 
                 // 更新状态为接收中
+                if (!isSubTask) {
                 withContext(Dispatchers.Main) {
                     _inputProcessingState.value =
                             InputProcessingState.Receiving("正在接收工具执行后的AI响应...")
+                    }
                 }
 
                 // 处理流
@@ -1100,10 +1101,10 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 stream.collect { content ->
                     // 更新streamBuffer
-                    streamBuffer.append(content)
+                    context.streamBuffer.append(content)
 
                     // 更新内容到轮次管理器
-                    roundManager.updateContent(streamBuffer.toString())
+                    context.roundManager.updateContent(context.streamBuffer.toString())
 
                     // 累计统计
                     chunkCount++
@@ -1121,21 +1122,22 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 // Update accumulated token counts and persist them
                 val inputTokens = serviceForFunction.inputTokenCount
+                val cachedInputTokens = serviceForFunction.cachedInputTokenCount
                 val outputTokens = serviceForFunction.outputTokenCount
                 accumulatedInputTokenCount += inputTokens
                 accumulatedOutputTokenCount += outputTokens
-                apiPreferences.updateTokensForFunction(functionType, inputTokens, outputTokens)
+                apiPreferences.updateTokensForProviderModel(serviceForFunction.providerModel, inputTokens, outputTokens, cachedInputTokens)
 
                 Log.d(
                         TAG,
-                        "Token count updated after tool result for $functionType. Input: $inputTokens, Output: $outputTokens. Turn Accumulated: $accumulatedInputTokenCount, $accumulatedOutputTokenCount"
+                        "Token count updated after tool result for $functionType. Input: $inputTokens, Output: $outputTokens."
                 )
 
                 val processingTime = System.currentTimeMillis() - aiStartTime
                 Log.d(TAG, "工具结果AI处理完成，收到 $totalChars 字符，耗时: ${processingTime}ms")
 
                 // 流处理完成，处理完成逻辑
-                processStreamCompletion(functionType, collector, enableThinking, enableMemoryAttachment, onNonFatalError, maxTokens, tokenUsageThreshold)
+                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri)
             } catch (e: Exception) {
                 Log.e(TAG, "处理工具执行结果时出错", e)
                 withContext(Dispatchers.Main) {
@@ -1146,10 +1148,6 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
         Log.d(TAG, "工具结果处理总耗时: ${System.currentTimeMillis() - startTime}ms")
     }
-
-    // Expose base AIService for token counting
-    fun getBaseAIService(): AIService = aiService
-
     /**
      * Get the current input token count from the last API call
      * @return The number of input tokens used in the most recent request
@@ -1177,60 +1175,6 @@ class EnhancedAIService private constructor(private val context: Context) {
      */
     suspend fun resetTokenCountersForFunction(functionType: FunctionType? = null) {
         Companion.resetTokenCountersForFunction(context, functionType)
-    }
-
-    /**
-     * Extract plan items from chat history without sending a message This is used by ChatViewModel
-     * to restore plan items when switching chats or on app startup
-     */
-    fun extractPlansFromHistory(chatHistory: List<Pair<String, String>>) {
-        if (chatHistory.isEmpty()) {
-            Log.d(TAG, "extractPlansFromHistory: 空聊天历史，跳过计划项提取")
-            return
-        }
-
-        Log.d(TAG, "extractPlansFromHistory: 从 ${chatHistory.size} 条聊天记录中提取计划项")
-
-        // 确保计划项状态流为空，以便重新填充
-        _planItems.value = emptyList()
-
-        // 提取所有助手消息
-        val assistantMessages = chatHistory.filter { it.first == "assistant" }.map { it.second }
-        Log.d(TAG, "extractPlansFromHistory: 找到 ${assistantMessages.size} 条助手消息")
-
-        // 从每条助手消息中提取计划项
-        var accumulatedItems = emptyList<PlanItem>()
-
-        toolProcessingScope.launch {
-            try {
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
-                if (!planningEnabled) {
-                    Log.d(TAG, "extractPlansFromHistory: 计划模式未启用，跳过提取")
-                    return@launch
-                }
-
-                // 按时间顺序处理每条消息
-                for (content in assistantMessages) {
-                    // 使用带有现有计划项参数的方法提取计划项
-                    accumulatedItems =
-                            ConversationMarkupManager.extractPlanItems(content, accumulatedItems)
-                }
-
-                // 只有找到计划项时才更新状态流
-                if (accumulatedItems.isNotEmpty()) {
-                    Log.d(
-                            TAG,
-                            "extractPlansFromHistory: 从历史聊天中提取到计划项: ${accumulatedItems.map { "${it.id}: ${it.status}" }}"
-                    )
-                    _planItems.value = accumulatedItems
-                    Log.d(TAG, "extractPlansFromHistory: 已更新计划项状态流")
-                } else {
-                    Log.d(TAG, "extractPlansFromHistory: 未从历史聊天中提取到任何计划项")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "extractPlansFromHistory: 提取计划项时发生错误: ${e.message}", e)
-            }
-        }
     }
 
     /**
@@ -1280,22 +1224,32 @@ class EnhancedAIService private constructor(private val context: Context) {
             processedInput: String,
             workspacePath: String?,
             promptFunctionType: PromptFunctionType,
-            thinkingGuidance: Boolean
+            thinkingGuidance: Boolean,
+            customSystemPromptTemplate: String? = null,
+            enableMemoryQuery: Boolean,
+            isSubTask: Boolean = false
     ): List<Pair<String, String>> {
+        // Check if image recognition service is configured
+        // For subtasks, always disable image recognition (only support OCR)
+        val hasImageRecognition = if (isSubTask) false else multiServiceManager.hasImageRecognitionConfigured()
+        
         return conversationService.prepareConversationHistory(
                 chatHistory,
                 processedInput,
                 workspacePath,
                 packageManager,
                 promptFunctionType,
-                thinkingGuidance
+                thinkingGuidance,
+                customSystemPromptTemplate,
+                enableMemoryQuery,
+                hasImageRecognition
         )
     }
 
     /** Cancel the current conversation */
     fun cancelConversation() {
         // Set conversation inactive
-        isConversationActive.set(false)
+        // isConversationActive.set(false) // This is now per-context, can't set a global one
 
         // Cancel underlying AIService streaming
         aiService.cancelStreaming()
@@ -1304,8 +1258,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         cancelAllToolExecutions()
 
         // Clean up current conversation content
-        roundManager.clearContent()
-        Log.d(TAG, "Conversation canceled - content pool cleared")
+        // roundManager.clearContent() // This is now per-context, can't clear a global one
+        Log.d(TAG, "Conversation canceled")
 
         // Reset input processing state
         _inputProcessingState.value = InputProcessingState.Idle
@@ -1320,7 +1274,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         // 停止AI服务并关闭屏幕常亮
         stopAiService()
 
-        Log.d(TAG, "Conversation cancellation complete - all state reset except plan items")
+        Log.d(TAG, "Conversation cancellation complete")
     }
 
     /** Cancel all tool executions */
@@ -1348,10 +1302,38 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** 停止前台服务 */
-    private fun stopAiService() {
+    private fun stopAiService(characterName: String? = null, avatarUri: String? = null) {
         if (AIForegroundService.isRunning.get()) {
             Log.d(TAG, "请求停止AI前台服务...")
-            context.stopService(serviceIntent)
+            
+            // 准备通知数据
+            runBlocking {
+                try {
+                    // 将数据传递给服务
+                    val stopIntent = Intent(context, AIForegroundService::class.java).apply {
+                        putExtra(AIForegroundService.EXTRA_CHARACTER_NAME, characterName)
+                        putExtra(AIForegroundService.EXTRA_REPLY_CONTENT, lastReplyContent)
+                        putExtra(AIForegroundService.EXTRA_AVATAR_URI, avatarUri)
+                    }
+                    
+                    Log.d(TAG, "传递通知数据 - 角色: $characterName, 内容长度: ${lastReplyContent?.length}, 头像: $avatarUri")
+                    
+                    // 先发送更新的Intent，然后再停止服务
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(stopIntent)
+                    } else {
+                        context.startService(stopIntent)
+                    }
+                    
+                    // 稍微延迟后停止服务，确保数据已被接收
+                    delay(100)
+                    context.stopService(serviceIntent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "准备通知数据失败: ${e.message}", e)
+                    // 即使失败也要停止服务
+                    context.stopService(serviceIntent)
+                }
+            }
         } else {
             Log.d(TAG, "AI前台服务未在运行，无需重复停止。")
         }
@@ -1386,7 +1368,54 @@ class EnhancedAIService private constructor(private val context: Context) {
         return conversationService.translateText(text, multiServiceManager)
     }
 
+    /**
+     * 自动生成工具包描述
+     * @param pluginName 工具包名称
+     * @param toolDescriptions 工具描述列表
+     * @return 生成的工具包描述
+     */
+    suspend fun generatePackageDescription(
+        pluginName: String,
+        toolDescriptions: List<String>
+    ): String {
+        return conversationService.generatePackageDescription(pluginName, toolDescriptions, multiServiceManager)
+    }
 
 
+    /**
+     * Manually saves the current conversation to the problem library.
+     * @param conversationHistory The history of the conversation to save.
+     * @param lastContent The content of the last message in the conversation.
+     */
+    suspend fun saveConversationToMemory(
+        conversationHistory: List<Pair<String, String>>,
+        lastContent: String
+    ) {
+            Log.d(TAG, "手动触发记忆更新...")
+            withContext(Dispatchers.IO) { // Use withContext to wait for completion
+                try {
+                    com.ai.assistance.operit.api.chat.library.ProblemLibrary.saveProblemAsync(
+                        context,
+                        toolHandler,
+                        conversationHistory,
+                        lastContent,
+                        multiServiceManager.getServiceForFunction(FunctionType.PROBLEM_LIBRARY)
+                    )
+                    Log.d(TAG, "手动记忆更新成功")
+                } catch (e: Exception) {
+                    Log.e(TAG, "手动记忆更新失败", e)
+                    throw e
+                }
+        }
+    }
 
+    /**
+     * 使用识图模型分析图片
+     * @param imagePath 图片路径
+     * @param userIntent 用户意图，例如"这个图片里面有什么"、"图片的题目公式是什么"等
+     * @return AI分析结果
+     */
+    suspend fun analyzeImageWithIntent(imagePath: String, userIntent: String?): String {
+        return conversationService.analyzeImageWithIntent(imagePath, userIntent, multiServiceManager)
+    }
 }

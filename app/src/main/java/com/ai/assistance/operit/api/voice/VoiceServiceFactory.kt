@@ -44,7 +44,8 @@ object VoiceServiceFactory {
                     SiliconFlowVoiceProvider(
                         context = context,
                         apiKey = httpConfig.apiKey,
-                        initialVoiceId = httpConfig.voiceId
+                        initialVoiceId = httpConfig.voiceId,
+                        initialModelName = httpConfig.modelName
                     )
                 }
             }

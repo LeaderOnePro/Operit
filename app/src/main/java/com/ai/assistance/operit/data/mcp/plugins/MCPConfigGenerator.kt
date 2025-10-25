@@ -23,12 +23,14 @@ class MCPConfigGenerator {
      * @param pluginId 插件ID
      * @param projectStructure 项目结构
      * @param environmentVariables 环境变量键值对
+     * @param pluginDirPath 插件在终端环境中的部署路径（如 ~/mcp_plugins/plugin_name）
      * @return MCP配置JSON
      */
     fun generateMcpConfig(
             pluginId: String,
             projectStructure: ProjectStructure,
-            environmentVariables: Map<String, String> = emptyMap()
+            environmentVariables: Map<String, String> = emptyMap(),
+            pluginDirPath: String? = null
     ): String {
         // 存储最终要使用的配置JSON
         var finalConfigJson: JsonObject? = null
@@ -58,7 +60,7 @@ class MCPConfigGenerator {
         }
 
         // 确定要使用的服务器名称
-        val serverName = existingServerName ?: pluginId.split("/").last().lowercase()
+        val serverName = pluginId
         Log.d(TAG, "使用服务器名称: $serverName")
 
         // 如果没有从示例提取到配置，或者是TypeScript项目需要进行特殊处理
@@ -89,17 +91,31 @@ class MCPConfigGenerator {
             when (projectStructure.type) {
                 ProjectType.PYTHON -> {
                     if (!serverJson.has("command")) {
-                        serverJson.addProperty("command", "python")
+                        // 如果提供了插件目录路径，使用 venv 中的 Python
+                        // 否则使用系统 Python（兼容旧逻辑）
+                        val pythonCommand = if (pluginDirPath != null) {
+                            "$pluginDirPath/venv/bin/python"
+                        } else {
+                            "python"
+                        }
+                        serverJson.addProperty("command", pythonCommand)
+                        Log.d(TAG, "Python 项目使用命令: $pythonCommand")
                     }
 
                     if (!serverJson.has("args")) {
                         val argsArray = com.google.gson.JsonArray()
                         argsArray.add("-m")
+                        // 优先级: pyproject.toml 包名 > mainPythonModule > 插件ID
                         val moduleName =
-                                projectStructure.moduleNameFromConfig
+                                projectStructure.pythonPackageName
                                         ?: projectStructure.mainPythonModule
                                                 ?: pluginId.replace("-", "_").lowercase()
-                        argsArray.add(moduleName.split('/').last())
+                        argsArray.add(moduleName)
+                        Log.d(TAG, "Python 项目使用模块名: $moduleName (来源: ${when {
+                            projectStructure.pythonPackageName != null -> "pyproject.toml"
+                            projectStructure.mainPythonModule != null -> "mainPythonModule"
+                            else -> "pluginId"
+                        }})")
                         serverJson.add("args", argsArray)
                     }
                 }
@@ -120,27 +136,41 @@ class MCPConfigGenerator {
                         // 根据项目结构决定可能的输出路径
                         val mainTsFile = projectStructure.mainTsFile
                         if (mainTsFile != null) {
+                            // 标准化 rootDir（为空或null都视为根目录）
+                            val normalizedRootDir = if (rootDir.isNullOrEmpty()) "" else rootDir
+                            
                             // 尝试确定编译输出位置
-                            if (mainTsFile.startsWith("$rootDir/")) {
-                                // 如果文件在rootDir中，使用outDir作为输出目录
-                                val compiledPath =
-                                        mainTsFile
-                                                .replace("$rootDir/", "$outDir/")
-                                                .replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "根据rootDir和outDir推断编译路径: $compiledPath")
-                            } else if (mainTsFile.startsWith("src/")) {
-                                // 如果只是常规的src/目录结构
-                                val compiledPath =
-                                        mainTsFile.replace("src/", "$outDir/").replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "根据src/和outDir推断编译路径: $compiledPath")
-                            } else {
-                                // 直接替换扩展名
-                                val compiledPath = mainTsFile.replace(".ts", ".js")
-                                argsArray.add(compiledPath)
-                                Log.d(TAG, "简单替换扩展名得到编译路径: $compiledPath")
+                            val compiledPath = when {
+                                // 如果rootDir为空或为根目录，文件会直接编译到outDir下
+                                normalizedRootDir.isEmpty() -> {
+                                    // 对于 rootDir="." 和 mainTsFile="index.ts" -> dist/index.js
+                                    val relativePath = mainTsFile.removePrefix("src/")
+                                    val jsFile = relativePath.replace(".ts", ".js")
+                                    "$outDir/$jsFile"
+                                }
+                                // 如果文件在rootDir中，需要保持相对路径结构
+                                mainTsFile.startsWith("$normalizedRootDir/") -> {
+                                    mainTsFile
+                                        .removePrefix("$normalizedRootDir/")
+                                        .replace(".ts", ".js")
+                                        .let { "$outDir/$it" }
+                                }
+                                // 如果是src目录结构
+                                mainTsFile.startsWith("src/") && normalizedRootDir == "src" -> {
+                                    mainTsFile
+                                        .removePrefix("src/")
+                                        .replace(".ts", ".js")
+                                        .let { "$outDir/$it" }
+                                }
+                                // 其他情况，假设文件在根目录
+                                else -> {
+                                    val jsFile = mainTsFile.replace(".ts", ".js")
+                                    "$outDir/$jsFile"
+                                }
                             }
+                            
+                            argsArray.add(compiledPath)
+                            Log.d(TAG, "TypeScript编译路径推断: $mainTsFile (rootDir=$normalizedRootDir) -> $compiledPath")
                         } else {
                             // 如果没有找到主TS文件，使用常见的输出位置
                             argsArray.add("$outDir/index.js")
@@ -165,8 +195,14 @@ class MCPConfigGenerator {
                 }
                 else -> {
                     if (!serverJson.has("command")) {
-                        // 使用默认配置
-                        serverJson.addProperty("command", "python")
+                        // 使用默认配置（尝试使用 venv 中的 Python）
+                        val pythonCommand = if (pluginDirPath != null) {
+                            "$pluginDirPath/venv/bin/python"
+                        } else {
+                            "python"
+                        }
+                        serverJson.addProperty("command", pythonCommand)
+                        Log.d(TAG, "UNKNOWN 项目类型使用命令: $pythonCommand")
                     }
 
                     if (!serverJson.has("args")) {
@@ -179,9 +215,7 @@ class MCPConfigGenerator {
             }
 
             // 确保其他必要字段存在
-            if (!serverJson.has("disabled")) {
-                serverJson.addProperty("disabled", false)
-            }
+            // 注意：disabled字段不再默认生成，不写表示启用（符合MCP标准）
 
             if (!serverJson.has("autoApprove")) {
                 val autoApproveArray = com.google.gson.JsonArray()

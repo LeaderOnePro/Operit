@@ -8,8 +8,13 @@
   <a href="https://github.com/AAswordman/Operit/releases/latest"><img src="https://img.shields.io/github/v/release/AAswordman/Operit" alt="Latest Release"></a>
   <br>
   <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
-  <a href="https://operit.dev.tc"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
+  <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
   <a href="docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg" alt="Contributions Welcome"></a>
+  <br>
+  <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
+  <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ_Group-blue.svg" alt="QQ Group"></a>
+  <a href="https://discord.gg/YnV9MWurRF"><img src="https://img.shields.io/badge/🎮-Discord-5865F2.svg" alt="Discord"></a>
+  <a href="https://github.com/AAswordman/Operit/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
 </div>
 
 <div align="center">
@@ -20,43 +25,47 @@
 
 <div align="center">
   <div style="padding: 10px 0; text-align: center;">
-    <img src="docs/assets/67bba92d5f1dbd7917345b6a73b1760.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/e18954ffd6a4bc8cc465f611fee7b71.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/ee852df3c187771fba0aa92b36a57f8.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
-    <img src="docs/assets/d7580a42ae03c723121bd172e1f9e7d.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/9f85b39450c8616909039b66d15a475a.jpg" width="22%" alt="Operit Preview 1" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/88a7b7520e4628682a849cc00716c8de.jpg" width="22%" alt="Operit Preview 2" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/9036f349c25888d357de5ce34580176d.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
+    <img src="docs/assets/d12038f26df3f814b4e3ce967537f039.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
   <p><b>🚀 We need your help to promote this application and gain more visibility! 🚀</b></p>
 </div>
 
 ## 🌟 Project Introduction
 
-**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device, featuring powerful **tool-calling capabilities**. It's not just a chat interface, but an **all-in-one assistant** deeply integrated with Android permissions and various tools.
+**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, a **Memory Vault**, and supports highly customizable features like **User Personality** and **Character Cards**. It is more than just a chat interface; it is an **all-in-one assistant** deeply integrated with Android permissions and various tools. Now with a built-in **Ubuntu 24 Environment**, it provides unprecedented functionality.
 
 ## 🛠️ Rich Built-in Tools
 
 Operit comes with over 40 powerful built-in tools, enabling the AI assistant to interact deeply with your device:
 
+- **Built-in Ubuntu 24 Environment**: Stably run various Linux commands and MCPs to achieve complex automation tasks.
 - **File System Tools**: Read/write files, search files, compress/decompress, convert formats, etc.
 - **HTTP Tools**: Make web requests, access web pages, upload/download files, etc.
 - **System Operation Tools**: Manage system settings, install apps, control app execution, etc.
-- **UI Automation Tools**: Screen tapping, swiping, element finding, form filling, etc.
 - **Media Processing Tools**: Video conversion, encoding/decoding, frame extraction, etc.
 
 These built-in tools, combined with a rich plugin system, allow Operit to handle a wide range of tasks from simple to complex, truly delivering an all-powerful mobile AI assistant experience.
 
 ## 🚀 Core Feature Showcase
 
-### 🗣️ Voice-Driven UI Automation
+### 🗣️ All-New Voice Interaction Experience
 
-Operit AI now supports seamless integration of **local voice conversations** with **UI automation**. You can talk to the AI while watching it perform on-screen actions for you automatically. This isn't just about voice commands; it's about "say and see," completing complex tasks as easily as having a conversation.
+Operit AI introduces a revolutionary voice interaction feature. It's no longer just about simple voice commands; it's an intelligent partner capable of **natural, continuous conversations**. By combining powerful local and cloud-based voice technologies, you can communicate fluently with the AI, achieving comprehensive voice control for everything from casual chats and queries to executing complex tasks.
 
-<div align="center">
-  <div style="margin: 20px 0;">
-    <!-- GIF placeholder -->
-    <p style="text-align: center; color: #888;">[A GIF demonstrating voice-driven UI automation should be here]</p>
-  </div>
-  <p>👆 Perform screen taps, app navigations, and other complex operations just by speaking, completely freeing your hands.</p>
-</div>
+### 🖥️ Built-in Ubuntu 24 Environment
+
+Operit AI includes a complete Ubuntu 24 environment, meaning you can have a powerful, desktop-class Linux system on your phone. This provides unprecedented support for the **stable operation of MCPs (Method, Coder, and Plan)**, allowing you to execute complex code tasks and automation workflows securely and efficiently without worrying about compatibility or environmental issues.
+
+### 🎨 Powerful Theming and Personalization
+
+Create an AI assistant that's uniquely yours! Operit AI offers powerful theme customization features, allowing you to tweak almost every corner of the interface—from colors and fonts to layouts—to create a one-of-a-kind visual style. What's more, you can shape the AI's personality and speaking style through **User Personality** and **Character Card** features, making it your most personal companion.
+
+### 🧠 Deep Search and Memory Vault
+
+Forget the hassle of information overload. Operit AI features a powerful **Deep Search** function that can quickly find the information you need on your device and in your conversation history. The unique **Memory Vault** feature allows the AI to remember your preferences, important information, and common habits, providing more personalized and context-aware intelligent services.
 
 ### 🌐 Web Development Functionality
 
@@ -90,10 +99,7 @@ Operit AI supports a floating window mode and convenient attachment uploads, all
 
 <div align="center">
   <div style="margin: 20px 0;">
-    <figure style="display: inline-block; margin: 0 10px;">
-      <img src="docs/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Floating Window and Attachments">
-      <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">The floating window, chat overlay, and attachment menu.</figcaption>
-    </figure>
+    <img src="docs/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px;">
   </div>
   <p>👆 Access via floating window anytime, with convenient attachment sharing.</p>
 </div>
@@ -104,21 +110,15 @@ Operit AI offers a rich plugin ecosystem. Combined with built-in tools, it can h
 
 <div align="center">
   <div style="margin: 20px 0;">
-    <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
-      <img src="docs/assets/package_list.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Package List">
-      <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">The Package Manager to enable plugins.</figcaption>
-    </figure>
-    <figure style="display: inline-block; margin: 0 10px; vertical-align: top;">
-      <img src="docs/assets/set_alarm_and_date.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Set Alarm and Date">
-      <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Using tools to set an alarm and get the date.</figcaption>
-    </figure>
+    <img src="docs/assets/84ea63a7437eae374f53c5b64f52c24d.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
+    <img src="docs/assets/73a602a713cff3f840efaba543465b03.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
   </div>
   <p>👆 A rich plugin ecosystem and built-in tools for a wide range of functions at your fingertips.</p>
 </div>
 
 ## 🚀 Quick Start
 
-> **For a detailed installation guide and rich usage examples, please check out our 👉 [User Guide](https://operit.dev.tc)**
+> **For a detailed installation guide and rich usage examples, please check out our 👉 [User Guide](https://aaswordman.github.io/OperitWeb)**
 
 - **System Requirements**: Android 8.0+ (API 26+), 4GB+ RAM recommended, 200MB+ storage space.
 - **Installation Steps**:
@@ -134,6 +134,14 @@ For this repository, you must download some dependency libraries from `https://d
 
 **Check out our [Contribution Guide](docs/CONTRIBUTING.md) and [Script Development Guide (Chinese)](docs/SCRIPT_DEV_GUIDE.md) to learn how to get involved.**
 
+## 💖 Contributors
+
+Thanks to all who have contributed to Operit AI!
+
+<a href="https://github.com/AAswordman/Operit/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=AAswordman/Operit" />
+</a>
+
 ## 📝 Feedback (Issues)
 
 If you encounter any problems or have suggestions for new features, we welcome you to submit an Issue!
@@ -145,11 +153,6 @@ If you encounter any problems or have suggestions for new features, we welcome y
 - If possible, provide screenshots or screen recordings to help us understand the issue.
 
 We do our best to address every reasonable issue, but please understand that open-source maintainers have limited time and energy. Also, we do not tolerate personal attacks or disrespectful comments; such issues will be closed immediately.
-
-## 📞 Contact Us
-
-- Email: aaswordsman@foxmail.com
-- For issues: [Issue Tracker](https://github.com/AAswordman/Operit/issues)
 
 ## 📄 License
 

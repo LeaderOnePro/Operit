@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.features.memory.viewmodel
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -39,6 +40,7 @@ data class MemoryUiState(
         val isEditingEdge: Boolean = false,
         val isBoxSelectionMode: Boolean = false, // 新增：是否处于框选模式
         val boxSelectedNodeIds: Set<String> = emptySet(), // 新增：框选中的节点ID
+        val showBatchDeleteConfirm: Boolean = false, // 新增：是否显示批量删除确认对话框
 
         // --- 新增：文档相关状态 ---
         val selectedDocumentChunks: List<DocumentChunk> = emptyList(),
@@ -48,14 +50,22 @@ data class MemoryUiState(
         // --- 新增：工具测试相关状态 ---
         val isToolTestDialogVisible: Boolean = false,
         val toolTestResult: String = "",
-        val isToolTestLoading: Boolean = false
+        val isToolTestLoading: Boolean = false,
+
+        // --- 新增：文件夹相关状态 ---
+        val folderPaths: List<String> = emptyList(), // 所有文件夹路径
+        val selectedFolderPath: String = "" // 当前选中的文件夹路径，空字符串表示显示全部
 )
 
 /**
- * ViewModel for the Memory/Knowledge Base screen. It handles the business logic for interacting
+ * ViewModel for the Memory/Memory Library screen. It handles the business logic for interacting
  * with the MemoryRepository.
  */
 class MemoryViewModel(private val repository: MemoryRepository, private val context: Context) : ViewModel() {
+
+    companion object {
+        private const val TAG = "MemoryViewModel"
+    }
 
     private val _uiState = MutableStateFlow(MemoryUiState())
     val uiState: StateFlow<MemoryUiState> = _uiState.asStateFlow()
@@ -63,10 +73,16 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
     init {
         // Initially load the graph
         loadMemoryGraph()
+        loadFolderPaths()
     }
 
     private suspend fun refreshGraph(): Graph {
-        return repository.getMemoryGraph()
+        val selectedFolder = _uiState.value.selectedFolderPath
+        return if (selectedFolder.isEmpty()) {
+            repository.getMemoryGraph()
+        } else {
+            repository.getGraphForFolder(selectedFolder)
+        }
     }
 
     /** Loads the entire memory graph from the repository. */
@@ -112,6 +128,87 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
     /** Updates the search query in the state. */
     fun onSearchQueryChange(newQuery: String) {
         _uiState.update { it.copy(searchQuery = newQuery) }
+    }
+
+    // --- 文件夹相关方法 ---
+
+    /** 加载所有文件夹路径列表 */
+    fun loadFolderPaths() {
+        viewModelScope.launch {
+            try {
+                val folders = repository.getAllFolderPaths()
+                _uiState.update { it.copy(folderPaths = folders) }
+                
+                // 如果还没有选中文件夹，自动选择第一个（通常是"未分类"）
+                if (_uiState.value.selectedFolderPath.isEmpty() && folders.isNotEmpty()) {
+                    selectFolder(folders.first())
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to load folders: ${e.message}") }
+            }
+        }
+    }
+
+    /** 手动刷新文件夹列表 */
+    fun refreshFolderList() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val folders = repository.getAllFolderPaths()
+                _uiState.update { it.copy(folderPaths = folders, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to refresh folders: ${e.message}", isLoading = false) }
+            }
+        }
+    }
+
+    /** 选择文件夹并加载该文件夹的图谱 */
+    fun selectFolder(folderPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, selectedFolderPath = folderPath) }
+            try {
+                val graphData = refreshGraph()
+                _uiState.update { it.copy(graph = graphData, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, error = "Failed to load folder graph: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /** 移动选中的记忆到目标文件夹 */
+    fun moveSelectedMemoriesToFolder(targetFolderPath: String) {
+        viewModelScope.launch {
+            val selectedIds = _uiState.value.boxSelectedNodeIds
+            if (selectedIds.isEmpty()) return@launch
+            
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                // 将UUID转换为Memory ID
+                val memoryIds = selectedIds.mapNotNull { uuid ->
+                    repository.findMemoryByUuid(uuid)?.id
+                }
+                
+                val success = repository.moveMemoriesToFolder(memoryIds, targetFolderPath)
+                if (success) {
+                    loadFolderPaths()
+                    val graphData = refreshGraph()
+                    _uiState.update {
+                        it.copy(
+                            graph = graphData,
+                            isLoading = false,
+                            boxSelectedNodeIds = emptySet(),
+                            isBoxSelectionMode = false
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(isLoading = false, error = "Failed to move memories") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Failed to move memories: ${e.message}") }
+            }
+        }
     }
 
     /** Selects a memory to view its details. */
@@ -226,12 +323,12 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
             try {
                 val aiToolHandler = AIToolHandler.getInstance(context)
                 // 确保工具已注册
-                if (aiToolHandler.getToolExecutor("query_knowledge_library") == null) {
+                if (aiToolHandler.getToolExecutor("query_memory") == null) {
                     aiToolHandler.registerDefaultTools()
                 }
 
                 val tool = AITool(
-                    name = "query_knowledge_library",
+                    name = "query_memory",
                     parameters = listOf(ToolParameter("query", query))
                 )
 
@@ -271,9 +368,11 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                repository.createMemoryFromDocument(title, filePath, fileContent)
-                // 刷新图谱
+                val currentFolder = _uiState.value.selectedFolderPath
+                repository.createMemoryFromDocument(title, filePath, fileContent, currentFolder)
+                // 刷新图谱和文件夹列表
                 val updatedGraph = refreshGraph()
+                loadFolderPaths()
                 _uiState.update { it.copy(graph = updatedGraph, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
@@ -288,8 +387,10 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                repository.createMemory(title, content, contentType)
+                val currentFolder = _uiState.value.selectedFolderPath
+                repository.createMemory(title, content, contentType, folderPath = currentFolder)
                 val updatedGraph = refreshGraph()
+                loadFolderPaths()
                 _uiState.update {
                     it.copy(isLoading = false, isEditing = false, editingMemory = null, graph = updatedGraph)
                 }
@@ -302,18 +403,35 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
     }
     /** 编辑记忆 */
     fun updateMemory(
-            memory: Memory,
-            newTitle: String,
-            newContent: String,
-            newContentType: String = memory.contentType
+        memory: Memory,
+        newTitle: String,
+        newContent: String,
+        newContentType: String,
+        newSource: String,
+        newCredibility: Float,
+        newImportance: Float,
+        newFolderPath: String,
+        newTags: List<String>
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                // 如果是文档节点，其内容是固定的格式
-                val contentToUpdate = if (memory.isDocumentNode) "Document: $newTitle" else newContent
-                repository.updateMemory(memory, newTitle, contentToUpdate, newContentType)
+                // 文档节点的内容不允许自由编辑，保持固定格式
+                val contentToUpdate = if (memory.isDocumentNode) memory.content else newContent
+                repository.updateMemory(
+                    memory = memory,
+                    newTitle = newTitle,
+                    newContent = contentToUpdate,
+                    newContentType = newContentType,
+                    newSource = newSource,
+                    newCredibility = newCredibility,
+                    newImportance = newImportance,
+                    newFolderPath = newFolderPath.ifBlank { null }, // 空字符串视为未分类
+                    newTags = newTags
+                )
                 val updatedGraph = refreshGraph()
+                // 刷新文件夹列表（如果记忆移动到新文件夹或从文件夹移出）
+                loadFolderPaths()
                 _uiState.update {
                     it.copy(isLoading = false, isEditing = false, editingMemory = null, graph = updatedGraph, isDocumentViewOpen = false)
                 }
@@ -331,6 +449,8 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
             try {
                 repository.deleteMemoryAndIndex(memoryId)
                 val updatedGraph = refreshGraph()
+                // 刷新文件夹列表（删除记忆可能导致文件夹变空）
+                loadFolderPaths()
                 _uiState.update {
                     it.copy(isLoading = false, selectedMemory = null, selectedNodeId = null, graph = updatedGraph, isDocumentViewOpen = false)
                 }
@@ -342,7 +462,22 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
         }
     }
 
-    /** 批量删除框选中的记忆 */
+    /** 显示批量删除确认对话框 */
+    fun showBatchDeleteConfirm() {
+        val selectedIds = _uiState.value.boxSelectedNodeIds
+        if (selectedIds.isEmpty()) {
+            android.util.Log.d("MemoryViewModel", "No nodes selected, aborting delete.")
+            return
+        }
+        _uiState.update { it.copy(showBatchDeleteConfirm = true) }
+    }
+
+    /** 隐藏批量删除确认对话框 */
+    fun dismissBatchDeleteConfirm() {
+        _uiState.update { it.copy(showBatchDeleteConfirm = false) }
+    }
+
+    /** 批量删除框选中的记忆（确认后执行） */
     fun deleteSelectedNodes() {
         viewModelScope.launch {
             val selectedIds = _uiState.value.boxSelectedNodeIds
@@ -352,12 +487,14 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
                 return@launch
             }
 
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, showBatchDeleteConfirm = false) }
             try {
                 android.util.Log.d("MemoryViewModel", "Calling repository.deleteMemoriesByUuids with IDs: $selectedIds")
                 repository.deleteMemoriesByUuids(selectedIds)
                 val updatedGraph = refreshGraph()
                 android.util.Log.d("MemoryViewModel", "Graph refreshed after deletion.")
+                // 刷新文件夹列表（批量删除可能导致文件夹变空）
+                loadFolderPaths()
                 _uiState.update {
                     it.copy(
                             isLoading = false,
@@ -496,6 +633,82 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = "Failed to link memories: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 创建新文件夹
+     */
+    fun createFolder(folderPath: String) {
+        viewModelScope.launch {
+            try {
+                // 创建一个空的占位记忆，确保文件夹路径存在
+                repository.createMemory(
+                    title = ".folder_placeholder",
+                    content = "这是一个文件夹占位符，请创建新记忆。",
+                    contentType = "text",
+                    folderPath = folderPath
+                )
+                // 重新加载文件夹列表
+                loadFolderPaths()
+                // 自动选择新创建的文件夹
+                selectFolder(folderPath)
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(error = "创建文件夹失败: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 重命名文件夹
+     */
+    fun renameFolder(oldPath: String, newPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                repository.renameFolder(oldPath, newPath)
+                // 重新加载文件夹列表
+                loadFolderPaths()
+                // 如果当前选中的就是被重命名的文件夹，更新选中状态
+                if (_uiState.value.selectedFolderPath == oldPath) {
+                    selectFolder(newPath)
+                } else {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, error = "重命名文件夹失败: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * 删除文件夹
+     */
+    fun deleteFolder(folderPath: String) {
+        viewModelScope.launch {
+            Log.d(TAG, "deleteFolder() 开始删除文件夹: $folderPath")
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                repository.deleteFolder(folderPath)
+                Log.d(TAG, "deleteFolder() 文件夹删除成功: $folderPath")
+                // 重新加载文件夹列表
+                loadFolderPaths()
+                // 如果当前选中的就是被删除的文件夹，切换到"所有记忆"
+                if (_uiState.value.selectedFolderPath == folderPath) {
+                    selectFolder("")
+                } else {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "deleteFolder() 删除文件夹失败: $folderPath", e)
+                _uiState.update {
+                    it.copy(isLoading = false, error = "删除文件夹失败: ${e.message}")
                 }
             }
         }

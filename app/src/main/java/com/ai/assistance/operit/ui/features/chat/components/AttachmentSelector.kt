@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ScreenshotMonitor
 import androidx.compose.material.icons.filled.VideoCameraBack
 import androidx.compose.material3.Divider
@@ -39,8 +40,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,10 +52,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.core.tools.AIToolHandler
-import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentManager
+import com.ai.assistance.operit.services.core.AttachmentDelegate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import androidx.core.content.FileProvider
 
 /** 简约风格的附件选择器组件 */
 @Composable
@@ -62,15 +68,17 @@ fun AttachmentSelectorPanel(
         onAttachScreenContent: () -> Unit,
         onAttachNotifications: () -> Unit = {},
         onAttachLocation: () -> Unit = {},
+        onAttachMemory: () -> Unit = {},
+        onTakePhoto: (Uri) -> Unit,
         userQuery: String = "",
         onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // 获取AttachmentManager实例
+    // 获取AttachmentDelegate实例
     val attachmentManager = remember {
-        AttachmentManager(context, AIToolHandler.getInstance(context))
+        AttachmentDelegate(context, AIToolHandler.getInstance(context))
     }
 
     // 文件/图片选择器启动器
@@ -98,6 +106,28 @@ fun AttachmentSelectorPanel(
             }
             onDismiss()
         }
+    }
+
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val takePictureLauncher =
+            rememberLauncherForActivityResult(contract = ActivityResultContracts.TakePicture()) { success ->
+                if (success) {
+                    tempCameraUri?.let {
+                        onTakePhoto(it)
+                        onDismiss()
+                    }
+                }
+            }
+
+    fun getTmpFileUri(context: Context): Uri {
+        // authority需要与AndroidManifest.xml中provider的authorities一致
+        val authority = "${context.applicationContext.packageName}.fileprovider"
+        val tmpFile =
+                File.createTempFile("temp_image_", ".jpg", context.cacheDir).apply {
+                    createNewFile()
+                    deleteOnExit()
+                }
+        return FileProvider.getUriForFile(context, authority, tmpFile)
     }
 
     // 附件选择面板 - 使用展开动画，从下方向上展开
@@ -134,7 +164,7 @@ fun AttachmentSelectorPanel(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 第一行选项 - 4个选项
+                // 第一行选项
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -147,11 +177,25 @@ fun AttachmentSelectorPanel(
                             onClick = { imagePickerLauncher.launch("image/*") }
                     )
 
-                    // 视频选项
+                    // 拍照选项
                     AttachmentOption(
-                            icon = Icons.Default.VideoCameraBack,
-                            label = "视频",
-                            onClick = { imagePickerLauncher.launch("video/*") }
+                            icon = Icons.Default.PhotoCamera,
+                            label = "拍照",
+                            onClick = {
+                                val uri = getTmpFileUri(context)
+                                tempCameraUri = uri
+                                takePictureLauncher.launch(uri)
+                            }
+                    )
+
+                    // 记忆选项
+                    AttachmentOption(
+                            icon = Icons.Default.Memory,
+                            label = "记忆",
+                            onClick = { 
+                                onAttachMemory()
+                                onDismiss()
+                            }
                     )
 
                     // 音频选项
@@ -160,23 +204,23 @@ fun AttachmentSelectorPanel(
                             label = "音频",
                             onClick = { imagePickerLauncher.launch("audio/*") }
                     )
-
-                    // 文件选项
-                    AttachmentOption(
-                            icon = Icons.Default.Description,
-                            label = "文件",
-                            onClick = { filePickerLauncher.launch("*/*") }
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 第二行选项 - 4个选项
+                // 第二行选项
                 Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 文件选项
+                    AttachmentOption(
+                        icon = Icons.Default.Description,
+                        label = "文件",
+                        onClick = { filePickerLauncher.launch("*/*") }
+                    )
+
                     // 屏幕内容选项
                     AttachmentOption(
                             icon = Icons.Default.ScreenshotMonitor,

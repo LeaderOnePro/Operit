@@ -69,26 +69,20 @@ class ModelConfigManager(private val context: Context) {
 
     // 初始化，确保至少有一个默认配置
     suspend fun initializeIfNeeded() {
-        Log.d("CONFIG_TIMING", "ModelConfigManager.initializeIfNeeded开始")
         // 检查配置列表，如果为空则创建默认配置
         // This is important for first-time users
         val configList = configListFlow.first()
-        Log.d("CONFIG_TIMING", "当前配置列表: $configList")
         if (configList.isEmpty()) {
-            Log.d("CONFIG_TIMING", "配置列表为空，创建默认配置")
             val defaultConfig = createFreshDefaultConfig()
-            Log.d("CONFIG_TIMING", "创建的默认配置apiKey: '${defaultConfig.apiKey}'")
             saveConfigToDataStore(defaultConfig)
 
             // 保存配置列表，移除活跃ID
             context.modelConfigDataStore.edit { preferences ->
                 preferences[CONFIG_LIST_KEY] = json.encodeToString(listOf(DEFAULT_CONFIG_ID))
             }
-            Log.d("CONFIG_TIMING", "默认配置已保存")
         } else {
             Log.d("CONFIG_TIMING", "配置列表不为空，跳过初始化")
         }
-        Log.d("CONFIG_TIMING", "ModelConfigManager.initializeIfNeeded完成")
     }
 
     // 从原有ApiPreferences创建默认配置
@@ -167,6 +161,20 @@ class ModelConfigManager(private val context: Context) {
             val config = loadConfigFromDataStore(configId) ?: ModelConfigData(id = configId, name = "配置 $configId")
             Log.d("CONFIG_TIMING", "getModelConfigFlow($configId) 返回配置，apiKey: '${config.apiKey}'")
             config
+        }
+    }
+
+    // 获取指定ID的配置的非Flow版本
+    suspend fun getModelConfig(configId: String): ModelConfigData? {
+        return loadConfigFromDataStore(configId)
+    }
+
+    // 更新API Key池的当前索引
+    suspend fun updateConfigKeyIndex(configId: String, newIndex: Int) {
+        val config = getModelConfig(configId)
+        if (config != null) {
+            val updatedConfig = config.copy(currentKeyIndex = newIndex)
+            saveConfigToDataStore(updatedConfig)
         }
     }
 
@@ -279,6 +287,33 @@ class ModelConfigManager(private val context: Context) {
         return updatedConfig
     }
 
+    // 更新模型配置 - 包含API提供商类型和MNN配置
+    suspend fun updateModelConfig(
+            configId: String,
+            apiKey: String,
+            apiEndpoint: String,
+            modelName: String,
+            apiProviderType: com.ai.assistance.operit.data.model.ApiProviderType,
+            mnnForwardType: Int,
+            mnnThreadCount: Int
+    ): ModelConfigData {
+        val config = getModelConfigFlow(configId).first()
+        val updatedConfig =
+                config.copy(
+                        apiKey = apiKey,
+                        apiEndpoint = apiEndpoint,
+                        modelName = modelName,
+                        apiProviderType = apiProviderType,
+                        mnnForwardType = mnnForwardType,
+                        mnnThreadCount = mnnThreadCount
+                )
+
+        // 保存更新后的配置
+        saveConfigToDataStore(updatedConfig)
+
+        return updatedConfig
+    }
+
     // 更新自定义参数
     suspend fun updateCustomParameters(configId: String, parametersJson: String): ModelConfigData {
         val config = getModelConfigFlow(configId).first()
@@ -327,6 +362,14 @@ class ModelConfigManager(private val context: Context) {
         )
 
         saveConfigToDataStore(updatedConfig)
+    }
+
+    // 更新图片直接处理配置
+    suspend fun updateDirectImageProcessing(configId: String, enableDirectImageProcessing: Boolean): ModelConfigData {
+        val config = getModelConfigFlow(configId).first()
+        val updatedConfig = config.copy(enableDirectImageProcessing = enableDirectImageProcessing)
+        saveConfigToDataStore(updatedConfig)
+        return updatedConfig
     }
 
     /**

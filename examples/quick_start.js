@@ -393,7 +393,12 @@ const finalTool = (function () {
     - `Tools.UI`: 与设备UI交互（高级功能）。
       - `getScreenshot()`: 获取当前屏幕截图。
       - `findAndClick(text)`: 查找并点击包含特定文本的UI元素。
-    - `Tools.Query`: 数据库查询功能（高级功能）。
+    - `Tools.Memory`: 记忆管理功能。
+      - `query(query)`: 查询记忆库。
+      - `create(title, content, ...)`: 创建新记忆。
+      - `update(oldTitle, updates)`: 更新记忆。
+      - `deleteMemory(title)`: 删除记忆。
+      - `link(sourceTitle, targetTitle, ...)`: 链接记忆。
     - `Tools.FFmpeg`: 音视频处理（高级功能）。
 
     所有的 `Tools` 函数都是【异步】的，意味着你必须使用 `await` 来调用它们，
@@ -427,4 +432,4 @@ exports.system_inspector = finalTool.system_inspector;
     6. **内置工具 `Tools`**: 学会了如何利用系统提供的强大工具与文件、网络和操作系统进行交互。
 
     这套“Wrapper + IIFE + Tools”的组合是经过实践检验的最佳实践，强烈建议你在开发自己的工具时采用它。
-*/ 
+*/

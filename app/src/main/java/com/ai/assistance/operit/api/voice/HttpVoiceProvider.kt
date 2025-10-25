@@ -97,13 +97,11 @@ class HttpVoiceProvider(
         if (_isInitialized.value) {
             return@withContext true
         }
-        if (httpConfig.urlTemplate.isBlank()) {
-            Log.e(TAG, "HTTP TTS URL template is not configured.")
-            _isInitialized.value = false
-            return@withContext false
-        }
-        
         try {
+            if (httpConfig.urlTemplate.isBlank()) {
+                throw TtsException("HTTP TTS 服务配置错误: URL 模板不能为空。")
+            }
+
             val isPost = httpConfig.httpMethod.uppercase() == "POST"
             val hasTextPlaceholder = if (isPost) {
                 httpConfig.requestBody.contains("{text}", ignoreCase = true)
@@ -113,25 +111,24 @@ class HttpVoiceProvider(
 
             if (!hasTextPlaceholder) {
                 val errorMessage = if (isPost) {
-                    "For POST requests, the request body template must contain a {text} placeholder."
+                    "HTTP TTS 服务配置错误: POST 请求的正文模板必须包含 {text} 占位符。"
                 } else {
-                    "For GET requests, the URL template must contain a {text} placeholder."
+                    "HTTP TTS 服务配置错误: GET 请求的 URL 模板必须包含 {text} 占位符。"
                 }
-                Log.e(TAG, errorMessage)
-                _isInitialized.value = false
-                return@withContext false
+                throw TtsException(errorMessage)
             }
 
             if (!httpConfig.urlTemplate.startsWith("http://") && !httpConfig.urlTemplate.startsWith("https://")) {
-                Log.e(TAG, "Invalid URL template scheme: ${httpConfig.urlTemplate}")
-                _isInitialized.value = false
-                return@withContext false
+                throw TtsException("HTTP TTS 服务配置错误: URL 模板必须以 http:// 或 https:// 开头。")
             }
 
             _isInitialized.value = true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize HTTP TTS provider due to invalid configuration", e)
             _isInitialized.value = false
+            // 重新抛出异常，以便UI层可以捕获并显示
+            if (e is TtsException) throw e
+            else throw TtsException("初始化HTTP TTS服务时发生意外错误", cause = e)
         }
         
         return@withContext _isInitialized.value
@@ -187,7 +184,7 @@ class HttpVoiceProvider(
             return@withContext true
         } catch (e: Exception) {
             Log.e(TAG, "HTTP TTS播放失败", e)
-            return@withContext false
+            throw e
         }
     }
 
@@ -415,18 +412,22 @@ class HttpVoiceProvider(
                     
                     return@withContext tempFile
                 }
+                // Should not happen if response is successful and body is present
+                return@withContext null
             } else {
                 val errorBody = response.body?.string()
                 Log.e(TAG, "HTTP TTS request failed. Code: ${response.code}, Body: $errorBody")
                 response.close()
-                return@withContext null
+                throw TtsException(
+                    message = "HTTP TTS request failed with code ${response.code}",
+                    httpStatusCode = response.code,
+                    errorBody = errorBody
+                )
             }
-            
-            response.close()
-            return@withContext null
         } catch (e: Exception) {
             Log.e(TAG, "获取HTTP TTS音频失败", e)
-            return@withContext null
+            if (e is TtsException) throw e
+            throw TtsException("获取HTTP TTS音频失败", cause = e)
         }
     }
     

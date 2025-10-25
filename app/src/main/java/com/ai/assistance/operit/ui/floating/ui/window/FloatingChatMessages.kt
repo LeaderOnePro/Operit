@@ -65,7 +65,8 @@ fun MessageItem(
                         thinkingTextColor = thinkingTextColor,
                         supportToolMarkup = true,
                         initialThinkingExpanded = true,
-                        overrideStream = streamToRender
+                        overrideStream = streamToRender,
+                        enableDialogs = false  // 在悬浮窗中禁用弹窗，避免闪退
                 )
         }
 }

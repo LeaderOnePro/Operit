@@ -12,7 +12,7 @@ import com.ai.assistance.operit.ui.floating.ui.ball.FloatingChatBallMode
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingDragonBonesBallMode
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingVoiceBallMode
 import com.ai.assistance.operit.ui.floating.ui.fullscreen.FloatingFullscreenMode
-import com.ai.assistance.operit.ui.floating.ui.pet.FloatingDragonBonesMode
+import com.ai.assistance.operit.ui.floating.ui.pet.FloatingAvatarMode
 import com.ai.assistance.operit.ui.floating.ui.window.FloatingChatWindowMode
 
 /**
@@ -136,6 +136,6 @@ fun FloatingChatWindow(
         }
         FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
         FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
-        FloatingMode.DragonBones -> FloatingDragonBonesMode(floatContext = floatContext)
+        FloatingMode.DragonBones -> FloatingAvatarMode(floatContext = floatContext)
     }
 }

@@ -95,6 +95,12 @@ fun AppContent(
     // Get toolbar transparency setting
     val toolbarTransparent =
             preferencesManager.toolbarTransparent.collectAsState(initial = false).value
+    
+    // Get AppBar custom color settings
+    val useCustomAppBarColor =
+            preferencesManager.useCustomAppBarColor.collectAsState(initial = false).value
+    val customAppBarColor =
+            preferencesManager.customAppBarColor.collectAsState(initial = null).value
 
     // Get AppBar content color settings
     val forceAppBarContentColor =
@@ -215,8 +221,11 @@ fun AppContent(
                     colors =
                     TopAppBarDefaults.smallTopAppBarColors(
                         containerColor =
-                        if (toolbarTransparent) Color.Transparent
-                        else MaterialTheme.colorScheme.primary,
+                        when {
+                            toolbarTransparent -> Color.Transparent
+                            useCustomAppBarColor && customAppBarColor != null -> Color(customAppBarColor)
+                            else -> MaterialTheme.colorScheme.primary
+                        },
                         titleContentColor = appBarContentColor,
                         navigationIconContentColor = appBarContentColor,
                         actionIconContentColor = appBarContentColor

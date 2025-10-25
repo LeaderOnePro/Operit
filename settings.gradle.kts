@@ -20,3 +20,5 @@ dependencyResolutionManagement {
 rootProject.name = "Operit"
 include(":app")
 include(":dragonbones")
+include(":terminal")
+include(":mnn")

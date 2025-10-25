@@ -18,7 +18,10 @@ enum class ApiProviderType {
         SILICONFLOW, // 硅基流动
         OPENROUTER, // OpenRouter (多模型聚合)
         INFINIAI, // 无问芯穹
+        ALIPAY_BAILING, // 支付宝百灵大模型
         LMSTUDIO, // LM Studio本地模型服务
+        MNN, // MNN本地推理引擎
+        PPINFRA, // 派欧云
         OTHER // 其他提供商
 }
 
@@ -33,6 +36,12 @@ data class ModelConfigData(
         val apiEndpoint: String = "",
         val modelName: String = "",
         val apiProviderType: ApiProviderType = ApiProviderType.DEEPSEEK,
+
+        // 多API Key支持
+        val useMultipleApiKeys: Boolean = false, // 是否启用多API Key模式
+        val apiKeyPool: List<ApiKeyInfo> = emptyList(), // API Key池
+        val currentKeyIndex: Int = 0, // 当前使用的Key索引
+        val keyRotationMode: String = "ROUND_ROBIN", // 轮询模式: ROUND_ROBIN / RANDOM
 
         // 是否包含自定义参数
         val hasCustomParameters: Boolean = false,
@@ -56,7 +65,15 @@ data class ModelConfigData(
         val repetitionPenalty: Float = 1.0f,
 
         // 自定义参数JSON字符串
-        val customParameters: String = "[]"
+        val customParameters: String = "[]",
+
+        // MNN特定配置
+        // 注意：MNN模型路径会根据modelName自动构建，不需要单独存储
+        val mnnForwardType: Int = 0, // 前向计算类型 (CPU/GPU等)
+        val mnnThreadCount: Int = 4, // 推理线程数
+
+        // 图片处理配置
+        val enableDirectImageProcessing: Boolean = false // 是否启用直接图片处理
 )
 
 /** 简化版的模型配置数据，用于列表显示 */

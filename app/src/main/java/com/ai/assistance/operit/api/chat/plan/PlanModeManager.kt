@@ -5,6 +5,8 @@ import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
 import com.google.gson.Gson
@@ -81,10 +83,19 @@ class PlanModeManager(
     ): Stream<String> = stream {
         
         try {
-            emit("🧠 启动深度搜索模式...\n")
-            emit("📊 正在分析您的请求并生成执行计划...\n")
+            // 开始时设置执行状态，整个计划执行期间保持这个状态
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Processing("正在执行深度搜索模式...")
+            )
+            
+            emit("<log>🧠 启动深度搜索模式...</log>\n")
+            emit("<log>📊 正在分析您的请求并生成执行计划...</log>\n")
             
             // 第一步：生成执行计划
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Processing("正在生成执行计划...")
+            )
+            
             val executionGraph = generateExecutionPlan(
                 userMessage, 
                 chatHistory, 
@@ -95,19 +106,28 @@ class PlanModeManager(
             )
             
             if (executionGraph == null) {
-                emit("❌ 无法生成有效的执行计划，切换回普通模式")
+                emit("<error>❌ 无法生成有效的执行计划，切换回普通模式</error>\n")
+                // 计划生成失败，恢复idle状态
+                enhancedAIService.setInputProcessingState(
+                    InputProcessingState.Idle
+                )
                 return@stream
             }
             
-            // 将执行计划序列化为JSON，并使用<plan>标签包裹，以便UI能够正确渲染
+            emit("<plan>\n")
+            
             val gson = Gson()
             val planJson = gson.toJson(executionGraph)
-            emit("<plan>$planJson</plan>")
+            emit("<graph><![CDATA[$planJson]]></graph>\n")
 
-            emit("\n" + "=".repeat(50) + "\n")
+            // emit("\n" + "=".repeat(50) + "\n")
             
             // 第二步：执行计划
-            val executionStream = taskExecutor.executeGraph(
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Processing("正在执行子任务...")
+            )
+            
+            val executionStream = taskExecutor.executeSubtasks(
                 executionGraph,
                 userMessage,
                 chatHistory,
@@ -122,9 +142,42 @@ class PlanModeManager(
                 emit(message)
             }
             
+            emit("<log>🎯 所有子任务执行完成，开始汇总结果...</log>\n")
+            
+            emit("</plan>\n")
+            
+            // 第三步：汇总结果 - 设置汇总状态
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Processing("正在汇总执行结果...")
+            )
+            
+            // 第三步：汇总结果
+            val summaryStream = taskExecutor.summarize(
+                executionGraph,
+                userMessage,
+                chatHistory,
+                workspacePath,
+                maxTokens,
+                tokenUsageThreshold,
+                onNonFatalError
+            )
+
+            summaryStream.collect { message ->
+                emit(message)
+            }
+            
+            // 计划执行完成，设置为完成状态
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Completed
+            )
+            
         } catch (e: Exception) {
             Log.e(TAG, "深度搜索模式执行失败", e)
-            emit("❌ 深度搜索模式执行失败: ${e.message}")
+            emit("<error>❌ 深度搜索模式执行失败: ${e.message}</error>\n")
+            // 执行失败，设置为idle状态
+            enhancedAIService.setInputProcessingState(
+                InputProcessingState.Idle
+            )
         }
     }
     
@@ -152,7 +205,7 @@ class PlanModeManager(
                 promptFunctionType = PromptFunctionType.CHAT,
                 enableThinking = false,
                 thinkingGuidance = false,
-                enableMemoryAttachment = false,
+                enableMemoryQuery = false,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError
@@ -164,7 +217,7 @@ class PlanModeManager(
                 planBuilder.append(chunk)
             }
             
-            val planResponse = planBuilder.toString().trim()
+            val planResponse = ChatUtils.removeThinkingContent(planBuilder.toString().trim())
             Log.d(TAG, "AI生成的执行计划: $planResponse")
             
             // 解析执行计划

@@ -99,6 +99,7 @@ fun ColorPickerDialog(
     primaryColorInput: Int,
     secondaryColorInput: Int,
     statusBarColorInput: Int,
+    appBarColorInput: Int,
     historyIconColorInput: Int,
     pipIconColorInput: Int,
     recentColors: List<Int>,
@@ -107,6 +108,7 @@ fun ColorPickerDialog(
                     primaryColor: Int?,
                     secondaryColor: Int?,
                     statusBarColor: Int?,
+                    appBarColor: Int?,
                     historyIconColor: Int?,
                     pipIconColor: Int?
             ) -> Unit,
@@ -119,6 +121,7 @@ fun ColorPickerDialog(
                 "primary" -> primaryColorInput
                 "secondary" -> secondaryColorInput
                 "statusBar" -> statusBarColorInput
+                "appBar" -> appBarColorInput
                 "historyIcon" -> historyIconColorInput
                 "pipIcon" -> pipIconColorInput
                 else -> primaryColorInput
@@ -557,11 +560,12 @@ fun ColorPickerDialog(
                 onClick = {
                     val newColor = pickedColor.toArgb()
                     when (currentColorPickerMode) {
-                        "primary" -> onColorSelected(newColor, null, null, null, null)
-                        "secondary" -> onColorSelected(null, newColor, null, null, null)
-                        "statusBar" -> onColorSelected(null, null, newColor, null, null)
-                        "historyIcon" -> onColorSelected(null, null, null, newColor, null)
-                        "pipIcon" -> onColorSelected(null, null, null, null, newColor)
+                        "primary" -> onColorSelected(newColor, null, null, null, null, null)
+                        "secondary" -> onColorSelected(null, newColor, null, null, null, null)
+                        "statusBar" -> onColorSelected(null, null, newColor, null, null, null)
+                        "appBar" -> onColorSelected(null, null, null, newColor, null, null)
+                        "historyIcon" -> onColorSelected(null, null, null, null, newColor, null)
+                        "pipIcon" -> onColorSelected(null, null, null, null, null, newColor)
                     }
                     onDismiss()
                 },

@@ -2,8 +2,8 @@ package com.ai.assistance.operit.api.chat.enhance
 
 import android.content.Context
 import android.util.Log
-import com.ai.assistance.operit.api.chat.AIService
-import com.ai.assistance.operit.api.chat.AIServiceFactory
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
+import com.ai.assistance.operit.api.chat.llmprovider.AIServiceFactory
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
@@ -70,6 +70,16 @@ class MultiServiceManager(private val context: Context) {
     /** 刷新指定功能类型的服务实例 当配置更改时调用此方法 */
     suspend fun refreshServiceForFunction(functionType: FunctionType) {
         serviceMutex.withLock {
+            // 释放旧实例的资源（对于本地模型如MNN，这很重要）
+            serviceInstances[functionType]?.let { oldService ->
+                try {
+                    oldService.release()
+                    Log.d(TAG, "已释放功能${functionType}的服务资源")
+                } catch (e: Exception) {
+                    Log.e(TAG, "释放服务资源时出错", e)
+                }
+            }
+
             // 移除旧实例
             serviceInstances.remove(functionType)
 
@@ -86,9 +96,18 @@ class MultiServiceManager(private val context: Context) {
     /** 刷新所有服务实例 当全局设置更改时调用此方法 */
     suspend fun refreshAllServices() {
         serviceMutex.withLock {
+            // 释放所有服务实例的资源
+            serviceInstances.values.forEach { service ->
+                try {
+                    service.release()
+                } catch (e: Exception) {
+                    Log.e(TAG, "释放服务资源时出错", e)
+                }
+            }
+
             serviceInstances.clear()
             defaultService = null
-            Log.d(TAG, "已清除所有服务实例缓存")
+            Log.d(TAG, "已清除所有服务实例缓存并释放资源")
         }
     }
 
@@ -99,11 +118,10 @@ class MultiServiceManager(private val context: Context) {
         val customHeadersJson = apiPreferences.getCustomHeaders()
 
         return AIServiceFactory.createService(
-                apiProviderType = config.apiProviderType,
-                apiEndpoint = config.apiEndpoint,
-                apiKey = config.apiKey,
-                modelName = config.modelName,
-                customHeadersJson = customHeadersJson
+            config = config,
+            customHeadersJson = customHeadersJson,
+            modelConfigManager = modelConfigManager,
+            context = context
         )
     }
 
@@ -118,4 +136,17 @@ class MultiServiceManager(private val context: Context) {
         val configId = functionalConfigManager.getConfigIdForFunction(functionType)
         return modelConfigManager.getModelParametersForConfig(configId)
     }
+
+    /**
+     * 检查识图功能是否已配置
+     * @return 如果识图功能配置启用了直接图片处理则返回true
+     */
+    suspend fun hasImageRecognitionConfigured(): Boolean {
+        val configId = functionalConfigManager.getConfigIdForFunction(FunctionType.IMAGE_RECOGNITION)
+        val config = modelConfigManager.getModelConfigFlow(configId).first()
+        
+        // 检查模型配置是否启用了直接图片处理
+        return config.enableDirectImageProcessing
+    }
+
 }

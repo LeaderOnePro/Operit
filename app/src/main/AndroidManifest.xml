@@ -18,15 +18,14 @@
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <!-- 麦克风前台服务权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     
     <!-- 持续高性能模式 -->
     <uses-permission android:name="android.permission.SUSTAINED_PERFORMANCE_MODE" />
-    
-    <!-- Termux permissions -->
-    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     
     <!-- 闹钟权限 -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
@@ -52,6 +51,10 @@
 
     <!-- 在<uses-permission>部分添加语音识别所需权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <!-- Workflow scheduling permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <queries>
         <!-- 允许查询和绑定到无障碍服务提供者应用 -->
@@ -75,6 +78,16 @@
         android:largeHeap="true"
         tools:targetApi="31"
         tools:replace="android:theme">
+
+        <!-- OpenCL 库权限声明 (Android 10+ 命名空间隔离解决方案) -->
+        <uses-native-library 
+            android:name="libOpenCL.so"
+            android:required="false" />
+        
+        <!-- Vulkan 库权限声明 -->
+        <uses-native-library 
+            android:name="libvulkan.so"
+            android:required="false" />
 
         <meta-data
             android:name="com.google.firebase.ml.kit.analytics.collection.enabled"
@@ -124,10 +137,20 @@
             android:label="@string/app_name"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
             android:windowSoftInputMode="adjustPan"
-            android:theme="@style/Theme.Operit">
+            android:theme="@style/Theme.Operit"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- GitHub OAuth Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="operit"
+                    android:host="github-oauth-callback" />
             </intent-filter>
         </activity>
 
@@ -138,6 +161,16 @@
             android:label="@string/title_activity_crash_report"
             android:process=":crash"
             android:theme="@style/Theme.Operit" />
+        
+        <activity
+            android:name=".integrations.tasker.ActivityConfigAIAgentAction"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="AI Agent Action">
+            <intent-filter>
+                <action android:name="net.dinglisch.android.tasker.ACTION_EDIT_EVENT" />
+            </intent-filter>
+        </activity>
         
         <!-- Floating Chat Service -->
         <service
@@ -162,16 +195,56 @@
             </intent-filter>
         </receiver>
         
-        <!-- Termux命令结果服务 -->
-        <service
-            android:name=".services.TermuxCommandResultService"
-            android:exported="false" />
-        
         <service
             android:name=".services.UIDebuggerService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
+        
+        <!-- Voice Assistant Widget Receiver -->
+        <receiver
+            android:name=".widget.VoiceAssistantWidgetReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/voice_assistant_widget_info" />
+        </receiver>
+        
+        <!-- Workflow Tasker Plugin Activity -->
+        <activity
+            android:name=".integrations.tasker.WorkflowTaskerActivityConfig"
+            android:exported="true"
+            android:label="Operit Workflow"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Workflow Tasker Receiver -->
+        <receiver
+            android:name=".integrations.tasker.WorkflowTaskerReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.ai.assistance.operit.TRIGGER_WORKFLOW" />
+                <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- Boot Completed Receiver for rescheduling workflows -->
+        <receiver
+            android:name=".integrations.tasker.WorkflowBootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
         
     </application>
 

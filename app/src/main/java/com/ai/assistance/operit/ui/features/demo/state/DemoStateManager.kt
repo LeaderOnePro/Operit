@@ -1,14 +1,18 @@
 package com.ai.assistance.operit.ui.features.demo.state
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import com.ai.assistance.operit.core.tools.system.OperitTerminalManager
 import com.ai.assistance.operit.core.tools.system.RootAuthorizer
-import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
-import com.ai.assistance.operit.core.tools.system.termux.TermuxAuthorizer
-import com.ai.assistance.operit.core.tools.system.termux.TermuxInstaller
-import com.ai.assistance.operit.ui.features.demo.utils.TermuxDemoUtil
+import com.ai.assistance.operit.data.repository.UIHierarchyManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,65 +20,52 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.content.pm.PackageManager
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.ai.assistance.operit.core.tools.system.AccessibilityProviderInstaller
+import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
+import com.ai.assistance.operit.core.tools.system.Terminal
+import com.ai.assistance.operit.data.mcp.plugins.MCPSharedSession
 
 private const val TAG = "DemoStateManager"
 
 /**
  * Consolidated state management for the demo screens. Handles state initialization, updates, and
- * listeners for Shizuku and Termux features.
+ * listeners for Shizuku and other features.
  */
-class DemoStateManager(private val context: Context, private val coroutineScope: CoroutineScope) {
+class DemoStateManager(private val context: Context, private val coroutineScope: CoroutineScope) : ViewModel() {
     // Main UI state holder
     private val _uiState = MutableStateFlow(DemoScreenState())
     val uiState: StateFlow<DemoScreenState> = _uiState.asStateFlow()
 
-    // Termux configuration states
-    var isTunaSourceEnabled = mutableStateOf(false)
-    var isPythonInstalled = mutableStateOf(false)
-    var isUvInstalled = mutableStateOf(false)
-    var isNodeInstalled = mutableStateOf(false)
-    var isTermuxBatteryOptimizationExempted = mutableStateOf(false)
-    var isTermuxFullyConfigured = mutableStateOf(false)
-    var isTermuxRunning = mutableStateOf(false)
-    var isTermuxConfiguring = mutableStateOf(false)
+    // NodeJS和Python环境状态
+    val isPnpmInstalled = mutableStateOf(false)
+    val isPythonInstalled = mutableStateOf(false)
+    val isNodejsPythonEnvironmentReady = mutableStateOf(false)
 
-    // Output text for commands and configuration operations
-    var outputText = mutableStateOf("欢迎使用Termux配置工具\n点击对应按钮开始配置")
-    var currentTask = mutableStateOf("")
-
-    // Shizuku/Termux state change listeners
-    private val shizukuListener: () -> Unit = {
-        refreshStatus()
-        checkTermuxAuthState()
-    }
-
-    private val termuxListener: () -> Unit = {
-        refreshStatus()
-        checkTermuxAuthState()
-    }
+    // Shizuku state change listeners
+    private val shizukuListener: () -> Unit = { refreshStatus() }
 
     // Root state change listener
     private val rootListener: () -> Unit = { refreshStatus() }
 
     init {
-        // Register listeners for Shizuku and Termux state changes
+        // Register listeners for Shizuku and Root state changes
         ShizukuAuthorizer.addStateChangeListener(shizukuListener)
-        TermuxInstaller.addStateChangeListener(termuxListener)
         RootAuthorizer.addStateChangeListener(rootListener)
+        // 初始化时刷新所有状态
+        coroutineScope.launch {
+            refreshAllStates()
+        }
     }
 
     /** Initialize state */
     fun initialize() {
         coroutineScope.launch {
             Log.d(TAG, "初始化状态...")
-
-            // 读取Termux配置持久化状态
-            isTermuxFullyConfigured.value = TermuxDemoUtil.getTermuxConfigStatus(context)
-
-            // 注册状态变更监听器
             registerStateChangeListeners()
-
-            // 刷新所有权限状态
             refreshStatusAsync()
         }
     }
@@ -103,140 +94,9 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         }
     }
 
-    /** Check Termux authorization state */
-    fun checkTermuxAuthState() {
-        coroutineScope.launch {
-            try {
-                // 检查是否存在一个运行中的Termux实例
-                val isRunning = TermuxDemoUtil.checkTermuxRunning(context)
-                isTermuxRunning.value = isRunning
-
-                // Update Termux authorization status
-                val hasTermuxPermission = TermuxAuthorizer.isTermuxAuthorized(context)
-                _uiState.value.isTermuxAuthorized.value = hasTermuxPermission
-
-                // 首先检查是否有缓存数据
-                val cachedFullyConfigured = TermuxDemoUtil.getTermuxConfigStatus(context)
-
-                // If Termux is not authorized, ensure the wizard card is shown
-                if (!_uiState.value.isTermuxAuthorized.value) {
-                    _uiState.value.showTermuxWizard.value = true
-                    isTermuxFullyConfigured.value = false
-                } else if (!isRunning) {
-                    // 如果已授权但未运行，显示向导卡片并设置为未完全配置
-                    _uiState.value.showTermuxWizard.value = true
-                    isTermuxFullyConfigured.value = false
-                } else {
-                    // Only check configurations if authorized and running
-                    isTermuxFullyConfigured.value = cachedFullyConfigured
-                    checkInstalledComponents()
-                }
-
-                Log.d(
-                        TAG,
-                        "Termux授权状态: $hasTermuxPermission, 配置状态: ${isTermuxFullyConfigured.value}, 运行状态: $isRunning"
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "检查Termux授权状态时出错: ${e.message}", e)
-            }
-        }
-    }
-
-    /** Check installed components */
-    fun checkInstalledComponents() {
-        coroutineScope.launch {
-            try {
-                // 读取持久化状态
-                isTermuxFullyConfigured.value = TermuxDemoUtil.getTermuxConfigStatus(context)
-
-                // 如果Termux未运行或未授权，不进行检查
-                if (!isTermuxRunning.value || !_uiState.value.isTermuxAuthorized.value) {
-                    return@launch
-                }
-
-                // 逐个检查各个组件状态
-                val batteryExemption = TermuxDemoUtil.checkTermuxBatteryOptimization(context)
-                val tunaEnabled = TermuxDemoUtil.checkTunaSourceEnabled(context)
-                val pythonInstalled = TermuxDemoUtil.checkPythonInstalled(context)
-                val uvInstalled = TermuxDemoUtil.checkUvInstalled(context)
-                val nodeInstalled = TermuxDemoUtil.checkNodeInstalled(context)
-
-                // 更新状态
-                isTermuxBatteryOptimizationExempted.value = batteryExemption
-                isTunaSourceEnabled.value = tunaEnabled
-                isPythonInstalled.value = pythonInstalled
-                isUvInstalled.value = uvInstalled
-                isNodeInstalled.value = nodeInstalled
-
-                // 检查是否所有组件都已配置
-                val allConfigured =
-                        batteryExemption &&
-                                tunaEnabled &&
-                                pythonInstalled &&
-                                uvInstalled &&
-                                nodeInstalled
-
-                // 更新缓存状态
-                if (allConfigured && !isTermuxFullyConfigured.value) {
-                    Log.d(TAG, "所有Termux组件已配置完成")
-                    TermuxDemoUtil.saveTermuxConfigStatus(context, true)
-                    isTermuxFullyConfigured.value = true
-                } else if (!allConfigured && isTermuxFullyConfigured.value) {
-                    Log.d(
-                            TAG,
-                            "Termux组件配置不完整（电池优化: $batteryExemption, 清华源: $tunaEnabled, " +
-                                    "Python: $pythonInstalled, UV: $uvInstalled, Node: $nodeInstalled）"
-                    )
-                    TermuxDemoUtil.saveTermuxConfigStatus(context, false)
-                    isTermuxFullyConfigured.value = false
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "检查已安装组件时出错: ${e.message}", e)
-            }
-        }
-    }
-
-    /** Update configuration status */
-    fun updateConfigStatus(isConfigured: Boolean) {
-        isTermuxFullyConfigured.value = isConfigured
-    }
-
-    /** Update component status */
-    fun updateSourceStatus(isEnabled: Boolean) {
-        isTunaSourceEnabled.value = isEnabled
-    }
-
-    fun updatePythonStatus(isInstalled: Boolean) {
-        isPythonInstalled.value = isInstalled
-    }
-
-    fun updateUvStatus(isInstalled: Boolean) {
-        isUvInstalled.value = isInstalled
-    }
-
-    fun updateNodeStatus(isInstalled: Boolean) {
-        isNodeInstalled.value = isInstalled
-    }
-
-    fun updateBatteryStatus(isExempted: Boolean) {
-        isTermuxBatteryOptimizationExempted.value = isExempted
-    }
-
     /** Update UI state */
     fun updateOutputText(text: String) {
-        outputText.value = text
-    }
-
-    fun startConfiguration(taskName: String) {
-        isTermuxConfiguring.value = true
-        currentTask.value = taskName
-        showResultDialog(taskName, outputText.value)
-    }
-
-    fun endConfiguration() {
-        isTermuxConfiguring.value = false
-        currentTask.value = ""
-        hideResultDialog()
+        // This function is kept for compatibility but might be repurposed or removed.
     }
 
     /** Dialog management */
@@ -265,10 +125,10 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         }
     }
 
-    fun toggleTermuxWizard() {
+    fun toggleOperitTerminalWizard() {
         _uiState.update { currentState ->
             currentState.copy(
-                    showTermuxWizard = mutableStateOf(!currentState.showTermuxWizard.value)
+                showOperitTerminalWizard = mutableStateOf(!currentState.showOperitTerminalWizard.value)
             )
         }
     }
@@ -296,15 +156,6 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         }
     }
 
-    fun toggleTermuxCommandExecutor() {
-        _uiState.update { currentState ->
-            currentState.copy(
-                    showTermuxCommandExecutor =
-                            mutableStateOf(!currentState.showTermuxCommandExecutor.value)
-            )
-        }
-    }
-
     fun toggleSampleCommands() {
         _uiState.update { currentState ->
             currentState.copy(
@@ -326,8 +177,23 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
     fun cleanup() {
         // Remove listeners
         ShizukuAuthorizer.removeStateChangeListener(shizukuListener)
-        TermuxInstaller.removeStateChangeListener(termuxListener)
         RootAuthorizer.removeStateChangeListener(rootListener)
+    }
+
+    /**
+     * 刷新所有状态
+     */
+    suspend fun refreshAllStates() {
+        refreshNodejsPythonEnvironment()
+    }
+
+    /**
+     * 公开的刷新所有状态方法
+     */
+    fun refreshAllStatesPublic() {
+        coroutineScope.launch {
+            refreshAllStates()
+        }
     }
 
     private fun registerStateChangeListeners() {
@@ -342,14 +208,7 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
     /** Initialize state asynchronously */
     suspend fun initializeAsync() {
         Log.d(TAG, "异步初始化状态...")
-
-        // 读取Termux配置持久化状态
-        isTermuxFullyConfigured.value = TermuxDemoUtil.getTermuxConfigStatus(context)
-
-        // 注册状态变更监听器
         registerStateChangeListeners()
-
-        // 刷新所有权限状态（在IO线程上）
         refreshStatusAsync()
     }
 
@@ -358,15 +217,16 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         _uiState.update { currentState -> currentState.copy(isRefreshing = mutableStateOf(true)) }
 
         try {
-            // 在IO线程上执行所有刷新操作
             // Refresh permissions and status
-            TermuxDemoUtil.refreshPermissionsAndStatus(
+            refreshPermissionsAndStatus(
                     context = context,
                     updateShizukuInstalled = { _uiState.value.isShizukuInstalled.value = it },
                     updateShizukuRunning = { _uiState.value.isShizukuRunning.value = it },
                     updateShizukuPermission = { _uiState.value.hasShizukuPermission.value = it },
-                    updateTermuxInstalled = { _uiState.value.isTermuxInstalled.value = it },
-                    updateTermuxRunning = { isTermuxRunning.value = it },
+                    updateOperitTerminalInstalled = { _uiState.value.isOperitTerminalInstalled.value = it },
+                    updateOperitTerminalRunning = { isOperitTerminalRunning -> 
+                        // Add logic if needed for OperitTerminal running state
+                    },
                     updateStoragePermission = { _uiState.value.hasStoragePermission.value = it },
                     updateLocationPermission = { _uiState.value.hasLocationPermission.value = it },
                     updateOverlayPermission = { _uiState.value.hasOverlayPermission.value = it },
@@ -394,8 +254,8 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
                 _uiState.value.showShizukuWizard.value = true
             }
 
-            // Check Termux authorization status
-            checkTermuxAuthStateAsync()
+            // Check OperitTerminal status
+            refreshNodejsPythonEnvironment()
 
             // 延迟300ms以确保UI能够刷新
             delay(300)
@@ -408,93 +268,186 @@ class DemoStateManager(private val context: Context, private val coroutineScope:
         }
     }
 
-    /** Check Termux authorization state asynchronously */
-    private suspend fun checkTermuxAuthStateAsync() {
+    /**
+     * 检查NodeJS和Python环境状态
+     */
+    suspend fun refreshNodejsPythonEnvironment() {
         try {
-            // 检查是否存在一个运行中的Termux实例
-            val isRunning = TermuxDemoUtil.checkTermuxRunning(context)
-            isTermuxRunning.value = isRunning
-
-            // 检查是否安装了Termux
-            val isInstalled = TermuxInstaller.isTermuxInstalled(context)
-            _uiState.value.isTermuxInstalled.value = isInstalled
-
-            // 如果未安装，就不需要检查权限
-            if (!isInstalled) {
-                _uiState.value.isTermuxAuthorized.value = false
-                _uiState.value.showTermuxWizard.value = true
-                isTermuxFullyConfigured.value = false
+            val sessionId = MCPSharedSession.getOrCreateSharedSession(context)
+            if (sessionId == null) {
+                isPnpmInstalled.value = false
+                isPythonInstalled.value = false
+                isNodejsPythonEnvironmentReady.value = false
                 return
             }
 
-            // 首先检查是否有缓存数据
-            val cachedFullyConfigured = TermuxDemoUtil.getTermuxConfigStatus(context)
+            val terminal = Terminal.getInstance(context)
+            
+            // 检查pnpm安装状态
+            val pnpmResult = terminal.executeCommand(sessionId, "command -v pnpm")
+            isPnpmInstalled.value = pnpmResult != null && pnpmResult.contains("pnpm")
+            
+            // 检查python安装状态
+            val pythonResult = terminal.executeCommand(sessionId, "command -v python")
+            var hasPython = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            
+            // 如果python不存在，检查python3
+            if (!hasPython) {
+                val python3Result = terminal.executeCommand(sessionId, "command -v python3")
+                hasPython = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
+            }
 
-            // 检查授权状态 - 无论是否运行
-            val hasTermuxPermission = TermuxAuthorizer.isTermuxAuthorized(context)
-            _uiState.value.isTermuxAuthorized.value = hasTermuxPermission
-
-            // 如果Termux没有运行，则始终显示向导卡片
-            if (!isRunning) {
-                _uiState.value.showTermuxWizard.value = true
-
-                // 如果缓存显示已配置，但Termux未运行，需要显示启动向导
-                if (cachedFullyConfigured) {
-                    Log.d(TAG, "Termux已授权但未运行，显示向导卡片")
-                    // 保留授权状态，只需显示向导
+            // 检查pip安装状态 - 只有python存在时才检查pip
+            var hasPip = false
+            if (hasPython) {
+                // 尝试检查pip
+                val pipResult = terminal.executeCommand(sessionId, "command -v pip")
+                hasPip = pipResult != null && pipResult.contains("pip")
+                
+                // 如果pip不存在，检查pip3
+                if (!hasPip) {
+                    val pip3Result = terminal.executeCommand(sessionId, "command -v pip3")
+                    hasPip = pip3Result != null && pip3Result.contains("pip3")
                 }
             }
 
-            // 检查是否已完全配置（缓存检查）
-            isTermuxFullyConfigured.value =
-                    cachedFullyConfigured && hasTermuxPermission && isRunning
+            // 只有python和pip都可用时，python环境才算准备好
+            isPythonInstalled.value = hasPython && hasPip
 
-            Log.d(
-                    TAG,
-                    "Termux授权状态: $hasTermuxPermission, 配置状态: ${isTermuxFullyConfigured.value}, 运行状态: $isRunning"
-            )
+            // 更新环境就绪状态 - 只有pnpm和python(包含pip)都准备好时才为true
+            isNodejsPythonEnvironmentReady.value = isPnpmInstalled.value && isPythonInstalled.value
+            
+            Log.d(TAG, "NodeJS环境检查 - pnpm: ${isPnpmInstalled.value}, python: $hasPython, pip: $hasPip, python环境: ${isPythonInstalled.value}, 整体ready: ${isNodejsPythonEnvironmentReady.value}")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "检查Termux授权状态时出错: ${e.message}", e)
+            Log.e(TAG, "检查NodeJS和Python环境时出错", e)
+            isPnpmInstalled.value = false
+            isPythonInstalled.value = false
+            isNodejsPythonEnvironmentReady.value = false
         }
     }
+}
 
-    /** Check installed components asynchronously */
-    private suspend fun checkInstalledComponentsAsync() {
-        try {
-            // 检查各项配置状态
-            val batteryExemption = TermuxDemoUtil.checkTermuxBatteryOptimization(context)
-            val tunaEnabled = TermuxDemoUtil.checkTunaSourceEnabled(context)
-            val pythonInstalled = TermuxDemoUtil.checkPythonInstalled(context)
-            val uvInstalled = TermuxDemoUtil.checkUvInstalled(context)
-            val nodeInstalled = TermuxDemoUtil.checkNodeInstalled(context)
+/** 刷新应用权限和组件状态 */
+suspend fun refreshPermissionsAndStatus(
+    context: Context,
+    updateShizukuInstalled: (Boolean) -> Unit,
+    updateShizukuRunning: (Boolean) -> Unit,
+    updateShizukuPermission: (Boolean) -> Unit,
+    updateOperitTerminalInstalled: (Boolean) -> Unit,
+    updateOperitTerminalRunning: (Boolean) -> Unit,
+    updateStoragePermission: (Boolean) -> Unit,
+    updateLocationPermission: (Boolean) -> Unit,
+    updateOverlayPermission: (Boolean) -> Unit,
+    updateBatteryOptimizationExemption: (Boolean) -> Unit,
+    updateAccessibilityProviderInstalled: (Boolean) -> Unit,
+    updateAccessibilityServiceEnabled: (Boolean) -> Unit
+) {
+    Log.d(TAG, "刷新应用权限状态...")
 
-            // 更新状态
-            isTermuxBatteryOptimizationExempted.value = batteryExemption
-            isTunaSourceEnabled.value = tunaEnabled
-            isPythonInstalled.value = pythonInstalled
-            isUvInstalled.value = uvInstalled
-            isNodeInstalled.value = nodeInstalled
+    // 检查Shizuku安装、运行和权限状态
+    val isShizukuInstalled = ShizukuAuthorizer.isShizukuInstalled(context)
+    val isShizukuRunning = ShizukuAuthorizer.isShizukuServiceRunning()
+    updateShizukuInstalled(isShizukuInstalled)
+    updateShizukuRunning(isShizukuRunning)
 
-            // 检查是否所有组件都已配置
-            val allConfigured =
-                    batteryExemption &&
-                            tunaEnabled &&
-                            pythonInstalled &&
-                            uvInstalled &&
-                            nodeInstalled
+    // Shizuku权限检查
+    val hasShizukuPermission =
+        if (isShizukuInstalled && isShizukuRunning) {
+            ShizukuAuthorizer.hasShizukuPermission()
+        } else {
+            false
+        }
+    updateShizukuPermission(hasShizukuPermission)
 
-            // 更新缓存状态
-            if (allConfigured) {
-                Log.d(TAG, "所有Termux组件已配置完成")
-                TermuxDemoUtil.saveTermuxConfigStatus(context, true)
-                isTermuxFullyConfigured.value = true
-            } else {
-                Log.d(TAG, "Termux组件配置不完整")
+    // 检查NodeJS和Python环境是否就绪（替代OperitTerminal安装检查）
+    val isNodejsPythonEnvironmentReady = try {
+        val sessionId = MCPSharedSession.getOrCreateSharedSession(context)
+        if (sessionId != null) {
+            val terminal = Terminal.getInstance(context)
+            val pnpmResult = terminal.executeCommand(sessionId, "command -v pnpm")
+            val isPnpmInstalled = pnpmResult != null && pnpmResult.contains("pnpm")
+            
+            val pythonResult = terminal.executeCommand(sessionId, "command -v python")
+            var hasPython = pythonResult != null && (pythonResult.contains("python") || pythonResult.contains("/python"))
+            
+            if (!hasPython) {
+                val python3Result = terminal.executeCommand(sessionId, "command -v python3")
+                hasPython = python3Result != null && (python3Result.contains("python3") || python3Result.contains("/python3"))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "检查已安装组件时出错: ${e.message}", e)
+            
+            // 检查pip安装状态 - 只有python存在时才检查pip
+            var hasPip = false
+            if (hasPython) {
+                // 尝试检查pip
+                val pipResult = terminal.executeCommand(sessionId, "command -v pip")
+                hasPip = pipResult != null && pipResult.contains("pip")
+                
+                // 如果pip不存在，检查pip3
+                if (!hasPip) {
+                    val pip3Result = terminal.executeCommand(sessionId, "command -v pip3")
+                    hasPip = pip3Result != null && pip3Result.contains("pip3")
+                }
+            }
+            
+            // 只有pnpm和python(包含pip)都准备好时才为true
+            isPnpmInstalled && hasPython && hasPip
+        } else {
+            false
         }
+    } catch (e: Exception) {
+        Log.e(TAG, "检查NodeJS和Python环境时出错", e)
+        false
     }
+    updateOperitTerminalInstalled(isNodejsPythonEnvironmentReady)
+
+    // 检查存储权限
+    val hasStoragePermission =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            context.checkSelfPermission(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                    context.checkSelfPermission(
+                        android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+    updateStoragePermission(hasStoragePermission)
+
+    // 检查位置权限
+    val hasLocationPermission =
+        context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                context.checkSelfPermission(
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    updateLocationPermission(hasLocationPermission)
+
+    // 检查悬浮窗权限
+    val hasOverlayPermission = Settings.canDrawOverlays(context)
+    updateOverlayPermission(hasOverlayPermission)
+
+    // 检查电池优化豁免
+    val powerManager =
+        context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+    val hasBatteryOptimizationExemption =
+        powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    updateBatteryOptimizationExemption(hasBatteryOptimizationExemption)
+
+    // 检查无障碍服务提供者和服务的状态
+    val isProviderInstalled = UIHierarchyManager.isProviderAppInstalled(context)
+    updateAccessibilityProviderInstalled(isProviderInstalled)
+
+    // 只有在提供者安装后才尝试绑定并检查服务状态
+    if (isProviderInstalled) {
+        // 确保服务已绑定
+        UIHierarchyManager.bindToService(context)
+    }
+
+    val hasAccessibilityServiceEnabled =
+        UIHierarchyManager.isAccessibilityServiceEnabled(context)
+    updateAccessibilityServiceEnabled(hasAccessibilityServiceEnabled)
 }
 
 /** Data class to hold all UI state */
@@ -503,8 +456,7 @@ data class DemoScreenState(
         val isShizukuInstalled: MutableState<Boolean> = mutableStateOf(false),
         val isShizukuRunning: MutableState<Boolean> = mutableStateOf(false),
         val hasShizukuPermission: MutableState<Boolean> = mutableStateOf(false),
-        val isTermuxInstalled: MutableState<Boolean> = mutableStateOf(false),
-        val isTermuxAuthorized: MutableState<Boolean> = mutableStateOf(false),
+        val isOperitTerminalInstalled: MutableState<Boolean> = mutableStateOf(false),
         val hasStoragePermission: MutableState<Boolean> = mutableStateOf(false),
         val hasOverlayPermission: MutableState<Boolean> = mutableStateOf(false),
         val hasBatteryOptimizationExemption: MutableState<Boolean> = mutableStateOf(false),
@@ -520,9 +472,8 @@ data class DemoScreenState(
         val permissionErrorMessage: MutableState<String?> = mutableStateOf(null),
         val showSampleCommands: MutableState<Boolean> = mutableStateOf(false),
         val showAdbCommandExecutor: MutableState<Boolean> = mutableStateOf(false),
-        val showTermuxCommandExecutor: MutableState<Boolean> = mutableStateOf(false),
         val showShizukuWizard: MutableState<Boolean> = mutableStateOf(false),
-        val showTermuxWizard: MutableState<Boolean> = mutableStateOf(false),
+        val showOperitTerminalWizard: MutableState<Boolean> = mutableStateOf(false),
         val showRootWizard: MutableState<Boolean> = mutableStateOf(false),
         val showAccessibilityWizard: MutableState<Boolean> = mutableStateOf(false),
         val showResultDialogState: MutableState<Boolean> = mutableStateOf(false),
@@ -548,17 +499,15 @@ val sampleAdbCommands =
                 "wm size" to "查看屏幕分辨率"
         )
 
-// Predefined Termux commands
-val termuxSampleCommands =
+// Predefined OperitTerminal commands (previously Termux)
+val operitTerminalSampleCommands =
         listOf(
-                "echo 'Hello Termux'" to "打印Hello Termux",
+                "echo 'Hello OperitTerminal'" to "打印Hello OperitTerminal",
                 "ls -la" to "列出文件和目录",
                 "whoami" to "显示当前用户",
-                "pkg update" to "更新包管理器",
-                "pkg install python" to "安装Python",
-                "termux-info" to "显示Termux信息",
-                "termux-notification -t '测试通知' -c '这是一条测试通知'" to "发送通知",
-                "termux-clipboard-get" to "获取剪贴板内容"
+                "apt update" to "更新包管理器 (Ubuntu)",
+                "apt install python3" to "安装Python (Ubuntu)",
+                "ip addr" to "显示网络信息"
         )
 
 // Root命令示例
