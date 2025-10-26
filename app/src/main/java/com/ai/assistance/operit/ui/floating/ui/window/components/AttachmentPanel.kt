@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.ui.floating.ui.window
+package com.ai.assistance.operit.ui.floating.ui.window.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
