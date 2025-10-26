@@ -810,8 +810,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 }
                 FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
                 FloatingMode.BALL,
-                FloatingMode.VOICE_BALL,
-                FloatingMode.DragonBones -> {
+                FloatingMode.VOICE_BALL -> {
                     // 这些模式暂时不处理，或者可以添加默认行为
                     Log.d(TAG, "未实现的悬浮窗模式: $mode")
                 }

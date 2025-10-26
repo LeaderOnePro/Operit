@@ -30,7 +30,8 @@ class WorkflowRepository(private val context: Context) {
         classDiscriminator = "__type"
     }
     
-    private val scheduler = WorkflowScheduler(context)
+    // Lazy initialization to avoid WorkManager initialization issues during app startup
+    private val scheduler by lazy { WorkflowScheduler(context) }
     
     companion object {
         private const val TAG = "WorkflowRepository"

@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.ui.floating.ui.window
+package com.ai.assistance.operit.ui.floating.ui.window.components
 
 import android.content.ClipData
 import android.content.ClipboardManager

@@ -1,4 +1,4 @@
-package com.ai.assistance.operit.ui.floating.ui.window
+package com.ai.assistance.operit.ui.floating.ui.window.models
 
 // 定义边缘类型
 enum class ResizeEdge {
