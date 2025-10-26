@@ -14,8 +14,8 @@ class FloatingWindowState(context: Context) {
     private val screenHeightDp: Dp
 
     // Window position
-    var x: Int = 0
-    var y: Int = 100
+    var x: Int = 200
+    var y: Int = 200
 
     // Window size
     val windowWidth = mutableStateOf(300.dp)
@@ -26,7 +26,7 @@ class FloatingWindowState(context: Context) {
     // Mode state
     val currentMode = mutableStateOf(FloatingMode.WINDOW)
     var previousMode: FloatingMode = FloatingMode.WINDOW
-    val ballSize = mutableStateOf(40.dp)
+    val ballSize = mutableStateOf(60.dp)
     val isAtEdge = mutableStateOf(false)
 
     // DragonBones pet mode lock state
@@ -66,8 +66,8 @@ class FloatingWindowState(context: Context) {
 
     fun restoreState() {
         // 始终使用默认值，不再读取保存的状态（除了高度）
-        x = 0
-        y = 100
+        x = 200
+        y = 200
 
         // 宽度使用屏幕宽度，高度默认为屏幕高度的一半
         windowWidth.value = screenWidthDp

@@ -146,6 +146,21 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                 }
             }
             
+            // 设置 EnhancedAIService 就绪回调，以便监听输入处理状态
+            chatCore.setOnEnhancedAiServiceReady { aiService ->
+                Log.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
+                serviceScope.launch {
+                    try {
+                        aiService.inputProcessingState.collect { state ->
+                            chatCore.handleInputProcessingState(state)
+                            Log.d(TAG, "输入处理状态已更新: $state")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "监听输入处理状态失败", e)
+                    }
+                }
+            }
+            
             lifecycleOwner = ServiceLifecycleOwner()
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
             windowState = FloatingWindowState(this)

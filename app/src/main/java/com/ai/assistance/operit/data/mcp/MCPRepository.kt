@@ -28,6 +28,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -170,12 +172,56 @@ class MCPRepository(private val context: Context) {
         val serverConfig = mcpLocalServer.getMCPServer(serverId)
         val command = serverConfig?.command?.lowercase() ?: return true
         
+        return commandNeedsPhysicalInstallation(command)
+    }
+    
+    /**
+     * 判断命令类型是否需要物理安装
+     * @param command 命令字符串（小写）
+     * @return true 如果需要物理安装，false 如果是 npx/uvx/uv 等不需要物理安装的命令
+     */
+    private fun commandNeedsPhysicalInstallation(command: String): Boolean {
         // npx、uvx、uv、remote 类型的插件不需要物理安装
-        return when {
-            command == "npx" -> false
-            command == "uvx" -> false
-            command == "uv" -> false
+        return when (command) {
+            "npx" -> false
+            "uvx" -> false
+            "uv" -> false
             else -> true
+        }
+    }
+    
+    /**
+     * 检查 JSON 配置中的所有服务器是否需要物理安装
+     * @param jsonConfig JSON 配置字符串
+     * @return true 如果至少有一个服务器需要物理安装，false 如果所有服务器都不需要物理安装
+     */
+    fun checkConfigNeedsPhysicalInstallation(jsonConfig: String): Boolean {
+        try {
+            val jsonElement = Json.parseToJsonElement(jsonConfig)
+            val mcpServersObject = jsonElement.jsonObject["mcpServers"]?.jsonObject
+            
+            if (mcpServersObject == null) {
+                Log.w(TAG, "No mcpServers found in config, assuming needs installation")
+                return true
+            }
+            
+            // 检查每个服务器的 command
+            for ((serverId, serverConfigElement) in mcpServersObject) {
+                val serverConfig = serverConfigElement.jsonObject
+                val command = serverConfig["command"]?.toString()?.trim('"')?.lowercase() ?: return true
+                
+                if (commandNeedsPhysicalInstallation(command)) {
+                    Log.d(TAG, "Server $serverId with command '$command' requires physical installation")
+                    return true
+                }
+            }
+            
+            // 所有命令都是 npx/uvx/uv，不需要物理安装
+            Log.d(TAG, "All commands in config are npx/uvx/uv, no physical installation needed")
+            return false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if config needs physical installation", e)
+            return true
         }
     }
 

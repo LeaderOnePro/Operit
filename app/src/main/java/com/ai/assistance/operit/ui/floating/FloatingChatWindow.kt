@@ -134,10 +134,10 @@ fun FloatingChatWindow(
 
     // 根据currentMode参数渲染对应界面，使用AnimatedContent添加炫酷过渡动画
     AnimatedContent(
-        targetState = floatContext, // 传递整个上下文以便快照状态
+        targetState = currentMode, // 只监听 currentMode，避免消息更新时触发动画
         transitionSpec = {
-            val targetMode = targetState.currentMode
-            val initialMode = initialState.currentMode
+            val targetMode = targetState
+            val initialMode = initialState
             
             // 判断是否从球模式切换到其他模式，或从其他模式切换到球模式
             val isToBall = targetMode == FloatingMode.BALL || targetMode == FloatingMode.VOICE_BALL
@@ -174,18 +174,18 @@ fun FloatingChatWindow(
             }
         },
         label = "mode_transition"
-    ) { contextForRender -> // 使用 lambda 提供的、代表当前动画帧状态的上下文
-        when (contextForRender.currentMode) {
-            FloatingMode.WINDOW -> FloatingChatWindowMode(floatContext = contextForRender)
+    ) { mode -> // 只接收 currentMode，不是整个 context
+        when (mode) {
+            FloatingMode.WINDOW -> FloatingChatWindowMode(floatContext = floatContext)
             FloatingMode.BALL -> {
                 // 根据前一个模式决定显示哪种球
-                when (contextForRender.previousMode) {
-                    FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = contextForRender)
-                    else -> FloatingChatBallMode(floatContext = contextForRender)
+                when (previousMode) {
+                    FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+                    else -> FloatingChatBallMode(floatContext = floatContext)
                 }
             }
-            FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = contextForRender)
-            FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = contextForRender)
+            FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+            FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
         }
     }
 }

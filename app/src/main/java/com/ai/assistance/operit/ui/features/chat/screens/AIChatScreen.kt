@@ -51,6 +51,7 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModelFactory
 import com.ai.assistance.operit.ui.main.LocalTopBarActions
 import com.ai.assistance.operit.ui.main.components.LocalAppBarContentColor
 import com.ai.assistance.operit.ui.main.screens.GestureStateHolder
+import com.ai.assistance.operit.ui.main.SharedFileHandler
 import java.io.File
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -91,6 +92,19 @@ fun AIChatScreen(
 
     // 设置权限系统的颜色方案
     LaunchedEffect(colorScheme) { actualViewModel.setPermissionSystemColorScheme(colorScheme) }
+
+    // Monitor shared files from external apps
+    val sharedFiles by SharedFileHandler.sharedFiles.collectAsState()
+    LaunchedEffect(sharedFiles) {
+        sharedFiles?.let { uris ->
+            if (uris.isNotEmpty()) {
+                // Process the shared files
+                actualViewModel.handleSharedFiles(uris)
+                // Clear the shared files
+                SharedFileHandler.clearSharedFiles()
+            }
+        }
+    }
 
     // 添加麦克风权限请求启动器
     val requestMicrophonePermissionLauncher =

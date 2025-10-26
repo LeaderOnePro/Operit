@@ -116,7 +116,6 @@ fun rememberFloatContext(
 }
 
 /** 简化的悬浮窗状态与回调上下文 */
-@Stable
 class FloatContext(
         val messages: List<ChatMessage>,
         var windowWidthState: Dp,

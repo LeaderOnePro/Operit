@@ -76,9 +76,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
     val replyToMessage: StateFlow<ChatMessage?> = _replyToMessage.asStateFlow()
 
-    // 服务收集器设置状态跟踪
-    private var serviceCollectorSetupComplete = false
-
     // API服务
     private var enhancedAiService: EnhancedAIService? = null
 
@@ -106,12 +103,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         enhancedAiService = service
                         // API配置变更后，异步设置服务收集器
                         viewModelScope.launch {
-                            // 重置服务收集器状态，因为服务实例已变更
-                            serviceCollectorSetupComplete = false
-                            Log.d(TAG, "API配置变更，重置服务收集器状态并重新设置")
-                            setupServiceCollectors()
+                            Log.d(TAG, "API配置变更，设置 token 统计收集器")
                             tokenStatsDelegate.setupCollectors()
                         }
+                        // 设置输入处理状态监听
+                        setupInputProcessingStateListener(service)
                     }
             )
 
@@ -402,23 +398,15 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     /** 设置服务相关的流收集逻辑 */
-    private fun setupServiceCollectors() {
-        // 避免重复设置服务收集器
-        if (serviceCollectorSetupComplete) {
-            Log.d(TAG, "服务收集器已经设置完成，跳过重复设置")
-            return
-        }
-
-        // 确保enhancedAiService不为null
-        if (enhancedAiService == null) {
-            Log.d(TAG, "EnhancedAIService尚未初始化，跳过服务收集器设置")
-            return
-        }
-
-        // 设置输入处理状态收集
+    /**
+     * 设置输入处理状态监听
+     * 当 EnhancedAIService 初始化或更新时调用
+     */
+    private fun setupInputProcessingStateListener(service: EnhancedAIService) {
+        Log.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
         viewModelScope.launch {
             try {
-                enhancedAiService?.inputProcessingState?.collect { state ->
+                service.inputProcessingState.collect { state ->
                     if (state is com.ai.assistance.operit.data.model.InputProcessingState.Completed && 
                         ::messageCoordinationDelegate.isInitialized && messageCoordinationDelegate.isSummarizing.value) {
                         messageProcessingDelegate.handleInputProcessingState(
@@ -433,27 +421,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 uiStateDelegate.showErrorMessage("输入处理状态收集失败: ${e.message}")
             }
         }
-
-        // 设置单次请求Token计数器收集
-        viewModelScope.launch {
-            try {
-                enhancedAiService?.perRequestTokenCounts?.collect { counts ->
-                    // uiStateDelegate.updatePerRequestTokenCount(counts) // Removed
-                    // 当收到新的单次请求token数时，更新TokenStatisticsDelegate中的lastCurrentWindowSize
-                    counts?.let {
-                        // tokenStatsDelegate.updateLastWindowSize(it.first) // Removed
-                        // uiStateDelegate.updateCurrentWindowSize(it.first) // Removed
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "单次请求Token计数收集出错: ${e.message}", e)
-                uiStateDelegate.showErrorMessage("单次请求Token计数收集失败: ${e.message}")
-            }
-        }
-
-        // 标记服务收集器设置为已完成
-        serviceCollectorSetupComplete = true
-        Log.d(TAG, "服务收集器设置已标记为完成")
     }
 
     // API配置相关方法
@@ -971,6 +938,67 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun handleTakenPhoto(uri: Uri) {
         viewModelScope.launch {
             attachmentDelegate.handleTakenPhoto(uri)
+        }
+    }
+
+    /**
+     * Handles shared files from external apps
+     * Creates a new chat, attaches files, and pre-fills message
+     */
+    fun handleSharedFiles(uris: List<Uri>) {
+        Log.d(TAG, "handleSharedFiles called with ${uris.size} file(s)")
+        uris.forEachIndexed { index, uri ->
+            Log.d(TAG, "  [$index] URI: $uri")
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Creating new chat for shared files...")
+                // Create a new chat for the shared file(s)
+                createNewChat()
+                
+                // Wait for chat to be created
+                var waitCount = 0
+                while (currentChatId.value == null && waitCount < 20) {
+                    delay(50)
+                    waitCount++
+                }
+                
+                if (currentChatId.value == null) {
+                    Log.e(TAG, "Failed to create chat after waiting")
+                    uiStateDelegate.showErrorMessage("创建新对话失败")
+                    return@launch
+                }
+                
+                Log.d(TAG, "Chat created successfully: ${currentChatId.value}")
+                
+                // Show processing state
+                messageProcessingDelegate.setInputProcessingState(true, "正在处理分享的文件...")
+                
+                // Attach each file
+                Log.d(TAG, "Starting to attach ${uris.size} file(s)...")
+                uris.forEachIndexed { index, uri ->
+                    val filePath = uri.toString()
+                    Log.d(TAG, "Attaching file [$index]: $filePath")
+                    attachmentDelegate.handleAttachment(filePath)
+                    delay(100) // Small delay between files
+                }
+                Log.d(TAG, "All files attached successfully")
+                
+                // Set the pre-filled message
+                Log.d(TAG, "Setting pre-filled message")
+                messageProcessingDelegate.updateUserMessage("帮我看看这个文件")
+                
+                // Clear processing state
+                messageProcessingDelegate.setInputProcessingState(false, "")
+                
+                Log.d(TAG, "Successfully processed shared files")
+                uiStateDelegate.showToast("已添加 ${uris.size} 个文件")
+            } catch (e: Exception) {
+                Log.e(TAG, "处理分享文件失败", e)
+                uiStateDelegate.showErrorMessage("处理分享文件失败: ${e.message}")
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            }
         }
     }
 

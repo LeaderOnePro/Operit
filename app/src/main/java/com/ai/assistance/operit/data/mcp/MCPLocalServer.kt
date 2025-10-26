@@ -179,7 +179,10 @@ class MCPLocalServer private constructor(private val context: Context) {
         @SerializedName("installedPath")
         val installedPath: String? = null,
         @SerializedName("installedTime")
-        val installedTime: Long = System.currentTimeMillis()
+        val installedTime: Long = System.currentTimeMillis(),
+        // 市场配置（来自 GitHub Issue）
+        @SerializedName("marketConfig")
+        val marketConfig: String? = null
     )
 
     /**

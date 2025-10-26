@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.GitHubAuthBus
 import android.content.Intent
+import android.net.Uri
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -84,6 +85,9 @@ class MainActivity : ComponentActivity() {
 
     // 是否已完成权限和迁移检查
     private var initialChecksDone = false
+
+    // 存储待处理的分享文件URIs
+    private var pendingSharedFileUris: List<Uri>? = null
 
     // 通知权限请求启动器
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -168,7 +172,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent) // 重要：更新当前Intent
-        Log.d(TAG, "onNewIntent: Received intent")
+        Log.d(TAG, "onNewIntent: Received intent with action: ${intent?.action}")
         intent?.data?.let { uri ->
             if (uri.scheme == "operit" && uri.host == "github-oauth-callback") {
                 val code = uri.getQueryParameter("code")
@@ -183,6 +187,11 @@ class MainActivity : ComponentActivity() {
         }
         
         handleIntent(intent)
+        
+        // 如果是文件分享，立即处理
+        if (intent?.action == Intent.ACTION_VIEW || intent?.action == Intent.ACTION_SEND) {
+            processPendingSharedFiles()
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -195,6 +204,24 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val error = uri.getQueryParameter("error")
                     Log.e(TAG, "GitHub OAuth error from onCreate: $error")
+                }
+            }
+        }
+        
+        // Handle opened and shared files
+        when (intent?.action) {
+            Intent.ACTION_VIEW -> {
+                // Handle "Open with" action
+                intent.data?.let { uri ->
+                    pendingSharedFileUris = listOf(uri)
+                    Log.d(TAG, "Received file to open: $uri")
+                }
+            }
+            Intent.ACTION_SEND -> {
+                // Handle "Share" action
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { uri ->
+                    pendingSharedFileUris = listOf(uri)
+                    Log.d(TAG, "Received shared file: $uri")
                 }
             }
         }
@@ -271,6 +298,37 @@ class MainActivity : ComponentActivity() {
 
         // 初始化MCP服务器并启动插件
         pluginLoadingState.initializeMCPServer(applicationContext, lifecycleScope)
+    }
+
+    // ======== 处理待处理的分享文件 ========
+    private fun processPendingSharedFiles() {
+        val uris = pendingSharedFileUris
+        if (uris == null) {
+            Log.d(TAG, "No pending shared files to process")
+            return
+        }
+        
+        Log.d(TAG, "Processing ${uris.size} pending shared file(s)")
+        uris.forEachIndexed { index, uri ->
+            Log.d(TAG, "  [$index] URI: $uri")
+        }
+        
+        lifecycleScope.launch {
+            try {
+                // Pass the URIs to the chat screen via SharedFileHandler
+                SharedFileHandler.setSharedFiles(uris)
+                Log.d(TAG, "Successfully passed shared files to SharedFileHandler")
+                pendingSharedFileUris = null
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process shared files", e)
+                Toast.makeText(
+                    this@MainActivity,
+                    "处理分享文件失败: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+                pendingSharedFileUris = null
+            }
+        }
     }
 
     // 配置双击返回退出的处理器
@@ -487,6 +545,9 @@ class MainActivity : ComponentActivity() {
                         }
                         // 显示主应用界面
                         else {
+                            // 处理待处理的分享文件
+                            processPendingSharedFiles()
+                            
                             // 主应用界面 (始终存在于底层)
                             OperitApp(
                                     initialNavItem =

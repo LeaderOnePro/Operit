@@ -411,6 +411,11 @@ class FloatingWindowManager(
         val startHeight = currentParams.height
         val startX = currentParams.x
         val startY = currentParams.y
+        
+        android.util.Log.d("FloatingWindowManager", 
+            "switchMode: from=${state.currentMode.value} to=$newMode, " +
+            "startPos=($startX,$startY), startSize=($startWidth,$startHeight), " +
+            "screenSize=($screenWidth,$screenHeight)")
 
         // Logic for leaving a mode
         state.previousMode = state.currentMode.value
@@ -446,13 +451,39 @@ class FloatingWindowManager(
                 val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                     val ballSizeInPx = (state.ballSize.value.value * density).toInt()
-                val (newX, newY) = calculateCenteredPosition(
-                    startX, startY, startWidth, startHeight,
-                    ballSizeInPx, ballSizeInPx
-                )
+                
+                // 如果从全屏模式切换，球应该出现在屏幕右侧中间位置
+                val (newX, newY) = if (state.previousMode == FloatingMode.FULLSCREEN) {
+                    // 球出现在屏幕右侧，垂直居中
+                    val rightX = screenWidth - ballSizeInPx
+                    val centerY = (screenHeight - ballSizeInPx) / 2
+                    Pair(rightX, centerY)
+                } else {
+                    // 处理 MATCH_PARENT (-1) 的情况，使用实际屏幕尺寸
+                    val actualStartWidth = if (startWidth == WindowManager.LayoutParams.MATCH_PARENT) {
+                        screenWidth
+                    } else {
+                        startWidth
+                    }
+                    val actualStartHeight = if (startHeight == WindowManager.LayoutParams.MATCH_PARENT) {
+                        screenHeight
+                    } else {
+                        startHeight
+                    }
+                    
+                    calculateCenteredPosition(
+                        startX, startY, actualStartWidth, actualStartHeight,
+                        ballSizeInPx, ballSizeInPx
+                    )
+                }
+                
+                android.util.Log.d("FloatingWindowManager", 
+                    "Ball target before coerce: newPos=($newX,$newY), ballSize=$ballSizeInPx")
                     val minVisible = ballSizeInPx / 2
                 val finalX = newX.coerceIn(-ballSizeInPx + minVisible, screenWidth - minVisible)
                 val finalY = newY.coerceIn(0, screenHeight - minVisible)
+                android.util.Log.d("FloatingWindowManager", 
+                    "Ball target after coerce: finalPos=($finalX,$finalY)")
                 TargetParams(ballSizeInPx, ballSizeInPx, finalX, finalY, flags)
                 }
                 FloatingMode.WINDOW -> {
@@ -518,11 +549,11 @@ class FloatingWindowManager(
                 }, 150) // 与 fadeOut/scaleOut 的时长匹配
                 
             } else if (isFromBall && !isToBall) {
-                // 球模式 -> 其他模式：触发爆炸动画，球直接爆开消失
-                // 1. 触发爆炸动画（100ms）
+                // 球模式 -> 其他模式：触发淡出动画，球平滑消失
+                // 1. 触发淡出动画（100ms）
                 state.ballExploding.value = true
                 
-                // 2. 延迟 100ms 后改变窗口尺寸（此时球已经爆炸消失）
+                // 2. 延迟 100ms 后改变窗口尺寸（此时球已经淡出消失）
                 android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                     updateViewLayout { params ->
                         params.width = target.width
@@ -536,9 +567,9 @@ class FloatingWindowManager(
                         state.y = params.y
                     }
                     
-                    // 重置爆炸状态
+                    // 重置淡出状态
                     state.ballExploding.value = false
-                }, 100) // 与爆炸动画时长匹配
+                }, 100) // 与淡出动画时长匹配
             } else {
                 // 球模式之间切换：立即更新窗口尺寸
                 updateViewLayout { params ->
