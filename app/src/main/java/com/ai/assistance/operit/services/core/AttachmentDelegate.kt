@@ -147,46 +147,37 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
 
                     // Check if it's a content URI path
                     if (filePath.startsWith("content://")) {
-                        // Handle as URI
                         val uri = Uri.parse(filePath)
-                        val contentResolver = context.contentResolver
+                        Log.d(TAG, "Handling content URI: $uri")
 
-                        // Get file name from ContentResolver
+                        // Get file metadata from ContentResolver
                         val fileName = getFileNameFromUri(uri)
+                        val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
 
-                        // Get file size from ContentResolver
-                        val fileSize = getFileSizeFromUri(uri)
+                        // Always create a temporary file for content URIs to ensure persistent access
+                        Log.d(TAG, "Copying content URI to a local temporary file.")
+                        val tempFile = createTempFileFromUri(uri, fileName)
 
-                        // Infer MIME type
-                        val mimeType = contentResolver.getType(uri) ?: "application/octet-stream"
-
-                        // 对所有文件类型尝试获取实际路径
-                        var actualFilePath = getFilePathFromUri(uri)
-
-                        // 如果无法获取实际路径，则创建临时文件以确保可用性
-                        if (actualFilePath == null) {
-                            Log.w(TAG, "无法从URI '$uri' 获取实际文件路径，将复制到临时文件。")
-                            // 创建一个临时文件来保存内容
-                            val tempFile = createTempFileFromUri(uri, fileName)
-                            actualFilePath = tempFile?.absolutePath
-                                    ?: filePath // fallback to original uri string if copying fails
-                        }
-
-                        val attachmentInfo =
+                        if (tempFile != null && tempFile.exists()) {
+                            Log.d(TAG, "Successfully created temp file: ${tempFile.absolutePath}")
+                            val attachmentInfo =
                                 AttachmentInfo(
-                                        filePath = actualFilePath,
-                                        fileName = fileName,
-                                        mimeType = mimeType,
-                                        fileSize = fileSize
+                                    filePath = tempFile.absolutePath,
+                                    fileName = fileName,
+                                    mimeType = mimeType,
+                                    fileSize = tempFile.length()
                                 )
 
-                        // Add to attachment list
-                        val currentList = _attachments.value
-                        if (!currentList.any { it.filePath == actualFilePath }) {
-                            _attachments.value = currentList + attachmentInfo
+                            // Add to attachment list
+                            val currentList = _attachments.value
+                            if (!currentList.any { it.filePath == tempFile.absolutePath }) {
+                                _attachments.value = currentList + attachmentInfo
+                            }
+                            _toastEvent.emit("已添加附件: $fileName")
+                        } else {
+                            Log.e(TAG, "Failed to create temp file from URI: $uri")
+                            _toastEvent.emit("无法附加文件: $fileName")
                         }
-
-                        _toastEvent.emit("已添加附件: $fileName")
                     } else {
                         // Handle as regular file path
                         val file = java.io.File(filePath)

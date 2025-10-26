@@ -107,29 +107,45 @@ class MCPDeployer(private val context: Context) {
                         return@withContext false
                     }
 
-                    // 创建项目分析器（仅用于分析项目类型和生成配置）
-                    val projectAnalyzer = MCPProjectAnalyzer()
-                    val readmeFile = projectAnalyzer.findReadmeFile(pluginDir)
-                    val readmeContent = readmeFile?.readText() ?: ""
-
-                    // 分析项目结构以便生成配置
-                    statusCallback(DeploymentStatus.InProgress("分析项目结构..."))
-                    val projectStructure = projectAnalyzer.analyzeProjectStructure(pluginDir, readmeContent)
-
-                    // 创建配置生成器
+                    // 检查是否有市场配置
+                    val pluginMetadata = mcpLocalServer.getPluginMetadata(pluginId)
+                    val marketConfig = pluginMetadata?.marketConfig
+                    
+                    // 创建配置生成器（用于提取 server name，无论是否有市场配置都需要）
                     val configGenerator = MCPConfigGenerator()
+                    
+                    val mcpConfig: String
+                    
+                    if (!marketConfig.isNullOrBlank()) {
+                        // 优先使用市场配置
+                        Log.d(TAG, "使用市场配置部署插件: $pluginId")
+                        statusCallback(DeploymentStatus.InProgress("使用市场配置部署插件..."))
+                        mcpConfig = marketConfig
+                    } else {
+                        // 没有市场配置，分析项目并生成配置
+                        Log.d(TAG, "没有市场配置，分析项目生成配置: $pluginId")
+                        
+                        // 创建项目分析器（仅用于分析项目类型和生成配置）
+                        val projectAnalyzer = MCPProjectAnalyzer()
+                        val readmeFile = projectAnalyzer.findReadmeFile(pluginDir)
+                        val readmeContent = readmeFile?.readText() ?: ""
 
-                    // 定义插件在 proot 环境中的目录路径
-                    val pluginHomeDir = "~/mcp_plugins"
-                    val pluginDirPath = "$pluginHomeDir/${pluginId.split("/").last()}"
+                        // 分析项目结构以便生成配置
+                        statusCallback(DeploymentStatus.InProgress("分析项目结构..."))
+                        val projectStructure = projectAnalyzer.analyzeProjectStructure(pluginDir, readmeContent)
 
-                    // 生成MCP配置，包含环境变量和插件目录路径
-                    val mcpConfig = configGenerator.generateMcpConfig(
-                        pluginId,
-                        projectStructure,
-                        environmentVariables,
-                        pluginDirPath
-                    )
+                        // 定义插件在 proot 环境中的目录路径
+                        val pluginHomeDir = "~/mcp_plugins"
+                        val pluginDirPath = "$pluginHomeDir/${pluginId.split("/").last()}"
+
+                        // 生成MCP配置，包含环境变量和插件目录路径
+                        mcpConfig = configGenerator.generateMcpConfig(
+                            pluginId,
+                            projectStructure,
+                            environmentVariables,
+                            pluginDirPath
+                        )
+                    }
 
                     // 保存MCP配置
                     statusCallback(DeploymentStatus.InProgress("保存MCP配置..."))

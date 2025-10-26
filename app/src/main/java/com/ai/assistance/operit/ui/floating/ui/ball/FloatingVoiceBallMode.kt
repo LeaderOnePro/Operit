@@ -69,20 +69,20 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
     val accentColor2 = Color(0xFFFF375F)   // 粉红色
     val accentColor3 = Color(0xFF00D4FF)   // 青色
     
-    // 爆炸动画状态
-    val isExploding = floatContext.windowState?.ballExploding?.value ?: false
-    val explosionProgress = remember { Animatable(0f) }
+    // 淡出动画状态
+    val isFadingOut = floatContext.windowState?.ballExploding?.value ?: false
+    val fadeOutProgress = remember { Animatable(0f) }
     
-    // 监听爆炸触发
-    LaunchedEffect(isExploding) {
-        if (isExploding) {
-            explosionProgress.snapTo(0f)
-            explosionProgress.animateTo(
+    // 监听淡出触发
+    LaunchedEffect(isFadingOut) {
+        if (isFadingOut) {
+            fadeOutProgress.snapTo(0f)
+            fadeOutProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 100, easing = LinearEasing)
             )
         } else {
-            explosionProgress.snapTo(0f)
+            fadeOutProgress.snapTo(0f)
         }
     }
     
@@ -114,7 +114,7 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
     // 外圈音波 - 第一层
     val ripple1Scale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.4f,
+        targetValue = 1.2f,
         animationSpec = infiniteRepeatable(
             animation = tween(2500, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart
@@ -135,7 +135,7 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
     // 外圈音波 - 第二层
     val ripple2Scale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.4f,
+        targetValue = 1.2f,
         animationSpec = infiniteRepeatable(
             animation = tween(2500, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
@@ -158,7 +158,7 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
     // 外圈音波 - 第三层
     val ripple3Scale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 1.4f,
+        targetValue = 1.2f,
         animationSpec = infiniteRepeatable(
             animation = tween(2500, easing = LinearOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
@@ -209,12 +209,11 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val baseRadius = size.minDimension / 2.0f
             
-            // 爆炸效果：缩放和透明度
-            val explodeScale = if (isExploding) 1f + explosionProgress.value * 2f else 1f
-            val explodeAlpha = if (isExploding) 1f - explosionProgress.value else 1f
+            // 淡出效果：只改变透明度，不改变缩放
+            val fadeAlpha = if (isFadingOut) 1f - fadeOutProgress.value else 1f
             
-            if (explodeAlpha <= 0.01f) {
-                // 爆炸完成，不绘制任何内容
+            if (fadeAlpha <= 0.01f) {
+                // 淡出完成，不绘制任何内容
                 return@Canvas
             }
             
@@ -223,138 +222,135 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color.Transparent,
-                        mainColor.copy(alpha = ripple3Alpha * 0.15f * explodeAlpha),
+                        mainColor.copy(alpha = ripple3Alpha * 0.15f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * ripple3Scale * explodeScale
+                    radius = baseRadius * ripple3Scale
                 ),
                 center = center,
-                radius = baseRadius * ripple3Scale * explodeScale
+                radius = baseRadius * ripple3Scale
             )
             
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color.Transparent,
-                        accentColor1.copy(alpha = ripple2Alpha * 0.2f * explodeAlpha),
+                        accentColor1.copy(alpha = ripple2Alpha * 0.2f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * ripple2Scale * explodeScale
+                    radius = baseRadius * ripple2Scale
                 ),
                 center = center,
-                radius = baseRadius * ripple2Scale * explodeScale
+                radius = baseRadius * ripple2Scale
             )
             
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color.Transparent,
-                        accentColor3.copy(alpha = ripple1Alpha * 0.25f * explodeAlpha),
+                        accentColor3.copy(alpha = ripple1Alpha * 0.25f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * ripple1Scale * explodeScale
+                    radius = baseRadius * ripple1Scale
                 ),
                 center = center,
-                radius = baseRadius * ripple1Scale * explodeScale
+                radius = baseRadius * ripple1Scale
             )
             
             // 2. 底部光晕（柔和的蓝紫光）
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        mainColor.copy(alpha = 0.3f * explodeAlpha),
-                        accentColor1.copy(alpha = 0.2f * explodeAlpha),
+                        mainColor.copy(alpha = 0.3f * fadeAlpha),
+                        accentColor1.copy(alpha = 0.2f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * breathe * 0.7f * explodeScale
+                    radius = baseRadius * breathe * 0.7f
                 ),
                 center = center,
-                radius = baseRadius * breathe * 0.7f * explodeScale,
+                radius = baseRadius * breathe * 0.7f,
                 blendMode = BlendMode.Screen
             )
             
             // 3. 流动的彩色光斑（4个色块，慢速旋转）
-            // 爆炸时光斑会向外飞散
-            val blobDistance = if (isExploding) explodeScale * 2f else 1f
-            
             // 主蓝色光斑
             drawColorBlob(
                 center = center,
-                radius = baseRadius * explodeScale,
+                radius = baseRadius,
                 angle = rotation,
-                distance = baseRadius * 0.25f * breathe * blobDistance,
-                color = mainColor.copy(alpha = explodeAlpha),
-                size = 0.6f
+                distance = baseRadius * 0.2f * breathe,
+                color = mainColor.copy(alpha = fadeAlpha),
+                size = 0.7f
             )
             
             // 紫色光斑（相位差90度）
             drawColorBlob(
                 center = center,
-                radius = baseRadius * explodeScale,
+                radius = baseRadius,
                 angle = rotation + 90f,
-                distance = baseRadius * 0.3f * breathe * blobDistance,
-                color = accentColor1.copy(alpha = explodeAlpha),
-                size = 0.55f
+                distance = baseRadius * 0.25f * breathe,
+                color = accentColor1.copy(alpha = fadeAlpha),
+                size = 0.65f
             )
             
             // 粉红色光斑（相位差180度）
             drawColorBlob(
                 center = center,
-                radius = baseRadius * explodeScale,
+                radius = baseRadius,
                 angle = rotation + 180f,
-                distance = baseRadius * 0.28f * breathe * blobDistance,
-                color = accentColor2.copy(alpha = explodeAlpha),
-                size = 0.5f
+                distance = baseRadius * 0.22f * breathe,
+                color = accentColor2.copy(alpha = fadeAlpha),
+                size = 0.6f
             )
             
             // 青色光斑（相位差270度）
             drawColorBlob(
                 center = center,
-                radius = baseRadius * explodeScale,
+                radius = baseRadius,
                 angle = rotation + 270f,
-                distance = baseRadius * 0.22f * breathe * blobDistance,
-                color = accentColor3.copy(alpha = explodeAlpha),
-                size = 0.58f
+                distance = baseRadius * 0.23f * breathe,
+                color = accentColor3.copy(alpha = fadeAlpha),
+                size = 0.68f
             )
             
             // 4. 中心明亮核心
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.7f * explodeAlpha),
-                        mainColor.copy(alpha = 0.6f * explodeAlpha),
-                        accentColor1.copy(alpha = 0.5f * explodeAlpha),
+                        Color.White.copy(alpha = 0.7f * fadeAlpha),
+                        mainColor.copy(alpha = 0.6f * fadeAlpha),
+                        accentColor1.copy(alpha = 0.5f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * 0.65f * breathe * explodeScale
+                    radius = baseRadius * 0.65f * breathe
                 ),
                 center = center,
-                radius = baseRadius * 0.65f * breathe * explodeScale,
+                radius = baseRadius * 0.65f * breathe,
                 blendMode = BlendMode.Screen
             )
             
             // 5. 玻璃球体高光（模拟3D质感）
             val highlightCenter = Offset(
-                center.x - baseRadius * 0.25f * explodeScale,
-                center.y - baseRadius * 0.25f * explodeScale
+                center.x - baseRadius * 0.25f,
+                center.y - baseRadius * 0.25f
             )
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.5f * explodeAlpha),
-                        Color.White.copy(alpha = 0.25f * explodeAlpha),
+                        Color.White.copy(alpha = 0.5f * fadeAlpha),
+                        Color.White.copy(alpha = 0.25f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = highlightCenter,
-                    radius = baseRadius * 0.35f * explodeScale
+                    radius = baseRadius * 0.35f
                 ),
                 center = highlightCenter,
-                radius = baseRadius * 0.35f * explodeScale,
+                radius = baseRadius * 0.35f,
                 blendMode = BlendMode.Screen
             )
             
@@ -363,15 +359,15 @@ fun FloatingVoiceBallMode(floatContext: FloatContext) {
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color.Transparent,
-                        Color.White.copy(alpha = 0.05f * explodeAlpha),
-                        Color.White.copy(alpha = 0.15f * explodeAlpha),
+                        Color.White.copy(alpha = 0.05f * fadeAlpha),
+                        Color.White.copy(alpha = 0.15f * fadeAlpha),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * breathe * explodeScale
+                    radius = baseRadius * breathe
                 ),
                 center = center,
-                radius = baseRadius * breathe * explodeScale
+                radius = baseRadius * breathe
             )
         }
     }

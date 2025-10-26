@@ -50,6 +50,9 @@ class ChatServiceCore(
         initializeDelegates()
     }
 
+    // 回调：当 EnhancedAIService 初始化或更新时
+    private var onEnhancedAiServiceReady: ((EnhancedAIService) -> Unit)? = null
+    
     private fun initializeDelegates() {
         // 初始化 API 配置委托
         apiConfigDelegate = ApiConfigDelegate(
@@ -59,6 +62,8 @@ class ChatServiceCore(
                 enhancedAiService = service
                 // 当服务初始化后，设置 token 统计收集器
                 tokenStatisticsDelegate.setupCollectors()
+                // 通知外部监听者
+                onEnhancedAiServiceReady?.invoke(service)
                 Log.d(TAG, "EnhancedAIService 已更新")
             }
         )
@@ -346,5 +351,12 @@ class ChatServiceCore(
 
     /** 检查是否已初始化 */
     fun isInitialized(): Boolean = initialized
+    
+    /** 设置 EnhancedAIService 就绪回调 */
+    fun setOnEnhancedAiServiceReady(callback: (EnhancedAIService) -> Unit) {
+        onEnhancedAiServiceReady = callback
+        // 如果已经初始化，立即调用回调
+        enhancedAiService?.let { callback(it) }
+    }
 }
 

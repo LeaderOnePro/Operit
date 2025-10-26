@@ -269,30 +269,39 @@ class MCPMarketViewModel(
                     // 标记插件开始安装
                     _installingPlugins.value = _installingPlugins.value + pluginId
                     
-                    // 如果提供了安装配置，使用配置合并方式
+                    // 如果提供了安装配置，检查是否需要物理安装
                     if (installInfo.installConfig != null && installInfo.installConfig.isNotBlank()) {
-                        Log.d(TAG, "Using config merge installation for plugin $pluginId")
-                        val mcpLocalServer = MCPLocalServer.getInstance(context)
-                        val mergeResult = mcpLocalServer.mergeConfigFromJson(installInfo.installConfig)
+                        // 检查配置中的命令是否都不需要物理安装
+                        val needsInstallation = mcpRepository.checkConfigNeedsPhysicalInstallation(installInfo.installConfig)
                         
-                        mergeResult.onSuccess { count ->
-                            _installingPlugins.value = _installingPlugins.value - pluginId
-                            Toast.makeText(
-                                context,
-                                "成功导入 ${issue.title} 配置，合并了 $count 个服务器",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            mcpRepository.refreshPluginList()
-                        }.onFailure { error ->
-                            _installingPlugins.value = _installingPlugins.value - pluginId
-                            Toast.makeText(
-                                context,
-                                "配置导入失败: ${error.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            Log.e(TAG, "Config merge failed for plugin $pluginId", error)
+                        if (!needsInstallation) {
+                            // 不需要物理安装，直接合并配置
+                            Log.d(TAG, "Using config merge installation for plugin $pluginId (no physical installation needed)")
+                            val mcpLocalServer = MCPLocalServer.getInstance(context)
+                            val mergeResult = mcpLocalServer.mergeConfigFromJson(installInfo.installConfig)
+                            
+                            mergeResult.onSuccess { count ->
+                                _installingPlugins.value = _installingPlugins.value - pluginId
+                                Toast.makeText(
+                                    context,
+                                    "成功导入 ${issue.title} 配置，合并了 $count 个服务器",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                mcpRepository.refreshPluginList()
+                            }.onFailure { error ->
+                                _installingPlugins.value = _installingPlugins.value - pluginId
+                                Toast.makeText(
+                                    context,
+                                    "配置导入失败: ${error.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                Log.e(TAG, "Config merge failed for plugin $pluginId", error)
+                            }
+                            return@launch
+                        } else {
+                            Log.d(TAG, "Config contains commands that need physical installation, proceeding with normal installation flow")
+                            // 继续执行下面的物理安装流程
                         }
-                        return@launch
                     }
                     
                     // 获取作者头像，如果缓存中没有，则使用分享者的头像作为备用
@@ -310,7 +319,8 @@ class MCPMarketViewModel(
                         updatedAt = issue.updated_at,
                         longDescription = issue.body ?: "",
                         repoUrl = installInfo.repoUrl ?: "",
-                        type = "local"
+                        type = "local",
+                        marketConfig = installInfo.installConfig // 保存市场配置
                     )
 
                     // 安装MCP，带进度回调

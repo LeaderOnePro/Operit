@@ -118,17 +118,17 @@ object MessageImageGenerator {
                                     .width(widthDp)
                                     .wrapContentHeight()
                                     .background(Color.White)
-                                    .padding(24.dp)
+                                    .padding(12.dp) // 减少外层边距：24dp -> 12dp
                             ) {
                                 // 内容卡片：圆角边框 + 阴影效果
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(RoundedCornerShape(12.dp)) // 减少圆角：16dp -> 12dp
                                         .border(
-                                            width = 2.dp,
+                                            width = 1.5.dp, // 减少边框宽度：2dp -> 1.5dp
                                             color = Color(0xFFE0E0E0),
-                                            shape = RoundedCornerShape(16.dp)
+                                            shape = RoundedCornerShape(12.dp)
                                         )
                                         .background(Color.White)
                                 ) {
@@ -137,7 +137,7 @@ object MessageImageGenerator {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(Color(0xFFF5F5F5))
-                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                            .padding(horizontal = 12.dp, vertical = 8.dp), // 减少品牌栏边距
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.Center
                                     ) {
@@ -145,13 +145,13 @@ object MessageImageGenerator {
                                         Image(
                                             painter = painterResource(id = com.ai.assistance.operit.R.drawable.ic_launcher_foreground),
                                             contentDescription = "Operit Logo",
-                                            modifier = Modifier.size(64.dp)
+                                            modifier = Modifier.size(48.dp) // 减少 Logo 尺寸：64dp -> 48dp
                                         )
                                         Spacer(modifier = Modifier.width(2.dp))
                                         // 品牌名称
                                         Text(
                                             text = "Operit AI",
-                                            fontSize = 18.sp,
+                                            fontSize = 16.sp, // 减少字体大小：18sp -> 16sp
                                             fontWeight = FontWeight.Bold,
                                             color = Color(0xFF333333)
                                         )
@@ -171,10 +171,15 @@ object MessageImageGenerator {
                                             .fillMaxWidth()
                                             .wrapContentHeight()
                                             .background(Color.White)
-                                            .padding(16.dp),
+                                            .padding(12.dp), // 减少内容区域边距：16dp -> 12dp
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        messages.forEach { message ->
+                                        // 创建消息副本，清除 contentStream，确保只使用 content 字段
+                                        val staticMessages = messages.map { message ->
+                                            message.copy(contentStream = null)
+                                        }
+                                        
+                                        staticMessages.forEach { message ->
                                             when (chatStyle) {
                                                 ChatStyle.BUBBLE -> {
                                                     BubbleStyleChatMessage(
