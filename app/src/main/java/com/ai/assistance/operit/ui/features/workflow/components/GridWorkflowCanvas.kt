@@ -160,39 +160,75 @@ fun GridWorkflowCanvas(
                     
                     if (sourcePos != null && targetPos != null) {
                         // 计算节点中心点
-                        val startCenter = Offset(
-                            sourcePos.x + nodeWidthPx / 2,
-                            sourcePos.y + nodeHeightPx / 2
-                        )
-                        val endCenter = Offset(
-                            targetPos.x + nodeWidthPx / 2,
-                            targetPos.y + nodeHeightPx / 2
-                        )
+                        val sourceCenterX = sourcePos.x + nodeWidthPx / 2
+                        val sourceCenterY = sourcePos.y + nodeHeightPx / 2
+                        val targetCenterX = targetPos.x + nodeWidthPx / 2
+                        val targetCenterY = targetPos.y + nodeHeightPx / 2
                         
-                        val dx = endCenter.x - startCenter.x
-                        val dy = endCenter.y - startCenter.y
+                        val dx = targetCenterX - sourceCenterX
+                        val dy = targetCenterY - sourceCenterY
+                        val centerDistance = kotlin.math.sqrt(dx * dx + dy * dy)
+                        
+                        // 计算从源节点到目标节点的方向
+                        val directionX = dx / centerDistance
+                        val directionY = dy / centerDistance
+                        
+                        // 计算最近边缘点的函数
+                        fun getEdgePoint(
+                            centerX: Float, 
+                            centerY: Float, 
+                            dirX: Float, 
+                            dirY: Float,
+                            isSource: Boolean
+                        ): Offset {
+                            // 节点的半宽和半高
+                            val halfWidth = nodeWidthPx / 2
+                            val halfHeight = nodeHeightPx / 2
+                            
+                            // 判断方向主要在哪个方向
+                            val absX = kotlin.math.abs(dirX)
+                            val absY = kotlin.math.abs(dirY)
+                            
+                            // 计算与四条边的交点，选择最近的
+                            val tRight = if (dirX > 0) halfWidth / absX else Float.POSITIVE_INFINITY
+                            val tLeft = if (dirX < 0) halfWidth / absX else Float.POSITIVE_INFINITY
+                            val tBottom = if (dirY > 0) halfHeight / absY else Float.POSITIVE_INFINITY
+                            val tTop = if (dirY < 0) halfHeight / absY else Float.POSITIVE_INFINITY
+                            
+                            val t = minOf(tRight, tLeft, tBottom, tTop)
+                            
+                            return Offset(
+                                centerX + dirX * t,
+                                centerY + dirY * t
+                            )
+                        }
+                        
+                        // 计算起点和终点在边缘上
+                        val startEdge = getEdgePoint(sourceCenterX, sourceCenterY, directionX, directionY, true)
+                        val endEdge = getEdgePoint(targetCenterX, targetCenterY, -directionX, -directionY, false)
+                        
+                        val edgeDx = endEdge.x - startEdge.x
+                        val edgeDy = endEdge.y - startEdge.y
+                        val edgeDistance = kotlin.math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy)
 
                         // 绘制贝塞尔曲线
+                        val controlDistance = edgeDistance * 0.4f
+                        
+                        val controlPoint1 = Offset(
+                            startEdge.x + controlDistance,
+                            startEdge.y
+                        )
+                        val controlPoint2 = Offset(
+                            endEdge.x - controlDistance,
+                            endEdge.y
+                        )
+                        
                         val path = Path().apply {
-                            moveTo(startCenter.x, startCenter.y)
-                            
-                            // 计算控制点以创建平滑的曲线
-                            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
-                            val controlDistance = distance * 0.4f
-                            
-                            val controlPoint1 = Offset(
-                                startCenter.x + controlDistance,
-                                startCenter.y
-                            )
-                            val controlPoint2 = Offset(
-                                endCenter.x - controlDistance,
-                                endCenter.y
-                            )
-                            
+                            moveTo(startEdge.x, startEdge.y)
                             cubicTo(
                                 controlPoint1.x, controlPoint1.y,
                                 controlPoint2.x, controlPoint2.y,
-                                endCenter.x, endCenter.y
+                                endEdge.x, endEdge.y
                             )
                         }
                         
@@ -216,28 +252,84 @@ fun GridWorkflowCanvas(
                             )
                         )
                         
-                        // 绘制箭头
-                        val arrowSize = 10f
-                        val angle = kotlin.math.atan2(dy, dx)
+                        // 计算贝塞尔曲线上某一点的位置和切线方向的辅助函数
+                        fun getBezierPointAndTangent(t: Float): Pair<Offset, Float> {
+                            // 三次贝塞尔曲线公式
+                            val oneMinusT = 1 - t
+                            val oneMinusT2 = oneMinusT * oneMinusT
+                            val oneMinusT3 = oneMinusT2 * oneMinusT
+                            val t2 = t * t
+                            val t3 = t2 * t
+                            
+                            // 位置
+                            val x = oneMinusT3 * startEdge.x + 
+                                    3 * oneMinusT2 * t * controlPoint1.x + 
+                                    3 * oneMinusT * t2 * controlPoint2.x + 
+                                    t3 * endEdge.x
+                            val y = oneMinusT3 * startEdge.y + 
+                                    3 * oneMinusT2 * t * controlPoint1.y + 
+                                    3 * oneMinusT * t2 * controlPoint2.y + 
+                                    t3 * endEdge.y
+                            
+                            // 切线（导数）
+                            val tangentX = -3 * oneMinusT2 * startEdge.x + 
+                                           3 * oneMinusT2 * controlPoint1.x - 
+                                           6 * oneMinusT * t * controlPoint1.x + 
+                                           6 * oneMinusT * t * controlPoint2.x - 
+                                           3 * t2 * controlPoint2.x + 
+                                           3 * t2 * endEdge.x
+                            val tangentY = -3 * oneMinusT2 * startEdge.y + 
+                                           3 * oneMinusT2 * controlPoint1.y - 
+                                           6 * oneMinusT * t * controlPoint1.y + 
+                                           6 * oneMinusT * t * controlPoint2.y - 
+                                           3 * t2 * controlPoint2.y + 
+                                           3 * t2 * endEdge.y
+                            
+                            val angle = kotlin.math.atan2(tangentY, tangentX)
+                            return Pair(Offset(x, y), angle)
+                        }
                         
-                        val arrowPath = Path().apply {
-                            moveTo(endCenter.x, endCenter.y)
-                            lineTo(
-                                endCenter.x - arrowSize * kotlin.math.cos(angle - Math.PI / 6).toFloat(),
-                                endCenter.y - arrowSize * kotlin.math.sin(angle - Math.PI / 6).toFloat()
+                        // 绘制箭头的辅助函数
+                        fun drawArrow(position: Offset, angle: Float, size: Float = 12f) {
+                            val arrowAngle = Math.PI / 6 // 30度角
+                            
+                            val arrowPath = Path().apply {
+                                // 箭头顶点
+                                moveTo(position.x, position.y)
+                                // 箭头左边
+                                lineTo(
+                                    position.x - size * kotlin.math.cos(angle - arrowAngle).toFloat(),
+                                    position.y - size * kotlin.math.sin(angle - arrowAngle).toFloat()
+                                )
+                                // 箭头右边
+                                lineTo(
+                                    position.x - size * kotlin.math.cos(angle + arrowAngle).toFloat(),
+                                    position.y - size * kotlin.math.sin(angle + arrowAngle).toFloat()
+                                )
+                                // 闭合路径
+                                close()
+                            }
+                            
+                            // 绘制箭头阴影
+                            drawPath(
+                                path = arrowPath,
+                                color = Color(0x40000000)
                             )
-                            moveTo(endCenter.x, endCenter.y)
-                            lineTo(
-                                endCenter.x - arrowSize * kotlin.math.cos(angle + Math.PI / 6).toFloat(),
-                                endCenter.y - arrowSize * kotlin.math.sin(angle + Math.PI / 6).toFloat()
+                            
+                            // 绘制实心箭头
+                            drawPath(
+                                path = arrowPath,
+                                color = Color(0xFF4285F4)
                             )
                         }
                         
-                        drawPath(
-                            path = arrowPath,
-                            color = Color(0xFF4285F4),
-                            style = Stroke(width = 2.5f, cap = StrokeCap.Round)
-                        )
+                        // 在曲线中点绘制箭头（增大尺寸使其更明显）
+                        val (midPoint, midAngle) = getBezierPointAndTangent(0.5f)
+                        drawArrow(midPoint, midAngle, 18f)
+                        
+                        // 在曲线终点绘制箭头
+                        val (endPoint, endAngle) = getBezierPointAndTangent(1.0f)
+                        drawArrow(endPoint, endAngle, 18f)
                     }
                 }
             }

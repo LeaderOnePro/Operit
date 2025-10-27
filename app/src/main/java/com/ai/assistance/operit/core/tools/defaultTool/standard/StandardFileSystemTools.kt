@@ -457,7 +457,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 return specialReadResult
                         }
 
-                        if (FileUtils.isTextBasedExtension(fileExt)) {
+                        // Check if file is text-like by analyzing content
+                        if (FileUtils.isTextLike(file)) {
                                 val content = file.readText()
                                 return ToolResult(
                                         toolName = tool.name,
@@ -475,7 +476,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                                         toolName = tool.name,
                                         success = false,
                                         result = StringResultData(""),
-                                        error = "Unsupported file format: .$fileExt"
+                                        error = "File does not appear to be a text file. Use specialized tools for binary files."
                                 )
                         }
                 } catch (e: Exception) {
@@ -562,13 +563,14 @@ open class StandardFileSystemTools(protected val context: Context) {
                         }
 
                         // For text-based files, read only the beginning.
-                        if (!FileUtils.isTextBasedExtension(fileExt)) {
+                        // Check if file is text-like by analyzing content
+                        if (!FileUtils.isTextLike(file)) {
                                 return ToolResult(
                                         toolName = tool.name,
                                         success = false,
                                         result = StringResultData(""),
                                         error =
-                                                "Unsupported file format for partial read: .$fileExt. Use readFileFull tool for full content."
+                                                "File does not appear to be a text file. Use readFileFull tool for special file types."
                                 )
                         }
 

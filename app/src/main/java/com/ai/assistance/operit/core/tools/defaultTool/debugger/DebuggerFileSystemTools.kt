@@ -413,42 +413,55 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                  // Optional: Could add fallback logic here if superclass fails for some reason
             }
 
-            // For standard text-based files, use shell `cat`
-            if (FileUtils.isTextBasedExtension(fileExt)) {
-                val result = AndroidShellExecutor.executeShellCommand("cat '$path'")
-                if (result.success) {
-                    val sizeResult =
-                        AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
-                    val size =
-                            sizeResult.stdout.trim().toLongOrNull()
-                                    ?: result.stdout.length.toLong()
-
-                    return ToolResult(
-                            toolName = tool.name,
-                            success = true,
-                            result =
-                                    FileContentData(
-                                            path = path,
-                                            content = result.stdout,
-                                            size = size
-                                    ),
-                            error = ""
-                    )
-                } else {
-                return ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result = StringResultData(""),
-                            error = "Failed to read file: ${result.stderr}"
-                    )
-                }
-            } else {
-                // 如果不是支持的文本文件类型，返回不支持的错误
+            // Check if file is text-like by reading first few bytes
+            // First, get a sample of the file
+            val sampleResult = AndroidShellExecutor.executeShellCommand("head -c 512 '$path'")
+            if (!sampleResult.success) {
                 return ToolResult(
                     toolName = tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error = "Unsupported file format: .$fileExt"
+                    error = "Failed to sample file: ${sampleResult.stderr}"
+                )
+            }
+
+            // Analyze the sample bytes
+            val sampleBytes = sampleResult.stdout.toByteArray()
+            if (!FileUtils.isTextLike(sampleBytes)) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "File does not appear to be a text file. Use specialized tools for binary files."
+                )
+            }
+
+            // For text-like files, use shell `cat` to read full content
+            val result = AndroidShellExecutor.executeShellCommand("cat '$path'")
+            if (result.success) {
+                val sizeResult =
+                    AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
+                val size =
+                        sizeResult.stdout.trim().toLongOrNull()
+                                ?: result.stdout.length.toLong()
+
+                return ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result =
+                                FileContentData(
+                                        path = path,
+                                        content = result.stdout,
+                                        size = size
+                                ),
+                        error = ""
+                )
+            } else {
+                return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "Failed to read file: ${result.stderr}"
                 )
             }
 
@@ -509,13 +522,18 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             // For text-based files, read only the beginning.
-            if (!FileUtils.isTextBasedExtension(fileExt)) {
-                 return ToolResult(
-                    toolName = tool.name,
-                    success = false,
-                    result = StringResultData(""),
-                    error = "Unsupported file format for partial read: .$fileExt. Use readFileFull tool for full content."
-                )
+            // Check if file is text-like by analyzing a sample
+            val sampleResult = AndroidShellExecutor.executeShellCommand("head -c 512 '$path'")
+            if (sampleResult.success) {
+                val sampleBytes = sampleResult.stdout.toByteArray()
+                if (!FileUtils.isTextLike(sampleBytes)) {
+                    return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "File does not appear to be a text file. Use readFileFull tool for special file types."
+                    )
+                }
             }
 
             // Check file size to see if truncation is needed
