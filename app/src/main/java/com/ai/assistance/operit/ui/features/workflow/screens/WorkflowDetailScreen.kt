@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
@@ -34,6 +35,7 @@ import com.ai.assistance.operit.data.model.Workflow
 import com.ai.assistance.operit.data.model.WorkflowNode
 import com.ai.assistance.operit.data.model.TriggerNode
 import com.ai.assistance.operit.data.model.ExecuteNode
+import com.ai.assistance.operit.data.model.ParameterValue
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import com.ai.assistance.operit.ui.features.workflow.viewmodel.WorkflowViewModel
 import com.ai.assistance.operit.ui.features.workflow.components.GridWorkflowCanvas
@@ -294,9 +296,10 @@ fun WorkflowDetailScreen(
             }
 
             // 添加节点对话框
-            if (showAddNodeDialog) {
+            if (showAddNodeDialog && workflow != null) {
                 NodeDialog(
                     node = null, // 创建模式
+                    workflow = workflow,
                     onDismiss = { showAddNodeDialog = false },
                     onConfirm = { node ->
                         viewModel.addNode(workflowId, node) {
@@ -357,16 +360,19 @@ fun WorkflowDetailScreen(
             }
 
             // 节点编辑对话框
-            showEditNodeDialog?.let { node ->
-                NodeDialog(
-                    node = node, // 编辑模式
-                    onDismiss = { showEditNodeDialog = null },
-                    onConfirm = { updatedNode ->
-                        viewModel.updateNode(workflowId, updatedNode) {
-                            showEditNodeDialog = null
+            if (workflow != null) {
+                showEditNodeDialog?.let { node ->
+                    NodeDialog(
+                        node = node, // 编辑模式
+                        workflow = workflow,
+                        onDismiss = { showEditNodeDialog = null },
+                        onConfirm = { updatedNode ->
+                            viewModel.updateNode(workflowId, updatedNode) {
+                                showEditNodeDialog = null
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
 
             // 连接菜单对话框
@@ -428,10 +434,20 @@ private fun SpeedDialAction(
     }
 }
 
+/**
+ * 参数配置数据类
+ */
+data class ParameterConfig(
+    val key: String,
+    val isReference: Boolean, // true表示引用节点，false表示静态值
+    val value: String // 静态值或节点ID
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NodeDialog(
     node: WorkflowNode? = null, // null 表示创建新节点，非 null 表示编辑
+    workflow: Workflow, // 用于获取前置节点信息
     onDismiss: () -> Unit,
     onConfirm: (WorkflowNode) -> Unit
 ) {
@@ -456,13 +472,31 @@ fun NodeDialog(
     }
     var actionTypeExpanded by remember { mutableStateOf(false) }
     
-    // 将 actionConfig (Map) 转换为可变的键值对列表
+    // 将 actionConfig (Map<String, ParameterValue>) 转换为可变的参数配置列表
     val initialActionConfigPairs = if (node is ExecuteNode) {
-        node.actionConfig.toList()
+        node.actionConfig.map { (key, paramValue) ->
+            when (paramValue) {
+                is com.ai.assistance.operit.data.model.ParameterValue.StaticValue -> 
+                    ParameterConfig(key, false, paramValue.value)
+                is com.ai.assistance.operit.data.model.ParameterValue.NodeReference -> 
+                    ParameterConfig(key, true, paramValue.nodeId)
+            }
+        }
     } else {
         emptyList()
     }
-    var actionConfigPairs by remember { mutableStateOf(initialActionConfigPairs.map { it.first to it.second }) }
+    var actionConfigPairs by remember { mutableStateOf(initialActionConfigPairs) }
+    
+    // 获取可用的前置节点
+    val availablePredecessors = if (node != null) {
+        workflow.connections
+            .filter { it.targetNodeId == node.id }
+            .mapNotNull { conn -> 
+                workflow.nodes.find { it.id == conn.sourceNodeId }
+            }
+    } else {
+        emptyList()
+    }
 
     // 触发节点配置
     var triggerType by remember {
@@ -593,45 +627,142 @@ fun NodeDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         
-                        actionConfigPairs.forEachIndexed { index, pair ->
-                            Row(
+                        actionConfigPairs.forEachIndexed { index, param ->
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = pair.first,
-                                    onValueChange = { newKey ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // 参数名输入
+                                    OutlinedTextField(
+                                        value = param.key,
+                                        onValueChange = { newKey ->
+                                            val newList = actionConfigPairs.toMutableList()
+                                            newList[index] = param.copy(key = newKey)
+                                            actionConfigPairs = newList
+                                        },
+                                        label = { Text("参数名") },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    
+                                    // 参数值输入框（如果是引用则显示节点名称）
+                                    OutlinedTextField(
+                                        value = if (param.isReference) {
+                                            // 显示引用节点的名称
+                                            workflow.nodes.find { it.id == param.value }?.name ?: "[未知节点]"
+                                        } else {
+                                            param.value
+                                        },
+                                        onValueChange = { newValue ->
+                                            if (!param.isReference) {
+                                                val newList = actionConfigPairs.toMutableList()
+                                                newList[index] = param.copy(value = newValue)
+                                                actionConfigPairs = newList
+                                            }
+                                        },
+                                        label = { Text("参数值") },
+                                        modifier = Modifier.weight(1f),
+                                        readOnly = param.isReference,
+                                        colors = if (param.isReference) {
+                                            OutlinedTextFieldDefaults.colors(
+                                                disabledTextColor = MaterialTheme.colorScheme.primary,
+                                                disabledBorderColor = MaterialTheme.colorScheme.primary,
+                                                disabledLabelColor = MaterialTheme.colorScheme.primary
+                                            )
+                                        } else {
+                                            OutlinedTextFieldDefaults.colors()
+                                        },
+                                        enabled = !param.isReference,
+                                        prefix = if (param.isReference) {
+                                            { Text("🔗 ", style = MaterialTheme.typography.bodyLarge) }
+                                        } else null
+                                    )
+                                    
+                                    // 连接选择器按钮
+                                    var showNodeSelector by remember { mutableStateOf(false) }
+                                    IconButton(
+                                        onClick = { showNodeSelector = true },
+                                        enabled = availablePredecessors.isNotEmpty()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Call,
+                                            contentDescription = "选择前置节点",
+                                            tint = if (param.isReference) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                        )
+                                    }
+                                    
+                                    // 前置节点选择下拉菜单
+                                    DropdownMenu(
+                                        expanded = showNodeSelector,
+                                        onDismissRequest = { showNodeSelector = false }
+                                    ) {
+                                        // 选项：切换回静态值
+                                        if (param.isReference) {
+                                            DropdownMenuItem(
+                                                text = { Text("使用静态值") },
+                                                onClick = {
+                                                    val newList = actionConfigPairs.toMutableList()
+                                                    newList[index] = param.copy(isReference = false, value = "")
+                                                    actionConfigPairs = newList
+                                                    showNodeSelector = false
+                                                }
+                                            )
+                                            Divider()
+                                        }
+                                        
+                                        // 显示所有可用的前置节点
+                                        availablePredecessors.forEach { predecessorNode ->
+                                            DropdownMenuItem(
+                                                text = { 
+                                                    Column {
+                                                        Text(
+                                                            text = predecessorNode.name,
+                                                            style = MaterialTheme.typography.bodyMedium
+                                                        )
+                                                        Text(
+                                                            text = predecessorNode.type,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    val newList = actionConfigPairs.toMutableList()
+                                                    newList[index] = param.copy(isReference = true, value = predecessorNode.id)
+                                                    actionConfigPairs = newList
+                                                    showNodeSelector = false
+                                                }
+                                            )
+                                        }
+                                        
+                                        if (availablePredecessors.isEmpty()) {
+                                            DropdownMenuItem(
+                                                text = { Text("无可用前置节点") },
+                                                onClick = { showNodeSelector = false },
+                                                enabled = false
+                                            )
+                                        }
+                                    }
+                                    
+                                    // 删除按钮
+                                    IconButton(onClick = {
                                         val newList = actionConfigPairs.toMutableList()
-                                        newList[index] = newKey to pair.second
+                                        newList.removeAt(index)
                                         actionConfigPairs = newList
-                                    },
-                                    label = { Text("参数名") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                OutlinedTextField(
-                                    value = pair.second,
-                                    onValueChange = { newValue ->
-                                        val newList = actionConfigPairs.toMutableList()
-                                        newList[index] = pair.first to newValue
-                                        actionConfigPairs = newList
-                                    },
-                                    label = { Text("参数值") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(onClick = {
-                                    val newList = actionConfigPairs.toMutableList()
-                                    newList.removeAt(index)
-                                    actionConfigPairs = newList
-                                }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "删除参数")
+                                    }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "删除参数")
+                                    }
                                 }
                             }
                         }
 
                         Button(
                             onClick = {
-                                actionConfigPairs = actionConfigPairs + ("" to "")
+                                actionConfigPairs = actionConfigPairs + ParameterConfig("", false, "")
                             },
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         ) {
@@ -763,8 +894,14 @@ fun NodeDialog(
                             description = description,
                             actionType = actionType,
                                 actionConfig = actionConfigPairs
-                                    .filter { it.first.isNotBlank() } // 过滤掉空的参数名
-                                    .toMap()
+                                    .filter { it.key.isNotBlank() } // 过滤掉空的参数名
+                                    .associate { param ->
+                                        param.key to if (param.isReference) {
+                                            ParameterValue.NodeReference(param.value)
+                                        } else {
+                                            ParameterValue.StaticValue(param.value)
+                                        }
+                                    }
                             )
                             else -> node
                         }
@@ -790,8 +927,14 @@ fun NodeDialog(
                                 description = description,
                                 actionType = actionType,
                                 actionConfig = actionConfigPairs
-                                    .filter { it.first.isNotBlank() } // 过滤掉空的参数名
-                                    .toMap()
+                                    .filter { it.key.isNotBlank() } // 过滤掉空的参数名
+                                    .associate { param ->
+                                        param.key to if (param.isReference) {
+                                            ParameterValue.NodeReference(param.value)
+                                        } else {
+                                            ParameterValue.StaticValue(param.value)
+                                        }
+                                    }
                         )
                         else -> TriggerNode(name = nodeName, description = description)
                     }

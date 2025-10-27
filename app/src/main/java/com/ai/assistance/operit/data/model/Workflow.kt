@@ -74,9 +74,22 @@ data class ExecuteNode(
     override var description: String = "",
     override var position: NodePosition = NodePosition(0f, 0f),
     var actionType: String = "", // 工具名称，如 "http_request", "list_files", "click_element"
-    var actionConfig: Map<String, String> = emptyMap(), // 工具参数
+    var actionConfig: Map<String, ParameterValue> = emptyMap(), // 工具参数：支持静态值或节点引用
     var jsCode: String? = null // 可选：直接执行 JavaScript 代码
 ) : WorkflowNode()
+
+/**
+ * 参数值类型
+ * 支持静态值或引用其他节点的输出
+ */
+@Serializable
+sealed class ParameterValue {
+    @Serializable
+    data class StaticValue(val value: String) : ParameterValue()
+    
+    @Serializable
+    data class NodeReference(val nodeId: String) : ParameterValue()
+}
 
 /**
  * 节点位置信息（用于将来的可视化编辑器）

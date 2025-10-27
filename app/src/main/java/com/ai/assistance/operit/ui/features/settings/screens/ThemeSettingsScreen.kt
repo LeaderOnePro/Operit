@@ -718,20 +718,34 @@ fun ThemeSettingsScreen() {
         rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? ->
             if (uri != null) {
                 scope.launch {
-                    // 复制字体文件到内部存储
-                    val internalUri = FileUtils.copyFileToInternalStorage(context, uri, "custom_font")
-                    if (internalUri != null) {
-                        Log.d("ThemeSettings", "Font file saved to: $internalUri")
-                        customFontPathInput = internalUri.toString()
-                        saveThemeSettingsWithCharacterCard {
-                            preferencesManager.saveThemeSettings(
-                                customFontPath = internalUri.toString(),
-                                fontType = UserPreferencesManager.FONT_TYPE_FILE
-                            )
+                    // 获取文件扩展名进行验证
+                    val extension = FileUtils.getFileExtension(context, uri)?.lowercase()
+                    
+                    // 检查是否是支持的字体文件格式
+                    if (extension != null && (extension == "ttf" || extension == "otf" || extension == "ttc")) {
+                        // 复制字体文件到内部存储
+                        val internalUri = FileUtils.copyFileToInternalStorage(context, uri, "custom_font")
+                        if (internalUri != null) {
+                            Log.d("ThemeSettings", "Font file saved to: $internalUri")
+                            customFontPathInput = internalUri.toString()
+                            fontTypeInput = UserPreferencesManager.FONT_TYPE_FILE
+                            saveThemeSettingsWithCharacterCard {
+                                preferencesManager.saveThemeSettings(
+                                    customFontPath = internalUri.toString(),
+                                    fontType = UserPreferencesManager.FONT_TYPE_FILE
+                                )
+                            }
+                            Toast.makeText(context, "字体文件已保存 (.$extension)", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "字体文件保存失败", Toast.LENGTH_LONG).show()
                         }
-                        Toast.makeText(context, "字体文件已保存", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "字体文件保存失败", Toast.LENGTH_LONG).show()
+                        // 不是支持的字体格式
+                        Toast.makeText(
+                            context, 
+                            "不支持的文件格式，请选择 .ttf, .otf 或 .ttc 字体文件",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
@@ -1867,7 +1881,7 @@ fun ThemeSettingsScreen() {
                             )
 
                             Text(
-                                text = "支持 .ttf 和 .otf 字体文件",
+                                text = "支持 .ttf、.otf 和 .ttc 字体文件",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1879,7 +1893,8 @@ fun ThemeSettingsScreen() {
                             ) {
                                 Button(
                                     onClick = {
-                                        fontPickerLauncher.launch("font/*")
+                                        // 使用 */* 让用户可以选择任意文件，包括 .ttf 和 .otf 字体文件
+                                        fontPickerLauncher.launch("*/*")
                                     },
                                     modifier = Modifier.weight(1f)
                                 ) {

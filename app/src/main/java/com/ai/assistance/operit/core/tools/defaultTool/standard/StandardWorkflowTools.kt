@@ -482,7 +482,7 @@ class StandardWorkflowTools(private val context: Context) {
                     val triggerType = nodeObj.optString("triggerType", "manual")
                     val triggerConfigObj = nodeObj.optJSONObject("triggerConfig")
                     val triggerConfig = if (triggerConfigObj != null) {
-                        jsonObjectToMap(triggerConfigObj)
+                        jsonObjectToStringMap(triggerConfigObj)
                     } else {
                         emptyMap()
                     }
@@ -500,7 +500,7 @@ class StandardWorkflowTools(private val context: Context) {
                     val actionType = nodeObj.optString("actionType", "")
                     val actionConfigObj = nodeObj.optJSONObject("actionConfig")
                     val actionConfig = if (actionConfigObj != null) {
-                        jsonObjectToMap(actionConfigObj)
+                        jsonObjectToParameterValueMap(actionConfigObj)
                     } else {
                         emptyMap()
                     }
@@ -580,12 +580,25 @@ class StandardWorkflowTools(private val context: Context) {
     /**
      * 将JSONObject转换为Map<String, String>
      */
-    private fun jsonObjectToMap(jsonObject: JSONObject): Map<String, String> {
+    private fun jsonObjectToStringMap(jsonObject: JSONObject): Map<String, String> {
         val map = mutableMapOf<String, String>()
         val keys = jsonObject.keys()
         while (keys.hasNext()) {
             val key = keys.next()
             map[key] = jsonObject.optString(key, "")
+        }
+        return map
+    }
+
+    /**
+     * 将JSONObject转换为Map<String, ParameterValue>
+     */
+    private fun jsonObjectToParameterValueMap(jsonObject: JSONObject): Map<String, ParameterValue> {
+        val map = mutableMapOf<String, ParameterValue>()
+        val keys = jsonObject.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            map[key] = ParameterValue.StaticValue(jsonObject.optString(key, ""))
         }
         return map
     }

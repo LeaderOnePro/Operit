@@ -463,14 +463,15 @@ class MemoryRepository(private val context: Context, profileId: String) {
             }
         }
 
-        android.util.Log.d("MemoryRepo", "--- Keyword Search Results: ${keywordResults.size} ---")
+        if (keywordResults.isNotEmpty()) {
+            android.util.Log.d("MemoryRepo", "Keyword search: ${keywordResults.size} matches")
+        }
         keywordResults.forEachIndexed { index, memory ->
             val rank = index + 1
             val baseScore = 1.0 / (k + rank)
             val keywordWeight = 10.0 // Boost keyword search importance
             val weightedScore = baseScore * memory.importance * keywordWeight
             scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
-            android.util.Log.d("MemoryRepo", "  [Keyword] Score for '${memory.title}': rank=$rank, baseScore=${String.format("%.4f", baseScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
         }
 
         // 2. Reverse Containment Search (Query contains Memory Title)
@@ -478,7 +479,9 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val reverseContainmentResults =
                 memoriesToSearch.filter { memory -> query.contains(memory.title, ignoreCase = true) }
         
-        android.util.Log.d("MemoryRepo", "--- Reverse Containment Search Results: ${reverseContainmentResults.size} ---")
+        if (reverseContainmentResults.isNotEmpty()) {
+            android.util.Log.d("MemoryRepo", "Reverse containment: ${reverseContainmentResults.size} matches")
+        }
         reverseContainmentResults.forEachIndexed { index, memory ->
             val rank = index + 1
             // Use the same RRF formula to add to the score
@@ -486,7 +489,6 @@ class MemoryRepository(private val context: Context, profileId: String) {
             val revContainWeight = 10.0 // Also boost this signal
             val weightedScore = baseScore * memory.importance * revContainWeight
             scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
-            android.util.Log.d("MemoryRepo", "  [RevContain] Score for '${memory.title}': rank=$rank, baseScore=${String.format("%.4f", baseScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
         }
 
         // 3. Semantic search (for conceptual matches)
@@ -503,8 +505,6 @@ class MemoryRepository(private val context: Context, profileId: String) {
         // 对每个关键词分别进行语义搜索和评分
         android.util.Log.d("MemoryRepo", "--- Starting Semantic Search for ${keywords.size} keywords ---")
         keywords.forEachIndexed { keywordIndex, keyword ->
-            android.util.Log.d("MemoryRepo", "Processing keyword ${keywordIndex + 1}/${keywords.size}: '$keyword'")
-            
             val queryEmbedding = OnnxEmbeddingService.generateEmbedding(keyword)
             if (queryEmbedding != null) {
                 // Calculate ALL similarities for this keyword
@@ -520,18 +520,14 @@ class MemoryRepository(private val context: Context, profileId: String) {
                     }
                     .sortedByDescending { it.second }
                 
-                // Log top similarities for this keyword
-                android.util.Log.d("MemoryRepo", "  Top similarities for '$keyword' (Total: ${allSimilarities.size}):")
-                allSimilarities.take(5).forEach { (memory, similarity, aboveThreshold) ->
-                    val marker = if (aboveThreshold) "✓" else "✗"
-                    android.util.Log.d("MemoryRepo", "    $marker [${memory.title}]: Similarity = ${String.format("%.4f", similarity)}")
-                }
-                
                 val semanticResultsWithScores = allSimilarities
                     .filter { it.third }
                     .map { Pair(it.first, it.second) }
 
-                android.util.Log.d("MemoryRepo", "  Results above threshold for '$keyword': ${semanticResultsWithScores.size}")
+                // 只在有结果时输出关键词信息
+                if (semanticResultsWithScores.isNotEmpty()) {
+                    android.util.Log.d("MemoryRepo", "Keyword '${keyword}': ${semanticResultsWithScores.size} matches (top: ${String.format("%.2f", allSimilarities.firstOrNull()?.second ?: 0f)})")
+                }
 
                 semanticResultsWithScores.forEachIndexed { index, (memory, similarity) ->
                     val rank = index + 1
@@ -546,19 +542,16 @@ class MemoryRepository(private val context: Context, profileId: String) {
                     // Combine them. Importance should only affect the rank score, not the raw similarity.
                     val weightedScore = (rankScore * Math.sqrt(memory.importance.toDouble())) + similarityScore
                     scores[memory.id] = scores.getOrDefault(memory.id, 0.0) + weightedScore
-
-                    android.util.Log.d("MemoryRepo", "    [Semantic-'$keyword'] Score for '${memory.title}': rank=$rank, similarity=${String.format("%.4f", similarity)}, rankScore=${String.format("%.4f", rankScore)}, similarityScore=${String.format("%.4f", similarityScore)}, importance=${memory.importance}, addedScore=${String.format("%.4f", weightedScore)}")
                 }
             } else {
-                android.util.Log.w("MemoryRepo", "  Failed to generate embedding for keyword: '$keyword'")
+                android.util.Log.w("MemoryRepo", "Failed to generate embedding for: '$keyword'")
             }
         }
-        android.util.Log.d("MemoryRepo", "--- Semantic Search Completed for All Keywords ---")
+        android.util.Log.d("MemoryRepo", "--- Semantic Search Completed ---")
 
         // 4. Graph-based expansion: Boost scores of connected memories based on edge weights
         // Take top-scoring memories as "seed nodes" and propagate scores through edges
         val topMemoriesForExpansion = scores.entries.sortedByDescending { it.value }.take(10)
-        android.util.Log.d("MemoryRepo", "Graph expansion: Using ${topMemoriesForExpansion.size} seed nodes")
 
         var edgesTraversed = 0
         val graphPropagationWeight = 0.4 // Increased from 0.1
@@ -579,7 +572,6 @@ class MemoryRepository(private val context: Context, profileId: String) {
                     // 边权重越高，传播的分数越多
                     val propagatedScore = (sourceScore * link.weight * graphPropagationWeight) + basePropagationScore
                     scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
-                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${sourceMemory.title}' to '${targetMemory.title}' (weight: ${link.weight})")
                     edgesTraversed++
                 }
             }
@@ -591,12 +583,13 @@ class MemoryRepository(private val context: Context, profileId: String) {
                     // 边权重越高，传播的分数越多
                     val propagatedScore = (sourceScore * link.weight * graphPropagationWeight) + basePropagationScore
                     scores[targetMemory.id] = scores.getOrDefault(targetMemory.id, 0.0) + propagatedScore
-                    android.util.Log.d("MemoryRepo", "  Propagated ${String.format("%.4f", propagatedScore)} from '${targetMemory.title}' to '${sourceMemory.title}' (weight: ${link.weight})")
                     edgesTraversed++
                 }
             }
         }
-        android.util.Log.d("MemoryRepo", "Graph expansion completed: ${edgesTraversed} edges traversed")
+        if (edgesTraversed > 0) {
+            android.util.Log.d("MemoryRepo", "Graph expansion: ${edgesTraversed} edges traversed")
+        }
 
         // 5. Fuse results using RRF and return sorted list
         if (scores.isEmpty()) {
@@ -607,17 +600,16 @@ class MemoryRepository(private val context: Context, profileId: String) {
         val minScoreThreshold = 0.025 // 最低分数阈值，可根据实际效果调整
         val filteredScores = scores.entries.filter { it.value >= minScoreThreshold }
         
-        android.util.Log.d("MemoryRepo", "Score filtering: ${scores.size} total results, ${filteredScores.size} above threshold $minScoreThreshold")
+        android.util.Log.d("MemoryRepo", "Final results: ${filteredScores.size}/${scores.size} above threshold")
         
-        // --- 详细日志记录 ---
+        // 只显示前3个结果的分数
         val sortedScoresForLogging = scores.entries.sortedByDescending { it.value }
-        sortedScoresForLogging.take(15).forEach { (id, score) ->
+        sortedScoresForLogging.take(3).forEach { (id, score) ->
             val memory = memoriesToSearch.find { it.id == id }
             if (memory != null) {
-                android.util.Log.d("MemoryRepo", "  - [${memory.title}]: Final Score = ${String.format("%.4f", score)}")
+                android.util.Log.d("MemoryRepo", "  Top: [${memory.title}] = ${String.format("%.4f", score)}")
             }
         }
-        // --- 日志记录结束 ---
 
         if (filteredScores.isEmpty()) {
             android.util.Log.d("MemoryRepo", "No memories above relevance threshold")

@@ -62,6 +62,143 @@ object FileUtils {
     }
 
     /**
+     * Checks if a file appears to be text-like by reading its first few bytes.
+     * This is more reliable than extension checking as it analyzes actual content.
+     * 
+     * @param file The file to check
+     * @param sampleSize Number of bytes to read for analysis (default: 512)
+     * @return True if the file appears to contain text, false otherwise
+     */
+    fun isTextLike(file: File, sampleSize: Int = 512): Boolean {
+        if (!file.exists() || !file.canRead()) {
+            return false
+        }
+
+        // Empty files are considered text
+        if (file.length() == 0L) {
+            return true
+        }
+
+        try {
+            file.inputStream().use { input ->
+                val buffer = ByteArray(minOf(sampleSize.toLong(), file.length()).toInt())
+                val bytesRead = input.read(buffer)
+                
+                if (bytesRead <= 0) {
+                    return true // Empty or unreadable, treat as text
+                }
+
+                return isTextLikeBytes(buffer, bytesRead)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if file is text-like: ${file.path}", e)
+            return false
+        }
+    }
+
+    /**
+     * Checks if a file appears to be text-like by reading its first few bytes from a path.
+     * This version accepts a file path string.
+     * 
+     * @param path The file path to check
+     * @param sampleSize Number of bytes to read for analysis (default: 512)
+     * @return True if the file appears to contain text, false otherwise
+     */
+    fun isTextLike(path: String, sampleSize: Int = 512): Boolean {
+        return isTextLike(File(path), sampleSize)
+    }
+
+    /**
+     * Check if the given byte array appears to be text content.
+     * This is useful when you already have a byte sample and want to check if it's text.
+     * 
+     * @param bytes The byte array to analyze
+     * @return True if content appears to be text
+     */
+    fun isTextLike(bytes: ByteArray): Boolean {
+        return isTextLikeBytes(bytes, bytes.size)
+    }
+
+    /**
+     * Analyzes a byte array to determine if it contains text-like content.
+     * 
+     * Algorithm:
+     * - Checks for null bytes (strong indicator of binary)
+     * - Counts printable characters (ASCII 32-126)
+     * - Counts common whitespace characters (tab, newline, carriage return)
+     * - Counts UTF-8 continuation bytes and common UTF-8 patterns
+     * 
+     * @param bytes The byte array to analyze
+     * @param length Number of bytes to analyze
+     * @return True if content appears to be text
+     */
+    private fun isTextLikeBytes(bytes: ByteArray, length: Int): Boolean {
+        if (length == 0) return true
+
+        var textChars = 0
+        var nonTextChars = 0
+
+        var i = 0
+        while (i < length) {
+            val byte = bytes[i].toInt() and 0xFF
+
+            when {
+                // ASCII printable, tab, newline, carriage return
+                byte >= 32 && byte <= 126 || byte == 9 || byte == 10 || byte == 13 -> {
+                    textChars++
+                    i++
+                }
+                // UTF-8 multi-byte sequences
+                byte >= 0xC2 && byte <= 0xDF -> { // 2-byte sequence
+                    if (i + 1 < length && (bytes[i + 1].toInt() and 0xC0 == 0x80)) {
+                        textChars += 2
+                        i += 2
+                    } else {
+                        nonTextChars++
+                        i++
+                    }
+                }
+                byte >= 0xE0 && byte <= 0xEF -> { // 3-byte sequence
+                    if (i + 2 < length && (bytes[i + 1].toInt() and 0xC0 == 0x80) && (bytes[i + 2].toInt() and 0xC0 == 0x80)) {
+                        textChars += 3
+                        i += 3
+                    } else {
+                        nonTextChars++
+                        i++
+                    }
+                }
+                byte >= 0xF0 && byte <= 0xF4 -> { // 4-byte sequence
+                    if (i + 3 < length && (bytes[i + 1].toInt() and 0xC0 == 0x80) && (bytes[i + 2].toInt() and 0xC0 == 0x80) && (bytes[i + 3].toInt() and 0xC0 == 0x80)) {
+                        textChars += 4
+                        i += 4
+                    } else {
+                        nonTextChars++
+                        i++
+                    }
+                }
+                else -> {
+                    // Includes null bytes, control chars, invalid UTF-8 start bytes, etc.
+                    nonTextChars++
+                    i++
+                }
+            }
+        }
+
+        // If there are non-text characters, check the ratio.
+        // A small number of weird characters might be acceptable in some text files.
+        // If there are zero non-text characters, it's definitely text.
+        // If there are any, and the ratio of non-text to text is high, it's binary.
+        // We can define "binary" as having more than 10% non-text characters.
+        if (nonTextChars == 0) return true
+        
+        // Avoid division by zero for empty or invalid files
+        val totalChars = textChars + nonTextChars
+        if (totalChars == 0) return true // Or false, depending on desired behavior for empty/unreadable
+
+        return (nonTextChars.toDouble() / totalChars) < 0.1
+    }
+
+    /**
      * Checks if a file is a text-based file, considering both extension and filename.
      * @param file The file to check.
      * @return True if the file is likely a text-based file, false otherwise.
@@ -128,8 +265,11 @@ object FileUtils {
                 return null
             }
 
-            // Use the unique name to create a distinct file
-            val file = File(context.filesDir, "${uniqueName}_${UUID.randomUUID()}.png")
+            // 获取原始文件的扩展名
+            val originalExtension = getFileExtensionFromUri(context, uri) ?: "dat"
+            
+            // Use the unique name to create a distinct file with correct extension
+            val file = File(context.filesDir, "${uniqueName}_${UUID.randomUUID()}.${originalExtension}")
             outputStream = FileOutputStream(file)
 
             val buffer = ByteArray(4 * 1024) // 4K buffer
@@ -152,6 +292,48 @@ object FileUtils {
                 Log.e("FileUtils", "Error closing streams", e)
             }
         }
+    }
+    
+    /**
+     * Get the file extension from a URI
+     * @param context The application context
+     * @param uri The URI to get the extension from
+     * @return The file extension or null if it couldn't be determined
+     */
+    private fun getFileExtensionFromUri(context: Context, uri: Uri): String? {
+        // First try to get from the URI path itself
+        val uriPath = uri.path
+        if (uriPath != null) {
+            val pathExtension = uriPath.substringAfterLast('.', "")
+            if (pathExtension.isNotEmpty() && pathExtension.length <= 10 && !pathExtension.contains('/')) {
+                return pathExtension.lowercase()
+            }
+        }
+        
+        // Try to get from content resolver
+        val mimeType = context.contentResolver.getType(uri)
+        if (mimeType != null) {
+            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+            if (extension != null) {
+                return extension.lowercase()
+            }
+        }
+        
+        // Try to get filename from content resolver
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0) {
+                    val fileName = cursor.getString(nameIndex)
+                    val fileExtension = fileName?.substringAfterLast('.', "")
+                    if (!fileExtension.isNullOrEmpty() && fileExtension.length <= 10) {
+                        return fileExtension.lowercase()
+                    }
+                }
+            }
+        }
+        
+        return null
     }
 
     /**
