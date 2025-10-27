@@ -826,10 +826,14 @@ class MemoryRepository(private val context: Context, profileId: String) {
      * @return 所有唯一的文件夹路径列表。
      */
     suspend fun getAllFolderPaths(): List<String> = withContext(Dispatchers.IO) {
-        memoryBox.all
+        val allMemories = memoryBox.all
+        android.util.Log.d("MemoryRepository", "getAllFolderPaths: Total memories: ${allMemories.size}")
+        val folderPaths = allMemories
             .map { it.folderPath ?: "未分类" }
             .distinct()
             .sorted()
+        android.util.Log.d("MemoryRepository", "getAllFolderPaths: Unique folders: $folderPaths")
+        folderPaths
     }
 
     /**

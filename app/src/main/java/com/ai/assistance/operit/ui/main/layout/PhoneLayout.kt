@@ -3,7 +3,11 @@ package com.ai.assistance.operit.ui.main.layout
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -27,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,34 +68,55 @@ fun PhoneLayout(
         isNavigatingBack: Boolean = false,
         topBarActions: @Composable RowScope.() -> Unit = {}
 ) {
-        // 创建动画化的内容偏移 - 使用更快的动画时间和更流畅的曲线
+        // 使用 updateTransition 来创建更复杂的动画
+        val transition = updateTransition(drawerState.targetValue, label = "drawer_transition")
+
         val animatedOffset by
-                animateDpAsState(
-                        targetValue =
-                                if (drawerState.currentValue == DrawerValue.Open) drawerWidth
-                                else 0.dp,
-                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                        label = "contentOffset"
-                )
+                transition.animateDp(
+                        label = "contentOffset",
+                        transitionSpec = {
+                                if (targetState == DrawerValue.Open) {
+                                        spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = 1000f
+                                        )
+                                } else {
+                                        spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = 1000f
+                                        )
+                                }
+                        }
+                ) { state -> if (state == DrawerValue.Open) drawerWidth else 0.dp }
 
         // 抽屉动画状态
         val isDrawerOpen =
                 drawerState.currentValue == DrawerValue.Open ||
                         drawerState.targetValue == DrawerValue.Open
 
-        // 侧边栏位移动画 - 加快动画
         val drawerOffset by
-                animateDpAsState(
-                        targetValue = if (isDrawerOpen) 0.dp else -drawerWidth,
-                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                        label = "drawerOffset"
-                )
+                transition.animateDp(
+                        label = "drawerOffset",
+                        transitionSpec = {
+                                if (targetState == DrawerValue.Open) {
+                                        spring(
+                                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                                stiffness = 1000f
+                                        )
+                                } else {
+                                        spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = 1000f
+                                        )
+                                }
+                        }
+                ) { state -> if (state == DrawerValue.Open) 0.dp else -drawerWidth }
 
         // 阴影大小动画
         val sidebarElevation by
                 animateDpAsState(
                         targetValue = if (isDrawerOpen) 3.dp else 0.dp,
-                        animationSpec = tween(durationMillis = 250),
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
                         label = "sidebarElevation"
                 )
 
@@ -98,7 +124,7 @@ fun PhoneLayout(
         val drawerContentAlpha by
                 animateFloatAsState(
                         targetValue = if (isDrawerOpen) 1f else 0.8f,
-                        animationSpec = tween(durationMillis = 200),
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
                         label = "drawerContentAlpha"
                 )
 
@@ -188,40 +214,30 @@ fun PhoneLayout(
                 // 主内容区域 - 使用自定义布局修饰符优化性能
                 // 该修饰符只会影响布局，不会触发内容重组
                 Box(
-                        modifier =
-                                Modifier.fillMaxSize()
-                                        // 使用自定义布局修饰符，而不是offset
-                                        // 这样可以避免在动画中触发内容重组
-                                        .layout { measurable, constraints ->
-                                                val placeable = measurable.measure(constraints)
-                                                layout(placeable.width, placeable.height) {
-                                                        placeable.placeRelative(
-                                                                animatedOffset.roundToPx(),
-                                                                0
-                                                        )
-                                                }
-                                        }
+                    modifier =
+                    Modifier.fillMaxSize()
+                        .graphicsLayer { translationX = animatedOffset.toPx() }
                 ) {
-                        // 普通调用AppContent，但由于我们的优化，它不会在动画时重组
-                        AppContent(
-                                currentScreen = currentScreen,
-                                selectedItem = selectedItem,
-                                useTabletLayout = false,
-                                isTabletSidebarExpanded = false,
-                                isLoading = isLoading,
-                                navController = navController,
-                                scope = scope,
-                                drawerState = drawerState,
-                                showFpsCounter = showFpsCounter,
-                                onScreenChange = onScreenChange,
-                                onNavItemChange = onNavItemChange,
-                                onToggleSidebar = { /* Not used in phone layout */},
-                                navigateToTokenConfig = navigateToTokenConfig,
-                                canGoBack = canGoBack,
-                                onGoBack = onGoBack,
-                                isNavigatingBack = isNavigatingBack,
-                                actions = topBarActions
-                        )
+                    // 普通调用AppContent，但由于我们的优化，它不会在动画时重组
+                    AppContent(
+                        currentScreen = currentScreen,
+                        selectedItem = selectedItem,
+                        useTabletLayout = false,
+                        isTabletSidebarExpanded = false,
+                        isLoading = isLoading,
+                        navController = navController,
+                        scope = scope,
+                        drawerState = drawerState,
+                        showFpsCounter = showFpsCounter,
+                        onScreenChange = onScreenChange,
+                        onNavItemChange = onNavItemChange,
+                        onToggleSidebar = { /* Not used in phone layout */},
+                        navigateToTokenConfig = navigateToTokenConfig,
+                        canGoBack = canGoBack,
+                        onGoBack = onGoBack,
+                        isNavigatingBack = isNavigatingBack,
+                        actions = topBarActions
+                    )
                 }
 
                 // // 添加一个小方块，填充圆角和工具栏之间的空隙

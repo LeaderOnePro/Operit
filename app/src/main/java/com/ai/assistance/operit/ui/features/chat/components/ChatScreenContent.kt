@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -114,6 +115,7 @@ fun ChatScreenContent(
         chatHeaderPipIconColor: Int?,
         chatHeaderOverlayMode: Boolean,
         chatStyle: ChatStyle, // Add chatStyle parameter
+        historyListState: LazyListState,
         onSwitchCharacter: (String) -> Unit
 ) {
     val density = LocalDensity.current
@@ -498,7 +500,8 @@ fun ChatScreenContent(
                     actualViewModel = actualViewModel,
                     chatHistories = chatHistories,
                     currentChatId = currentChatId,
-                    showChatHistorySelector = showChatHistorySelector
+                    showChatHistorySelector = showChatHistorySelector,
+                    historyListState = historyListState
             )
         }
 
@@ -697,7 +700,8 @@ fun ChatHistorySelectorPanel(
         actualViewModel: ChatViewModel,
         chatHistories: List<ChatHistory>,
         currentChatId: String,
-        showChatHistorySelector: Boolean
+        showChatHistorySelector: Boolean,
+        historyListState: LazyListState
 ) {
     // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
     Box(
@@ -744,7 +748,8 @@ fun ChatHistorySelectorPanel(
                     actualViewModel.deleteGroup(groupName, deleteChats)
                 },
                 chatHistories = chatHistories,
-                currentId = currentChatId
+                currentId = currentChatId,
+                lazyListState = historyListState
         )
 
         // 在右侧添加浮动返回按钮

@@ -13,6 +13,7 @@ import com.ai.assistance.operit.core.tools.ChatServiceStartResultData
 import com.ai.assistance.operit.core.tools.ChatSwitchResultData
 import com.ai.assistance.operit.core.tools.MessageSendResultData
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.services.ChatServiceCore
@@ -456,28 +457,11 @@ class StandardChatManagerTool(private val context: Context) {
                 )
             }
 
-            // 获取 API 配置
-            val apiPreferences = ApiPreferences.getInstance(context)
-            val maxTokens = apiPreferences.contextLengthFlow.first().toInt()
-            val tokenThreshold = apiPreferences.summaryTokenThresholdFlow.first().toDouble()
-            val enableThinking = apiPreferences.enableThinkingModeFlow.first()
-            val thinkingGuidance = apiPreferences.enableThinkingGuidanceFlow.first()
-            val enableMemoryQuery = apiPreferences.enableMemoryQueryFlow.first()
+            // 设置消息文本
+            core.updateUserMessage(message)
 
-            // 发送消息
-            core.sendUserMessage(
-                message = message,
-                attachments = emptyList(),
-                chatId = currentChatId,
-                workspacePath = null,
-                enableThinking = enableThinking,
-                thinkingGuidance = thinkingGuidance,
-                enableMemoryQuery = enableMemoryQuery,
-                enableWorkspaceAttachment = false,
-                maxTokens = maxTokens,
-                tokenUsageThreshold = tokenThreshold,
-                replyToMessage = null
-            )
+            // 发送消息（包含总结逻辑）
+            core.sendUserMessage(PromptFunctionType.CHAT)
 
             ToolResult(
                 toolName = tool.name,

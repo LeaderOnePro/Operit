@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,7 +88,8 @@ fun ChatHistorySelector(
     onUpdateGroupName: (oldName: String, newName: String) -> Unit,
     onDeleteGroup: (groupName: String, deleteChats: Boolean) -> Unit,
         chatHistories: List<ChatHistory>,
-        currentId: String?
+        currentId: String?,
+        lazyListState: LazyListState? = null
 ) {
     var chatToEdit by remember { mutableStateOf<ChatHistory?>(null) }
     var showNewGroupDialog by remember { mutableStateOf(false) }
@@ -99,7 +101,7 @@ fun ChatHistorySelector(
     var groupToDelete by remember { mutableStateOf<String?>(null) }
     var hasLongPressedGroup by rememberLocal("has_long_pressed_group", defaultValue = false)
 
-    val lazyListState = rememberLazyListState()
+    val actualLazyListState = lazyListState ?: rememberLazyListState()
     val ungroupedText = stringResource(R.string.ungrouped)
 
     val flatItems = remember(chatHistories, collapsedGroups, ungroupedText) {
@@ -117,7 +119,7 @@ fun ChatHistorySelector(
             }
     }
 
-    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+    val reorderableState = rememberReorderableLazyListState(actualLazyListState) { from, to ->
         val movedItem = flatItems.getOrNull(from.index) as? HistoryListItem.Item ?: return@rememberReorderableLazyListState
 
         val reorderedFlatList = flatItems.toMutableList().apply {
@@ -540,7 +542,7 @@ fun ChatHistorySelector(
         Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn(
-            state = lazyListState,
+            state = actualLazyListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp)

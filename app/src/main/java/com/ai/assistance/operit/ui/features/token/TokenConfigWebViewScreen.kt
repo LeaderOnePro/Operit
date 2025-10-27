@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import com.ai.assistance.operit.ui.main.LocalTopBarActions
 import com.ai.assistance.operit.ui.main.components.LocalAppBarContentColor
+import com.ai.assistance.operit.ui.main.components.LocalIsCurrentScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -158,25 +159,23 @@ fun TokenConfigWebViewScreen(onNavigateBack: () -> Unit) {
     // 从CompositionLocal获取设置TopBar Actions的函数
     val setTopBarActions = LocalTopBarActions.current
     val appBarContentColor = LocalAppBarContentColor.current
+    val isCurrentScreen = LocalIsCurrentScreen.current
 
     // 使用DisposableEffect来设置和清理TopBar按钮，避免竞争条件
-    DisposableEffect(Unit) {
-        setTopBarActions {
-            // 设置按钮
-            IconButton(
-                onClick = { showConfigDialog = true }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = stringResource(R.string.settings_config),
-                    tint = appBarContentColor
-                )
+    LaunchedEffect(isCurrentScreen, appBarContentColor) {
+        if (isCurrentScreen) {
+            setTopBarActions {
+                // 设置按钮
+                IconButton(
+                    onClick = { showConfigDialog = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.settings_config),
+                        tint = appBarContentColor
+                    )
+                }
             }
-        }
-
-        onDispose {
-            // 当此Composable离开组合时，清空TopAppBar的actions
-            // setTopBarActions {} // 移除此行以避免竞争条件
         }
     }
 

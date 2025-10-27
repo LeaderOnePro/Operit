@@ -54,6 +54,8 @@ import com.ai.assistance.operit.services.core.ApiConfigDelegate
 import com.ai.assistance.operit.services.core.TokenStatisticsDelegate
 import com.ai.assistance.operit.services.core.AttachmentDelegate
 import com.ai.assistance.operit.services.core.MessageCoordinationDelegate
+import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -166,7 +168,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 消息处理相关
     val userMessage: StateFlow<String> by lazy { messageProcessingDelegate.userMessage }
     val isLoading: StateFlow<Boolean> by lazy { messageProcessingDelegate.isLoading }
-    val inputProcessingState: StateFlow<com.ai.assistance.operit.data.model.InputProcessingState> by lazy {
+    val inputProcessingState: StateFlow<InputProcessingState> by lazy {
         messageProcessingDelegate.inputProcessingState
     }
 
@@ -185,18 +187,18 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             initialValue = false
         )
     }
-    val currentChatInputProcessingState: StateFlow<com.ai.assistance.operit.data.model.InputProcessingState> by lazy {
+    val currentChatInputProcessingState: StateFlow<InputProcessingState> by lazy {
         kotlinx.coroutines.flow.combine(
             messageProcessingDelegate.inputProcessingState,
             chatHistoryDelegate.currentChatId,
             messageProcessingDelegate.activeStreamingChatId
         ) { state, currentId, activeId ->
             if (activeId != null && activeId == currentId) state
-            else com.ai.assistance.operit.data.model.InputProcessingState.Idle
+            else InputProcessingState.Idle
         }.stateIn(
             scope = viewModelScope,
             started = kotlinx.coroutines.flow.SharingStarted.Eagerly,
-            initialValue = com.ai.assistance.operit.data.model.InputProcessingState.Idle
+            initialValue = InputProcessingState.Idle
         )
     }
 
@@ -407,10 +409,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 service.inputProcessingState.collect { state ->
-                    if (state is com.ai.assistance.operit.data.model.InputProcessingState.Completed && 
+                    if (state is InputProcessingState.Completed && 
                         ::messageCoordinationDelegate.isInitialized && messageCoordinationDelegate.isSummarizing.value) {
                         messageProcessingDelegate.handleInputProcessingState(
-                            com.ai.assistance.operit.data.model.InputProcessingState.Summarizing("正在总结记忆...")
+                            InputProcessingState.Summarizing("正在总结记忆...")
                         )
                     } else if (::messageProcessingDelegate.isInitialized) {
                         messageProcessingDelegate.handleInputProcessingState(state)
@@ -575,7 +577,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 Log.d(TAG, "准备生成图片，选中消息数量: ${selectedMessages.size}")
                 
                 // 生成图片（内部会自动处理线程切换）
-                val imageFile = com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
+                val imageFile = MessageImageGenerator
                     .generateMessageImage(
                         context = context,
                         messages = selectedMessages,

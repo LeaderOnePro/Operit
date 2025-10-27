@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** 简洁样式的工具调用显示组件 使用箭头图标+工具名+参数的简洁行样式 */
 @Composable
@@ -282,80 +284,90 @@ private fun CodeContentWithLineNumbers(
     }
 }
 
-/** XML语法高亮文本 */
+/** XML语法高亮文本 - 异步计算高亮以避免阻塞主线程 */
 @Composable
 private fun FormattedXmlText(text: String, modifier: Modifier = Modifier) {
-    val formattedText = buildAnnotatedString {
-        val trimmedText = text.trim()
+    // 使用状态保存格式化后的文本
+    var formattedText by remember(text) { mutableStateOf<AnnotatedString?>(null) }
+    
+    // 异步计算语法高亮
+    LaunchedEffect(text) {
+        val result = withContext(Dispatchers.Default) {
+            buildAnnotatedString {
+                val trimmedText = text.trim()
 
-        // 简单的XML语法高亮
-        when {
-            // XML标签
-            trimmedText.startsWith("<") && trimmedText.contains(">") -> {
-                val parts = trimmedText.split("<", ">", "=", "\"")
-                var inTag = false
-                var inAttr = false
+                // 简单的XML语法高亮
+                when {
+                    // XML标签
+                    trimmedText.startsWith("<") && trimmedText.contains(">") -> {
+                        var inTag = false
+                        var inAttr = false
 
-                for (i in trimmedText.indices) {
-                    val char = trimmedText[i]
-                    when {
-                        char == '<' -> {
-                            inTag = true
-                            withStyle(SpanStyle(color = Color(0xFF9C27B0))) { // 紫色
-                                append(char)
-                            }
-                        }
-                        char == '>' -> {
-                            inTag = false
-                            withStyle(SpanStyle(color = Color(0xFF9C27B0))) { // 紫色
-                                append(char)
-                            }
-                        }
-                        char == '=' -> {
-                            inAttr = true
-                            withStyle(SpanStyle(color = Color(0xFF757575))) { // 灰色
-                                append(char)
-                            }
-                        }
-                        char == '"' -> {
-                            if (inAttr) {
-                                withStyle(SpanStyle(color = Color(0xFF4CAF50))) { // 绿色
+                        for (i in trimmedText.indices) {
+                            val char = trimmedText[i]
+                            when {
+                                char == '<' -> {
+                                    inTag = true
+                                    withStyle(SpanStyle(color = Color(0xFF9C27B0))) { // 紫色
+                                        append(char)
+                                    }
+                                }
+                                char == '>' -> {
+                                    inTag = false
+                                    withStyle(SpanStyle(color = Color(0xFF9C27B0))) { // 紫色
+                                        append(char)
+                                    }
+                                }
+                                char == '=' -> {
+                                    inAttr = true
+                                    withStyle(SpanStyle(color = Color(0xFF757575))) { // 灰色
+                                        append(char)
+                                    }
+                                }
+                                char == '"' -> {
+                                    if (inAttr) {
+                                        withStyle(SpanStyle(color = Color(0xFF4CAF50))) { // 绿色
+                                            append(char)
+                                        }
+                                    } else {
+                                        append(char)
+                                    }
+                                    inAttr = !inAttr
+                                }
+                                inTag && char.isLetterOrDigit() -> {
+                                    withStyle(SpanStyle(color = Color(0xFF2196F3))) { // 蓝色
+                                        append(char)
+                                    }
+                                }
+                                inAttr -> {
+                                    withStyle(SpanStyle(color = Color(0xFF4CAF50))) { // 绿色
+                                        append(char)
+                                    }
+                                }
+                                else -> {
                                     append(char)
                                 }
-                            } else {
-                                append(char)
-                            }
-                            inAttr = !inAttr
-                        }
-                        inTag && char.isLetterOrDigit() -> {
-                            withStyle(SpanStyle(color = Color(0xFF2196F3))) { // 蓝色
-                                append(char)
                             }
                         }
-                        inAttr -> {
-                            withStyle(SpanStyle(color = Color(0xFF4CAF50))) { // 绿色
-                                append(char)
-                            }
-                        }
-                        else -> {
-                            append(char)
-                        }
+                    }
+                    // 普通文本
+                    else -> {
+                        append(trimmedText)
                     }
                 }
             }
-            // 普通文本
-            else -> {
-                append(trimmedText)
-            }
         }
+        formattedText = result
     }
 
+    // 显示格式化后的文本，计算完成前显示原始文本
     Text(
-            text = formattedText,
+            text = formattedText ?: AnnotatedString(text.trim()),
             style =
                     MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            color = if (formattedText == null) Color.Gray else Color.Unspecified
                     ),
             softWrap = true,
             modifier = modifier

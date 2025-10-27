@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
@@ -56,8 +57,8 @@ import java.io.File
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.sample
-import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.ui.main.components.LocalIsCurrentScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clipToBounds
@@ -247,6 +248,7 @@ fun AIChatScreen(
 
     // UI state
     val scrollState = rememberScrollState()
+    val historyListState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
@@ -416,46 +418,44 @@ fun AIChatScreen(
     // 从CompositionLocal获取设置TopBar Actions的函数
     val setTopBarActions = LocalTopBarActions.current
     val appBarContentColor = LocalAppBarContentColor.current
+    val isCurrentScreen = LocalIsCurrentScreen.current
 
-    
 
     // 当showWebView或showAiComputer状态改变时，更新TopAppBar的actions
     // 使用DisposableEffect确保当AIChatScreen离开组合时，actions被清空
-    DisposableEffect(showWebView, showAiComputer, appBarContentColor) {
-        setTopBarActions {
-            // AI电脑模式切换按钮
-            IconButton(
-                    onClick = {
-                        actualViewModel.onAiComputerButtonClick()
-                    }
-            ) {
-                Icon(
-                        imageVector = Icons.Default.Terminal,
-                        contentDescription = "AI电脑",
-                        tint =
-                                if (showAiComputer) MaterialTheme.colorScheme.primaryContainer
-                                else appBarContentColor
-                )
-            }
-            
-            // Web开发模式切换按钮
-            IconButton(
-                    onClick = {
-                        actualViewModel.onWorkspaceButtonClick()
-                    }
-            ) {
-                Icon(
-                        imageVector = Icons.Default.Code,
-                        contentDescription = "代码编辑器",
-                        tint =
-                                if (showWebView) MaterialTheme.colorScheme.primaryContainer
-                                else appBarContentColor
-                )
-            }
-        }
+    LaunchedEffect(isCurrentScreen, showWebView, showAiComputer, appBarContentColor) {
+        if (isCurrentScreen) {
+            setTopBarActions {
+                // AI电脑模式切换按钮
+                IconButton(
+                        onClick = {
+                            actualViewModel.onAiComputerButtonClick()
+                        }
+                ) {
+                    Icon(
+                            imageVector = Icons.Default.Terminal,
+                            contentDescription = "AI电脑",
+                            tint =
+                            if (showAiComputer) MaterialTheme.colorScheme.primaryContainer
+                            else appBarContentColor
+                    )
+                }
 
-        onDispose {
-            // 当此Composable离开组合时，不再清空TopAppBar的actions，以避免竞争条件
+                // Web开发模式切换按钮
+                IconButton(
+                        onClick = {
+                            actualViewModel.onWorkspaceButtonClick()
+                        }
+                ) {
+                    Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = "代码编辑器",
+                            tint =
+                            if (showWebView) MaterialTheme.colorScheme.primaryContainer
+                            else appBarContentColor
+                    )
+                }
+            }
         }
     }
 
@@ -628,6 +628,7 @@ fun AIChatScreen(
                                 chatHeaderPipIconColor = chatHeaderPipIconColor,
                                 chatHeaderOverlayMode = chatHeaderOverlayMode,
                                 chatStyle = chatStyle, // Pass chat style
+                                historyListState = historyListState,
                                 onSwitchCharacter = { characterId ->
                                     coroutineScope.launch {
                                         characterCardManager.setActiveCharacterCard(characterId)

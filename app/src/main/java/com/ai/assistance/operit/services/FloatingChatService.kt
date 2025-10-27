@@ -31,6 +31,7 @@ import com.ai.assistance.operit.services.floating.FloatingWindowCallback
 import com.ai.assistance.operit.services.floating.FloatingWindowManager
 import com.ai.assistance.operit.services.floating.FloatingWindowState
 import com.ai.assistance.operit.ui.floating.FloatingMode
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -157,6 +158,16 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "监听输入处理状态失败", e)
+                    }
+                }
+            }
+            
+            // 订阅 Toast 事件
+            serviceScope.launch {
+                chatCore.getUiStateDelegate().toastEvent.collect { message ->
+                    message?.let {
+                        Toast.makeText(this@FloatingChatService, it, Toast.LENGTH_SHORT).show()
+                        chatCore.getUiStateDelegate().clearToastEvent()
                     }
                 }
             }
@@ -417,37 +428,11 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                     Log.d(TAG, "新对话创建完成，ID: $chatId")
                 }
                 
-                // 获取当前附件列表
-                val currentAttachments = chatCore.attachments.value
+                // 设置消息文本
+                chatCore.updateUserMessage(message)
                 
-                // 获取工作区路径
-                val currentChat = chatCore.chatHistories.value.find { it.id == chatId }
-                val workspacePath = currentChat?.workspace
-                
-                // 获取配置
-                val maxTokens = (chatCore.contextLength.value * 1024).toInt()
-                val tokenUsageThreshold = chatCore.summaryTokenThreshold.value.toDouble()
-                
-                // 发送消息
-                chatCore.sendUserMessage(
-                    message = message,
-                    attachments = currentAttachments,
-                    chatId = chatId,
-                    workspacePath = workspacePath,
-                    promptFunctionType = promptType,
-                    enableThinking = chatCore.enableThinkingMode.value,
-                    thinkingGuidance = chatCore.enableThinkingGuidance.value,
-                    enableMemoryQuery = chatCore.enableMemoryQuery.value,
-                    enableWorkspaceAttachment = !workspacePath.isNullOrBlank(),
-                    maxTokens = maxTokens,
-                    tokenUsageThreshold = tokenUsageThreshold,
-                    replyToMessage = null
-                )
-                
-                // 发送后清空附件列表
-                if (currentAttachments.isNotEmpty()) {
-                    chatCore.clearAttachments()
-                }
+                // 发送消息（包含总结逻辑）
+                chatCore.sendUserMessage(promptType)
                 
                 Log.d(TAG, "消息已通过 chatCore 发送")
             } catch (e: Exception) {

@@ -55,7 +55,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
     private suspend fun executeQueryMemory(tool: AITool): ToolResult {
         val query = tool.parameters.find { it.name == "query" }?.value ?: ""
         val folderPath = tool.parameters.find { it.name == "folder_path" }?.value
-        val threshold = tool.parameters.find { it.name == "threshold" }?.value?.toFloatOrNull() ?: 0.35f
+        val threshold = tool.parameters.find { it.name == "threshold" }?.value?.toFloatOrNull() ?: 0.25f
         val limit = tool.parameters.find { it.name == "limit" }?.value?.toIntOrNull() ?: 5
 
         if (query.isBlank()) {

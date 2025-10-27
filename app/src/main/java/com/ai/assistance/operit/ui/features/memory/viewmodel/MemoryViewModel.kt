@@ -137,6 +137,7 @@ class MemoryViewModel(private val repository: MemoryRepository, private val cont
         viewModelScope.launch {
             try {
                 val folders = repository.getAllFolderPaths()
+                android.util.Log.d("MemoryViewModel", "Loaded ${folders.size} folders: $folders")
                 _uiState.update { it.copy(folderPaths = folders) }
                 
                 // 如果还没有选中文件夹，自动选择第一个（通常是"未分类"）

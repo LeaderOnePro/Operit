@@ -155,6 +155,14 @@ class MessageCoordinationDelegate(
             }
         }
 
+        // 检测是否附着了记忆文件夹
+        val hasMemoryFolder = currentAttachments.any { 
+            it.fileName == "memory_context.xml" && it.mimeType == "application/xml" 
+        }
+        
+        // 如果附着了记忆文件夹，临时启用记忆查询功能
+        val shouldEnableMemoryQuery = apiConfigDelegate.enableMemoryQuery.value || hasMemoryFolder
+        
         // 调用messageProcessingDelegate发送消息，并传递附件信息和工作区路径
         messageProcessingDelegate.sendUserMessage(
             attachments = currentAttachments,
@@ -163,7 +171,7 @@ class MessageCoordinationDelegate(
             promptFunctionType = promptFunctionType,
             enableThinking = apiConfigDelegate.enableThinkingMode.value,
             thinkingGuidance = apiConfigDelegate.enableThinkingGuidance.value,
-            enableMemoryQuery = apiConfigDelegate.enableMemoryQuery.value,
+            enableMemoryQuery = shouldEnableMemoryQuery,
             enableWorkspaceAttachment = !workspacePath.isNullOrBlank(),
             maxTokens = maxTokens,
             //如果记忆总结没开，直接调1；如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断

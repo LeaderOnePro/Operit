@@ -44,21 +44,39 @@ import com.ai.assistance.operit.ui.common.displays.FpsCounter
 import com.ai.assistance.operit.ui.main.screens.Screen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.with
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.zIndex
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.annotation.RequiresApi
+import android.os.Build
+import androidx.compose.runtime.compositionLocalOf
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.setValue
 
+// 定义一个 CompositionLocal，用于向下传递当前屏幕是否可见的状态
+val LocalIsCurrentScreen = compositionLocalOf { true }
+
+// 用于屏幕切换动画的状态
+private enum class ScreenVisibility {
+    VISIBLE,
+    HIDDEN
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun AppContent(
@@ -139,6 +157,31 @@ fun AppContent(
             } else {
                 ""
             }
+
+    // 屏幕缓存 Map - 保存已访问过的屏幕，使其状态得以保留
+    val screenCache = remember { mutableStateMapOf<String, @Composable () -> Unit>() }
+    // 使用 Screen 对象的 toString() 作为 key，这对于 data class 和 data object 都能生成一个唯一的、
+    // 包含其内部状态的字符串，从而实现通用且可靠的状态缓存。
+    val currentScreenKey = currentScreen.toString()
+
+    // 这是一个对前一个屏幕的引用。我们用它来识别当向后导航时要从缓存中删除哪个屏幕。
+    // 在没有 `by` 委托的情况下使用 `mutableStateOf`，可以让我们在 `LaunchedEffect` 内部读写它，而不会导致父 Composable 重组。
+    val previousScreenState = remember { mutableStateOf<Screen?>(null) }
+
+    LaunchedEffect(currentScreen, isNavigatingBack) {
+        val previousScreen = previousScreenState.value
+        // 当 `isNavigatingBack` 为 true 时，表示 `currentScreen` 变为活动状态是因为用户向后导航了。
+        // 他们导航 *来自* 的屏幕是 `previousScreen`。我们应该从缓存中删除这个现在被丢弃的屏幕。
+        if (isNavigatingBack && previousScreen != null) {
+            val keyToRemove = previousScreen.toString()
+            // 作为保障，确保我们不会意外地删除当前屏幕。
+            if (keyToRemove != currentScreenKey) {
+                screenCache.remove(keyToRemove)
+            }
+        }
+        // 为下一次导航事件更新我们对前一个屏幕的引用。
+        previousScreenState.value = currentScreen
+    }
 
     CompositionLocalProvider(LocalAppBarContentColor provides appBarContentColor) {
         // 使用Scaffold来正确处理顶部栏和内容的布局
@@ -275,47 +318,78 @@ fun AppContent(
                         }
                     }
                 } else {
-                    // 主要内容 - 使用Screen的Content方法直接渲染
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            // 根据导航方向决定动画方向
-                            if (isNavigatingBack) {
-                                // 返回操作：新屏幕从左侧滑入，旧屏幕向右侧滑出
-                                slideInHorizontally { width -> -width } + fadeIn() with
-                                        slideOutHorizontally { width -> width } + fadeOut()
-                            } else {
-                                // 前进操作：新屏幕从右侧滑入，旧屏幕向左侧滑出
-                                slideInHorizontally { width -> width } + fadeIn() with
-                                        slideOutHorizontally { width -> -width } + fadeOut()
-                            }
-                        },
-                        label = "ScreenAnimation"
-                    ) { screen ->
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            // 统一调用当前屏幕的内容渲染方法
-                            screen.Content(
-                                navController = navController,
-                                navigateTo = onScreenChange,
-                                updateNavItem = onNavItemChange,
-                                onGoBack = onGoBack,
-                                hasBackgroundImage = hasBackgroundImage,
-                                onLoading = onLoading,
-                                onError = onError,
-                                onGestureConsumed =
-                                if (screen is Screen.AiChat) onGestureConsumed
-                                else { _ -> },
-                            )
-
-                            // 帧率计数器 - 放在右上角
-                            if (showFpsCounter) {
-                                FpsCounter(
-                                    modifier =
-                                    Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 80.dp, end = 16.dp)
+                    // 主要内容 - 使用 Box 堆叠所有访问过的屏幕，保留状态
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // 将当前屏幕的 Composable 缓存起来
+                        if (!screenCache.containsKey(currentScreenKey)) {
+                            screenCache[currentScreenKey] = {
+                                currentScreen.Content(
+                                    navController = navController,
+                                    navigateTo = onScreenChange,
+                                    updateNavItem = onNavItemChange,
+                                    onGoBack = onGoBack,
+                                    hasBackgroundImage = hasBackgroundImage,
+                                    onLoading = onLoading,
+                                    onError = onError,
+                                    onGestureConsumed = if (currentScreen is Screen.AiChat) onGestureConsumed else { _ -> }
                                 )
                             }
+                        }
+
+                        // 渲染所有缓存的屏幕，并通过z-index和alpha控制它们的可见性
+                        screenCache.forEach { (screenKey, screenContent) ->
+                            key(screenKey) {
+                                val isCurrentScreen = screenKey == currentScreenKey
+
+                                // 为每个屏幕维护一个独立的可见性状态
+                                // 当屏幕首次组合时，其状态为 HIDDEN
+                                var visibility by remember { mutableStateOf(ScreenVisibility.HIDDEN) }
+
+                                // 使用 LaunchedEffect 在 isCurrentScreen 状态变化后更新可见性
+                                // 这确保了即使是新屏幕，也会从 HIDDEN 过渡到 VISIBLE，从而触发进入动画
+                                LaunchedEffect(isCurrentScreen) {
+                                    visibility = if (isCurrentScreen) ScreenVisibility.VISIBLE else ScreenVisibility.HIDDEN
+                                }
+
+                                // 使用 updateTransition 来处理更复杂的动画状态，确保进入和退出都有动画
+                                val transition = updateTransition(
+                                    targetState = visibility,
+                                    label = "ScreenVisibilityTransition"
+                                )
+
+                                val alpha by transition.animateFloat(
+                                    transitionSpec = {
+                                        // 将动画时间设置为 400 毫秒
+                                        tween(durationMillis = 400)
+                                    },
+                                    label = "ScreenAlphaAnimation"
+                                ) { visibility ->
+                                    if (visibility == ScreenVisibility.VISIBLE) 1f else 0f
+                                }
+
+                                Box(
+                                    modifier =
+                                        Modifier.fillMaxSize()
+                                            .zIndex(if (isCurrentScreen) 1f else 0f)
+                                            .graphicsLayer { this.alpha = alpha }
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        CompositionLocalProvider(LocalIsCurrentScreen provides isCurrentScreen) {
+                                            screenContent()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 帧率计数器 - 放在所有屏幕之上
+                        if (showFpsCounter) {
+                            FpsCounter(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 80.dp, end = 16.dp)
+                                    .zIndex(2f)
+                            )
                         }
                     }
                 }

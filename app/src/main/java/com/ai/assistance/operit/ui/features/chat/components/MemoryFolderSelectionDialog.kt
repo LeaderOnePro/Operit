@@ -329,38 +329,42 @@ private fun FolderTreeItem(
 
 /**
  * 构建文件夹树结构
+ * 使用与 FolderNavigator 相同的逻辑，自动创建缺失的父节点
  */
 private fun buildFolderTree(folderPaths: List<String>): List<FolderNode> {
     val rootNodes = mutableListOf<FolderNode>()
     val nodeMap = mutableMapOf<String, FolderNode>()
     
-    // 过滤掉"未分类"，按路径长度排序（确保父节点先创建）
-    val sortedPaths = folderPaths
-        .filter { it != "未分类" }
-        .sortedBy { it.count { c -> c == '/' } }
+    // 过滤掉"未分类"
+    val validPaths = folderPaths.filter { it != "未分类" && it.isNotBlank() }
     
-    for (path in sortedPaths) {
-        if (path.isBlank()) continue
+    // 遍历每个路径，自动创建所有中间节点
+    validPaths.forEach { path ->
+        val parts = path.split("/").filter { it.isNotBlank() }
+        var currentPath = ""
         
-        val parts = path.split('/')
-        val level = parts.size - 1
-        val name = parts.last()
-        
-        val node = FolderNode(
-            path = path,
-            name = name,
-            level = level
-        )
-        
-        nodeMap[path] = node
-        
-        if (level == 0) {
-            // 顶层节点
-            rootNodes.add(node)
-        } else {
-            // 子节点，找到父节点并添加
-            val parentPath = parts.dropLast(1).joinToString("/")
-            nodeMap[parentPath]?.children?.add(node)
+        parts.forEachIndexed { index, part ->
+            currentPath = if (currentPath.isEmpty()) part else "$currentPath/$part"
+            val level = index
+            
+            // 如果节点不存在，创建它
+            if (!nodeMap.containsKey(currentPath)) {
+                val node = FolderNode(
+                    path = currentPath,
+                    name = part,
+                    level = level
+                )
+                nodeMap[currentPath] = node
+                
+                if (level == 0) {
+                    // 顶层节点
+                    rootNodes.add(node)
+                } else {
+                    // 子节点，找到父节点并添加
+                    val parentPath = parts.take(index).joinToString("/")
+                    nodeMap[parentPath]?.children?.add(node)
+                }
+            }
         }
     }
     
@@ -391,8 +395,11 @@ private fun getSubfolders(parentPath: String, allPaths: List<String>): Set<Strin
 private suspend fun loadFolderPaths(context: Context): List<String> = withContext(Dispatchers.IO) {
     try {
         val profileId = preferencesManager.activeProfileIdFlow.first()
+        Log.d("MemoryFolderDialog", "Loading folders for profileId: $profileId")
         val repository = MemoryRepository(context, profileId)
-        repository.getAllFolderPaths()
+        val folders = repository.getAllFolderPaths()
+        Log.d("MemoryFolderDialog", "Loaded ${folders.size} folders: $folders")
+        folders
     } catch (e: Exception) {
         Log.e("MemoryFolderDialog", "Error loading folder paths", e)
         throw e

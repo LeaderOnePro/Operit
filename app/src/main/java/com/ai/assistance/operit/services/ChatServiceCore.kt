@@ -10,9 +10,11 @@ import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.core.ApiConfigDelegate
 import com.ai.assistance.operit.services.core.AttachmentDelegate
 import com.ai.assistance.operit.services.core.ChatHistoryDelegate
+import com.ai.assistance.operit.services.core.MessageCoordinationDelegate
 import com.ai.assistance.operit.services.core.MessageProcessingDelegate
 import com.ai.assistance.operit.services.core.TokenStatisticsDelegate
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.ui.features.chat.viewmodel.UiStateDelegate
 import com.ai.assistance.operit.util.stream.SharedStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
@@ -41,6 +43,8 @@ class ChatServiceCore(
     private lateinit var apiConfigDelegate: ApiConfigDelegate
     private lateinit var tokenStatisticsDelegate: TokenStatisticsDelegate
     private lateinit var attachmentDelegate: AttachmentDelegate
+    private lateinit var uiStateDelegate: UiStateDelegate
+    private lateinit var messageCoordinationDelegate: MessageCoordinationDelegate
 
     // 初始化状态
     private var initialized = false
@@ -54,6 +58,9 @@ class ChatServiceCore(
     private var onEnhancedAiServiceReady: ((EnhancedAIService) -> Unit)? = null
     
     private fun initializeDelegates() {
+        // 初始化 UI 状态委托
+        uiStateDelegate = UiStateDelegate()
+        
         // 初始化 API 配置委托
         apiConfigDelegate = ApiConfigDelegate(
             context = context,
@@ -144,41 +151,31 @@ class ChatServiceCore(
             }
         )
 
+        // 初始化消息协调委托
+        messageCoordinationDelegate = MessageCoordinationDelegate(
+            coroutineScope = coroutineScope,
+            chatHistoryDelegate = chatHistoryDelegate,
+            messageProcessingDelegate = messageProcessingDelegate,
+            tokenStatsDelegate = tokenStatisticsDelegate,
+            apiConfigDelegate = apiConfigDelegate,
+            attachmentDelegate = attachmentDelegate,
+            uiStateDelegate = uiStateDelegate,
+            getEnhancedAiService = { enhancedAiService },
+            updateWebServerForCurrentChat = { _ -> }, // 空实现
+            resetAttachmentPanelState = { }, // 空实现
+            clearReplyToMessage = { }, // 空实现
+            getReplyToMessage = { null } // 总是返回 null
+        )
+
         initialized = true
         Log.d(TAG, "所有委托已初始化")
     }
 
     // ========== 消息处理相关 ==========
 
-    /** 发送用户消息 */
-    fun sendUserMessage(
-        message: String,
-        attachments: List<AttachmentInfo> = emptyList(),
-        chatId: String? = null,
-        workspacePath: String? = null,
-        promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
-        enableThinking: Boolean = false,
-        thinkingGuidance: Boolean = false,
-        enableMemoryQuery: Boolean = true,
-        enableWorkspaceAttachment: Boolean = false,
-        maxTokens: Int,
-        tokenUsageThreshold: Double,
-        replyToMessage: ChatMessage? = null
-    ) {
-        messageProcessingDelegate.updateUserMessage(message)
-        messageProcessingDelegate.sendUserMessage(
-            attachments = attachments,
-            chatId = chatId,
-            workspacePath = workspacePath,
-            promptFunctionType = promptFunctionType,
-            enableThinking = enableThinking,
-            thinkingGuidance = thinkingGuidance,
-            enableMemoryQuery = enableMemoryQuery,
-            enableWorkspaceAttachment = enableWorkspaceAttachment,
-            maxTokens = maxTokens,
-            tokenUsageThreshold = tokenUsageThreshold,
-            replyToMessage = replyToMessage
-        )
+    /** 发送用户消息（使用 MessageCoordinationDelegate，包含总结逻辑） */
+    fun sendUserMessage(promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT) {
+        messageCoordinationDelegate.sendUserMessage(promptFunctionType)
     }
 
     /** 取消当前消息 */
@@ -286,6 +283,9 @@ class ChatServiceCore(
     val nonFatalErrorEvent: SharedFlow<String>
         get() = messageProcessingDelegate.nonFatalErrorEvent
 
+    val isSummarizing: StateFlow<Boolean>
+        get() = messageCoordinationDelegate.isSummarizing
+
     // 聊天历史相关
     val chatHistory: StateFlow<List<ChatMessage>>
         get() = chatHistoryDelegate.chatHistory
@@ -345,6 +345,9 @@ class ChatServiceCore(
         get() = attachmentDelegate.toastEvent
 
     // ========== 其他方法 ==========
+
+    /** 获取 UiStateDelegate 实例 */
+    fun getUiStateDelegate(): UiStateDelegate = uiStateDelegate
 
     /** 获取 EnhancedAIService 实例 */
     fun getEnhancedAiService(): EnhancedAIService? = enhancedAiService
