@@ -91,7 +91,7 @@ fun ToolResultDisplay(
 
         // 结果内容（确保在一行显示）
         Text(
-                text = if (hasContent) result else if (isSuccess) "执行成功" else "执行失败",
+                text = if (hasContent) result.take(200) else if (isSuccess) "执行成功" else "执行失败",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (!hasContent) FontWeight.Medium else FontWeight.Normal,
                 color =

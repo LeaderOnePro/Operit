@@ -50,7 +50,7 @@ enum class MarkdownProcessorType {
 
 /** Markdown数据模型 */
 class MarkdownNode(val type: MarkdownProcessorType, initialContent: String = "") {
-    val content: MutableState<String> = mutableStateOf(initialContent)
+    val content: SmartString = SmartString(initialContent)
     val children: SnapshotStateList<MarkdownNode> = mutableStateListOf()
 }
 

@@ -356,13 +356,6 @@ class ConversationService(
                 continue
             }
 
-            // 应用内存优化: 只有当消息不是最近25条时才触发
-            val distanceFromEnd = totalMessages - 1 - messageIndex
-            if (distanceFromEnd > 25 && tagContent.length > 1000 && tagName == "tool_result") {
-                 Log.d(TAG, "Optimizing tool result for message at index $messageIndex (distance from end: $distanceFromEnd)")
-                tagContent = optimizeToolResult(tagContent)
-            }
-
             // 根据标签类型分配角色
             when (tagName) {
                 "status" -> {
@@ -412,61 +405,6 @@ class ConversationService(
 
         // 将合并后的消息添加到对话历史
         conversationHistory.addAll(mergedSegments)
-    }
-
-    /**
-     * Optimize tool result by selecting the most important parts This helps with memory management
-     * for long tool outputs
-     */
-    fun optimizeToolResult(toolResult: String): String {
-        // 如果结果不够长，直接返回
-        if (toolResult.length <= 1000) return toolResult
-
-        // 提取工具名称
-        val nameMatch = Regex("name=\"([^\"]+)\"").find(toolResult)
-        val toolName = nameMatch?.groupValues?.getOrNull(1) ?: "unknown"
-
-        // 为特定工具类型保留完整内容
-        if (toolName == "use_package") {
-            return toolResult
-        }
-
-        // 提取内容
-        val tagContent =
-                Regex("<[^>]*>(.*?)</[^>]*>", RegexOption.DOT_MATCHES_ALL)
-                        .find(toolResult)
-                        ?.groupValues
-                        ?.getOrNull(1)
-
-        val sb = StringBuilder()
-
-        // 添加工具名称前缀
-        sb.append("<tool_result name=\"$toolName\">")
-
-        // 处理提取的内容
-        if (!tagContent.isNullOrEmpty()) {
-            // 对于XML内容，最多保留800个字符
-            val maxContentLength = 800
-            val content =
-                    if (tagContent.length > maxContentLength) {
-                        tagContent.substring(0, 400) +
-                                "\n... [content truncated for memory optimization] ...\n" +
-                                tagContent.substring(tagContent.length - 400)
-                    } else {
-                        tagContent
-                    }
-            sb.append(content)
-        } else {
-            // 对于非XML内容，从头部和尾部保留重要部分
-            sb.append(toolResult.substring(0, 400))
-            sb.append("\n... [content truncated for memory optimization] ...\n")
-            sb.append(toolResult.substring(toolResult.length - 400))
-        }
-
-        // 添加结束标签
-        sb.append("</tool_result>")
-
-        return sb.toString()
     }
 
     /** Build a formatted preferences text string from a PreferenceProfile */
