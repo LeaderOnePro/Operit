@@ -497,6 +497,20 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
         }
     }
 
+    // Add XML output formatting guidance to ensure XML blocks start at line start
+    val xmlFormattingGuidelines = if (useEnglish) {
+        """
+        XML OUTPUT FORMATTING:
+        - When you output any XML fragment (e.g., <status>, <tool>, <plan>), you MUST insert a newline before it and ensure the opening tag starts at the beginning of a line with no preceding characters (including spaces).
+        """.trimIndent()
+    } else {
+        """
+        XML输出格式：
+        - 当你输出任何XML片段（例如 <status>、<tool>、<plan>），必须在XML前先换行，并确保起始标签位于行首，前面不能有任何字符（包括空格）。
+        """.trimIndent()
+    }
+    prompt += "\n\n$xmlFormattingGuidelines\n"
+
     // Clean up multiple consecutive blank lines (replace 3+ newlines with 2)
     prompt = prompt.replace(Regex("\n{3,}"), "\n\n")
 
