@@ -258,12 +258,12 @@ fun StreamMarkdownRenderer(
 
                                     if (lastCharWasNewline) {
                                         // 更新父节点和子节点内容
-                                        newNode.content.value += "\n" + str
-                                        childNode!!.content.value += "\n" + str
+                                        newNode.content + ("\n" + str)
+                                        childNode!!.content + ("\n" + str)
                                         lastCharWasNewline = false
                                     } else {
-                                        newNode.content.value += str
-                                        childNode!!.content.value += str
+                                        newNode.content + str
+                                        childNode!!.content + str
                                     }
 
                                     // 更新lastCharWasNewline状态
@@ -272,10 +272,12 @@ fun StreamMarkdownRenderer(
 
                                 // 如果是内联LaTeX，在收集完内容后，将节点替换为INLINE_LATEX类型
                                 if (isInlineLatex && childNode != null) {
-                                    val latexContent = childNode!!.content.value
+                                    val latexContent = childNode!!.content.toString()
                                     val latexChildNode =
-                                            MarkdownNode(type = MarkdownProcessorType.INLINE_LATEX)
-                                    latexChildNode.content.value = latexContent
+                                            MarkdownNode(
+                                                    type = MarkdownProcessorType.INLINE_LATEX,
+                                                    initialContent = latexContent
+                                            )
                                     val childIndex = newNode.children.lastIndexOf(childNode)
                                     if (childIndex != -1) {
                                         newNode.children[childIndex] = latexChildNode
@@ -284,7 +286,7 @@ fun StreamMarkdownRenderer(
 
                                 // 优化：如果子节点内容经过trim后为空，则移除该子节点
                                 if (childNode != null &&
-                                                childNode!!.content.value.trimAll().isEmpty() &&
+                                                childNode!!.content.toString().trimAll().isEmpty() &&
                                                 originalInlineType ==
                                                         MarkdownProcessorType.PLAIN_TEXT
                                 ) {
@@ -298,16 +300,18 @@ fun StreamMarkdownRenderer(
                 } else {
                     // 对于没有内联格式的代码块，直接流式传输内容。
                     blockGroup.stream.collect { contentChunk ->
-                        newNode.content.value += contentChunk
+                        newNode.content + contentChunk
                     }
                 }
 
                 // 如果原始类型是LaTeX块，现在收集完毕，将其转换回LaTeX节点
                 if (isLatexBlock) {
-                    val latexContent = newNode.content.value
+                    val latexContent = newNode.content.toString()
                     // 创建新的LaTeX节点
-                    val latexNode = MarkdownNode(type = MarkdownProcessorType.BLOCK_LATEX)
-                    latexNode.content.value = latexContent
+                    val latexNode =
+                            MarkdownNode(
+                                    type = MarkdownProcessorType.BLOCK_LATEX, initialContent = latexContent
+                            )
                     // 原地替换节点，以保持索引的稳定性，避免不必要的重组
                     nodes[nodeIndex] = latexNode
                 }
@@ -484,12 +488,12 @@ fun StreamMarkdownRenderer(
 
                                         if (lastCharWasNewline) {
                                             // 更新父节点和子节点内容
-                                            newNode.content.value += "\n" + str
-                                            childNode!!.content.value += "\n" + str
+                                            newNode.content + ("\n" + str)
+                                            childNode!!.content + ("\n" + str)
                                             lastCharWasNewline = false
                                         } else {
-                                            newNode.content.value += str
-                                            childNode!!.content.value += str
+                                            newNode.content + str
+                                            childNode!!.content + str
                                         }
 
                                         // 更新lastCharWasNewline状态
@@ -498,12 +502,12 @@ fun StreamMarkdownRenderer(
 
                                     // 如果是内联LaTeX，在收集完内容后，将节点替换为INLINE_LATEX类型
                                     if (isInlineLatex && childNode != null) {
-                                        val latexContent = childNode!!.content.value
+                                        val latexContent = childNode!!.content.toString()
                                         val latexChildNode =
                                                 MarkdownNode(
-                                                        type = MarkdownProcessorType.INLINE_LATEX
+                                                        type = MarkdownProcessorType.INLINE_LATEX,
+                                                        initialContent = latexContent
                                                 )
-                                        latexChildNode.content.value = latexContent
                                         val childIndex = newNode.children.lastIndexOf(childNode)
                                         if (childIndex != -1) {
                                             newNode.children[childIndex] = latexChildNode
@@ -512,7 +516,7 @@ fun StreamMarkdownRenderer(
 
                                     // 优化：如果子节点内容经过trim后为空，则移除该子节点
                                     if (childNode != null &&
-                                                    childNode!!.content.value.trimAll().isEmpty() &&
+                                                    childNode!!.content.toString().trimAll().isEmpty() &&
                                                     originalInlineType ==
                                                             MarkdownProcessorType.PLAIN_TEXT
                                     ) {
@@ -529,16 +533,19 @@ fun StreamMarkdownRenderer(
                     } else {
                         // 对于没有内联格式的代码块，直接流式传输内容。
                         blockGroup.stream.collect { contentChunk ->
-                            newNode.content.value += contentChunk
+                            newNode.content + contentChunk
                         }
                     }
 
                     // 如果原始类型是LaTeX块，现在收集完毕，将其转换回LaTeX节点
                     if (isLatexBlock) {
-                        val latexContent = newNode.content.value
+                        val latexContent = newNode.content.toString()
                         // 创建新的LaTeX节点
-                        val latexNode = MarkdownNode(type = MarkdownProcessorType.BLOCK_LATEX)
-                        latexNode.content.value = latexContent
+                        val latexNode =
+                                MarkdownNode(
+                                        type = MarkdownProcessorType.BLOCK_LATEX,
+                                        initialContent = latexContent
+                                )
                         // 原地替换节点，以保持索引的稳定性，避免不必要的重组
                         parsedNodes[nodeIndex] = latexNode
                     }
@@ -708,7 +715,7 @@ fun StableMarkdownNodeRenderer(
     val rendererId = remember { "node-${node.type}-$index-${System.identityHashCode(node)}" }
 
     // 直接从node读取状态，确保在节点被替换时能获取到最新状态
-    val content by node.content
+    val content = node.content.toString()
     val children = node.children
 
     when (node.type) {
@@ -860,12 +867,12 @@ fun StableMarkdownNodeRenderer(
                                 val firstChild = modifiedChildren[0]
                                 val newContent =
                                         numberMatch?.let {
-                                            firstChild.content.value.substring(it.range.last + 1)
+                                            firstChild.content.toString().substring(it.range.last + 1)
                                         }
-                                                ?: firstChild.content.value
+                                                ?: firstChild.content.toString()
                                 // 创建一个更新后的新节点替换旧节点
-                                val newFirstChild = MarkdownNode(firstChild.type)
-                                newFirstChild.content.value = newContent
+                                val newFirstChild =
+                                        MarkdownNode(firstChild.type, initialContent = newContent)
                                 newFirstChild.children.addAll(firstChild.children)
                                 modifiedChildren[0] = newFirstChild
                             }
@@ -917,11 +924,11 @@ fun StableMarkdownNodeRenderer(
                                 val firstChild = modifiedChildren[0]
                                 val newContent =
                                         markerMatch?.let {
-                                            firstChild.content.value.substring(it.range.last + 1)
+                                            firstChild.content.toString().substring(it.range.last + 1)
                                         }
-                                                ?: firstChild.content.value
-                                val newFirstChild = MarkdownNode(firstChild.type)
-                                newFirstChild.content.value = newContent
+                                                ?: firstChild.content.toString()
+                                val newFirstChild =
+                                        MarkdownNode(firstChild.type, initialContent = newContent)
                                 newFirstChild.children.addAll(firstChild.children)
                                 modifiedChildren[0] = newFirstChild
                             }
@@ -1062,7 +1069,7 @@ fun StableMarkdownNodeRenderer(
             } else {
                 // 不完整的图片标记作为普通文本处理
                 Text(
-                        text = imageContent,
+                        text = node.content.toString(),
                         color = textColor,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
@@ -1172,10 +1179,10 @@ private fun AnnotatedString.Builder.appendStyledText(
     children.forEach { child ->
         when (child.type) {
             MarkdownProcessorType.BOLD -> {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(child.content.value) }
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(child.content.toString()) }
             }
             MarkdownProcessorType.ITALIC -> {
-                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(child.content.value) }
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(child.content.toString()) }
             }
             MarkdownProcessorType.INLINE_CODE -> {
                 withStyle(
@@ -1184,21 +1191,21 @@ private fun AnnotatedString.Builder.appendStyledText(
                                 background = Color.LightGray.copy(alpha = 0.15f),
                                 fontSize = 14.sp
                         )
-                ) { append(child.content.value) }
+                ) { append(child.content.toString()) }
             }
             MarkdownProcessorType.STRIKETHROUGH -> {
                 withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
-                    append(child.content.value)
+                    append(child.content.toString())
                 }
             }
             MarkdownProcessorType.UNDERLINE -> {
                 withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) {
-                    append(child.content.value)
+                    append(child.content.toString())
                 }
             }
             MarkdownProcessorType.LINK -> {
-                val linkText = extractLinkText(child.content.value)
-                val linkUrl = extractLinkUrl(child.content.value)
+                val linkText = extractLinkText(child.content.toString())
+                val linkUrl = extractLinkUrl(child.content.toString())
 
                 pushStringAnnotation("URL", linkUrl)
                 withStyle(
@@ -1210,7 +1217,7 @@ private fun AnnotatedString.Builder.appendStyledText(
                 pop()
             }
             MarkdownProcessorType.INLINE_LATEX -> {
-                val latexContent = child.content.value.trimAll().removeSurrounding("$$", "$$")
+                val latexContent = child.content.toString().trimAll().removeSurrounding("$$", "$$")
 
                 val context = LocalContext.current
                 val density = LocalDensity.current
@@ -1277,14 +1284,14 @@ private fun AnnotatedString.Builder.appendStyledText(
                             )
                     ) {
                         append("$$")
-                        append(latexContent)
+                        append(child.content.toString())
                         append("$$")
                     }
                 }
             }
             else -> {
                 // 默认情况，通常是 PLAIN_TEXT
-                append(child.content.value)
+                append(child.content.toString())
             }
         }
     }
