@@ -21,6 +21,8 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
 
     private var startTagMatcher: StreamKmpGraph
     private var endTagMatcher: StreamKmpGraph? = null
+    // Allow matching a new start tag immediately after we just closed an end tag, even if not at start of line
+    private var allowStartAfterEndTag: Boolean = false
 
     init {
         startTagMatcher =
@@ -58,6 +60,8 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                 is StreamKmpMatchResult.Match -> {
                     // End tag fully matched. Reset state and filter this last character if needed.
                     StreamLogger.i("StreamXmlPlugin", "Found end tag. Switching to IDLE.")
+                    // Enable one-time allowance for starting a new tag right after this end tag
+                    allowStartAfterEndTag = true
                     reset()
                     includeTagsInOutput
                 }
@@ -73,6 +77,15 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                 }
             }
         } else {
+            if (state == PluginState.IDLE && !atStartOfLine) {
+                if (!allowStartAfterEndTag) {
+                    return true
+                }
+                // Allow adjacent XML after an end tag even if separated by spaces/tabs
+                if (c == ' ' || c == '\t') {
+                    return true
+                }
+            }
             // We are in IDLE or TRYING state, looking for a start tag.
             val previousState = state
             when (val result = startTagMatcher.processChar(c)) {
@@ -84,6 +97,8 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                                 "Found start tag '$tagName'. Switching to PROCESSING."
                         )
                         state = PluginState.PROCESSING
+                        // Consuming this as a new start clears the post-end allowance
+                        allowStartAfterEndTag = false
                         // We have a full start tag. Configure the end tag matcher.
                         endTagMatcher =
                                 StreamKmpGraphBuilder()
@@ -103,6 +118,10 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                 }
                 is StreamKmpMatchResult.InProgress -> {
                     state = PluginState.TRYING
+                    // We are attempting a new start, consume the allowance
+                    // so only this potential sequence benefits from it
+                    // (if it fails below, we will clear it)
+                    // Keep it true while in-progress so subsequent chars can proceed
                     return includeTagsInOutput
                 }
                 is StreamKmpMatchResult.NoMatch -> {
@@ -110,6 +129,8 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                     if (previousState == PluginState.TRYING) {
                         reset()
                     }
+                    // Clear the allowance if we failed to start a new tag
+                    allowStartAfterEndTag = false
                     // This is a default character, not part of a tag managed by this plugin.
                     return true
                 }

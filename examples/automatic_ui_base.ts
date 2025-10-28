@@ -74,7 +74,7 @@ const UIAutomationTools = (function () {
     }
 
     async function get_page_info(params: { format?: 'xml' | 'json', detail?: 'minimal' | 'summary' | 'full' }): Promise<ToolResponse> {
-        const result = await Tools.UI.getPageInfo();
+        const result = (await UINode.getCurrentPage()).toFormattedString!();
         return { success: true, message: '成功获取页面信息', data: result };
     }
 
@@ -117,8 +117,84 @@ const UIAutomationTools = (function () {
     }
 
     async function main() {
-        console.log("UI Automation Tools package main function. This is for testing and demonstration.");
-        complete({ success: true, message: "UI Automation Tools main finished." });
+        console.log("=== UI Automation Tools 测试开始 ===\n");
+        const results: any[] = [];
+
+        try {
+            // 1. 测试 get_page_info
+            console.log("1. 测试 get_page_info...");
+            const pageInfoResult = await get_page_info({});
+            results.push({ tool: 'get_page_info', result: pageInfoResult });
+            console.log("✓ get_page_info 测试完成\n");
+
+            // 2. 测试 tap (点击屏幕中心位置)
+            console.log("2. 测试 tap...");
+            const tapResult = await tap({ x: 500, y: 1000 });
+            results.push({ tool: 'tap', result: tapResult });
+            console.log("✓ tap 测试完成\n");
+            await Tools.System.sleep(500);
+
+            // 3. 测试 press_key (按音量上键)
+            console.log("3. 测试 press_key...");
+            const pressKeyResult = await press_key({ key_code: 'KEYCODE_VOLUME_UP' });
+            results.push({ tool: 'press_key', result: pressKeyResult });
+            console.log("✓ press_key 测试完成\n");
+            await Tools.System.sleep(500);
+
+            // 4. 测试 set_input_text
+            console.log("4. 测试 set_input_text...");
+            const setTextResult = await set_input_text({ text: 'UI自动化测试文本' });
+            results.push({ tool: 'set_input_text', result: setTextResult });
+            console.log("✓ set_input_text 测试完成\n");
+            await Tools.System.sleep(500);
+
+            // 5. 测试 swipe (向上滑动)
+            console.log("5. 测试 swipe...");
+            const swipeResult = await swipe({
+                start_x: 500,
+                start_y: 1500,
+                end_x: 500,
+                end_y: 500,
+                duration: 300
+            });
+            results.push({ tool: 'swipe', result: swipeResult });
+            console.log("✓ swipe 测试完成\n");
+            await Tools.System.sleep(500);
+
+            // 6. 测试 click_element (尝试点击一个常见的元素)
+            console.log("6. 测试 click_element...");
+            try {
+                const clickResult = await click_element({
+                    className: 'android.widget.Button',
+                    index: 0
+                });
+                results.push({ tool: 'click_element', result: clickResult });
+                console.log("✓ click_element 测试完成\n");
+            } catch (error: any) {
+                console.log("⚠ click_element 测试失败（这可能是正常的，如果当前页面没有按钮）:", error.message, "\n");
+                results.push({ tool: 'click_element', result: { success: false, message: error.message } });
+            }
+
+            console.log("=== UI Automation Tools 测试完成 ===\n");
+            console.log("测试结果汇总:");
+            results.forEach((r, i) => {
+                const status = r.result.success ? '✓' : '✗';
+                console.log(`${i + 1}. ${status} ${r.tool}: ${r.result.message}`);
+            });
+
+            complete({
+                success: true,
+                message: "所有UI工具测试完成",
+                data: results
+            });
+        } catch (error: any) {
+            console.error("测试过程中发生错误:", error);
+            complete({
+                success: false,
+                message: `测试失败: ${error.message}`,
+                data: results
+            });
+        }
     }
 
     return {

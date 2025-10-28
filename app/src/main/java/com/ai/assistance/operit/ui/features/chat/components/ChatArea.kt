@@ -54,23 +54,32 @@ import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.AiReference
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.data.model.PlanItem
+
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.ContentCut
+
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.OutlinedTextField
+
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
 import com.ai.assistance.operit.util.WaifuMessageProcessor
+
+/**
+ * 清理消息中的XML标签，保留纯文本内容和换行格式
+ */
+private fun cleanXmlTags(content: String): String {
+    return content
+        .replace(Regex("<[^>]*>"), "") // 移除所有XML/HTML标签
+        .replace(Regex("[ \t]+"), " ") // 将多个空格和制表符替换为单个空格，但保留换行符
+        .replace(Regex("\n+"), "\n") // 将多个连续换行符替换为单个换行符
+        .trim() // 移除首尾空白
+}
 
 enum class ChatStyle {
     CURSOR,
@@ -82,8 +91,6 @@ fun ChatArea(
     chatHistory: List<ChatMessage>,
     scrollState: ScrollState,
     aiReferences: List<AiReference> = emptyList(),
-    planItems: List<PlanItem> = emptyList(),
-    enablePlanning: Boolean = false,
     isLoading: Boolean,
     userMessageColor: Color,
     aiMessageColor: Color,
@@ -100,9 +107,15 @@ fun ChatArea(
     onDeleteMessage: ((Int) -> Unit)? = null,
     onDeleteMessagesFrom: ((Int) -> Unit)? = null,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调参数
+    onAutoReadMessage: ((String) -> Unit)? = null, // 添加自动朗读回调参数
+    onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调参数
     messagesPerPage: Int = 10, // 每页显示的消息数量
     topPadding: Dp = 0.dp,
-    chatStyle: ChatStyle = ChatStyle.CURSOR // 新增参数，默认为CURSOR风格
+    chatStyle: ChatStyle = ChatStyle.CURSOR, // 新增参数，默认为CURSOR风格
+    isMultiSelectMode: Boolean = false, // 是否处于多选模式
+    selectedMessageIndices: Set<Int> = emptySet(), // 已选中的消息索引集合
+    onToggleMultiSelectMode: ((Int?) -> Unit)? = null, // 切换多选模式的回调，可传入要初始选中的消息索引
+    onToggleMessageSelection: ((Int) -> Unit)? = null // 切换消息选中状态的回调
 ) {
     // 记住当前深度状态，但当chatHistory发生变化时重置为1
     var currentDepth = remember(chatHistory) { mutableStateOf(1) }
@@ -110,12 +123,7 @@ fun ChatArea(
     Column(modifier = modifier) {
         // 移除References display
 
-        // Plan display when planning is enabled and there are plan items
-        if (enablePlanning && planItems.isNotEmpty()) {
-            PlanGraphDisplay(planItems = planItems, modifier = Modifier.fillMaxWidth())
-        } else {
-            // 删除全部不必要的诊断日志
-        }
+        // Plan display removed
 
         // 改用普通Column替代LazyColumn，避免复杂的回收逻辑带来的性能问题
         Column(
@@ -181,8 +189,14 @@ fun ChatArea(
                         onDeleteMessage = onDeleteMessage,
                         onDeleteMessagesFrom = onDeleteMessagesFrom,
                         onSpeakMessage = onSpeakMessage, // 传递朗读回调
+                        onReplyToMessage = onReplyToMessage, // 传递回复回调
                         chatStyle = chatStyle, // 传递风格
-                        isHidden = shouldHide // 新增参数控制隐藏
+                        isHidden = shouldHide, // 新增参数控制隐藏
+                        isMultiSelectMode = isMultiSelectMode, // 传递多选模式状态
+                        isSelected = selectedMessageIndices.contains(actualIndex), // 传递选中状态
+                        onToggleSelection = { onToggleMessageSelection?.invoke(actualIndex) }, // 传递选中切换回调
+                        onToggleMultiSelectMode = onToggleMultiSelectMode, // 传递多选模式切换回调
+                        messageIndex = actualIndex // 传递消息索引
                     )
                 }
 
@@ -242,12 +256,18 @@ private fun MessageItem(
     onDeleteMessage: ((Int) -> Unit)?,
     onDeleteMessagesFrom: ((Int) -> Unit)?,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
+    onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调
     chatStyle: ChatStyle, // 新增参数
-    isHidden: Boolean = false // 新增参数控制隐藏
+    isHidden: Boolean = false, // 新增参数控制隐藏
+    isMultiSelectMode: Boolean = false, // 是否处于多选模式
+    isSelected: Boolean = false, // 是否被选中
+    onToggleSelection: (() -> Unit)? = null, // 切换选中状态的回调
+    onToggleMultiSelectMode: ((Int?) -> Unit)? = null, // 切换多选模式的回调，可传入要初始选中的消息索引
+    messageIndex: Int // 消息索引，用于进入多选时自动选中
 ) {
     val context = LocalContext.current
     var showContextMenu by remember { mutableStateOf(false) }
-    var showSelectableCopyDialog by remember { mutableStateOf(false) }
+
 
     // 只有用户和AI的消息才能被操作
     val isActionable = message.sender == "user" || message.sender == "ai"
@@ -256,9 +276,25 @@ private fun MessageItem(
         modifier =
         Modifier
             .alpha(if (isHidden) 0f else 1f)
+            .then(
+                if (isSelected) {
+                    Modifier.background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                } else Modifier
+            )
             .combinedClickable(
-                onClick = {},
-                onLongClick = { if (isActionable) showContextMenu = true },
+                onClick = {
+                    if (isMultiSelectMode && isActionable) {
+                        onToggleSelection?.invoke()
+                    }
+                },
+                onLongClick = { 
+                    if (!isMultiSelectMode && isActionable) {
+                        showContextMenu = true
+                    }
+                },
             ),
     ) {
         when (chatStyle) {
@@ -318,7 +354,8 @@ private fun MessageItem(
                 onClick = {
                     val clipboardManager =
                         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clipData = ClipData.newPlainText("聊天消息", message.content)
+                    val cleanContent = cleanXmlTags(message.content)
+                    val clipData = ClipData.newPlainText("聊天消息", cleanContent)
                     clipboardManager.setPrimaryClip(clipData)
                     Toast.makeText(context, context.getString(R.string.message_copied), Toast.LENGTH_SHORT).show()
                     onCopyMessage?.invoke(message)
@@ -335,29 +372,7 @@ private fun MessageItem(
                 modifier = Modifier.height(36.dp)
             )
 
-            // 框选复制选项
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(id = R.string.select_copy),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontSize = 13.sp
-                    )
-                },
-                onClick = {
-                    showSelectableCopyDialog = true
-                    showContextMenu = false
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.ContentCut,
-                        contentDescription = stringResource(id = R.string.select_copy),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                },
-                modifier = Modifier.height(36.dp)
-            )
+
 
             // 朗读消息选项
             DropdownMenuItem(
@@ -369,7 +384,7 @@ private fun MessageItem(
                     )
                 },
                 onClick = {
-                    onSpeakMessage?.invoke(WaifuMessageProcessor.cleanContentForWaifu(message.content))
+                    onSpeakMessage?.invoke(message.content)
                     showContextMenu = false
                 },
                 leadingIcon = {
@@ -458,23 +473,49 @@ private fun MessageItem(
                 modifier = Modifier.height(36.dp)
             )
 
-            // 删除到此
+            // 回复选项
+            if (message.sender == "ai") {
+                DropdownMenuItem(
+        text = {
+                        Text(
+                            stringResource(R.string.reply_message),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 13.sp
+            )
+        },
+                onClick = {
+                        onReplyToMessage?.invoke(message)
+                        showContextMenu = false
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Reply,
+                            contentDescription = stringResource(R.string.reply_message),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    modifier = Modifier.height(36.dp)
+                )
+            }
+
+            // 多选
             DropdownMenuItem(
                 text = {
                     Text(
-                        stringResource(id = R.string.delete_from_here),
+                        stringResource(id = R.string.multi_select),
                         style = MaterialTheme.typography.bodyMedium,
                         fontSize = 13.sp
                     )
                 },
                 onClick = {
-                    onDeleteMessagesFrom?.invoke(index)
+                    onToggleMultiSelectMode?.invoke(messageIndex) // 传入消息索引
                     showContextMenu = false
                 },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Default.DeleteSweep,
-                        contentDescription = stringResource(id = R.string.delete_from_here),
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = stringResource(id = R.string.multi_select),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
@@ -483,61 +524,11 @@ private fun MessageItem(
             )
         }
 
-        if (showSelectableCopyDialog) {
-            SelectableCopyDialog(
-                text = message.content,
-                onDismiss = { showSelectableCopyDialog = false }
-            )
-        }
-    }
+
+}
 }
 
-@Composable
-private fun SelectableCopyDialog(text: String, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    var textFieldValue by remember { mutableStateOf(TextFieldValue(text)) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(id = R.string.select_copy)) },
-        text = {
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { textFieldValue = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 300.dp),
-                readOnly = true
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val selectedText = textFieldValue.text.substring(
-                        textFieldValue.selection.start,
-                        textFieldValue.selection.end
-                    )
-                    if (selectedText.isNotEmpty()) {
-                        val clipboardManager =
-                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clipData = ClipData.newPlainText("selected text", selectedText)
-                        clipboardManager.setPrimaryClip(clipData)
-                        Toast.makeText(context, context.getString(R.string.selection_copied), Toast.LENGTH_SHORT).show()
-                    }
-                    onDismiss()
-                },
-                enabled = !textFieldValue.selection.collapsed
-            ) {
-                Text(stringResource(id = R.string.copy))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.cancel))
-            }
-        }
-    )
-}
 
 @Composable
 private fun LoadingDotsIndicator(textColor: Color) {

@@ -2,14 +2,11 @@ package com.ai.assistance.operit.ui.main.layout
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -72,29 +69,22 @@ fun TabletLayout(
                                                 androidx.compose.ui.platform.LocalConfiguration
                                                         .current
                                                         .screenWidthDp
-                                                        .dp - tabletSidebarWidth
+                                                        .dp - tabletSidebarWidth + 1.dp // 增加1dp解决右侧白线问题
                                         else
                                                 androidx.compose.ui.platform.LocalConfiguration
                                                         .current
                                                         .screenWidthDp
-                                                        .dp - collapsedTabletSidebarWidth,
+                                                        .dp - collapsedTabletSidebarWidth + 1.dp, // 增加1dp解决右侧白线问题
                                 animationSpec = tween(durationMillis = 280),
                                 label = "contentWidth"
                         )
 
-                // 侧边栏区域，使用动画宽度
+                // 侧边栏区域，使用动画宽度，无圆角以完全遮住背景
                 Surface(
                         modifier =
                                 Modifier.width(animatedSidebarWidth)
                                         .fillMaxHeight()
                                         .zIndex(2f), // 确保侧边栏在主内容之上
-                        shape =
-                                MaterialTheme.shapes.medium.copy(
-                                        topEnd = CornerSize(12.dp),
-                                        bottomEnd = CornerSize(12.dp),
-                                        topStart = CornerSize(0.dp),
-                                        bottomStart = CornerSize(0.dp)
-                                ),
                         shadowElevation = 4.dp,
                         color = MaterialTheme.colorScheme.surface
                 ) {
@@ -158,15 +148,5 @@ fun TabletLayout(
                                 actions = topBarActions
                         )
                 }
-
-                // 添加一个小方块，填充圆角和工具栏之间的空隙
-                Box(
-                        modifier =
-                                Modifier.width(16.dp)
-                                        .height(64.dp)
-                                        .offset(x = animatedSidebarWidth - 16.dp)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .zIndex(0f)
-                )
         }
 }

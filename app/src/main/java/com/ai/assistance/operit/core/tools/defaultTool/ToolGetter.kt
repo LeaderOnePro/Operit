@@ -139,14 +139,6 @@ object ToolGetter {
         return StandardFFmpegToolExecutor(context)
     }
 
-    /**
-     * 获取文件转换工具执行器
-     * @param context 应用上下文
-     * @return 文件转换工具执行器实现（只有标准版本）
-     */
-    fun getFileConverterToolExecutor(context: Context): FileConverterToolExecutor {
-        return FileConverterToolExecutor(context)
-    }
 
     /**
      * 获取FFmpeg信息工具执行器
@@ -172,11 +164,20 @@ object ToolGetter {
     fun getCalculator() = StandardCalculator
 
     /**
-     * 获取AI电脑桌面工具
+     * 获取工作流工具
      * @param context 应用上下文
-     * @return 电脑桌面工具实现（只有标准版本）
+     * @return 工作流工具实现（只有标准版本）
      */
-    fun getComputerDesktopTools(context: Context): ComputerDesktopToolExecutor {
-        return ComputerDesktopToolExecutor(context)
+    fun getWorkflowTools(context: Context): StandardWorkflowTools {
+        return StandardWorkflowTools(context)
+    }
+
+    /**
+     * 获取对话管理工具
+     * @param context 应用上下文
+     * @return 对话管理工具实现（只有标准版本）
+     */
+    fun getChatManagerTool(context: Context): StandardChatManagerTool {
+        return StandardChatManagerTool(context)
     }
 }

@@ -12,6 +12,7 @@ import com.ai.assistance.operit.core.tools.FileInfoData
 import com.ai.assistance.operit.core.tools.FileOperationData
 import com.ai.assistance.operit.core.tools.FilePartContentData
 import com.ai.assistance.operit.core.tools.FindFilesResultData
+import com.ai.assistance.operit.core.tools.GrepResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
@@ -31,6 +32,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import com.ai.assistance.operit.util.FileUtils
+import com.ai.assistance.operit.util.SyntaxCheckUtil
+import com.ai.assistance.operit.util.PathMapper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -38,6 +41,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
+import com.ai.assistance.operit.api.chat.enhance.FileBindingService
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 
 /**
  * Collection of file system operation tools for the AI assistant These tools use Java File APIs for
@@ -46,17 +51,37 @@ import android.webkit.MimeTypeMap
 open class StandardFileSystemTools(protected val context: Context) {
         companion object {
                 private const val TAG = "FileSystemTools"
+        }
 
-                // Maximum allowed file size for operations
-                protected const val MAX_FILE_SIZE_BYTES = 32 * 1024 // 32k
+        // ApiPreferences 实例，用于动态获取配置
+        protected val apiPreferences: ApiPreferences by lazy {
+                ApiPreferences.getInstance(context)
+        }
 
-                // 每个部分的行数
-                protected const val PART_SIZE = 200
+        /** Adds line numbers to a string of content. */
+        private fun addLineNumbers(content: String): String {
+                val lines = content.lines()
+                if (lines.isEmpty()) return ""
+                val maxDigits = lines.size.toString().length
+                return lines.mapIndexed { index, line ->
+                        "${(index + 1).toString().padStart(maxDigits, ' ')}| $line"
+                }.joinToString("\n")
+        }
+
+        /** Adds line numbers to a string of content, starting from a specific line number. */
+        private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
+                val lines = content.lines()
+                if (lines.isEmpty()) return ""
+                val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
+                return lines.mapIndexed { index, line ->
+                        "${(startLine + index + 1).toString().padStart(maxDigits, ' ')}| $line"
+                }.joinToString("\n")
         }
 
         /** List files in a directory */
         open suspend fun listFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -67,8 +92,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val directory = File(path)
+                        val directory = File(actualPath)
 
                         if (!directory.exists()) {
                                 return ToolResult(
@@ -154,172 +181,143 @@ open class StandardFileSystemTools(protected val context: Context) {
                         "doc", "docx" -> {
                                 Log.d(
                                         TAG,
-                                        "Detected Word document, attempting to convert to text before reading"
+                                        "Detected Word document, attempting to extract text"
                                 )
                                 val tempFilePath =
                                         "${path}_converted_${System.currentTimeMillis()}.txt"
                                 try {
-                                        val fileConverterTool =
-                                                AITool(
-                                                        name = "convert_file",
-                                                        parameters =
-                                                                listOf(
-                                                                        ToolParameter(
-                                                                                "source_path",
-                                                                                path
-                                                                        ),
-                                                                        ToolParameter(
-                                                                                "target_path",
-                                                                                tempFilePath
-                                                                        )
-                                                                )
-                                                )
-                                        val toolHandler = AIToolHandler.getInstance(context)
-                                        val conversionResult =
-                                                toolHandler.executeTool(fileConverterTool)
+                                        val sourceFile = File(path)
+                                        val tempFile = File(tempFilePath)
+                                        val success = com.ai.assistance.operit.util.DocumentConversionUtil
+                                                .extractTextFromWord(sourceFile, tempFile, fileExt)
 
-                                        if (conversionResult.success) {
+                                        if (success && tempFile.exists()) {
                                                 Log.d(
                                                         TAG,
-                                                        "Successfully converted Word document to text"
+                                                        "Successfully extracted text from Word document"
                                                 )
-                                                val tempFile = File(tempFilePath)
-                                                if (tempFile.exists()) {
-                                                        val content = tempFile.readText()
-                                                        tempFile.delete() // Clean up
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = true,
-                                                                result =
-                                                                        FileContentData(
-                                                                                path = path,
-                                                                                content = content,
-                                                                                size =
-                                                                                        content.length
-                                                                                                .toLong()
-                                                                        ),
-                                                                error = ""
-                                                        )
-                                                } else {
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = false,
-                                                                result = StringResultData(""),
-                                                                error =
-                                                                        "Conversion produced no output."
-                                                        )
-                                                }
+                                                val content = tempFile.readText()
+                                                tempFile.delete() // Clean up
+                                                ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result =
+                                                                FileContentData(
+                                                                        path = path,
+                                                                        content = content,
+                                                                        size = content.length.toLong(),
+                                                                ),
+                                                        error = ""
+                                                )
                                         } else {
                                                 Log.w(
                                                         TAG,
-                                                        "Word conversion failed: ${conversionResult.error}, falling back to raw content"
+                                                        "Word text extraction failed, returning error"
                                                 )
                                                 ToolResult(
                                                         toolName = tool.name,
                                                         success = false,
                                                         result = StringResultData(""),
-                                                        error =
-                                                                "Failed to convert Word document: ${conversionResult.error}"
+                                                        error = "Failed to extract text from Word document"
                                                 )
                                         }
                                 } catch (e: Exception) {
-                                        Log.e(TAG, "Error during Word document conversion", e)
+                                        Log.e(TAG, "Error during Word document text extraction", e)
                                         ToolResult(
                                                 toolName = tool.name,
                                                 success = false,
                                                 result = StringResultData(""),
-                                                error =
-                                                        "Error converting Word document: ${e.message}"
+                                                error = "Error extracting text from Word document: ${e.message}"
                                         )
                                 }
                         }
                         "pdf" -> {
                                 Log.d(
                                         TAG,
-                                        "Detected PDF document, attempting to convert to text before reading"
+                                        "Detected PDF document, attempting to extract text"
                                 )
                                 val tempFilePath =
                                         "${path}_converted_${System.currentTimeMillis()}.txt"
                                 try {
-                                        val fileConverterTool =
-                                                AITool(
-                                                        name = "convert_file",
-                                                        parameters =
-                                                                listOf(
-                                                                        ToolParameter(
-                                                                                "source_path",
-                                                                                path
-                                                                        ),
-                                                                        ToolParameter(
-                                                                                "target_path",
-                                                                                tempFilePath
-                                                                        )
-                                                                )
-                                                )
-                                        val toolHandler = AIToolHandler.getInstance(context)
-                                        val conversionResult =
-                                                toolHandler.executeTool(fileConverterTool)
+                                        val sourceFile = File(path)
+                                        val tempFile = File(tempFilePath)
+                                        val success = com.ai.assistance.operit.util.DocumentConversionUtil
+                                                .extractTextFromPdf(context, sourceFile, tempFile)
 
-                                        if (conversionResult.success) {
+                                        if (success && tempFile.exists()) {
                                                 Log.d(
                                                         TAG,
-                                                        "Successfully converted PDF document to text"
+                                                        "Successfully extracted text from PDF document"
                                                 )
-                                                val tempFile = File(tempFilePath)
-                                                if (tempFile.exists()) {
-                                                        val content = tempFile.readText()
-                                                        tempFile.delete() // Clean up
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = true,
-                                                                result =
-                                                                        FileContentData(
-                                                                                path = path,
-                                                                                content = content,
-                                                                                size =
-                                                                                        content.length
-                                                                                                .toLong()
-                                                                        ),
-                                                                error = ""
-                                                        )
-                                                } else {
-                                                        ToolResult(
-                                                                toolName = tool.name,
-                                                                success = false,
-                                                                result = StringResultData(""),
-                                                                error =
-                                                                        "Conversion produced no output."
-                                                        )
-                                                }
+                                                val content = tempFile.readText()
+                                                tempFile.delete() // Clean up
+                                                ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result =
+                                                                FileContentData(
+                                                                        path = path,
+                                                                        content = content,
+                                                                        size = content.length.toLong(),
+                                                                ),
+                                                        error = ""
+                                                )
                                         } else {
                                                 Log.w(
                                                         TAG,
-                                                        "PDF conversion failed: ${conversionResult.error}, falling back to raw content"
+                                                        "PDF text extraction failed, returning error"
                                                 )
                                                 ToolResult(
                                                         toolName = tool.name,
                                                         success = false,
                                                         result = StringResultData(""),
-                                                        error =
-                                                                "Failed to convert PDF document: ${conversionResult.error}"
+                                                        error = "Failed to extract text from PDF document"
                                                 )
                                         }
                                 } catch (e: Exception) {
-                                        Log.e(TAG, "Error during PDF document conversion", e)
+                                        Log.e(TAG, "Error during PDF document text extraction", e)
                                         ToolResult(
                                                 toolName = tool.name,
                                                 success = false,
                                                 result = StringResultData(""),
-                                                error =
-                                                        "Error converting PDF document: ${e.message}"
+                                                error = "Error extracting text from PDF document: ${e.message}"
                                         )
                                 }
                         }
                         "jpg", "jpeg", "png", "gif", "bmp" -> {
+                                // 获取可选的intent参数
+                                val intent = tool.parameters.find { it.name == "intent" }?.value
+                                
                                 Log.d(
                                         TAG,
-                                        "Detected image file, attempting to extract text using OCR"
+                                        "Detected image file, intent=${intent ?: "无"}"
                                 )
+                                
+                                // 如果提供了intent，使用识图模型
+                                if (!intent.isNullOrBlank()) {
+                                        try {
+                                                val enhancedService = com.ai.assistance.operit.api.chat.EnhancedAIService.getInstance(context)
+                                                val analysisResult = kotlinx.coroutines.runBlocking {
+                                                        enhancedService.analyzeImageWithIntent(path, intent)
+                                                }
+                                                
+                                                return ToolResult(
+                                                        toolName = tool.name,
+                                                        success = true,
+                                                        result = FileContentData(
+                                                                path = path,
+                                                                content = analysisResult,
+                                                                size = analysisResult.length.toLong()
+                                                        ),
+                                                        error = ""
+                                                )
+                                        } catch (e: Exception) {
+                                                Log.e(TAG, "识图模型调用失败，回退到OCR", e)
+                                                // 回退到默认OCR处理
+                                        }
+                                }
+                                
+                                // 默认OCR处理
                                 try {
                                         val bitmap = android.graphics.BitmapFactory.decodeFile(path)
                                         if (bitmap != null) {
@@ -419,6 +417,8 @@ open class StandardFileSystemTools(protected val context: Context) {
          */
         open suspend fun readFileFull(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -428,8 +428,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -455,7 +457,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 return specialReadResult
                         }
 
-                        if (FileUtils.isTextBasedExtension(fileExt)) {
+                        // Check if file is text-like by analyzing content
+                        if (FileUtils.isTextLike(file)) {
                                 val content = file.readText()
                                 return ToolResult(
                                         toolName = tool.name,
@@ -473,7 +476,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                                         toolName = tool.name,
                                         success = false,
                                         result = StringResultData(""),
-                                        error = "Unsupported file format: .$fileExt"
+                                        error = "File does not appear to be a text file. Use specialized tools for binary files."
                                 )
                         }
                 } catch (e: Exception) {
@@ -487,9 +490,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
-        /** Read file content, truncated to MAX_FILE_SIZE_BYTES */
+        /** Read file content, truncated to configured max size */
         open suspend fun readFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -500,8 +504,13 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 try {
-                        val file = File(path)
+                        // 从配置中获取最大文件大小
+                        val maxFileSizeBytes = apiPreferences.getMaxFileSizeBytes()
+                        
+                        val file = File(actualPath)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -531,10 +540,14 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                                 val contentData = fullResult.result as FileContentData
                                 var content = contentData.content
-                                if (content.length > MAX_FILE_SIZE_BYTES) {
-                                        content =
-                                                content.substring(0, MAX_FILE_SIZE_BYTES) +
-                                                        "\n\n... (file content truncated) ..."
+                                val isTruncated = content.length > maxFileSizeBytes
+                                if (isTruncated) {
+                                        content = content.substring(0, maxFileSizeBytes)
+                                }
+
+                                var contentWithLineNumbers = addLineNumbers(content)
+                                if (isTruncated) {
+                                        contentWithLineNumbers += "\n\n... (file content truncated) ..."
                                 }
                                 return ToolResult(
                                         toolName = tool.name,
@@ -542,33 +555,34 @@ open class StandardFileSystemTools(protected val context: Context) {
                                         result =
                                                 FileContentData(
                                                         path = path,
-                                                        content = content,
-                                                        size = content.length.toLong()
+                                                        content = contentWithLineNumbers,
+                                                        size = contentWithLineNumbers.length.toLong()
                                                 ),
                                         error = ""
                                 )
                         }
 
                         // For text-based files, read only the beginning.
-                        if (!FileUtils.isTextBasedExtension(fileExt)) {
+                        // Check if file is text-like by analyzing content
+                        if (!FileUtils.isTextLike(file)) {
                                 return ToolResult(
                                         toolName = tool.name,
                                         success = false,
                                         result = StringResultData(""),
                                         error =
-                                                "Unsupported file format for partial read: .$fileExt. Use readFileFull tool for full content."
+                                                "File does not appear to be a text file. Use readFileFull tool for special file types."
                                 )
                         }
 
                         val content =
                                 file.bufferedReader().use {
-                                        val buffer = CharArray(MAX_FILE_SIZE_BYTES)
-                                        val charsRead = it.read(buffer, 0, MAX_FILE_SIZE_BYTES)
+                                        val buffer = CharArray(maxFileSizeBytes)
+                                        val charsRead = it.read(buffer, 0, maxFileSizeBytes)
                                         if (charsRead > 0) String(buffer, 0, charsRead) else ""
                                 }
 
-                        val truncated = file.length() > MAX_FILE_SIZE_BYTES
-                        var finalContent = content
+                        val truncated = file.length() > maxFileSizeBytes
+                        var finalContent = addLineNumbers(content)
                         if (truncated) {
                                 finalContent += "\n\n... (file content truncated) ..."
                         }
@@ -595,9 +609,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
-        /** 分段读取文件内容，每次读取指定部分（默认每部分200行） */
+        /** 分段读取文件内容，每次读取指定部分（默认每部分从配置中获取） */
         open suspend fun readFilePart(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val partIndex =
                         tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
 
@@ -610,8 +625,13 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        // 从配置中获取分段大小
+                        val partSize = apiPreferences.getPartSize()
+                        
+                        val file = File(actualPath)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -630,12 +650,12 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
                         }
 
-                        val totalParts = (totalLines + PART_SIZE - 1) / PART_SIZE
+                        val totalParts = (totalLines + partSize - 1) / partSize
                         val validPartIndex =
                                 partIndex.coerceIn(0, if (totalParts > 0) totalParts - 1 else 0)
 
-                        val startLine = validPartIndex * PART_SIZE // 0-indexed
-                        val endLine = minOf(startLine + PART_SIZE, totalLines) // exclusive
+                        val startLine = validPartIndex * partSize // 0-indexed
+                        val endLine = minOf(startLine + partSize, totalLines) // exclusive
 
                         val partContent = StringBuilder()
                         if (totalLines > 0) {
@@ -657,13 +677,15 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 }
                         }
 
+                        val contentWithLineNumbers = addLineNumbers(partContent.toString(), startLine, totalLines)
+
                         ToolResult(
                                 toolName = tool.name,
                                 success = true,
                                 result =
                                         FilePartContentData(
                                                 path = path,
-                                                content = partContent.toString(),
+                                                content = contentWithLineNumbers,
                                                 partIndex = validPartIndex,
                                                 totalParts = totalParts,
                                                 startLine = startLine,
@@ -686,6 +708,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Write content to a file */
         open suspend fun writeFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val content = tool.parameters.find { it.name == "content" }?.value ?: ""
                 val append =
                         tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
@@ -705,8 +728,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -811,6 +836,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Write base64 encoded content to a binary file */
         open suspend fun writeFileBinary(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val base64Content = tool.parameters.find { it.name == "base64Content" }?.value ?: ""
 
                 if (path.isBlank()) {
@@ -843,8 +869,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -931,8 +959,11 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Delete a file or directory */
         open suspend fun deleteFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -968,7 +999,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -1066,6 +1097,7 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Check if a file or directory exists */
         open suspend fun fileExists(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1076,8 +1108,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         val exists = file.exists()
 
                         if (!exists) {
@@ -1125,6 +1159,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun moveFile(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1160,8 +1198,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destFile = File(destPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destFile = File(actualDestPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1312,8 +1350,12 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun copyFile(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1332,8 +1374,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destFile = File(destPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destFile = File(actualDestPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1467,9 +1509,12 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Create a directory */
         open suspend fun makeDirectory(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val createParents =
                         tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean()
                                 ?: false
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1487,7 +1532,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val directory = File(path)
+                        val directory = File(actualPath)
 
                         // Check if directory already exists
                         if (directory.exists()) {
@@ -1580,7 +1625,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Search for files matching a pattern */
         open suspend fun findFiles(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank() || pattern.isBlank()) {
                         return ToolResult(
@@ -1597,7 +1645,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val rootDir = File(path)
+                        val rootDir = File(actualPath)
 
                         if (!rootDir.exists() || !rootDir.isDirectory) {
                                 return ToolResult(
@@ -1748,6 +1796,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Get file information */
         open suspend fun fileInfo(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1770,7 +1821,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -1871,6 +1922,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun zipFiles(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
+                val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
 
                 if (sourcePath.isBlank() || zipPath.isBlank()) {
                         return ToolResult(
@@ -1882,8 +1937,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(sourcePath)
-                        val destZipFile = File(zipPath)
+                        val sourceFile = File(actualSourcePath)
+                        val destZipFile = File(actualZipPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1992,6 +2047,10 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun unzipFiles(tool: AITool): ToolResult {
                 val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (zipPath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -2003,8 +2062,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val zipFile = File(zipPath)
-                        val destDir = File(destPath)
+                        val zipFile = File(actualZipPath)
+                        val destDir = File(actualDestPath)
 
                         if (!zipFile.exists()) {
                                 return ToolResult(
@@ -2097,7 +2156,10 @@ open class StandardFileSystemTools(protected val context: Context) {
          */
         open fun applyFile(tool: AITool): Flow<ToolResult> = flow {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val aiGeneratedCode = tool.parameters.find { it.name == "content" }?.value ?: ""
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         emit(
@@ -2138,73 +2200,75 @@ open class StandardFileSystemTools(protected val context: Context) {
                 // 1. 检查文件是否存在
                 val fileExistsResult =
                         fileExists(
-                                AITool(name = "file_exists", parameters = listOf(ToolParameter("path", path)))
+                                AITool(name = "file_exists", parameters = listOf(
+                                        ToolParameter("path", path),
+                                        ToolParameter("environment", environment ?: "")
+                                ))
                         )
 
-                // 如果文件不存在，直接写入内容而不是合并
                 if (!fileExistsResult.success ||
                                 !(fileExistsResult.result as FileExistsData).exists
                 ) {
+                        // 文件不存在，直接创建并写入内容
+                        Log.d(TAG, "File does not exist. Creating new file '$path'...")
                         emit(
-                                ToolResult(
-                                        toolName = tool.name,
-                                        success = true,
-                                        result =
-                                                StringResultData(
-                                                        "File does not exist. Creating new file '$path'..."
-                                                )
-                                )
+                            ToolResult(
+                                toolName = tool.name,
+                                success = true,
+                                result = StringResultData("File does not exist. Creating new file '$path'...")
+                            )
                         )
 
-                        // 直接调用writeFile写入内容
-                        val writeResult =
-                                writeFile(
-                                        AITool(
-                                                name = "write_file",
-                                                parameters =
-                                                        listOf(
-                                                                ToolParameter("path", path),
-                                                                ToolParameter(
-                                                                        "content",
-                                                                        aiGeneratedCode
-                                                                ),
-                                                                ToolParameter("append", "false")
-                                                        )
-                                        )
+                        val writeResult = writeFile(
+                            AITool(
+                                name = "write_file",
+                                parameters = listOf(
+                                    ToolParameter("path", path),
+                                    ToolParameter("content", aiGeneratedCode),
+                                    ToolParameter("environment", environment ?: "")
                                 )
+                            )
+                        )
+
+                        val formattedDiff = FileBindingService.formatNewFileContentAsDiff(aiGeneratedCode)
 
                         if (writeResult.success) {
-                                // 成功写入新文件
-                                val operationData =
-                                        FileOperationData(
-                                                operation = "apply",
-                                                path = path,
-                                                successful = true,
-                                                details = "Successfully created new file with AI code: $path"
-                                        )
-
-                                emit(
-                                        ToolResult(
-                                                toolName = tool.name,
-                                                success = true,
-                                                result =
-                                                        FileApplyResultData(
-                                                                operation = operationData,
-                                                                aiDiffInstructions = aiGeneratedCode
-                                                        ),
-                                                error = ""
-                                        )
+                            emit(
+                                ToolResult(
+                                    toolName = tool.name,
+                                    success = true,
+                                    result = FileOperationData(
+                                        operation = "create",
+                                        path = path,
+                                        successful = true,
+                                        details = "Successfully created new file with AI code: $path\n\n--- AI-Generated Diff ---\n$formattedDiff"
+                                    )
                                 )
+                            )
                         } else {
-                                // 写入失败，返回写入工具的错误
-                                emit(writeResult)
+                            emit(
+                                ToolResult(
+                                    toolName = tool.name,
+                                    success = false,
+                                    result = FileOperationData(
+                                        operation = "create",
+                                        path = path,
+                                        successful = false,
+                                        details = "Failed to create new file: ${writeResult.error}"
+                                    ),
+                                    error = "Failed to create new file: ${writeResult.error}"
+                                )
+                            )
                         }
                         return@flow
                 }
 
                 // 2. 读取原始文件内容
                 val readResult =
-                        readFile(AITool(name = "read_file_full", parameters = listOf(ToolParameter("path", path))))
+                        readFileFull(AITool(name = "read_file_full", parameters = listOf(
+                                ToolParameter("path", path),
+                                ToolParameter("environment", environment ?: "")
+                        )))
 
                 if (!readResult.success) {
                         emit(
@@ -2274,7 +2338,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                                 listOf(
                                                         ToolParameter("path", path),
                                                         ToolParameter("content", mergedContent),
-                                                        ToolParameter("append", "false")
+                                                        ToolParameter("append", "false"),
+                                                        ToolParameter("environment", environment ?: "")
                                                 )
                                 )
                         )
@@ -2307,6 +2372,9 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 details = "Successfully applied AI code to file: $path"
                         )
 
+                // 执行语法检查
+                val syntaxCheckResult = performSyntaxCheck(path, mergedContent)
+
                 emit(
                         ToolResult(
                                 toolName = tool.name,
@@ -2314,7 +2382,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 result =
                                         FileApplyResultData(
                                                 operation = operationData,
-                                                aiDiffInstructions = aiInstructions
+                                                aiDiffInstructions = aiInstructions,
+                                                syntaxCheckResult = syntaxCheckResult
                                         ),
                                 error = ""
                         )
@@ -2343,6 +2412,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun downloadFile(tool: AITool): ToolResult {
                 val url = tool.parameters.find { it.name == "url" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
                 if (url.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -2377,7 +2449,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val destFile = File(destPath)
+                        val destFile = File(actualDestPath)
 
                         // Create parent directory if needed
                         val destParent = destFile.parentFile
@@ -2488,6 +2560,9 @@ open class StandardFileSystemTools(protected val context: Context) {
         /** Open file with system default app */
         open suspend fun openFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2505,7 +2580,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -2579,10 +2654,205 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
+        /** 
+         * Grep代码搜索工具 - 在指定目录中搜索包含指定模式的代码
+         * 依赖 findFiles 和 readFileFull 函数，不直接使用 File 类
+         */
+        open suspend fun grepCode(tool: AITool): ToolResult {
+                val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+                val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value ?: "*"
+                val caseInsensitive = tool.parameters.find { it.name == "case_insensitive" }?.value?.toBoolean() ?: false
+                val contextLines = tool.parameters.find { it.name == "context_lines" }?.value?.toIntOrNull() ?: 3
+                val maxResults = tool.parameters.find { it.name == "max_results" }?.value?.toIntOrNull() ?: 100
+                
+                val actualPath = PathMapper.resolvePath(context, path, environment)
+                
+                if (path.isBlank()) {
+                        return ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Path parameter is required"
+                        )
+                }
+                
+                if (pattern.isBlank()) {
+                        return ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Pattern parameter is required"
+                        )
+                }
+                
+                return try {
+                        // 1. 使用 findFiles 查找所有匹配的文件
+                        val findFilesResult = findFiles(
+                                AITool(
+                                        name = "find_files",
+                                        parameters = listOf(
+                                                ToolParameter("path", actualPath),
+                                                ToolParameter("pattern", filePattern),
+                                                ToolParameter("use_path_pattern", "false"),
+                                                ToolParameter("case_insensitive", "false"),
+                                                ToolParameter("environment", environment ?: "")
+                                        )
+                                )
+                        )
+                        
+                        if (!findFilesResult.success) {
+                                return ToolResult(
+                                        toolName = tool.name,
+                                        success = false,
+                                        result = StringResultData(""),
+                                        error = "Failed to find files: ${findFilesResult.error}"
+                                )
+                        }
+                        
+                        val foundFiles = (findFilesResult.result as FindFilesResultData).files
+                        
+                        if (foundFiles.isEmpty()) {
+                                return ToolResult(
+                                        toolName = tool.name,
+                                        success = true,
+                                        result = GrepResultData(
+                                                searchPath = path,
+                                                pattern = pattern,
+                                                matches = emptyList(),
+                                                totalMatches = 0,
+                                                filesSearched = 0
+                                        ),
+                                        error = ""
+                                )
+                        }
+                        
+                        // 2. 创建正则表达式用于匹配
+                        val regex = if (caseInsensitive) {
+                                Regex(pattern, RegexOption.IGNORE_CASE)
+                        } else {
+                                Regex(pattern)
+                        }
+                        
+                        // 3. 遍历每个文件，搜索匹配的行
+                        val fileMatches = mutableListOf<GrepResultData.FileMatch>()
+                        var totalMatches = 0
+                        var filesSearched = 0
+                        
+                        for (filePath in foundFiles) {
+                                if (totalMatches >= maxResults) {
+                                        break
+                                }
+                                
+                                filesSearched++
+                                
+                                // 读取文件内容
+                                val readResult = readFileFull(
+                                        AITool(
+                                                name = "read_file_full",
+                                                parameters = listOf(ToolParameter("path", filePath))
+                                        )
+                                )
+                                
+                                if (!readResult.success) {
+                                        // 如果读取失败（可能是二进制文件或权限问题），跳过该文件
+                                        continue
+                                }
+                                
+                                val fileContent = (readResult.result as FileContentData).content
+                                val lines = fileContent.lines()
+                                val lineMatches = mutableListOf<GrepResultData.LineMatch>()
+                                
+                                // 搜索每一行
+                                lines.forEachIndexed { index, line ->
+                                        if (regex.containsMatchIn(line)) {
+                                                val lineNumber = index + 1
+                                                
+                                                // 获取上下文（前后几行）
+                                                val context = if (contextLines > 0) {
+                                                        val startIdx = maxOf(0, index - contextLines)
+                                                        val endIdx = minOf(lines.size - 1, index + contextLines)
+                                                        lines.subList(startIdx, endIdx + 1).joinToString("\n")
+                                                } else {
+                                                        null
+                                                }
+                                                
+                                                lineMatches.add(
+                                                        GrepResultData.LineMatch(
+                                                                lineNumber = lineNumber,
+                                                                lineContent = line.trim(),
+                                                                matchContext = context
+                                                        )
+                                                )
+                                                
+                                                totalMatches++
+                                                
+                                                if (totalMatches >= maxResults) {
+                                                        return@forEachIndexed
+                                                }
+                                        }
+                                }
+                                
+                                // 如果该文件有匹配，添加到结果中
+                                if (lineMatches.isNotEmpty()) {
+                                        fileMatches.add(
+                                                GrepResultData.FileMatch(
+                                                        filePath = filePath,
+                                                        lineMatches = lineMatches
+                                                )
+                                        )
+                                }
+                        }
+                        
+                        // 4. 返回结果
+                        ToolResult(
+                                toolName = tool.name,
+                                success = true,
+                                result = GrepResultData(
+                                        searchPath = path,
+                                        pattern = pattern,
+                                        matches = fileMatches.take(20), // 最多显示20个文件
+                                        totalMatches = totalMatches,
+                                        filesSearched = filesSearched
+                                ),
+                                error = ""
+                        )
+                        
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error performing grep search", e)
+                        ToolResult(
+                                toolName = tool.name,
+                                success = false,
+                                result = StringResultData(""),
+                                error = "Error performing grep search: ${e.message}"
+                        )
+                }
+        }
+
+        /**
+         * 执行语法检查
+         * @param filePath 文件路径
+         * @param content 文件内容
+         * @return 语法检查结果的字符串表示，如果不支持该文件类型则返回null
+         */
+        protected fun performSyntaxCheck(filePath: String, content: String): String? {
+                return try {
+                        val result = SyntaxCheckUtil.checkSyntax(filePath, content)
+                        result?.toString()
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error performing syntax check", e)
+                        "Syntax check failed: ${e.message}"
+                }
+        }
+
         /** Share file via system share dialog */
         open suspend fun shareFile(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val title = tool.parameters.find { it.name == "title" }?.value ?: "Share File"
+
+                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2600,7 +2870,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(path)
+                        val file = File(actualPath)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,

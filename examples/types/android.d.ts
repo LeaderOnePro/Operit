@@ -122,8 +122,8 @@ export const enum IntentAction {
     ACTION_MEDIA_PREVIOUS = "android.intent.action.MEDIA_PREVIOUS",
     ACTION_MUSIC_PLAYER = "android.intent.action.MUSIC_PLAYER",
     ACTION_CAMERA_BUTTON = "android.intent.action.CAMERA_BUTTON",
-    ACTION_IMAGE_CAPTURE = "android.intent.action.IMAGE_CAPTURE",
-    ACTION_VIDEO_CAPTURE = "android.intent.action.VIDEO_CAPTURE",
+    ACTION_IMAGE_CAPTURE = "android.media.action.IMAGE_CAPTURE",
+    ACTION_VIDEO_CAPTURE = "android.media.action.VIDEO_CAPTURE",
 
     // Communication actions
     ACTION_ANSWER = "android.intent.action.ANSWER",

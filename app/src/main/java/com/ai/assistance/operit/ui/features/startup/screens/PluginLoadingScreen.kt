@@ -79,7 +79,8 @@ data class PluginInfo(
         val id: String,
         val displayName: String,
         var status: PluginStatus = PluginStatus.WAITING,
-        var message: String = ""
+        var message: String = "",
+        var serviceName: String = ""
 ) {
     val shortName: String
         get() = id.split("/").lastOrNull() ?: id
@@ -469,8 +470,7 @@ class PluginLoadingState {
     // 跳过加载事件回调
     private var onSkipCallback: (() -> Unit)? = null
 
-    // 插件加载完成事件回调
-    private var onPluginsLoadedCallback: ((List<String>) -> Unit)? = null
+
 
     // 设置应用上下文
     fun setAppContext(context: Context) {
@@ -541,6 +541,27 @@ class PluginLoadingState {
         }
     }
 
+    /** 更新插件注册状态 */
+    fun updatePluginRegistration(pluginId: String, serviceName: String, success: Boolean) {
+        val currentPlugins = _plugins.value.toMutableList()
+        val pluginIndex = currentPlugins.indexOfFirst { it.id == pluginId }
+
+        if (pluginIndex >= 0) {
+            val plugin = currentPlugins[pluginIndex]
+            val message = if (success) {
+                appContext?.getString(R.string.plugin_registered) ?: "已注册"
+            } else {
+                appContext?.getString(R.string.plugin_registration_failed) ?: "注册失败"
+            }
+            currentPlugins[pluginIndex] = plugin.copy(
+                serviceName = serviceName,
+                // 不要改变主状态，只更新消息
+                message = message
+            )
+            _plugins.value = currentPlugins
+        }
+    }
+
     /** 开始加载指定插件 */
     fun startLoadingPlugin(pluginId: String) {
         updatePluginStatus(
@@ -573,10 +594,7 @@ class PluginLoadingState {
         onSkipCallback = callback
     }
 
-    // 设置插件加载完成回调
-    fun setOnPluginsLoadedCallback(callback: (List<String>) -> Unit) {
-        onPluginsLoadedCallback = callback
-    }
+
 
     // 触发跳过操作
     fun skip() {
@@ -657,12 +675,7 @@ class PluginLoadingState {
                     // 获取MCPRepository实例
                     val mcpRepository = MCPRepository(context)
 
-                    // 设置回调，以便在插件成功加载后注册其工具
-                    setOnPluginsLoadedCallback { successfulPluginIds ->
-                        Log.d("PluginLoadingState", "所有插件加载完成，开始注册 ${successfulPluginIds.size} 个插件的工具...")
-                        mcpRepository.registerToolsForLoadedPlugins(successfulPluginIds)
-                        Log.d("PluginLoadingState", "工具注册流程已触发")
-                    }
+                    // 注意：工具注册现在在MCPStarter的验证阶段进行，确保插件真正就绪后才注册工具
 
                     // 获取已安装的插件列表 (这是一个Set<String>)
                     updateMessage(context.getString(R.string.plugin_loading_list))
@@ -683,12 +696,26 @@ class PluginLoadingState {
                         return@launch
                     }
 
-                    // 设置插件列表，传入List<String>
+                    // 筛选出将要启动的插件（已启用且满足条件的插件）
+                    val pluginsToStart = installedPluginsList.filter { pluginId ->
+                        val isEnabled = mcpLocalServer.isServerEnabled(pluginId)
+                        if (!isEnabled) {
+                            false
+                        } else {
+                            val pluginInfo = mcpRepository.getInstalledPluginInfo(pluginId)
+                            when (pluginInfo?.type) {
+                                "remote" -> true // 远程插件只需启用
+                                else -> true // 本地插件现在会自动部署，所以也包含在内
+                            }
+                        }
+                    }
+
+                    // 设置插件列表，只传入将要启动的插件
                     updateMessage(
-                            context.getString(R.string.plugin_preparing, installedPluginsList.size)
+                            context.getString(R.string.plugin_preparing, pluginsToStart.size)
                     )
                     updateProgress(0.32f)
-                    setPlugins(installedPluginsList)
+                    setPlugins(pluginsToStart)
 
                     // 有安装的插件，使用MCPStarter启动
                     updateMessage(context.getString(R.string.plugin_checking_env))
@@ -718,7 +745,7 @@ class PluginLoadingState {
 
                     // 延迟后隐藏
                     lifecycleScope.launch {
-                        delay(5000)
+                        delay(3000)
                         if (isVisible.value) {
                             hide()
                         }
@@ -731,7 +758,7 @@ class PluginLoadingState {
 
                 // 延迟一会儿后如果用户未跳过，则自动隐藏进度条
                 lifecycleScope.launch {
-                    delay(5000) // 等待5秒
+                    delay(3000) // 等待3秒
                     if (isVisible.value) {
                         hide()
                     }
@@ -749,8 +776,7 @@ class PluginLoadingState {
         return object : MCPStarter.PluginStartProgressListener {
             override fun onPluginStarting(pluginId: String, index: Int, total: Int) {
                 // 在这里检查插件是否被启用
-                val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-                val isEnabled = serverStatus?.isEnabled != false // 默认为true
+                val isEnabled = mcpLocalServer.isServerEnabled(pluginId) // 从配置读取
 
                 // 更新总体状态
                 val disabledSuffix =
@@ -763,10 +789,17 @@ class PluginLoadingState {
                                 disabledSuffix
                         )
                 )
-                updateProgress(0.4f + 0.6f * (index.toFloat() / total))
+                updateProgress(0.4f + 0.1f * (index.toFloat() / total)) // 注册占10% (0.4 -> 0.5)
 
                 // 更新特定插件状态
                 startLoadingPlugin(pluginId)
+            }
+
+            override fun onPluginRegistered(pluginId: String, serviceName: String, success: Boolean) {
+                updatePluginRegistration(pluginId, serviceName, success)
+                if (!success) {
+                    setPluginFailed(pluginId, context.getString(R.string.plugin_registration_failed))
+                }
             }
 
             override fun onPluginStarted(
@@ -779,11 +812,11 @@ class PluginLoadingState {
                 if (success) {
                     setPluginSuccess(pluginId)
                 } else {
-                    setPluginFailed(pluginId)
+                    setPluginFailed(pluginId, context.getString(R.string.plugin_verification_failed))
                 }
 
                 // 更新总体进度
-                updateProgress(0.4f + 0.6f * (index.toFloat() / total))
+                updateProgress(0.5f + 0.5f * (index.toFloat() / total)) // 验证和处理占50% (0.5 -> 1.0)
             }
 
             override fun onAllPluginsStarted(
@@ -793,12 +826,6 @@ class PluginLoadingState {
             ) {
                 // 根据初始化状态显示不同的消息
                 when (status) {
-                    MCPStarter.PluginInitStatus.TERMUX_NOT_RUNNING -> {
-                        updateMessage(context.getString(R.string.plugin_termux_not_running))
-                    }
-                    MCPStarter.PluginInitStatus.TERMUX_NOT_AUTHORIZED -> {
-                        updateMessage(context.getString(R.string.plugin_termux_not_authorized))
-                    }
                     MCPStarter.PluginInitStatus.NODEJS_MISSING -> {
                         updateMessage(context.getString(R.string.plugin_nodejs_missing))
                     }
@@ -817,13 +844,7 @@ class PluginLoadingState {
                                     0 // 当没有部署的插件时，成功率为0
                                 }
 
-                        // 触发插件加载完成的回调
-                        if (status == MCPStarter.PluginInitStatus.SUCCESS && successCount > 0) {
-                            val successfulPlugins = _plugins.value
-                                .filter { it.status == PluginStatus.SUCCESS }
-                                .map { it.id }
-                            onPluginsLoadedCallback?.invoke(successfulPlugins)
-                        }
+                        // 工具注册将在验证阶段自动进行，无需在此处触发
 
                         // 如果有插件加载失败，则特别提示可以跳过
                         if (successCount < totalCount && totalCount > 0) {
@@ -846,7 +867,7 @@ class PluginLoadingState {
                 updateProgress(1.0f)
 
                 // 对于错误状态，延长显示时间让用户看清消息
-                val delayTime = if (status != MCPStarter.PluginInitStatus.SUCCESS) 5000L else 3000L
+                val delayTime = if (status != MCPStarter.PluginInitStatus.SUCCESS) 3000L else 100L
 
                 // 延迟一会儿后隐藏进度条
                 lifecycleScope.launch {

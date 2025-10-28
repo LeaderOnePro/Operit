@@ -6,6 +6,7 @@ import com.ai.assistance.operit.core.tools.HttpResponseData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -34,7 +35,11 @@ class StandardHttpTools(private val context: Context) {
         private const val TAG = "HttpTools"
         private const val USER_AGENT =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        private const val MAX_RESPONSE_SIZE_BYTES =  126 * 1024 // 1MB
+    }
+
+    // ApiPreferences 实例，用于动态获取配置
+    private val apiPreferences: ApiPreferences by lazy {
+        ApiPreferences.getInstance(context)
     }
 
     // 内存中的Cookie存储
@@ -300,8 +305,11 @@ class StandardHttpTools(private val context: Context) {
             // 检查响应大小和类型，防止下载大文件
             val contentType = response.header("Content-Type") ?: ""
             val contentLength = response.header("Content-Length")?.toLongOrNull() ?: -1L
+            
+            // 从配置中获取最大响应大小
+            val maxResponseSizeBytes = apiPreferences.getMaxHttpResponseLength()
 
-            if (contentLength > MAX_RESPONSE_SIZE_BYTES) {
+            if (contentLength > maxResponseSizeBytes) {
                 response.body?.close()
                 return ToolResult(
                     toolName = tool.name,
@@ -718,8 +726,11 @@ class StandardHttpTools(private val context: Context) {
             // 检查响应大小和类型，防止下载大文件
             val contentType = response.header("Content-Type") ?: ""
             val contentLength = response.header("Content-Length")?.toLongOrNull() ?: -1L
+            
+            // 从配置中获取最大响应大小
+            val maxResponseSizeBytes = apiPreferences.getMaxHttpResponseLength()
 
-            if (contentLength > MAX_RESPONSE_SIZE_BYTES) {
+            if (contentLength > maxResponseSizeBytes) {
                 response.body?.close()
                 return ToolResult(
                     toolName = tool.name,

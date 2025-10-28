@@ -18,9 +18,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 /**
@@ -40,7 +45,6 @@ class MCPLocalServer private constructor(private val context: Context) {
         
         // 配置文件名称
         private const val MCP_CONFIG_FILE = "mcp_config.json"
-        private const val PLUGIN_METADATA_FILE = "plugin_metadata.json"
         private const val SERVER_STATUS_FILE = "server_status.json"
         
         // 默认目录名称
@@ -57,6 +61,8 @@ class MCPLocalServer private constructor(private val context: Context) {
                     }
         }
     }
+
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // 持久化配置
     private val prefs: SharedPreferences =
@@ -81,7 +87,6 @@ class MCPLocalServer private constructor(private val context: Context) {
 
     // 配置文件路径
     private val mcpConfigFile get() = File(configBaseDir, MCP_CONFIG_FILE)
-    private val pluginMetadataFile get() = File(configBaseDir, PLUGIN_METADATA_FILE)
     private val serverStatusFile get() = File(configBaseDir, SERVER_STATUS_FILE)
 
     // 服务路径
@@ -92,9 +97,10 @@ class MCPLocalServer private constructor(private val context: Context) {
     private val _mcpConfig = MutableStateFlow(MCPConfig())
     val mcpConfig: StateFlow<MCPConfig> = _mcpConfig.asStateFlow()
 
-    // 插件元数据
-    private val _pluginMetadata = MutableStateFlow<Map<String, PluginMetadata>>(emptyMap())
-    val pluginMetadata: StateFlow<Map<String, PluginMetadata>> = _pluginMetadata.asStateFlow()
+    // 插件元数据 - 现在从MCPConfig派生
+    val pluginMetadata: StateFlow<Map<String, PluginMetadata>> = _mcpConfig
+        .map { it.pluginMetadata.toMap() }
+        .stateIn(coroutineScope, SharingStarted.Eagerly, emptyMap())
 
     // 服务器状态
     private val _serverStatus = MutableStateFlow<Map<String, ServerStatus>>(emptyMap())
@@ -118,29 +124,29 @@ class MCPLocalServer private constructor(private val context: Context) {
     @Serializable
     data class MCPConfig(
         @SerializedName("mcpServers")
-        val mcpServers: MutableMap<String, ServerConfig> = mutableMapOf()
+        val mcpServers: MutableMap<String, ServerConfig> = mutableMapOf(),
+        @SerializedName("pluginMetadata")
+        val pluginMetadata: MutableMap<String, PluginMetadata> = mutableMapOf()
     ) {
         @Serializable
         data class ServerConfig(
             @SerializedName("command")
             val command: String,
             @SerializedName("args")
-            val args: List<String> = emptyList(),
+            val args: List<String>? = emptyList(),
             @SerializedName("disabled")
             val disabled: Boolean = false,
             @SerializedName("autoApprove")
-            val autoApprove: List<String> = emptyList(),
+            val autoApprove: List<String>? = emptyList(),
             @SerializedName("env")
-            val env: Map<String, String> = emptyMap(),
-            // 扩展字段，用于存储额外信息，使用String存储JSON
-            @SerializedName("metadata")
-            val metadata: String = "{}"
+            val env: Map<String, String>? = emptyMap()
         )
     }
 
     /**
      * 插件元数据
      */
+    @Serializable
     data class PluginMetadata(
         @SerializedName("id")
         val id: String,
@@ -148,44 +154,47 @@ class MCPLocalServer private constructor(private val context: Context) {
         val name: String,
         @SerializedName("description")
         val description: String,
-        @SerializedName("version")
-        val version: String = "1.0.0",
-        @SerializedName("author")
-        val author: String = "Unknown",
-        @SerializedName("category")
-        val category: String = "General",
-        @SerializedName("requiresApiKey")
-        val requiresApiKey: Boolean = false,
-        @SerializedName("isVerified")
-        val isVerified: Boolean = false,
         @SerializedName("logoUrl")
         val logoUrl: String? = null,
-        @SerializedName("repoUrl")
-        val repoUrl: String = "",
+        @SerializedName("author")
+        val author: String = "Unknown",
+        @SerializedName("isInstalled")
+        val isInstalled: Boolean = false,
+        @SerializedName("version")
+        val version: String = "",
+        @SerializedName("updatedAt")
+        val updatedAt: String = "",
         @SerializedName("longDescription")
         val longDescription: String = "",
+        @SerializedName("repoUrl")
+        val repoUrl: String = "",
+        // 新增字段以支持远程服务
         @SerializedName("type")
-        val type: String = "local", // local, remote
+        val type: String = "local", // "local" or "remote"
         @SerializedName("endpoint")
         val endpoint: String? = null,
         @SerializedName("connectionType")
         val connectionType: String? = "httpStream",
+        // 本地安装相关字段
         @SerializedName("installedPath")
         val installedPath: String? = null,
         @SerializedName("installedTime")
-        val installedTime: Long = System.currentTimeMillis()
+        val installedTime: Long = System.currentTimeMillis(),
+        // 市场配置（来自 GitHub Issue）
+        @SerializedName("marketConfig")
+        val marketConfig: String? = null
     )
 
     /**
      * 服务器运行状态
+     * 注意：启用/禁用状态已移至ServerConfig.disabled字段
      */
+    @Serializable
     data class ServerStatus(
         @SerializedName("serverId")
         val serverId: String,
         @SerializedName("active")
         val active: Boolean = false,
-        @SerializedName("isEnabled")
-        val isEnabled: Boolean = true,
         @SerializedName("lastStartTime")
         val lastStartTime: Long = 0L,
         @SerializedName("lastStopTime")
@@ -195,10 +204,39 @@ class MCPLocalServer private constructor(private val context: Context) {
         @SerializedName("lastDeployTime")
         val lastDeployTime: Long = 0L,
         @SerializedName("errorMessage")
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        @SerializedName("cachedTools")
+        val cachedTools: List<CachedToolInfo>? = null,
+        @SerializedName("toolsCachedTime")
+        val toolsCachedTime: Long = 0L
+    )
+
+    /**
+     * 缓存的工具信息
+     */
+    @Serializable
+    data class CachedToolInfo(
+        @SerializedName("name")
+        val name: String,
+        @SerializedName("description")
+        val description: String = "",
+        @SerializedName("inputSchema")
+        val inputSchema: String = "{}", // JSON字符串形式的schema
+        @SerializedName("cachedAt")
+        val cachedAt: Long = System.currentTimeMillis()
     )
 
     // ==================== 配置文件操作 ====================
+    
+    /**
+     * 重新加载配置文件（用于用户手动编辑配置后刷新）
+     */
+    suspend fun reloadConfigurations() {
+        withContext(Dispatchers.IO) {
+            loadAllConfigurations()
+            Log.d(TAG, "配置已重新加载")
+        }
+    }
 
     /**
      * 加载所有配置文件
@@ -209,15 +247,18 @@ class MCPLocalServer private constructor(private val context: Context) {
             if (mcpConfigFile.exists()) {
                 val configJson = mcpConfigFile.readText()
                 val config = gson.fromJson(configJson, MCPConfig::class.java) ?: MCPConfig()
-                _mcpConfig.value = config
-            }
-
-            // 加载插件元数据
-            if (pluginMetadataFile.exists()) {
-                val metadataJson = pluginMetadataFile.readText()
-                val typeToken = object : TypeToken<Map<String, PluginMetadata>>() {}.type
-                val metadata = gson.fromJson<Map<String, PluginMetadata>>(metadataJson, typeToken) ?: emptyMap()
-                _pluginMetadata.value = metadata
+                
+                // 自动为 mcpServers 中存在但 pluginMetadata 中缺失的服务器创建默认元数据
+                val updatedConfig = autoFillMissingMetadata(config)
+                _mcpConfig.value = updatedConfig
+                
+                // 如果有新增的元数据，保存配置
+                if (updatedConfig.pluginMetadata.size > config.pluginMetadata.size) {
+                    coroutineScope.launch {
+                        saveMCPConfig()
+                        Log.d(TAG, "自动创建了 ${updatedConfig.pluginMetadata.size - config.pluginMetadata.size} 个缺失的插件元数据")
+                    }
+                }
             }
 
             // 加载服务器状态
@@ -227,10 +268,90 @@ class MCPLocalServer private constructor(private val context: Context) {
                 val status = gson.fromJson<Map<String, ServerStatus>>(statusJson, typeToken) ?: emptyMap()
                 _serverStatus.value = status
             }
+            
+            // 为新配置的服务器初始化状态
+            initializeMissingServerStatus()
 
-            Log.d(TAG, "配置加载完成 - MCP服务器: ${_mcpConfig.value.mcpServers.size}, 插件元数据: ${_pluginMetadata.value.size}")
+            Log.d(TAG, "配置加载完成 - MCP服务器: ${_mcpConfig.value.mcpServers.size}, 插件元数据: ${_mcpConfig.value.pluginMetadata.size}")
         } catch (e: Exception) {
             Log.e(TAG, "加载配置时出错", e)
+        }
+    }
+    
+    /**
+     * 自动为缺失的服务器创建默认元数据
+     */
+    private fun autoFillMissingMetadata(config: MCPConfig): MCPConfig {
+        val newMetadata = config.pluginMetadata.toMutableMap()
+        var hasNewMetadata = false
+        
+        config.mcpServers.forEach { (serverId, serverConfig) ->
+            if (!newMetadata.containsKey(serverId)) {
+                // 从 serverId 生成友好的显示名称
+                val displayName = serverId
+                    .replace("_", " ")
+                    .replace("-", " ")
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+                
+                // 创建默认元数据
+                val metadata = PluginMetadata(
+                    id = serverId,
+                    name = displayName,
+                    description = "",
+                    logoUrl = null,
+                    author = "Unknown",
+                    isInstalled = true,
+                    version = "1.0.0",
+                    updatedAt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                    longDescription = "通过配置文件自动识别的 MCP 服务器",
+                    repoUrl = "",
+                    type = "local",
+                    endpoint = null,
+                    connectionType = "httpStream"
+                )
+                
+                newMetadata[serverId] = metadata
+                hasNewMetadata = true
+                Log.d(TAG, "自动创建元数据: $serverId -> $displayName")
+            }
+        }
+        
+        return if (hasNewMetadata) {
+            config.copy(pluginMetadata = newMetadata)
+        } else {
+            config
+        }
+    }
+    
+    /**
+     * 为新配置的服务器初始化状态
+     */
+    private fun initializeMissingServerStatus() {
+        val currentStatus = _serverStatus.value.toMutableMap()
+        var hasNewStatus = false
+        
+        _mcpConfig.value.mcpServers.forEach { (serverId, _) ->
+            if (!currentStatus.containsKey(serverId)) {
+                currentStatus[serverId] = ServerStatus(
+                    serverId = serverId,
+                    active = false,
+                    lastStartTime = 0L,
+                    lastStopTime = 0L,
+                    deploySuccess = false,
+                    lastDeployTime = 0L,
+                    errorMessage = null
+                )
+                hasNewStatus = true
+                Log.d(TAG, "初始化服务器状态: $serverId")
+            }
+        }
+        
+        if (hasNewStatus) {
+            _serverStatus.value = currentStatus
+            coroutineScope.launch {
+                saveServerStatus()
+            }
         }
     }
 
@@ -244,19 +365,6 @@ class MCPLocalServer private constructor(private val context: Context) {
             Log.d(TAG, "MCP配置已保存")
         } catch (e: Exception) {
             Log.e(TAG, "保存MCP配置时出错", e)
-        }
-    }
-
-    /**
-     * 保存插件元数据
-     */
-    suspend fun savePluginMetadata() {
-        try {
-            val metadataJson = gson.toJson(_pluginMetadata.value)
-            pluginMetadataFile.writeText(metadataJson)
-            Log.d(TAG, "插件元数据已保存")
-        } catch (e: Exception) {
-            Log.e(TAG, "保存插件元数据时出错", e)
         }
     }
 
@@ -281,22 +389,22 @@ class MCPLocalServer private constructor(private val context: Context) {
     suspend fun addOrUpdateMCPServer(
         serverId: String,
         command: String,
-        args: List<String> = emptyList(),
-        env: Map<String, String> = emptyMap(),
+        args: List<String>? = emptyList(),
+        env: Map<String, String>? = emptyMap(),
         disabled: Boolean = false,
-        autoApprove: List<String> = emptyList(),
-        metadata: Map<String, Any> = emptyMap()
+        autoApprove: List<String>? = emptyList()
     ) {
-        val config = _mcpConfig.value
-        config.mcpServers[serverId] = MCPConfig.ServerConfig(
-            command = command,
-            args = args,
-            disabled = disabled,
-            autoApprove = autoApprove,
-            env = env,
-            metadata = gson.toJson(metadata) // 将Map<String, Any>转换为JSON字符串
-        )
-        _mcpConfig.value = config
+        _mcpConfig.update { currentConfig ->
+            val newServers = currentConfig.mcpServers.toMutableMap()
+            newServers[serverId] = MCPConfig.ServerConfig(
+                command = command,
+                args = args ?: emptyList(),
+                disabled = disabled,
+                autoApprove = autoApprove ?: emptyList(),
+                env = env ?: emptyMap()
+            )
+            currentConfig.copy(mcpServers = newServers)
+        }
         saveMCPConfig()
         Log.d(TAG, "MCP服务器配置已更新: $serverId")
     }
@@ -305,9 +413,11 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 删除MCP服务器配置
      */
     suspend fun removeMCPServer(serverId: String) {
-        val config = _mcpConfig.value
-        config.mcpServers.remove(serverId)
-        _mcpConfig.value = config
+        _mcpConfig.update { currentConfig ->
+            val newServers = currentConfig.mcpServers.toMutableMap()
+            newServers.remove(serverId)
+            currentConfig.copy(mcpServers = newServers)
+        }
         saveMCPConfig()
 
         // 同时清理相关的元数据和状态
@@ -316,6 +426,73 @@ class MCPLocalServer private constructor(private val context: Context) {
         
         Log.d(TAG, "MCP服务器配置已删除: $serverId")
     }
+
+    /**
+     * 合并JSON配置到现有配置
+     */
+    suspend fun mergeConfigFromJson(jsonConfig: String): Result<Int> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "开始合并配置，输入长度: ${jsonConfig.length}")
+                Log.d(TAG, "配置内容预览: ${jsonConfig.take(200)}")
+                
+                val parsedConfig = try {
+                    gson.fromJson(jsonConfig, MCPConfig::class.java)
+                } catch (e: Exception) {
+                    Log.e(TAG, "JSON 解析失败", e)
+                    return@withContext Result.failure(Exception("JSON 格式错误: ${e.message}"))
+                }
+                
+                if (parsedConfig?.mcpServers == null) {
+                    Log.e(TAG, "配置解析结果为 null 或 mcpServers 字段为 null")
+                    return@withContext Result.failure(Exception("配置中没有找到 mcpServers 字段"))
+                }
+                
+                if (parsedConfig.mcpServers.isEmpty()) {
+                    Log.e(TAG, "mcpServers 为空")
+                    return@withContext Result.failure(Exception("配置中 mcpServers 为空"))
+                }
+                
+                Log.d(TAG, "解析到 ${parsedConfig.mcpServers.size} 个服务器配置")
+                parsedConfig.mcpServers.forEach { (serverId, serverConfig) ->
+                    Log.d(TAG, "服务器: $serverId, command: ${serverConfig.command}, args: ${serverConfig.args}")
+                }
+                
+                var addedCount = 0
+                _mcpConfig.update { currentConfig ->
+                    val newServers = currentConfig.mcpServers.toMutableMap()
+                    parsedConfig.mcpServers.forEach { (serverId, serverConfig) ->
+                        newServers[serverId] = serverConfig
+                        addedCount++
+                        Log.d(TAG, "添加服务器配置: $serverId")
+                    }
+                    currentConfig.copy(mcpServers = newServers)
+                }
+                
+                Log.d(TAG, "自动填充缺失的元数据")
+                val updatedConfig = autoFillMissingMetadata(_mcpConfig.value)
+                _mcpConfig.value = updatedConfig
+                
+                Log.d(TAG, "保存配置文件")
+                saveMCPConfig()
+                
+                Log.d(TAG, "初始化服务器状态")
+                initializeMissingServerStatus()
+                
+                Log.i(TAG, "成功合并 $addedCount 个服务器配置")
+                Result.success(addedCount)
+            } catch (e: Exception) {
+                Log.e(TAG, "合并配置失败: ${e.message}", e)
+                e.printStackTrace()
+                Result.failure(Exception("合并配置失败: ${e.message}"))
+            }
+        }
+    }
+
+    /**
+     * 获取配置文件路径
+     */
+    fun getConfigFilePath(): String = mcpConfigFile.absolutePath
 
     /**
      * 获取MCP服务器配置
@@ -337,10 +514,12 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 添加或更新插件元数据
      */
     suspend fun addOrUpdatePluginMetadata(metadata: PluginMetadata) {
-        val currentMetadata = _pluginMetadata.value.toMutableMap()
-        currentMetadata[metadata.id] = metadata
-        _pluginMetadata.value = currentMetadata
-        savePluginMetadata()
+        _mcpConfig.update { currentConfig ->
+            val newMetadata = currentConfig.pluginMetadata.toMutableMap()
+            newMetadata[metadata.id] = metadata
+            currentConfig.copy(pluginMetadata = newMetadata)
+        }
+        saveMCPConfig()
         Log.d(TAG, "插件元数据已更新: ${metadata.id} - ${metadata.name}")
     }
 
@@ -348,10 +527,12 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 删除插件元数据
      */
     suspend fun removePluginMetadata(pluginId: String) {
-        val currentMetadata = _pluginMetadata.value.toMutableMap()
-        currentMetadata.remove(pluginId)
-        _pluginMetadata.value = currentMetadata
-        savePluginMetadata()
+        _mcpConfig.update { currentConfig ->
+            val newMetadata = currentConfig.pluginMetadata.toMutableMap()
+            newMetadata.remove(pluginId)
+            currentConfig.copy(pluginMetadata = newMetadata)
+        }
+        saveMCPConfig()
         Log.d(TAG, "插件元数据已删除: $pluginId")
     }
 
@@ -359,36 +540,38 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 获取插件元数据
      */
     fun getPluginMetadata(pluginId: String): PluginMetadata? {
-        return _pluginMetadata.value[pluginId]
+        return _mcpConfig.value.pluginMetadata[pluginId]
     }
 
     /**
      * 获取所有插件元数据
      */
     fun getAllPluginMetadata(): Map<String, PluginMetadata> {
-        return _pluginMetadata.value.toMap()
+        return _mcpConfig.value.pluginMetadata.toMap()
     }
 
     // ==================== 服务器状态管理 ====================
 
     /**
      * 更新服务器状态
+     * 注意：启用/禁用状态请使用 setServerEnabled() 方法
      */
     suspend fun updateServerStatus(
         serverId: String,
         active: Boolean? = null,
-        isEnabled: Boolean? = null,
         deploySuccess: Boolean? = null,
-        errorMessage: String? = null
+        errorMessage: String? = null,
+        cachedTools: List<CachedToolInfo>? = null
     ) {
         val currentStatus = _serverStatus.value.toMutableMap()
         val existingStatus = currentStatus[serverId] ?: ServerStatus(serverId)
         
         val updatedStatus = existingStatus.copy(
             active = active ?: existingStatus.active,
-            isEnabled = isEnabled ?: existingStatus.isEnabled,
             deploySuccess = deploySuccess ?: existingStatus.deploySuccess,
             errorMessage = errorMessage ?: existingStatus.errorMessage,
+            cachedTools = cachedTools ?: existingStatus.cachedTools,
+            toolsCachedTime = if (cachedTools != null) System.currentTimeMillis() else existingStatus.toolsCachedTime,
             lastStartTime = if (active == true) System.currentTimeMillis() else existingStatus.lastStartTime,
             lastStopTime = if (active == false) System.currentTimeMillis() else existingStatus.lastStopTime,
             lastDeployTime = if (deploySuccess == true) System.currentTimeMillis() else existingStatus.lastDeployTime
@@ -398,6 +581,39 @@ class MCPLocalServer private constructor(private val context: Context) {
         _serverStatus.value = currentStatus
         saveServerStatus()
         Log.d(TAG, "服务器状态已更新: $serverId")
+    }
+
+    /**
+     * 缓存服务器的工具列表
+     */
+    suspend fun cacheServerTools(serverId: String, tools: List<CachedToolInfo>) {
+        updateServerStatus(serverId = serverId, cachedTools = tools)
+        Log.d(TAG, "已缓存服务器 $serverId 的 ${tools.size} 个工具")
+    }
+
+    /**
+     * 获取缓存的工具列表
+     */
+    fun getCachedTools(serverId: String): List<CachedToolInfo>? {
+        return _serverStatus.value[serverId]?.cachedTools
+    }
+
+    /**
+     * 检查工具缓存是否有效 (有效期1天)
+     */
+    fun hasValidToolCache(serverId: String): Boolean {
+        val status = _serverStatus.value[serverId] ?: return false
+        
+        val cachedTools = status.cachedTools
+        val cacheTime = status.toolsCachedTime
+        
+        if (cachedTools.isNullOrEmpty() || cacheTime <= 0) {
+            return false
+        }
+        
+        // 缓存有效期为1天
+        val oneDayInMillis = 24 * 60 * 60 * 1000L
+        return (System.currentTimeMillis() - cacheTime) < oneDayInMillis
     }
 
     /**
@@ -425,6 +641,32 @@ class MCPLocalServer private constructor(private val context: Context) {
         return _serverStatus.value.toMap()
     }
 
+    /**
+     * 检查服务器是否启用
+     * 从MCP配置的disabled字段读取，默认为启用（disabled=false或不存在）
+     */
+    fun isServerEnabled(serverId: String): Boolean {
+        val serverConfig = getMCPServer(serverId)
+        return serverConfig?.disabled != true // disabled为true表示禁用，其他情况均为启用
+    }
+
+    /**
+     * 设置服务器启用状态
+     * 修改MCP配置的disabled字段
+     */
+    suspend fun setServerEnabled(serverId: String, enabled: Boolean) {
+        val serverConfig = getMCPServer(serverId) ?: return
+        addOrUpdateMCPServer(
+            serverId = serverId,
+            command = serverConfig.command,
+            args = serverConfig.args ?: emptyList(),
+            env = serverConfig.env ?: emptyMap(),
+            disabled = !enabled,
+            autoApprove = serverConfig.autoApprove ?: emptyList()
+        )
+        Log.d(TAG, "服务器启用状态已更新: $serverId, enabled=$enabled")
+    }
+
     // ==================== 兼容性方法 ====================
 
     /**
@@ -449,16 +691,26 @@ class MCPLocalServer private constructor(private val context: Context) {
      * 保存插件配置（兼容旧接口）
      *
      * @param pluginId 插件ID
-     * @param config 配置内容JSON字符串
+     * @param config 配置内容JSON字符串，可以是完整的MCPConfig或单个ServerConfig
      * @return 是否保存成功
      */
     suspend fun savePluginConfig(pluginId: String, config: String): Boolean {
         return try {
-            // 尝试解析为ServerConfig
-            val serverConfig = gson.fromJson(config, MCPConfig.ServerConfig::class.java)
-            val currentConfig = _mcpConfig.value
-            currentConfig.mcpServers[pluginId] = serverConfig
-            _mcpConfig.value = currentConfig
+            // 先尝试解析为完整的MCPConfig（getPluginConfig返回的格式）
+            val serverConfig = try {
+                val fullConfig = gson.fromJson(config, MCPConfig::class.java)
+                // 如果包含mcpServers且有对应的pluginId，使用该配置
+                fullConfig.mcpServers[pluginId] ?: throw Exception("No server config found for $pluginId")
+            } catch (e: Exception) {
+                // 如果失败，尝试直接解析为ServerConfig
+                gson.fromJson(config, MCPConfig.ServerConfig::class.java)
+            }
+            
+            _mcpConfig.update { currentConfig ->
+                val newServers = currentConfig.mcpServers.toMutableMap()
+                newServers[pluginId] = serverConfig
+                currentConfig.copy(mcpServers = newServers)
+            }
             saveMCPConfig()
             true
         } catch (e: Exception) {
@@ -475,7 +727,6 @@ class MCPLocalServer private constructor(private val context: Context) {
     fun exportConfigAsJson(): String {
         val exportData = mapOf(
             "mcpConfig" to _mcpConfig.value,
-            "pluginMetadata" to _pluginMetadata.value,
             "serverStatus" to _serverStatus.value,
             "exportTime" to System.currentTimeMillis(),
             "version" to "1.0"
@@ -496,14 +747,6 @@ class MCPLocalServer private constructor(private val context: Context) {
                 val mcpConfig = gson.fromJson(configJson, MCPConfig::class.java)
                 _mcpConfig.value = mcpConfig
                 saveMCPConfig()
-            }
-            
-            importData["pluginMetadata"]?.let { metadata ->
-                val metadataJson = gson.toJson(metadata)
-                val typeToken2 = object : TypeToken<Map<String, PluginMetadata>>() {}.type
-                val pluginMetadata = gson.fromJson<Map<String, PluginMetadata>>(metadataJson, typeToken2)
-                _pluginMetadata.value = pluginMetadata
-                savePluginMetadata()
             }
             
             importData["serverStatus"]?.let { status ->
@@ -533,7 +776,7 @@ class MCPLocalServer private constructor(private val context: Context) {
     suspend fun cleanupInvalidConfigurations() {
         try {
             // 清理不存在的插件配置
-            val validPluginIds = _pluginMetadata.value.keys
+            val validPluginIds = _mcpConfig.value.pluginMetadata.keys
             val mcpConfig = _mcpConfig.value
             val serversToRemove = mcpConfig.mcpServers.keys.filter { it !in validPluginIds }
             

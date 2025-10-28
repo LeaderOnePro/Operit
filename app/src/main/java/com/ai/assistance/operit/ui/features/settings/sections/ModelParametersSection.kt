@@ -216,6 +216,21 @@ fun ModelParametersSection(
                                     isCustom = true
                                 )
                             }
+                            ParameterValueType.OBJECT -> {
+                ModelParameter(
+                                    id = customParam.id,
+                                    name = customParam.name,
+                                    apiName = customParam.apiName,
+                                    description = customParam.description,
+                                    defaultValue = customParam.defaultValue,
+                                    currentValue = customParam.currentValue,
+                                    isEnabled = customParam.isEnabled,
+                                    valueType = ParameterValueType.OBJECT,
+                                    category =
+                                    ParameterCategory.valueOf(customParam.category),
+                                    isCustom = true
+                                )
+                            }
                         }
                     paramList.add(param)
                 }
@@ -253,6 +268,10 @@ fun ModelParametersSection(
                                 val boolParam = p as ModelParameter<Boolean>
                                 boolParam.copy(currentValue = newValue as Boolean)
                             }
+                            ParameterValueType.OBJECT -> {
+                                val objParam = p as ModelParameter<String>
+                                objParam.copy(currentValue = newValue as String)
+                            }
                         }
                     } else {
                         p
@@ -286,6 +305,10 @@ fun ModelParametersSection(
                             ParameterValueType.BOOLEAN -> {
                                 val boolParam = p as ModelParameter<Boolean>
                                 boolParam.copy(isEnabled = isEnabled)
+                            }
+                            ParameterValueType.OBJECT -> {
+                                val objParam = p as ModelParameter<String>
+                                objParam.copy(isEnabled = isEnabled)
                             }
                         }
                     } else {
@@ -332,6 +355,13 @@ fun ModelParametersSection(
                                     val boolParam = param as ModelParameter<Boolean>
                                     boolParam.copy(
                                             currentValue = boolParam.defaultValue,
+                                            isEnabled = false
+                                    )
+                                }
+                                ParameterValueType.OBJECT -> {
+                                    val objParam = param as ModelParameter<String>
+                                    objParam.copy(
+                                            currentValue = objParam.defaultValue,
                                             isEnabled = false
                                     )
                                 }
@@ -453,6 +483,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -484,6 +515,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -510,6 +542,7 @@ fun ModelParametersSection(
                             },
                             onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                             onEditClick = { /* Not needed for standard parameters */ },
+                            onDeleteClick = { },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
                                 if (error != null) {
@@ -534,6 +567,13 @@ fun ModelParametersSection(
                         onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
                         onEditClick = {
                             parameterToEdit = modelParameterToCustomParameterData(parameter)
+                        },
+                        onDeleteClick = {
+                            scope.launch {
+                                val updatedParameters = parameters.filterNot { it.id == parameter.id }
+                                parameters = updatedParameters
+                                configManager.updateParameters(config.id, updatedParameters)
+                            }
                         },
                             error = parameterErrors[parameter.id],
                             onErrorChange = { error ->
@@ -651,6 +691,21 @@ private fun convertCustomParameterDataToModelParameter(
                 isCustom = true
             )
         }
+
+        ParameterValueType.OBJECT -> {
+            ModelParameter(
+                id = customParam.id,
+                name = customParam.name,
+                apiName = customParam.apiName,
+                description = customParam.description,
+                defaultValue = customParam.defaultValue,
+                currentValue = customParam.currentValue,
+                isEnabled = customParam.isEnabled,
+                valueType = ParameterValueType.OBJECT,
+                category = ParameterCategory.valueOf(customParam.category),
+                isCustom = true
+            )
+        }
     }
 }
 
@@ -672,6 +727,7 @@ private fun modelParameterToCustomParameterData(
         category = param.category.name
     )
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -731,6 +787,7 @@ private fun AddCustomParameterDialog(
     val mustBeIntegerText = stringResource(R.string.must_be_integer)
     val mustBeFloatText = stringResource(R.string.must_be_float)
     val mustBeBooleanText = stringResource(R.string.must_be_boolean)
+    val mustBeJsonText = stringResource(R.string.must_be_valid_json)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -791,6 +848,7 @@ private fun AddCustomParameterDialog(
                                         ParameterValueType.FLOAT -> "0.0"
                                         ParameterValueType.STRING -> ""
                                         ParameterValueType.BOOLEAN -> "true"
+                                        ParameterValueType.OBJECT -> "{}"
                                     }
                                 }
                             )
@@ -802,7 +860,21 @@ private fun AddCustomParameterDialog(
                 // Default Value - 总是显示
                 OutlinedTextField(
                     value = defaultValue,
-                    onValueChange = { defaultValue = it },
+                    onValueChange = {
+                        defaultValue = it
+                        // 实时校验 JSON 格式（仅在对象类型时）
+                        if (valueType == ParameterValueType.OBJECT) {
+                            val isValid = try {
+                                Json.parseToJsonElement(it)
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+                            defaultValueError = if (isValid) null else mustBeJsonText
+                        } else {
+                            defaultValueError = null
+                        }
+                    },
                     label = { Text(parameterDefaultValueText) },
                     isError = defaultValueError != null,
                     modifier = Modifier.fillMaxWidth()
@@ -874,34 +946,36 @@ private fun AddCustomParameterDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Category Dropdown
-                    ExposedDropdownMenuBox(
+                }
+
+                // Category Dropdown - 创建/编辑均显示
+                Spacer(modifier = Modifier.height(8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = categoryExpanded,
+                    onExpandedChange = { categoryExpanded = !categoryExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = category.toDisplayString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(parameterCategoryText) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
                         expanded = categoryExpanded,
-                        onExpandedChange = { categoryExpanded = !categoryExpanded }
+                        onDismissRequest = { categoryExpanded = false }
                     ) {
-                        OutlinedTextField(
-                            value = category.toDisplayString(),
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(parameterCategoryText) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = categoryExpanded,
-                            onDismissRequest = { categoryExpanded = false }
-                        ) {
-                            ParameterCategory.values().forEach { cat ->
-                                DropdownMenuItem(
-                                    text = { Text(cat.toDisplayString()) },
-                                    onClick = {
-                                        category = cat
-                                        categoryExpanded = false
-                                    }
-                                )
-                            }
+                        ParameterCategory.values().forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat.toDisplayString()) },
+                                onClick = {
+                                    category = cat
+                                    categoryExpanded = false
+                                }
+                            )
                         }
                     }
                 }
@@ -964,6 +1038,18 @@ private fun AddCustomParameterDialog(
                         ParameterValueType.STRING -> {
                             // No validation needed for string
                         }
+                        ParameterValueType.OBJECT -> {
+                            val isValid = try {
+                                kotlinx.serialization.json.Json.parseToJsonElement(defaultValue)
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+                            if (!isValid) {
+                                defaultValueError = mustBeJsonText
+                                hasError = true
+                            }
+                        }
                     }
 
                     if (hasError) return@Button
@@ -999,6 +1085,7 @@ private fun ParameterValueType.toDisplayString(): String {
         ParameterValueType.FLOAT -> stringResource(R.string.value_type_float)
         ParameterValueType.STRING -> stringResource(R.string.value_type_string)
         ParameterValueType.BOOLEAN -> stringResource(R.string.value_type_boolean)
+        ParameterValueType.OBJECT -> stringResource(R.string.value_type_object)
     }
 }
 
@@ -1040,11 +1127,13 @@ private fun ParameterItem(
         onValueChange: (Any) -> Unit,
         onToggle: (Boolean) -> Unit,
         onEditClick: () -> Unit,
+        onDeleteClick: () -> Unit,
         error: String? = null,
         onErrorChange: (String?) -> Unit
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     
     val valueText = stringResource(R.string.parameter_value)
     val rangeFormatText = stringResource(R.string.parameter_range_format)
@@ -1111,6 +1200,14 @@ private fun ParameterItem(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                    IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_action),
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
 
                 // 展开/收起按钮
@@ -1126,6 +1223,27 @@ private fun ParameterItem(
                     )
                 }
             }
+        }
+
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text(stringResource(R.string.confirm_delete)) },
+                text = { Text(parameter.name) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDeleteConfirm = false
+                        onDeleteClick()
+                    }) {
+                        Text(stringResource(R.string.delete_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
         }
 
         // 参数值设置（仅在展开时显示）
@@ -1236,6 +1354,34 @@ private fun ParameterItem(
                                     onCheckedChange = { onValueChange(it) }
                             )
                         }
+                    }
+                    ParameterValueType.OBJECT -> {
+                        val objParam = parameter as ModelParameter<String>
+                        var textValue by remember { mutableStateOf(objParam.currentValue) }
+                        val mustBeJsonTextLocal = stringResource(R.string.must_be_valid_json)
+                        OutlinedTextField(
+                                value = textValue,
+                                onValueChange = {
+                                    textValue = it
+                                    // 实时校验 JSON
+                                    val isValid = try {
+                                        Json.parseToJsonElement(it)
+                                        true
+                                    } catch (e: Exception) {
+                                        false
+                                    }
+                                    onErrorChange(if (isValid) null else mustBeJsonTextLocal)
+                                    onValueChange(it)
+                                },
+                                isError = error != null,
+                                supportingText = { if (error != null) Text(error) },
+                                label = { Text(valueText) },
+                                modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(120.dp),
+                                singleLine = false,
+                                maxLines = 6
+                        )
                     }
                 }
 

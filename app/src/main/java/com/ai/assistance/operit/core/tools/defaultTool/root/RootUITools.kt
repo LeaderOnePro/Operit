@@ -1,48 +1,36 @@
 package com.ai.assistance.operit.core.tools.defaultTool.root
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import com.ai.assistance.operit.core.tools.SimplifiedUINode
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.UIActionResultData
+import com.ai.assistance.operit.core.tools.UIPageResultData
 import com.ai.assistance.operit.core.tools.defaultTool.admin.AdminUITools
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
-import java.util.Random
-import kotlin.random.Random as KotlinRandom
+import java.io.StringReader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 
-/** Root级别的UI工具，使用底层事件注入实现UI操作 这个实现使用直接的设备节点操作，比标准input命令更难被检测 */
+/**
+ * Root-level UI tools that use shell commands (uiautomator, input) for robust UI automation.
+ * This implementation is modeled after DebuggerUITools but operates without accessibility fallbacks.
+ */
 open class RootUITools(context: Context) : AdminUITools(context) {
 
     companion object {
         private const val TAG = "RootUITools"
-
-        // 设备路径
-        private const val INPUT_DEVICES_PATH = "/dev/input"
-
-        // 触摸事件类型
-        private const val EV_SYN = 0
-        private const val EV_KEY = 1
-        private const val EV_ABS = 3
-
-        // 触摸事件代码
-        private const val SYN_REPORT = 0
-        private const val BTN_TOUCH = 330
-        private const val ABS_MT_TRACKING_ID = 57
-        private const val ABS_MT_POSITION_X = 53
-        private const val ABS_MT_POSITION_Y = 54
-        private const val ABS_MT_PRESSURE = 58
-        private const val ABS_MT_TOUCH_MAJOR = 48
-
-        // 随机器，用于添加人类操作的随机性
-        private val random = Random()
     }
 
-    // 缓存触摸设备路径
-    private var touchDevicePath: String? = null
-
-    /** 使用底层事件发送点击操作 这种方法绕过了Android的input命令，更难被检测 */
+    /** Performs a tap action using the 'input tap' shell command. */
     override suspend fun tap(tool: AITool): ToolResult {
         val x = tool.parameters.find { it.name == "x" }?.value?.toIntOrNull()
         val y = tool.parameters.find { it.name == "y" }?.value?.toIntOrNull()
@@ -52,102 +40,58 @@ open class RootUITools(context: Context) : AdminUITools(context) {
                     toolName = tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error =
-                            "Missing or invalid coordinates. Both 'x' and 'y' must be valid integers."
+                error = "Missing or invalid coordinates. Both 'x' and 'y' must be valid integers."
             )
         }
 
-        // 显示点击反馈
-        operationOverlay.showTap(x, y)
+        withContext(Dispatchers.Main) { operationOverlay.showTap(x, y) }
 
         try {
-            // 获取触摸设备
-            val devicePath = findTouchDevice()
-            if (devicePath == null) {
-                Log.d(TAG, "No touch device found, falling back to standard input")
-                return super.tap(tool)
-            }
+            Log.d(TAG, "Attempting to tap at coordinates: ($x, $y) via shell command")
+            val command = "input tap $x $y"
+            val result = AndroidShellExecutor.executeShellCommand(command)
 
-            // 生成一个唯一的跟踪ID
-            val trackingId = (System.currentTimeMillis() % 65536).toInt()
-
-            // 添加小量随机偏移，模拟人类触摸的不精确性
-            val randX = x + KotlinRandom.nextInt(-2, 3)
-            val randY = y + KotlinRandom.nextInt(-2, 3)
-
-            // 构建触摸事件序列，模拟真实人类触摸
-            val touchEvents = buildString {
-                // 按下事件
-                append("sendevent $devicePath $EV_ABS $ABS_MT_TRACKING_ID $trackingId\n")
-                append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_X $randX\n")
-                append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_Y $randY\n")
-
-                // 随机压力和接触面积
-                val pressure = KotlinRandom.nextInt(40, 61)
-                val touchMajor = KotlinRandom.nextInt(5, 11)
-                append("sendevent $devicePath $EV_ABS $ABS_MT_PRESSURE $pressure\n")
-                append("sendevent $devicePath $EV_ABS $ABS_MT_TOUCH_MAJOR $touchMajor\n")
-
-                // 按下按钮
-                append("sendevent $devicePath $EV_KEY $BTN_TOUCH 1\n")
-                append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-                // 添加随机短暂停顿，模拟人类手指在屏幕上短暂停留
-                append("sleep 0.${KotlinRandom.nextInt(8, 20)}\n")
-
-                // 微小移动，进一步模拟真实触摸
-                val microMoveX = randX + KotlinRandom.nextInt(-1, 2)
-                val microMoveY = randY + KotlinRandom.nextInt(-1, 2)
-                append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_X $microMoveX\n")
-                append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_Y $microMoveY\n")
-                append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-                // 另一个短暂停顿
-                append("sleep 0.${KotlinRandom.nextInt(5, 15)}\n")
-
-                // 抬起事件
-                append("sendevent $devicePath $EV_ABS $ABS_MT_TRACKING_ID -1\n") // -1表示释放跟踪ID
-                append("sendevent $devicePath $EV_KEY $BTN_TOUCH 0\n")
-                append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-            }
-
-            // 执行触摸事件序列
-            Log.d(TAG, "Executing low-level touch events at ($randX, $randY)")
-            val result = AndroidShellExecutor.executeShellCommand(touchEvents)
-
-            if (result.success) {
-                return ToolResult(
+            return if (result.success) {
+                Log.d(TAG, "Tap successful at coordinates: ($x, $y)")
+                ToolResult(
                         toolName = tool.name,
                         success = true,
                         result =
                                 UIActionResultData(
                                         actionType = "tap",
-                                        actionDescription =
-                                                "Executed low-level touch events at ($x, $y) via direct device injection",
+                            actionDescription = "Successfully tapped at ($x, $y) via shell command",
                                         coordinates = Pair(x, y)
-                                ),
-                        error = ""
+                        )
                 )
             } else {
-                operationOverlay.hide()
-                Log.e(TAG, "Low-level tap failed: ${result.stderr}")
-                return super.tap(tool)
+                Log.e(TAG, "Tap failed at coordinates: ($x, $y), error: ${result.stderr}")
+                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Failed to tap at ($x, $y): ${result.stderr ?: "Unknown error"}"
+                )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error executing low-level tap", e)
-            operationOverlay.hide()
-            return super.tap(tool)
+            Log.e(TAG, "Error tapping at coordinates ($x, $y)", e)
+            withContext(Dispatchers.Main) { operationOverlay.hide() }
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Error tapping at coordinates: ${e.message ?: "Unknown exception"}"
+            )
         }
     }
 
-    /** 使用底层事件实现滑动操作 生成更多中间点，添加随机微扰动和不规则的时间间隔 */
+    /** Performs a swipe action using the 'input swipe' shell command. */
     override suspend fun swipe(tool: AITool): ToolResult {
         val startX = tool.parameters.find { it.name == "start_x" }?.value?.toIntOrNull()
         val startY = tool.parameters.find { it.name == "start_y" }?.value?.toIntOrNull()
         val endX = tool.parameters.find { it.name == "end_x" }?.value?.toIntOrNull()
         val endY = tool.parameters.find { it.name == "end_y" }?.value?.toIntOrNull()
         val duration = tool.parameters.find { it.name == "duration" }?.value?.toIntOrNull() ?: 300
-        val steps = tool.parameters.find { it.name == "steps" }?.value?.toIntOrNull() ?: 10
 
         if (startX == null || startY == null || endX == null || endY == null) {
             return ToolResult(
@@ -159,306 +103,410 @@ open class RootUITools(context: Context) : AdminUITools(context) {
             )
         }
 
-        // 显示滑动反馈
-        operationOverlay.showSwipe(startX, startY, endX, endY)
+        withContext(Dispatchers.Main) { operationOverlay.showSwipe(startX, startY, endX, endY) }
 
         try {
-            val devicePath = findTouchDevice()
-            if (devicePath == null) {
-                Log.d(TAG, "No touch device found, falling back to standard swipe")
-                return super.swipe(tool)
-            }
+            Log.d(TAG, "Swiping from ($startX, $startY) to ($endX, $endY) via shell")
+            val command = "input swipe $startX $startY $endX $endY $duration"
+            val result = AndroidShellExecutor.executeShellCommand(command)
 
-            // 生成唯一跟踪ID
-            val trackingId = (System.currentTimeMillis() % 65536).toInt()
-
-            // 计算每步时间间隔（添加轻微的随机性）
-            val baseStepDuration = duration / steps.toFloat()
-
-            // 构建滑动事件序列
-            val swipeEvents = StringBuilder()
-
-            // 添加更多的中间点，使路径更自然（真实人类不会完全直线滑动）
-            val actualSteps = steps * 2 // 增加步数，让动作更流畅
-
-            // 按下事件
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_TRACKING_ID $trackingId\n")
-
-            // 初始压力和接触面积（随机值）
-            val initialPressure = KotlinRandom.nextInt(40, 61)
-            val initialTouchMajor = KotlinRandom.nextInt(5, 11)
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_PRESSURE $initialPressure\n")
-            swipeEvents.append(
-                    "sendevent $devicePath $EV_ABS $ABS_MT_TOUCH_MAJOR $initialTouchMajor\n"
-            )
-
-            // 初始位置（添加轻微随机性）
-            val initialX = startX + KotlinRandom.nextInt(-2, 3)
-            val initialY = startY + KotlinRandom.nextInt(-2, 3)
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_X $initialX\n")
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_Y $initialY\n")
-
-            // 按下按钮
-            swipeEvents.append("sendevent $devicePath $EV_KEY $BTN_TOUCH 1\n")
-            swipeEvents.append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-            // 短暂停顿，模拟人类手指接触屏幕后的微小停顿
-            swipeEvents.append("sleep 0.${KotlinRandom.nextInt(8, 15)}\n")
-
-            // 生成滑动路径
-            for (i in 1 until actualSteps) {
-                val progress = i.toFloat() / actualSteps
-
-                // 计算基础位置
-                val baseX = startX + ((endX - startX) * progress).toInt()
-                val baseY = startY + ((endY - startY) * progress).toInt()
-
-                // 添加微小随机偏移，模拟人类手指抖动
-                val randX = baseX + KotlinRandom.nextInt(-3, 4)
-                val randY = baseY + KotlinRandom.nextInt(-3, 4)
-
-                // 随机变化压力和接触面积（人类滑动时这些值会略微变化）
-                val pressureChange = KotlinRandom.nextInt(-5, 6)
-                val pressure = (initialPressure + pressureChange).coerceIn(35, 65)
-                swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_PRESSURE $pressure\n")
-
-                // 每隔几步更新一次接触面积
-                if (i % 3 == 0) {
-                    val touchMajorChange = KotlinRandom.nextInt(-2, 3)
-                    val touchMajor = (initialTouchMajor + touchMajorChange).coerceIn(4, 12)
-                    swipeEvents.append(
-                            "sendevent $devicePath $EV_ABS $ABS_MT_TOUCH_MAJOR $touchMajor\n"
-                    )
-                }
-
-                // 更新位置
-                swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_X $randX\n")
-                swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_Y $randY\n")
-                swipeEvents.append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-                // 添加不均匀的时间间隔，模拟人类滑动的不均匀性
-                val randomFactor = KotlinRandom.nextFloat() * 0.4f + 0.8f // 0.8到1.2之间
-                val stepTime = (baseStepDuration * randomFactor / 2).coerceAtLeast(1f)
-                swipeEvents.append("sleep %.3f\n".format(stepTime / 1000))
-            }
-
-            // 最终位置（添加轻微随机性）
-            val finalX = endX + KotlinRandom.nextInt(-2, 3)
-            val finalY = endY + KotlinRandom.nextInt(-2, 3)
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_X $finalX\n")
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_POSITION_Y $finalY\n")
-            swipeEvents.append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-            // 短暂停顿，模拟人类手指在最终位置的微小停顿
-            swipeEvents.append("sleep 0.${KotlinRandom.nextInt(5, 12)}\n")
-
-            // 抬起事件
-            swipeEvents.append("sendevent $devicePath $EV_ABS $ABS_MT_TRACKING_ID -1\n")
-            swipeEvents.append("sendevent $devicePath $EV_KEY $BTN_TOUCH 0\n")
-            swipeEvents.append("sendevent $devicePath $EV_SYN $SYN_REPORT 0\n")
-
-            // 执行滑动事件序列
-            Log.d(TAG, "Executing low-level swipe events from ($startX, $startY) to ($endX, $endY)")
-            val result = AndroidShellExecutor.executeShellCommand(swipeEvents.toString())
-
-            if (result.success) {
-                return ToolResult(
+            return if (result.success) {
+                Log.d(TAG, "Swipe successful")
+                ToolResult(
                         toolName = tool.name,
                         success = true,
                         result =
                                 UIActionResultData(
                                         actionType = "swipe",
-                                        actionDescription =
-                                                "Executed low-level swipe from ($startX, $startY) to ($endX, $endY) via direct device injection",
-                                        coordinates = Pair(startX, startY)
-                                ),
-                        error = ""
+                            actionDescription = "Successfully swiped from ($startX, $startY) to ($endX, $endY)"
+                        )
                 )
             } else {
-                operationOverlay.hide()
-                Log.e(TAG, "Low-level swipe failed: ${result.stderr}")
-                return super.swipe(tool)
+                Log.e(TAG, "Swipe failed: ${result.stderr}")
+                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Failed to perform swipe: ${result.stderr ?: "Unknown error"}"
+                )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error executing low-level swipe", e)
-            operationOverlay.hide()
-            return super.swipe(tool)
+            Log.e(TAG, "Error performing swipe", e)
+            withContext(Dispatchers.Main) { operationOverlay.hide() }
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Error performing swipe: ${e.message ?: "Unknown exception"}"
+            )
         }
     }
 
-    /** 使用底层键盘事件注入实现按键功能 更接近于人类按键，添加随机延迟和可变压力 */
-    override suspend fun pressKey(tool: AITool): ToolResult {
-        val keyCode = tool.parameters.find { it.name == "key_code" }?.value
-        val longPress =
-                tool.parameters.find { it.name == "long_press" }?.value?.toBoolean() ?: false
+    /** Clicks a UI element by finding it via uiautomator dump. */
+    override suspend fun clickElement(tool: AITool): ToolResult {
+        val resourceId = tool.parameters.find { it.name == "resourceId" }?.value
+        val className = tool.parameters.find { it.name == "className" }?.value
+        val contentDesc = tool.parameters.find { it.name == "contentDesc" }?.value
+        val bounds = tool.parameters.find { it.name == "bounds" }?.value
 
-        if (keyCode == null) {
+        if (resourceId == null && className == null && bounds == null && contentDesc == null) {
             return ToolResult(
                     toolName = tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error = "Missing 'key_code' parameter."
+                error =
+                    "Missing element identifier. Provide at least one of: 'resourceId', 'className', 'contentDesc', or 'bounds'."
             )
         }
 
-        // 直接调用父类实现
-        return super.pressKey(tool)
+        if (bounds != null) {
+            extractCenterCoordinates(bounds)?.let { (x, y) ->
+                val tapTool = AITool("tap", listOf(ToolParameter("x", x.toString()), ToolParameter("y", y.toString())))
+                return tap(tapTool)
+            }
+                ?: return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Invalid bounds format. Should be: [left,top][right,bottom]"
+                )
+        }
+
+        return clickElementWithUiautomator(tool)
     }
 
-    /** 通过低级事件实现文本输入，更真实地模拟人类打字 */
+    /** Sets input text by clearing the field and pasting from the clipboard. */
     override suspend fun setInputText(tool: AITool): ToolResult {
         val text = tool.parameters.find { it.name == "text" }?.value ?: ""
 
         try {
-            // 首先清除当前文本
-            // 由于清除动作较复杂，使用标准命令
-            Log.d(TAG, "Clearing existing text")
-            val clearCommand =
-                    "input keyevent KEYCODE_MOVE_HOME && input keyevent --longpress KEYCODE_DEL"
-            val clearResult = AndroidShellExecutor.executeShellCommand(clearCommand)
-
-            if (!clearResult.success) {
-                Log.e(TAG, "Failed to clear text: ${clearResult.stderr}")
+            val displayMetrics = context.resources.displayMetrics
+            withContext(Dispatchers.Main) {
+                operationOverlay.showTextInput(displayMetrics.widthPixels / 2, displayMetrics.heightPixels / 2, text)
             }
 
-            // 短暂延迟
-            delay(KotlinRandom.nextLong(200, 500))
+            Log.d(TAG, "Clearing text field with KEYCODE_CLEAR")
+            AndroidShellExecutor.executeShellCommand("input keyevent KEYCODE_CLEAR")
+            delay(300)
 
-            // 如果文本为空，只需清除字段
             if (text.isEmpty()) {
                 return ToolResult(
                         toolName = tool.name,
                         success = true,
-                        result =
-                                UIActionResultData(
-                                        actionType = "textInput",
-                                        actionDescription = "Successfully cleared input field"
-                                ),
-                        error = ""
+                    result = UIActionResultData("textInput", "Successfully cleared input field")
                 )
             }
 
-            // 获取屏幕中心作为文本输入的位置（用于UI反馈）
-            val displayMetrics = context.resources.displayMetrics
-            val centerX = displayMetrics.widthPixels / 2
-            val centerY = displayMetrics.heightPixels / 2
-
-            // 显示文本输入反馈
-            operationOverlay.showTextInput(centerX, centerY, text)
-
-            // 回退方法：使用standard input命令，但添加随机延迟模拟人类打字
-            Log.d(TAG, "Using text input method with human-like delays")
-
-            // 对于较长文本或复杂文本，使用分段输入
-            val segments = text.chunked(10)
-
-            for (segment in segments) {
-                val escapedSegment =
-                        segment.replace(" ", "%s").replace("'", "\\'").replace("\"", "\\\"")
-                val segmentCommand = "input text '$escapedSegment'"
-                val segmentResult = AndroidShellExecutor.executeShellCommand(segmentCommand)
-
-                if (!segmentResult.success) {
-                    operationOverlay.hide()
-                    return ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result = StringResultData(""),
-                            error =
-                                    "Failed to input text: ${segmentResult.stderr ?: "Unknown error"}"
-                    )
-                }
-
-                // 在文本块之间添加随机延迟，模拟人类思考或停顿
-                if (segments.size > 1) {
-                    delay(KotlinRandom.nextLong(200, 800))
-                }
+            Log.d(TAG, "Setting text to clipboard and pasting via ADB: $text")
+            withContext(Dispatchers.Main) {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("operit_input", text))
             }
+            delay(100)
 
-            return ToolResult(
+            val pasteResult = AndroidShellExecutor.executeShellCommand("input keyevent KEYCODE_PASTE")
+            return if (pasteResult.success) {
+                ToolResult(
                     toolName = tool.name,
                     success = true,
                     result =
                             UIActionResultData(
-                                    actionType = "textInput",
-                                    actionDescription =
-                                            "Successfully input text with human-like delays: $text"
-                            ),
-                    error = ""
-            )
+                            "textInput",
+                            "Successfully set input text to: $text via clipboard paste"
+                        )
+                )
+            } else {
+                withContext(Dispatchers.Main) { operationOverlay.hide() }
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Failed to paste text: ${pasteResult.stderr ?: "Unknown error"}"
+                )
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error setting input text", e)
-            operationOverlay.hide()
-
-            // 最后的后备方法 - 直接使用标准input
-            return super.setInputText(tool)
+            withContext(Dispatchers.Main) { operationOverlay.hide() }
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Error setting input text: ${e.message ?: "Unknown exception"}"
+            )
         }
     }
 
-    /** 使用更难被检测的方法点击UI元素 */
-    override suspend fun clickElement(tool: AITool): ToolResult {
-        val resourceId = tool.parameters.find { it.name == "resourceId" }?.value
-        val className = tool.parameters.find { it.name == "className" }?.value
-        val bounds = tool.parameters.find { it.name == "bounds" }?.value
+    /** Executes a key press using the 'input keyevent' shell command. */
+    override suspend fun pressKey(tool: AITool): ToolResult {
+        val keyCode = tool.parameters.find { it.name == "key_code" }?.value
+            ?: return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Missing 'key_code' parameter."
+            )
 
-        if (resourceId == null && className == null && bounds == null) {
+        try {
+            val result = AndroidShellExecutor.executeShellCommand("input keyevent $keyCode")
+            return if (result.success) {
+                ToolResult(
+                    toolName = tool.name,
+                    success = true,
+                    result = UIActionResultData("keyPress", "Successfully pressed key: $keyCode")
+                )
+            } else {
+                ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Failed to press key: ${result.stderr ?: "Unknown error"}"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pressing key", e)
             return ToolResult(
                     toolName = tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error =
-                            "Missing element identifier. Provide at least one of: 'resourceId', 'className', or 'bounds'."
+                error = "Error pressing key: ${e.message ?: "Unknown exception"}"
             )
         }
-
-        // 使用父类的方法进行点击
-        return super.clickElement(tool)
     }
 
-    /** 通过root权限获取更详细的UI层次结构 */
+    /** Gets page info using uiautomator dump and dumpsys. */
     override suspend fun getPageInfo(tool: AITool): ToolResult {
-        // 使用父类的实现
-        return super.getPageInfo(tool)
+        return try {
+            val uiData = getUIDataFromShell()
+                ?: return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "Failed to retrieve UI data."
+                )
+
+            val focusInfo = extractFocusInfoFromShell(uiData.windowInfo)
+            val simplifiedLayout = simplifyLayoutFromXml(uiData.uiXml)
+
+            val resultData =
+                UIPageResultData(
+                    packageName = focusInfo.packageName ?: "Unknown",
+                    activityName = focusInfo.activityName ?: "Unknown",
+                    uiElements = simplifiedLayout
+                )
+
+            ToolResult(toolName = tool.name, success = true, result = resultData, error = "")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting page info", e)
+            ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "Error getting page info: ${e.message}"
+            )
+        }
     }
-    /** 查找适合触摸事件的输入设备 这是一个root权限专有操作，因为需要访问/dev/input下的设备 */
-    private suspend fun findTouchDevice(): String? {
-        if (touchDevicePath != null) return touchDevicePath
 
-        try {
-            // 列出所有输入设备
-            val findCommand = "find $INPUT_DEVICES_PATH -name \"event*\" | sort"
-            val result = AndroidShellExecutor.executeShellCommand(findCommand)
+    private data class UIData(val uiXml: String, val windowInfo: String)
 
-            if (!result.success || result.stdout.isBlank()) {
-                Log.e(TAG, "Failed to list input devices")
+    private suspend fun getUIDataFromShell(): UIData? {
+        return try {
+            Log.d(TAG, "Getting UI data via ADB")
+            val dumpResult = AndroidShellExecutor.executeShellCommand("uiautomator dump /sdcard/window_dump.xml")
+            if (!dumpResult.success) {
+                Log.e(TAG, "uiautomator dump failed: ${dumpResult.stderr}")
                 return null
             }
 
-            val devices = result.stdout.trim().split("\n")
-
-            // 对每个设备进行测试，找出支持触摸事件的设备
-            for (device in devices) {
-                val checkCommand = "getevent -p $device | grep -E 'ABS_MT_POSITION|BTN_TOUCH'"
-                val checkResult = AndroidShellExecutor.executeShellCommand(checkCommand)
-
-                if (checkResult.success && checkResult.stdout.isNotEmpty()) {
-                    Log.d(TAG, "Found touch input device: $device")
-                    touchDevicePath = device
-                    return device
-                }
+            val readResult = AndroidShellExecutor.executeShellCommand("cat /sdcard/window_dump.xml")
+            if (!readResult.success) {
+                Log.e(TAG, "Reading UI dump file failed: ${readResult.stderr}")
+                return null
             }
 
-            // 如果没有找到明确的触摸设备，使用第一个设备作为后备
-            if (devices.isNotEmpty()) {
-                Log.d(TAG, "Using first available device: ${devices[0]}")
-                touchDevicePath = devices[0]
-                return devices[0]
+            var windowInfo = getWindowInfoFromShell()
+            if (windowInfo.isEmpty()) {
+                Log.w(TAG, "Failed to get window info, retrying after 500ms")
+                delay(500)
+                windowInfo = getWindowInfoFromShell()
             }
 
-            return null
+            UIData(readResult.stdout, windowInfo)
         } catch (e: Exception) {
-            Log.e(TAG, "Error finding touch device", e)
-            return null
+            Log.e(TAG, "Error getting UI data", e)
+            null
+        }
+    }
+
+    private suspend fun getWindowInfoFromShell(): String {
+        val commands =
+            listOf(
+                "dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'",
+                "dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'",
+                "dumpsys activity activities | grep -E 'topResumedActivity|topActivity'"
+            )
+        for (command in commands) {
+            try {
+                val result = AndroidShellExecutor.executeShellCommand(command)
+                if (result.success && result.stdout.isNotBlank()) {
+                    Log.d(TAG, "Successfully got window info with: $command")
+                    return result.stdout
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Command failed: '$command'", e)
+            }
+        }
+        Log.e(TAG, "All attempts to get window info failed.")
+        return ""
+    }
+
+    private data class UINodeShell(
+        val className: String?,
+        val text: String?,
+        val contentDesc: String?,
+        val resourceId: String?,
+        val bounds: String?,
+        val isClickable: Boolean,
+        val children: MutableList<UINodeShell> = mutableListOf()
+    )
+
+    private fun simplifyLayoutFromXml(xml: String): SimplifiedUINode {
+        return try {
+            val factory = XmlPullParserFactory.newInstance().apply { isNamespaceAware = false }
+            val parser = factory.newPullParser().apply { setInput(StringReader(xml)) }
+            val nodeStack = mutableListOf<UINodeShell>()
+            var rootNode: UINodeShell? = null
+
+            while (parser.eventType != XmlPullParser.END_DOCUMENT) {
+                when (parser.eventType) {
+                    XmlPullParser.START_TAG -> {
+                        if (parser.name == "node") {
+                            val newNode = createNodeShell(parser)
+                            if (rootNode == null) {
+                                rootNode = newNode
+                            } else {
+                                nodeStack.lastOrNull()?.children?.add(newNode)
+                            }
+                            nodeStack.add(newNode)
+                        }
+                    }
+                    XmlPullParser.END_TAG -> if (parser.name == "node") nodeStack.removeLastOrNull()
+                }
+                parser.next()
+            }
+            rootNode?.toUINodeSimplified() ?: SimplifiedUINode(null, null, null, null, null, false, emptyList())
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing XML layout", e)
+            SimplifiedUINode(null, null, null, null, null, false, emptyList())
+        }
+    }
+
+    private fun UINodeShell.toUINodeSimplified(): SimplifiedUINode = SimplifiedUINode(
+        className, text, contentDesc, resourceId, bounds, isClickable, children.map { it.toUINodeSimplified() }
+    )
+
+    private fun createNodeShell(parser: XmlPullParser): UINodeShell {
+        return UINodeShell(
+            className = parser.getAttributeValue(null, "class")?.substringAfterLast('.'),
+            text = parser.getAttributeValue(null, "text")?.replace("&#10;", "\n"),
+            contentDesc = parser.getAttributeValue(null, "content-desc"),
+            resourceId = parser.getAttributeValue(null, "resource-id"),
+            bounds = parser.getAttributeValue(null, "bounds"),
+            isClickable = parser.getAttributeValue(null, "clickable") == "true"
+        )
+    }
+
+    private data class FocusInfoShell(var packageName: String? = null, var activityName: String? = null)
+
+    private fun extractFocusInfoFromShell(windowInfo: String): FocusInfoShell {
+        val result = FocusInfoShell()
+        if (windowInfo.isBlank()) {
+            Log.w(TAG, "Window info is empty, cannot extract focus.")
+            return result
+        }
+
+        val patterns =
+            listOf(
+                "mCurrentFocus=.*?\\s+([a-zA-Z0-9_.]+)/([^\\s}]+)".toRegex(),
+                "mFocusedApp=.*?ActivityRecord\\{.*?\\s+([a-zA-Z0-9_.]+)/\\.?([^\\s}]+)".toRegex(),
+                "topActivity=ComponentInfo\\{([a-zA-Z0-9_.]+)/\\.?([^}]+)\\}".toRegex()
+            )
+
+        for (pattern in patterns) {
+            val match = pattern.find(windowInfo)
+            if (match != null && match.groupValues.size >= 3) {
+                result.packageName = match.groupValues[1]
+                result.activityName = match.groupValues[2]
+                Log.d(TAG, "Extracted from pattern ${patterns.indexOf(pattern)}: ${result.packageName}/${result.activityName}")
+                return result
+            }
+        }
+
+        Log.w(TAG, "Could not extract focus info from window data.")
+        return result
+    }
+
+    private suspend fun clickElementWithUiautomator(tool: AITool): ToolResult {
+        Log.d(TAG, "Using uiautomator to click element")
+        val resourceId = tool.parameters.find { it.name == "resourceId" }?.value
+        val className = tool.parameters.find { it.name == "className" }?.value
+        val contentDesc = tool.parameters.find { it.name == "contentDesc" }?.value
+        val index = tool.parameters.find { it.name == "index" }?.value?.toIntOrNull() ?: 0
+
+        try {
+            val dumpResult = AndroidShellExecutor.executeShellCommand("uiautomator dump /sdcard/window_dump.xml")
+            if (!dumpResult.success) {
+                return ToolResult(tool.name, false, StringResultData(""), "Failed to dump UI hierarchy: ${dumpResult.stderr}")
+            }
+            val readResult = AndroidShellExecutor.executeShellCommand("cat /sdcard/window_dump.xml")
+            if (!readResult.success) {
+                return ToolResult(tool.name, false, StringResultData(""), "Failed to read UI dump: ${readResult.stderr}")
+            }
+            val xml = readResult.stdout
+            
+            val partialMatch = tool.parameters.find { it.name == "partialMatch" }?.value?.toBoolean() ?: false
+
+            fun buildPattern(name: String, value: String?) = value?.let {
+                if (partialMatch) "$name=\".*?${Regex.escape(it)}.*?\""
+                else "$name=\"(?:.*?:id/)?${Regex.escape(it)}\""
+            }
+            
+            val attributes = listOfNotNull(
+                buildPattern("resource-id", resourceId),
+                buildPattern("class", className),
+                buildPattern("content-desc", contentDesc)
+            ).joinToString(".*?")
+            
+            if (attributes.isEmpty()) {
+                 return ToolResult(tool.name, false, StringResultData(""), "No element identifiers provided for click.")
+            }
+
+            val nodeRegex = "<node[^>]*?$attributes[^>]*?>".toRegex()
+            val matchingNodes = nodeRegex.findAll(xml).toList()
+
+            if (matchingNodes.isEmpty()) {
+                return ToolResult(tool.name, false, StringResultData(""), "No matching element found.")
+            }
+            if (index >= matchingNodes.size) {
+                return ToolResult(tool.name, false, StringResultData(""), "Index out of range. Found ${matchingNodes.size}, requested $index.")
+            }
+
+            val nodeText = matchingNodes[index].value
+            val bounds = "bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"".toRegex().find(nodeText)
+                ?: return ToolResult(tool.name, false, StringResultData(""), "Failed to extract bounds from element.")
+
+            val (x1, y1, x2, y2) = bounds.destructured
+            val centerX = (x1.toInt() + x2.toInt()) / 2
+            val centerY = (y1.toInt() + y2.toInt()) / 2
+
+            return tap(AITool("tap", listOf(ToolParameter("x", centerX.toString()), ToolParameter("y", centerY.toString()))))
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clicking with uiautomator", e)
+            return ToolResult(tool.name, false, StringResultData(""), "Error clicking element: ${e.message}")
+        } finally {
+            AndroidShellExecutor.executeShellCommand("rm /sdcard/window_dump.xml")
         }
     }
 }
+

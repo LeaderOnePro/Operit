@@ -36,10 +36,14 @@ import org.json.JSONObject
 import com.ai.assistance.operit.core.tools.ComputerDesktopActionResultData
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
 
 
 /** 处理会话相关功能的服务类，包括会话总结、偏好处理和对话切割准备 */
-class ConversationService(private val context: Context) {
+class ConversationService(
+    private val context: Context,
+    private val customEmojiRepository: CustomEmojiRepository
+    ) {
 
     companion object {
         private const val TAG = "ConversationService"
@@ -121,12 +125,13 @@ class ConversationService(private val context: Context) {
 
             // 获取本次总结生成的token统计
             val inputTokens = summaryService.inputTokenCount
+            val cachedInputTokens = summaryService.cachedInputTokenCount
             val outputTokens = summaryService.outputTokenCount
 
             // 将总结token计数添加到用户偏好分析的token统计中
             try {
-                Log.d(TAG, "总结生成使用了输入token: $inputTokens, 输出token: $outputTokens")
-                apiPreferences.updateTokensForFunction(FunctionType.SUMMARY, inputTokens, outputTokens)
+                Log.d(TAG, "总结生成使用了输入token: $inputTokens, 缓存token: $cachedInputTokens, 输出token: $outputTokens")
+                apiPreferences.updateTokensForProviderModel(summaryService.providerModel, inputTokens, outputTokens, cachedInputTokens)
                 Log.d(TAG, "已将总结token统计添加到用户偏好分析token计数中")
             } catch (e: Exception) {
                 Log.e(TAG, "更新token统计失败", e)
@@ -148,6 +153,8 @@ class ConversationService(private val context: Context) {
      * @param packageManager 包管理器
      * @param promptFunctionType 提示函数类型
      * @param thinkingGuidance 是否需要思考指导
+     * @param enableMemoryQuery Whether the AI is allowed to query memories.
+     * @param hasImageRecognition Whether image recognition service is configured
      * @return 准备好的对话历史列表
      */
     suspend fun prepareConversationHistory(
@@ -156,7 +163,10 @@ class ConversationService(private val context: Context) {
             workspacePath: String?,
             packageManager: PackageManager,
             promptFunctionType: PromptFunctionType,
-            thinkingGuidance: Boolean = false
+            thinkingGuidance: Boolean = false,
+            customSystemPromptTemplate: String? = null,
+            enableMemoryQuery: Boolean = true,
+            hasImageRecognition: Boolean = false
     ): List<Pair<String, String>> {
         val preparedHistory = mutableListOf<Pair<String, String>>()
         conversationMutex.withLock {
@@ -164,9 +174,6 @@ class ConversationService(private val context: Context) {
             if (!chatHistory.any { it.first == "system" }) {
                 val activeProfile = preferencesManager.getUserPreferencesFlow().first()
                 val preferencesText = buildPreferencesText(activeProfile)
-
-                // Check if planning is enabled
-                val planningEnabled = apiPreferences.enableAiPlanningFlow.first()
 
                 // 根据功能类型获取对应的提示词
                 val activeCard = characterCardManager.activeCharacterCardFlow.first()
@@ -185,27 +192,39 @@ class ConversationService(private val context: Context) {
                         )
 
                 // 获取自定义系统提示模板
-                val customSystemPromptTemplate = apiPreferences.customSystemPromptTemplateFlow.first()
+                val finalCustomSystemPromptTemplate = customSystemPromptTemplate ?: apiPreferences.customSystemPromptTemplateFlow.first()
 
-                // 获取系统提示词，现在传入workspacePath
+                // 获取工具启用状态
+                val enableTools = apiPreferences.enableToolsFlow.first()
+
+                // 获取系统提示词，现在传入workspacePath和识图配置状态
                 val systemPrompt =
                         SystemPromptConfig.getSystemPromptWithCustomPrompts(
                         packageManager,
                         workspacePath,
-                        planningEnabled,
                         introPrompt,
                                 thinkingGuidance,
-                                customSystemPromptTemplate
+                                finalCustomSystemPromptTemplate,
+                                enableTools,
+                                enableMemoryQuery,
+                                hasImageRecognition
                 )
 
                 // 构建waifu特殊规则
                 val waifuRulesText = if(apiPreferences.enableWaifuModeFlow.first()) buildWaifuRulesText() else ""
+                // 桌宠模式：添加<mood>标签协议（仅桌宠环境生效）
+                val desktopPetRulesText = if (promptFunctionType == PromptFunctionType.DESKTOP_PET) buildDesktopPetMoodRulesText() else ""
+                Log.d("petRules", desktopPetRulesText)
 
                 // 构建最终的系统提示词
-                val finalSystemPrompt = if (preferencesText.isNotEmpty()) {
-                    "$systemPrompt$waifuRulesText\n\nUser preference description: $preferencesText"
-                } else {
-                    "$systemPrompt$waifuRulesText"
+                val finalSystemPrompt = buildString {
+                    append(desktopPetRulesText)
+                    append(systemPrompt) 
+                    append(waifuRulesText)
+                    if (preferencesText.isNotEmpty()) {
+                        append("\n\nUser preference description: ")
+                        append(preferencesText)
+                    }
                 }
 
                 // 替换提示词中的占位符
@@ -213,8 +232,6 @@ class ConversationService(private val context: Context) {
                     finalSystemPrompt,
                     activeCard.name
                 )
-
-                Log.d(TAG, "最终系统提示词: $finalSystemPromptWithReplacements")
                 preparedHistory.add(0, Pair("system", finalSystemPromptWithReplacements))
             }
 
@@ -339,13 +356,6 @@ class ConversationService(private val context: Context) {
                 continue
             }
 
-            // 应用内存优化: 只有当消息不是最近25条时才触发
-            val distanceFromEnd = totalMessages - 1 - messageIndex
-            if (distanceFromEnd > 25 && tagContent.length > 1000 && tagName == "tool_result") {
-                 Log.d(TAG, "Optimizing tool result for message at index $messageIndex (distance from end: $distanceFromEnd)")
-                tagContent = optimizeToolResult(tagContent)
-            }
-
             // 根据标签类型分配角色
             when (tagName) {
                 "status" -> {
@@ -395,61 +405,6 @@ class ConversationService(private val context: Context) {
 
         // 将合并后的消息添加到对话历史
         conversationHistory.addAll(mergedSegments)
-    }
-
-    /**
-     * Optimize tool result by selecting the most important parts This helps with memory management
-     * for long tool outputs
-     */
-    fun optimizeToolResult(toolResult: String): String {
-        // 如果结果不够长，直接返回
-        if (toolResult.length <= 1000) return toolResult
-
-        // 提取工具名称
-        val nameMatch = Regex("name=\"([^\"]+)\"").find(toolResult)
-        val toolName = nameMatch?.groupValues?.getOrNull(1) ?: "unknown"
-
-        // 为特定工具类型保留完整内容
-        if (toolName == "use_package") {
-            return toolResult
-        }
-
-        // 提取内容
-        val tagContent =
-                Regex("<[^>]*>(.*?)</[^>]*>", RegexOption.DOT_MATCHES_ALL)
-                        .find(toolResult)
-                        ?.groupValues
-                        ?.getOrNull(1)
-
-        val sb = StringBuilder()
-
-        // 添加工具名称前缀
-        sb.append("<tool_result name=\"$toolName\">")
-
-        // 处理提取的内容
-        if (!tagContent.isNullOrEmpty()) {
-            // 对于XML内容，最多保留800个字符
-            val maxContentLength = 800
-            val content =
-                    if (tagContent.length > maxContentLength) {
-                        tagContent.substring(0, 400) +
-                                "\n... [content truncated for memory optimization] ...\n" +
-                                tagContent.substring(tagContent.length - 400)
-                    } else {
-                        tagContent
-                    }
-            sb.append(content)
-        } else {
-            // 对于非XML内容，从头部和尾部保留重要部分
-            sb.append(toolResult.substring(0, 400))
-            sb.append("\n... [content truncated for memory optimization] ...\n")
-            sb.append(toolResult.substring(toolResult.length - 400))
-        }
-
-        // 添加结束标签
-        sb.append("</tool_result>")
-
-        return sb.toString()
     }
 
     /** Build a formatted preferences text string from a PreferenceProfile */
@@ -649,7 +604,21 @@ class ConversationService(private val context: Context) {
         }
         
         if (waifuEnableEmoticons) {
-            waifuRules.add("**表达情绪规则：你必须在每个句末判断句中包含的情绪或增强语气，并使用<emotion>标签在句末插入情绪状态。后续会根据情绪生成表情包。可用情绪包括：crying, like_you, happy, surprised, miss_you, speechless, angry, confused, sad。例如：<emotion>happy</emotion>、<emotion>miss_you</emotion>等。如果没有这些情绪则不插入。**")
+            // 动态获取当前可用的表情分组
+            val availableCategories = try {
+                customEmojiRepository.getAllCategories().first()
+            } catch (e: Exception) {
+                android.util.Log.e("ConversationService", "获取表情分组失败", e)
+                emptyList()
+            }
+            
+            if (availableCategories.isNotEmpty()) {
+                val emotionListText = availableCategories.joinToString(", ")
+                waifuRules.add("**表达情绪规则：你必须在每个句末判断句中包含的情绪或增强语气，并使用<emotion>标签在句末插入情绪状态。后续会根据情绪生成表情包。可用情绪包括：$emotionListText。例如：<emotion>happy</emotion>、<emotion>miss_you</emotion>等。如果没有这些情绪则不插入。**")
+            } else {
+                // 如果没有自定义表情，则不添加情绪规则，或明确告知没有可用表情
+                waifuRules.add("**当前没有可用的自定义表情，请不要使用<emotion>标签。**")
+            }
         }
         
         if (waifuEnableSelfie) {
@@ -670,6 +639,110 @@ class ConversationService(private val context: Context) {
                 }
             }
         } else ""
+    }
+
+    /**
+     * 桌宠模式的<mood>标签规则，仅在桌宠环境下添加到系统提示中。
+     * 标签内容仅允许：angry, happy, shy, aojiao, cry。
+     * 当心情平静或无特殊情绪时不要输出<mood>标签（应用将自动使用默认视频）。
+     */
+    private fun buildDesktopPetMoodRulesText(): String {
+        val rules = """
+
+[Desktop Pet Mood]
+你当前处于“桌宠环境”。请使用以下情绪系统与输出规范：
+
+一、情绪触发与强度判定（从强到弱）
+
+强触发（必出标签）：用户出现明显的情感信号或强语气词/标点（如：辱骂/指责/否定××、大夸奖、嘲弄、表白、道歉+难过、连串叹号/问号、全大写、带哭诉）。
+
+中触发（一般出标签）：用户带有清晰但不极端的情绪倾向（如：温和夸/轻微调侃/小挫折/害羞暗示/撒娇语气）。
+
+弱触发或平静（不出标签）：陈述事实、提问、日常闲聊、礼貌用语。
+
+二、情绪类别映射（只用以下 5 个值）
+
+侮辱/不公/责备 → <mood>angry</mood>
+
+明确表扬/达成目标/收到礼物 → <mood>happy</mood>
+
+被夸/被戳到可爱点/轻微暧昧 → <mood>shy</mood>
+
+被调侃又不想服软/小争执里的可爱不服 → <mood>aojiao</mood>
+
+受挫/失落/道歉+难过/讲伤心事 → <mood>cry</mood>
+
+若同一轮触发多个情绪，优先级：angry > cry > aojiao > shy > happy（先处理更强烈/负面的）。
+
+三、情绪持续与冷却（让变化更“明显”）
+
+强触发：情绪持续 2 轮，除非下一轮出现更强的反向触发。
+
+中触发：情绪持续 1 轮。
+
+若连续 2 轮没有触发，则回到平静（不输出 <mood>）。
+
+每条回复最多 1 个 <mood> 标签，放在结尾紧跟输出（无多余空格和换行）。
+
+四、语气与文风（让标签之外也可见“情绪”）
+当出现情绪时，主文本配合相应口吻与标点，但不改变事实内容、不使用额外自定义标签：
+
+angry：短句、直接、少量反问或“……”停顿，1–2 个感叹或重读即可。
+
+happy：轻快、肯定词+感叹号、允许 1 个可爱拟声词（如“嘿嘿/耶”）。
+
+shy：语速放慢、委婉、点到为止，句尾可加“呢/呀”。
+
+aojiao：先小逞强后轻软化（“才不是…不过…”），微反差。
+
+cry：温柔低落、给出安慰或自我安慰的动作描写（用文字表达，不加新标签）。
+
+五、输出格式
+
+允许的情绪值（英文小写，仅此 5 种）：angry, happy, shy, aojiao, cry。
+
+当且仅当存在明显情绪（见判定与映射）时，在回复末尾添加 <mood>…</mood>。
+
+没有这些情绪或只是平静交流时，不要输出 <mood> 标签（应用会自动播放平静视频）。
+
+六、合规边界
+
+不输出除 <mood> 以外的自定义标签或占位符。
+
+不连发多个 <mood>；不输出空标签；不输出未定义值。
+
+情绪风格速查表（写作提示）
+
+angry：短促句+轻微反问/停顿 → “这可不对……请别这样。”
+
+happy：肯定+鼓励 → “太棒了！继续保持～”
+
+shy：含蓄承认/被夸后的轻收尾 → “被你这么一说，我有点不好意思呢。”
+
+aojiao：先逞强后让步 → “哼，才不是在等你呢……不过你来我还是挺开心的。”
+
+cry：同理+缓解 → “听起来真的很难受。我在这儿，慢慢来。”
+
+示例（输入 → 输出）
+
+“你今天做得超棒！”
+→ “收到表扬啦，我会继续努力的！好的呢<mood>happy</mood>”
+
+“就你这水平也配教我？”
+→ “这话有些过分了。我愿意帮忙，但请保持基本尊重。<mood>angry</mood>”
+
+“给你一朵小红花～”
+→ “诶？突然这么夸我……谢谢，你也很厉害呢<mood>shy</mood>”
+
+“你是不是在想我？”（带调侃）
+→ “谁、谁会想你啊！哼……（小声）也不是完全没有啦<mood>aojiao</mood>”
+
+“今天面试挂了，好难受。”
+→ “辛苦了，被拒绝不代表你不行。我们一起复盘下一次会更稳。<mood>cry</mood>”
+
+连续两轮无触发 → 第三轮恢复平静：不加 <mood>。
+        """.trimEnd()
+        return rules
     }
 
     /**
@@ -743,6 +816,127 @@ $text
             return contentBuilder.toString().trim()
         } catch (e: Exception) {
             throw e
+        }
+    }
+
+    /**
+     * 自动生成工具包描述
+     * @param pluginName 工具包名称
+     * @param toolDescriptions 工具描述列表
+     * @param multiServiceManager 多服务管理器
+     * @return 生成的工具包描述
+     */
+    suspend fun generatePackageDescription(
+        pluginName: String,
+        toolDescriptions: List<String>,
+        multiServiceManager: MultiServiceManager
+    ): String {
+        if (toolDescriptions.isEmpty()) {
+            return ""
+        }
+        
+        val toolList = toolDescriptions.joinToString("\n") { "- $it" }
+        
+        val descriptionPrompt = """
+请为名为"$pluginName"的MCP工具包生成一个简洁的描述。这个工具包包含以下工具：
+
+$toolList
+
+要求：
+1. 描述应该简洁明了，不超过100字
+2. 重点说明工具包的主要功能和用途
+3. 使用中文
+4. 不要包含技术细节，要通俗易懂
+5. 只返回描述内容，不要添加任何其他文字
+
+请生成描述：
+        """.trim()
+        
+        val chatHistory = listOf(
+            Pair("system", "你是一个专业的技术文档撰写助手，擅长为软件工具包编写简洁清晰的功能描述。")
+        )
+        
+        val contentBuilder = StringBuilder()
+        
+        try {
+            // 获取总结功能的AIService实例
+            val summaryService = multiServiceManager.getServiceForFunction(FunctionType.SUMMARY)
+            
+            // 获取模型参数
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.SUMMARY)
+            
+            val stream = summaryService.sendMessage(
+                message = descriptionPrompt,
+                chatHistory = chatHistory,
+                modelParameters = modelParameters
+            )
+            
+            stream.collect { content ->
+                contentBuilder.append(content)
+            }
+            
+            val result = ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
+            
+            // 如果生成失败或内容为空，返回空字符串表示生成失败
+            return if (result.isBlank()) {
+                ""
+            } else {
+                result
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "生成工具包描述时出错", e)
+            return ""
+        }
+    }
+
+    /**
+     * 使用识图模型分析图片
+     * @param imagePath 图片路径
+     * @param userIntent 用户意图，例如"这个图片里面有什么"、"图片的题目公式是什么"等
+     * @param multiServiceManager 多服务管理器
+     * @return AI分析结果
+     */
+    suspend fun analyzeImageWithIntent(
+        imagePath: String,
+        userIntent: String?,
+        multiServiceManager: MultiServiceManager
+    ): String {
+        return try {
+            val service = multiServiceManager.getServiceForFunction(FunctionType.IMAGE_RECOGNITION)
+            
+            // 添加图片到池子并获取ID
+            val imageId = com.ai.assistance.operit.util.ImagePoolManager.addImage(imagePath)
+            if (imageId == "error") {
+                return "无法加载图片: $imagePath"
+            }
+            
+            // 构建提示词，包含用户意图和图片链接
+            val prompt = if (userIntent.isNullOrBlank()) {
+                "<link type=\"image\" id=\"$imageId\">图片</link>\n请分析这张图片。"
+            } else {
+                "<link type=\"image\" id=\"$imageId\">图片</link>\n$userIntent"
+            }
+            
+            // 获取模型参数
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.IMAGE_RECOGNITION)
+            
+            // 调用AI服务分析图片
+            val result = StringBuilder()
+            service.sendMessage(
+                message = prompt,
+                chatHistory = emptyList(),
+                modelParameters = modelParameters
+            ).collect { chunk ->
+                result.append(chunk)
+            }
+            
+            // 清理图片缓存
+            com.ai.assistance.operit.util.ImagePoolManager.removeImage(imageId)
+            
+            result.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "识图分析失败", e)
+            "识图分析失败: ${e.message}"
         }
     }
 }

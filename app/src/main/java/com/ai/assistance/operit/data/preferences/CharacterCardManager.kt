@@ -348,6 +348,12 @@ class CharacterCardManager private constructor(private val context: Context) {
         }
     }
     
+    // 根据角色名查找角色卡
+    suspend fun findCharacterCardByName(name: String): CharacterCard? {
+        val allCards = getAllCharacterCards()
+        return allCards.find { it.name == name }
+    }
+    
     /**
      * 从酒馆角色卡JSON字符串创建角色卡
      */

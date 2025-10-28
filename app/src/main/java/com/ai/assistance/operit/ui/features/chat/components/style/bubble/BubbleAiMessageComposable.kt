@@ -31,6 +31,7 @@ import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRender
 import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
@@ -38,6 +39,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.runBlocking
 
 @Composable
 fun BubbleAiMessageComposable(
@@ -49,11 +51,31 @@ fun BubbleAiMessageComposable(
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { UserPreferencesManager(context) }
+    val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val showThinkingProcess by preferencesManager.showThinkingProcess.collectAsState(initial = true)
     val showStatusTags by preferencesManager.showStatusTags.collectAsState(initial = true)
-    val aiAvatarUri by preferencesManager.customAiAvatarUri.collectAsState(initial = null)
     val avatarShapePref by preferencesManager.avatarShape.collectAsState(initial = UserPreferencesManager.AVATAR_SHAPE_CIRCLE)
     val avatarCornerRadius by preferencesManager.avatarCornerRadius.collectAsState(initial = 8f)
+    
+    // 根据角色名获取头像
+    val aiAvatarUri by remember(message.roleName) {
+        if (message.roleName != null) {
+            try {
+                runBlocking {
+                    val characterCard = characterCardManager.findCharacterCardByName(message.roleName)
+                    if (characterCard != null) {
+                        preferencesManager.getAiAvatarForCharacterCardFlow(characterCard.id)
+                    } else {
+                        preferencesManager.customAiAvatarUri
+                    }
+                }
+            } catch (e: Exception) {
+                preferencesManager.customAiAvatarUri
+            }
+        } else {
+            preferencesManager.customAiAvatarUri
+        }
+    }.collectAsState(initial = null)
 
     val avatarShape = remember(avatarShapePref, avatarCornerRadius) {
         if (avatarShapePref == UserPreferencesManager.AVATAR_SHAPE_SQUARE) {

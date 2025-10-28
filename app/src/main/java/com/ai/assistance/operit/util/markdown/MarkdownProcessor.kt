@@ -50,7 +50,7 @@ enum class MarkdownProcessorType {
 
 /** Markdown数据模型 */
 class MarkdownNode(val type: MarkdownProcessorType, initialContent: String = "") {
-    val content: MutableState<String> = mutableStateOf(initialContent)
+    val content: SmartString = SmartString(initialContent)
     val children: SnapshotStateList<MarkdownNode> = mutableStateListOf()
 }
 
@@ -100,8 +100,8 @@ object NestedMarkdownProcessor {
                     StreamMarkdownBlockLaTeXPlugin(includeDelimiters = false),
                     StreamMarkdownTablePlugin(),
                     StreamMarkdownImagePlugin(),
-                    StreamXmlPlugin(includeTagsInOutput = true), // 使用现有的StreamXmlPlugin
-                    StreamPlanExecutionPlugin()
+                    StreamPlanExecutionPlugin(),
+                    StreamXmlPlugin(includeTagsInOutput = true) // 使用现有的StreamXmlPlugin
             )
 
     /** 内联插件列表 */

@@ -12,10 +12,12 @@ import com.ai.assistance.operit.core.tools.FilePartContentData
 import com.ai.assistance.operit.core.tools.FindFilesResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.defaultTool.accessbility.AccessibilityFileSystemTools
+import com.ai.assistance.operit.core.tools.defaultTool.standard.StandardFileSystemTools
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -28,18 +30,48 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.ai.assistance.operit.util.FileUtils
 
-/** 调试者级别的文件系统工具，继承无障碍级别，使用ADB命令实现 */
+/** 调试者级别的文件系统工具，继承无障碍版本 */
 open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTools(context) {
+
+    // ApiPreferences 实例，用于动态获取配置
+    /*private val apiPreferences: ApiPreferences by lazy {
+        ApiPreferences.getInstance(context)
+    }*/
 
     companion object {
         private const val TAG = "DebuggerFileSystemTools"
+        
+        // 使用父类 StandardFileSystemTools 中定义的文件大小限制常量
+        // MAX_FILE_SIZE_BYTES 和 PART_SIZE 可直接通过 StandardFileSystemTools.MAX_FILE_SIZE_BYTES 访问
+    }
 
-        // Maximum allowed file size for operations
-        protected const val MAX_FILE_SIZE_BYTES = 32 * 1024 // 32k
+    /** Adds line numbers to a string of content. */
+    private fun addLineNumbers(content: String): String {
+        val lines = content.lines()
+        if (lines.isEmpty()) return ""
+        val maxDigits = lines.size.toString().length
+        return lines.mapIndexed { index, line ->
+            "${(index + 1).toString().padStart(maxDigits, ' ')}| $line"
+        }.joinToString("\n")
+    }
+
+    /** Adds line numbers to a string of content, starting from a specific line number. */
+    private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
+        val lines = content.lines()
+        if (lines.isEmpty()) return ""
+        val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
+        return lines.mapIndexed { index, line ->
+            "${(startLine + index).toString().padStart(maxDigits, ' ')}| $line"
+        }.joinToString("\n")
     }
 
     /** List files in a directory */
     override suspend fun listFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.listFiles(tool)
+        }
+
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -338,6 +370,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
      * This function does not enforce a size limit.
      */
     override suspend fun readFileFull(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFileFull(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         if (path.isBlank()) {
             return ToolResult(
@@ -377,42 +413,55 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                  // Optional: Could add fallback logic here if superclass fails for some reason
             }
 
-            // For standard text-based files, use shell `cat`
-            if (FileUtils.isTextBasedExtension(fileExt)) {
-                val result = AndroidShellExecutor.executeShellCommand("cat '$path'")
-                if (result.success) {
-                    val sizeResult =
-                        AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
-                    val size =
-                            sizeResult.stdout.trim().toLongOrNull()
-                                    ?: result.stdout.length.toLong()
-
-                    return ToolResult(
-                            toolName = tool.name,
-                            success = true,
-                            result =
-                                    FileContentData(
-                                            path = path,
-                                            content = result.stdout,
-                                            size = size
-                                    ),
-                            error = ""
-                    )
-                } else {
-                return ToolResult(
-                            toolName = tool.name,
-                            success = false,
-                            result = StringResultData(""),
-                            error = "Failed to read file: ${result.stderr}"
-                    )
-                }
-            } else {
-                // 如果不是支持的文本文件类型，返回不支持的错误
+            // Check if file is text-like by reading first few bytes
+            // First, get a sample of the file
+            val sampleResult = AndroidShellExecutor.executeShellCommand("head -c 512 '$path'")
+            if (!sampleResult.success) {
                 return ToolResult(
                     toolName = tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error = "Unsupported file format: .$fileExt"
+                    error = "Failed to sample file: ${sampleResult.stderr}"
+                )
+            }
+
+            // Analyze the sample bytes
+            val sampleBytes = sampleResult.stdout.toByteArray()
+            if (!FileUtils.isTextLike(sampleBytes)) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "File does not appear to be a text file. Use specialized tools for binary files."
+                )
+            }
+
+            // For text-like files, use shell `cat` to read full content
+            val result = AndroidShellExecutor.executeShellCommand("cat '$path'")
+            if (result.success) {
+                val sizeResult =
+                    AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
+                val size =
+                        sizeResult.stdout.trim().toLongOrNull()
+                                ?: result.stdout.length.toLong()
+
+                return ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result =
+                                FileContentData(
+                                        path = path,
+                                        content = result.stdout,
+                                        size = size
+                                ),
+                        error = ""
+                )
+            } else {
+                return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "Failed to read file: ${result.stderr}"
                 )
             }
 
@@ -429,6 +478,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Read file content */
     override suspend fun readFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -450,33 +503,45 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
                 val contentData = fullResult.result as FileContentData
                 var content = contentData.content
-                if (content.length > MAX_FILE_SIZE_BYTES) {
-                    content = content.substring(0, MAX_FILE_SIZE_BYTES) + "\n\n... (file content truncated) ..."
+                val isTruncated = content.length > apiPreferences.getMaxFileSizeBytes()
+                if (isTruncated) {
+                    content = content.substring(0, apiPreferences.getMaxFileSizeBytes())
                 }
+
+                var contentWithLineNumbers = addLineNumbers(content)
+                if (isTruncated) {
+                    contentWithLineNumbers += "\n\n... (file content truncated) ..."
+                }
+
                 return ToolResult(
                     toolName = tool.name,
                     success = true,
-                    result = FileContentData(path = path, content = content, size = content.length.toLong()),
+                    result = FileContentData(path = path, content = contentWithLineNumbers, size = contentWithLineNumbers.length.toLong()),
                     error = ""
                 )
             }
 
             // For text-based files, read only the beginning.
-            if (!FileUtils.isTextBasedExtension(fileExt)) {
-                 return ToolResult(
-                    toolName = tool.name,
-                    success = false,
-                    result = StringResultData(""),
-                    error = "Unsupported file format for partial read: .$fileExt. Use readFileFull tool for full content."
-                )
+            // Check if file is text-like by analyzing a sample
+            val sampleResult = AndroidShellExecutor.executeShellCommand("head -c 512 '$path'")
+            if (sampleResult.success) {
+                val sampleBytes = sampleResult.stdout.toByteArray()
+                if (!FileUtils.isTextLike(sampleBytes)) {
+                    return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "File does not appear to be a text file. Use readFileFull tool for special file types."
+                    )
+                }
             }
 
             // Check file size to see if truncation is needed
             val sizeResult = AndroidShellExecutor.executeShellCommand("stat -c %s '$path'")
             val size = sizeResult.stdout.trim().toLongOrNull() ?: 0
-            val truncated = size > MAX_FILE_SIZE_BYTES
+            val truncated = size > apiPreferences.getMaxFileSizeBytes()
 
-            val readCommand = "head -c $MAX_FILE_SIZE_BYTES '$path'"
+            val readCommand = "head -c ${apiPreferences.getMaxFileSizeBytes()} '$path'"
             val readResult = AndroidShellExecutor.executeShellCommand(readCommand)
 
             if (!readResult.success) {
@@ -489,8 +554,9 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             var content = readResult.stdout
+            var contentWithLineNumbers = addLineNumbers(content)
             if (truncated) {
-                content += "\n\n... (file content truncated) ..."
+                contentWithLineNumbers += "\n\n... (file content truncated) ..."
             }
 
             return ToolResult(
@@ -499,8 +565,8 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result =
                             FileContentData(
                                     path = path,
-                                    content = content,
-                                    size = content.length.toLong()
+                                    content = contentWithLineNumbers,
+                                    size = contentWithLineNumbers.length.toLong()
                             ),
                     error = ""
             )
@@ -517,9 +583,13 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 分段读取文件内容 */
     override suspend fun readFilePart(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.readFilePart(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val partIndex = tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
-        val partSize = 200
+        val partSize = apiPreferences.getPartSize()
 
         if (path.isBlank()) {
             return ToolResult(
@@ -597,6 +667,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             }
 
             val content = partResult.stdout
+            val contentWithLineNumbers = addLineNumbers(content, startLine, totalLines)
 
             ToolResult(
                     toolName = tool.name,
@@ -604,7 +675,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result =
                             FilePartContentData(
                                     path = path,
-                                    content = content.trimEnd(),
+                                    content = contentWithLineNumbers.trimEnd(),
                                     partIndex = validPartIndex,
                                     totalParts = totalParts,
                                     startLine = startLine - 1, // To 0-indexed for response
@@ -626,6 +697,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Write content to a file */
     override suspend fun writeFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.writeFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val content = tool.parameters.find { it.name == "content" }?.value ?: ""
         val append = tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
@@ -790,6 +865,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Delete a file or directory */
     override suspend fun deleteFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.deleteFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
 
@@ -809,7 +888,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         // Don't allow deleting system directories
-        val restrictedPaths = listOf("/system", "/data", "/proc", "/dev")
+        val restrictedPaths = listOf("/system", "/proc", "/dev")
         if (restrictedPaths.any { path.startsWith(it) }) {
             return ToolResult(
                     toolName = tool.name,
@@ -875,6 +954,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Check if a file or directory exists */
     override suspend fun fileExists(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.fileExists(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -950,6 +1033,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Move or rename a file or directory */
     override suspend fun moveFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.moveFile(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1034,6 +1121,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Copy a file or directory */
     override suspend fun copyFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.copyFile(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
         val recursive =
@@ -1181,6 +1272,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Create a directory */
     override suspend fun makeDirectory(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.makeDirectory(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val createParents =
                 tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean() ?: false
@@ -1201,6 +1296,28 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         return try {
+            // 首先检查目录是否已存在
+            val checkDirResult =
+                    AndroidShellExecutor.executeShellCommand(
+                            "test -d '$path' && echo 'exists' || echo 'not exists'"
+                    )
+            
+            if (checkDirResult.success && checkDirResult.stdout.trim() == "exists") {
+                // 目录已存在，返回成功
+                return ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result =
+                                FileOperationData(
+                                        operation = "mkdir",
+                                        path = path,
+                                        successful = true,
+                                        details = "Directory already exists: $path"
+                                ),
+                        error = ""
+                )
+            }
+
             val mkdirCommand = if (createParents) "mkdir -p '$path'" else "mkdir '$path'"
             val result = AndroidShellExecutor.executeShellCommand(mkdirCommand)
 
@@ -1218,6 +1335,28 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                         error = ""
                 )
             } else {
+                // 创建失败后再次检查是否已存在（可能在执行过程中被创建）
+                val recheckDirResult =
+                        AndroidShellExecutor.executeShellCommand(
+                                "test -d '$path' && echo 'exists' || echo 'not exists'"
+                        )
+                
+                if (recheckDirResult.success && recheckDirResult.stdout.trim() == "exists") {
+                    // 目录已存在，返回成功
+                    return ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result =
+                                    FileOperationData(
+                                            operation = "mkdir",
+                                            path = path,
+                                            successful = true,
+                                            details = "Directory already exists: $path"
+                                    ),
+                            error = ""
+                    )
+                }
+                
                 return ToolResult(
                         toolName = tool.name,
                         success = false,
@@ -1250,6 +1389,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Search for files matching a pattern */
     override suspend fun findFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.findFiles(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
 
@@ -1335,6 +1478,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Get file information */
     override suspend fun fileInfo(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.fileInfo(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -1488,6 +1635,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Zip files or directories */
     override suspend fun zipFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.zipFiles(tool)
+        }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1696,6 +1847,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Unzip a zip file */
     override suspend fun unzipFiles(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.unzipFiles(tool)
+        }
         val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 
@@ -1843,6 +1998,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 打开文件 使用系统默认应用打开文件 */
     override suspend fun openFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.openFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
 
         if (path.isBlank()) {
@@ -1938,6 +2097,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 分享文件 调用系统分享功能 */
     override suspend fun shareFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.shareFile(tool)
+        }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val title = tool.parameters.find { it.name == "title" }?.value ?: "分享文件"
 
@@ -2035,6 +2198,10 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** 下载文件 从网络URL下载文件到指定路径 */
     override suspend fun downloadFile(tool: AITool): ToolResult {
+        val environment = tool.parameters.find { it.name == "environment" }?.value
+        if (environment == "linux") {
+            return super.downloadFile(tool)
+        }
         val url = tool.parameters.find { it.name == "url" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
 

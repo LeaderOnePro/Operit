@@ -2,7 +2,7 @@
 METADATA
 {
     "name": "daily_life",
-    "description": "日常生活工具集合，提供丰富的日常功能接口，包括日期时间查询、设备状态监测、天气搜索、提醒闹钟设置、短信电话通讯等。通过系统Intent实现各类日常任务，支持用户便捷地完成日常交互需求。",
+    "description": "日常生活工具集合，提供丰富的日常功能接口，包括日期时间查询、设备状态监测、天气搜索、提醒闹钟设置、短信电话通讯、手电筒控制、音量调节、Wi-Fi开关、截屏拍照及深色模式切换等。通过系统Intent和UI模拟实现各类日常任务，支持用户便捷地完成日常交互需求。",
     "enabledByDefault": true,
     "tools": [
         {
@@ -121,6 +121,77 @@ METADATA
                     "description": "要查询天气的位置（城市名称或'current'表示当前位置）",
                     "type": "string",
                     "required": false
+                }
+            ]
+        },
+        {
+            "name": "toggle_flashlight",
+            "description": "打开或关闭手电筒",
+            "parameters": [
+                {
+                    "name": "state",
+                    "description": "手电筒状态：'on'表示打开，'off'表示关闭",
+                    "type": "string",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "adjust_volume",
+            "description": "调节设备音量，通过模拟按键点击实现",
+            "parameters": [
+                {
+                    "name": "action",
+                    "description": "音量调节动作：'up'增加音量，'down'减小音量，'mute'静音",
+                    "type": "string",
+                    "required": true
+                },
+                {
+                    "name": "count",
+                    "description": "按键次数，默认为1次",
+                    "type": "number",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "toggle_wifi",
+            "description": "打开或关闭Wi-Fi",
+            "parameters": [
+                {
+                    "name": "state",
+                    "description": "Wi-Fi状态：'on'表示打开，'off'表示关闭",
+                    "type": "string",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "take_screenshot",
+            "description": "截取当前屏幕",
+            "parameters": [
+                {
+                    "name": "file_path",
+                    "description": "截图保存路径，例如 /sdcard/Pictures/screenshot.png。如果未提供，将使用默认路径和时间戳文件名。",
+                    "type": "string",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "take_photo",
+            "description": "打开相机应用拍照",
+            "parameters": []
+        },
+        {
+            "name": "toggle_dark_mode",
+            "description": "切换系统深夜模式（暗色主题）",
+            "parameters": [
+                {
+                    "name": "state",
+                    "description": "模式：'on'开启, 'off'关闭, 'auto'自动",
+                    "type": "string",
+                    "required": true
                 }
             ]
         }
@@ -571,6 +642,281 @@ const dailyLife = (function () {
     }
 
     /**
+     * Toggle flashlight on or off
+     * @param params - Parameters with flashlight state
+     */
+    async function toggle_flashlight(params: { state: string }): Promise<any> {
+        try {
+            if (!params.state) {
+                throw new Error("Flashlight state is required");
+            }
+
+            // Normalize state to lowercase
+            const state = params.state.toLowerCase();
+
+            if (state !== 'on' && state !== 'off') {
+                throw new Error("Invalid state. Must be 'on' or 'off'");
+            }
+
+            console.log(`${state === 'on' ? '打开' : '关闭'}手电筒...`);
+
+            // Convert state to numeric value (1 for on, 0 for off)
+            const stateValue = state === 'on' ? '1' : '0';
+
+            // Set FlashState using Tools.System.setSetting
+            const flashStateResult = await Tools.System.setSetting('FlashState', stateValue, 'system');
+            console.log(`FlashState 设置结果: ${JSON.stringify(flashStateResult)}`);
+
+            // Set back_flashlight_state using Tools.System.setSetting
+            const backFlashlightResult = await Tools.System.setSetting('back_flashlight_state', stateValue, 'system');
+            console.log(`back_flashlight_state 设置结果: ${JSON.stringify(backFlashlightResult)}`);
+
+            return {
+                success: true,
+                message: `手电筒已${state === 'on' ? '打开' : '关闭'}`,
+                state: state,
+                flash_state_result: flashStateResult,
+                back_flashlight_result: backFlashlightResult
+            };
+        } catch (error) {
+            console.error(`手电筒操作失败: ${error.message}`);
+            return {
+                success: false,
+                message: `手电筒操作失败: ${error.message}`,
+                state: params.state
+            };
+        }
+    }
+
+    /**
+     * Adjust device volume using simulated key presses
+     * @param params - Parameters with volume action and count
+     */
+    async function adjust_volume(params: { action: string; count?: number | string }): Promise<any> {
+        try {
+            if (!params.action) {
+                throw new Error("Volume action is required");
+            }
+
+            // Normalize action to lowercase
+            const action = params.action.toLowerCase();
+
+            if (action !== 'up' && action !== 'down' && action !== 'mute') {
+                throw new Error("Invalid action. Must be 'up', 'down', or 'mute'");
+            }
+
+            // Parse count parameter
+            let count = 1;
+            if (params.count !== undefined) {
+                count = typeof params.count === 'string' ? Number(params.count) : params.count;
+                if (isNaN(count) || count < 1 || count > 20) {
+                    throw new Error("Count must be a number between 1 and 20");
+                }
+            }
+
+            console.log(`调节音量: ${action === 'up' ? '增加' : action === 'down' ? '减小' : '静音'}, 次数: ${count}`);
+
+            // Map action to Android key code string
+            let keyCode: string;
+            let actionName: string;
+
+            switch (action) {
+                case 'up':
+                    keyCode = 'KEYCODE_VOLUME_UP';
+                    actionName = '增加';
+                    break;
+                case 'down':
+                    keyCode = 'KEYCODE_VOLUME_DOWN';
+                    actionName = '减小';
+                    break;
+                case 'mute':
+                    keyCode = 'KEYCODE_VOLUME_MUTE';
+                    actionName = '静音';
+                    count = 1; // Mute should only be pressed once
+                    break;
+                default:
+                    throw new Error("Invalid action");
+            }
+
+            // Simulate key presses using Tools.UI.pressKey
+            const results: any[] = [];
+            for (let i = 0; i < count; i++) {
+                const result = await Tools.UI.pressKey(keyCode);
+                results.push(result);
+                console.log(`第 ${i + 1} 次按键结果: ${JSON.stringify(result)}`);
+
+                // Add a small delay between key presses to make them more natural
+                if (i < count - 1) {
+                    await sleep(100);
+                }
+            }
+
+            return {
+                success: true,
+                message: `音量${actionName}操作完成，共执行 ${count} 次`,
+                action: action,
+                key_code: keyCode,
+                count: count,
+                results: results
+            };
+        } catch (error) {
+            console.error(`音量调节失败: ${error.message}`);
+            return {
+                success: false,
+                message: `音量调节失败: ${error.message}`,
+                action: params.action,
+                count: params.count || 1
+            };
+        }
+    }
+
+    /**
+     * Toggle Wi-Fi on or off
+     * @param params - Parameters with Wi-Fi state
+     */
+    async function toggle_wifi(params: { state: string }): Promise<any> {
+        try {
+            if (!params.state || (params.state.toLowerCase() !== 'on' && params.state.toLowerCase() !== 'off')) {
+                throw new Error("State is required and must be 'on' or 'off'");
+            }
+
+            const state = params.state.toLowerCase();
+            console.log(`${state === 'on' ? '开启' : '关闭'} Wi-Fi...`);
+
+            const command = state === 'on' ? 'svc wifi enable' : 'svc wifi disable';
+            const result = await Tools.System.shell(command);
+
+            return {
+                success: true,
+                message: `Wi-Fi 已${state === 'on' ? '开启' : '关闭'}`,
+                state: state,
+                raw_result: result
+            };
+        } catch (error) {
+            console.error(`Wi-Fi 操作失败: ${error.message}`);
+            return {
+                success: false,
+                message: `Wi-Fi 操作失败: ${error.message}`,
+                state: params.state
+            };
+        }
+    }
+
+    /**
+     * Take a screenshot
+     * @param params - Optional parameters with file path
+     */
+    async function take_screenshot(params: { file_path?: string }): Promise<any> {
+        try {
+            let filePath = params.file_path;
+            const screenshotDir = "/sdcard/DCIM/Screenshots";
+
+            // Ensure the directory exists
+            await Tools.Files.mkdir(screenshotDir, true);
+
+            if (!filePath) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                filePath = `${screenshotDir}/screenshot_${timestamp}.png`;
+            }
+
+            console.log(`截取屏幕并保存到: ${filePath}`);
+
+            const result = await Tools.System.shell(`screencap -p ${filePath}`);
+
+            return {
+                success: true,
+                message: `截图已保存到 ${filePath}`,
+                file_path: filePath,
+                raw_result: result
+            };
+        } catch (error) {
+            console.error(`截图失败: ${error.message}`);
+            return {
+                success: false,
+                message: `截图失败: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Open camera to take a photo
+     */
+    async function take_photo(): Promise<any> {
+        try {
+            console.log("打开相机应用...");
+
+            const intent = new Intent(IntentAction.ACTION_IMAGE_CAPTURE);
+            intent.addFlag(IntentFlag.ACTIVITY_NEW_TASK);
+            const result = await intent.start();
+
+            return {
+                success: true,
+                message: "相机应用已打开",
+                raw_result: result
+            };
+        } catch (error) {
+            console.error(`打开相机失败: ${error.message}`);
+            return {
+                success: false,
+                message: `打开相机失败: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Toggle dark mode
+     * @param params - Parameters with dark mode state
+     */
+    async function toggle_dark_mode(params: { state: string }): Promise<any> {
+        try {
+            if (!params.state) {
+                throw new Error("Dark mode state is required");
+            }
+
+            const state = params.state.toLowerCase();
+            let shellArg: string;
+            let stateName: string;
+
+            switch (state) {
+                case 'on':
+                    shellArg = 'yes';
+                    stateName = '开启';
+                    break;
+                case 'off':
+                    shellArg = 'no';
+                    stateName = '关闭';
+                    break;
+                case 'auto':
+                    shellArg = 'auto';
+                    stateName = '自动';
+                    break;
+                default:
+                    throw new Error("Invalid state. Must be 'on', 'off', or 'auto'");
+            }
+
+            console.log(`设置深夜模式为 ${stateName}...`);
+
+            const command = `cmd uimode night ${shellArg}`;
+            const result = await Tools.System.shell(command);
+
+
+            return {
+                success: true,
+                message: `深夜模式已设置为 ${stateName}`,
+                state: state,
+                raw_result: result
+            };
+        } catch (error) {
+            console.error(`深夜模式操作失败: ${error.message}`);
+            return {
+                success: false,
+                message: `深夜模式操作失败: ${error.message}`,
+                state: params.state
+            };
+        }
+    }
+
+    /**
      * 等待指定的毫秒数
      * @param ms 等待的毫秒数
      */
@@ -597,121 +943,180 @@ const dailyLife = (function () {
                 alarm?: any;
                 message?: any;
                 call?: any;
+                wifi?: any;
+                screenshot?: any;
+                photo?: any;
+                dark_mode?: any;
             } = {};
 
             // 1. 测试当前日期时间函数
-            console.log("测试获取当前日期时间...");
-            try {
-                const dateResult = await get_current_date({});
-                results.date = dateResult;
-                console.log("✓ 日期时间获取成功");
-            } catch (error) {
-                results.date = { error: `获取日期时间失败: ${error.message}` };
-                console.log("✗ 日期时间获取失败");
-            }
-
-            // 2. 测试设备状态函数
-            console.log("测试获取设备状态...");
-            try {
-                const deviceResult = await device_status();
-                results.device = deviceResult;
-                console.log("✓ 设备状态获取成功");
-            } catch (error) {
-                results.device = { error: `获取设备状态失败: ${error.message}` };
-                console.log("✗ 设备状态获取失败");
-            }
-
-            // 3. 测试天气搜索功能
-            console.log("测试天气搜索...");
-            try {
-                const weatherResult = await search_weather({ location: "current" });
-                results.weather = weatherResult;
-                console.log("✓ 天气搜索成功");
-            } catch (error) {
-                results.weather = { error: `天气搜索失败: ${error.message}` };
-                console.log("✗ 天气搜索失败");
-            }
-
-            // 4. 测试设置提醒功能
-            // console.log("测试设置提醒...");
+            // console.log("测试获取当前日期时间...");
             // try {
-            //     const reminderResult = await set_reminder({
-            //         title: "测试提醒",
-            //         description: "这是一个测试提醒",
-            //         // 可以设置未来时间
-            //         due_date: new Date(Date.now() + 3600000).toISOString() // 1小时后
-            //     });
-            //     results.reminder = reminderResult;
-            //     console.log("✓ 设置提醒成功");
+            //     const dateResult = await get_current_date({});
+            //     results.date = dateResult;
+            //     console.log("✓ 日期时间获取成功");
             // } catch (error) {
-            //     results.reminder = { error: `设置提醒失败: ${error.message}` };
-            //     console.log("✗ 设置提醒失败");
+            //     results.date = { error: `获取日期时间失败: ${error.message}` };
+            //     console.log("✗ 日期时间获取失败");
             // }
 
-            // 5. 测试设置闹钟功能
-            console.log("测试设置闹钟...");
-            try {
-                // 获取当前时间，设置为5分钟后的闹钟
-                const now = new Date();
-                const hour = now.getHours();
-                const minute = (now.getMinutes() + 5) % 60;
+            // // 2. 测试设备状态函数
+            // console.log("测试获取设备状态...");
+            // try {
+            //     const deviceResult = await device_status();
+            //     results.device = deviceResult;
+            //     console.log("✓ 设备状态获取成功");
+            // } catch (error) {
+            //     results.device = { error: `获取设备状态失败: ${error.message}` };
+            //     console.log("✗ 设备状态获取失败");
+            // }
 
-                const alarmResult = await set_alarm({
-                    hour: hour.toString(),
-                    minute: minute.toString(),
-                    message: "测试闹钟",
-                    // 可以添加重复日期测试，例如每周一和周五
-                    // days: [2, 6]  // 2表示周一，6表示周五
-                });
-                results.alarm = alarmResult;
-                console.log("✓ 设置闹钟成功");
-            } catch (error) {
-                results.alarm = { error: `设置闹钟失败: ${error.message}` };
-                console.log("✗ 设置闹钟失败");
-            }
+            // // 3. 测试天气搜索功能
+            // console.log("测试天气搜索...");
+            // try {
+            //     const weatherResult = await search_weather({ location: "current" });
+            //     results.weather = weatherResult;
+            //     console.log("✓ 天气搜索成功");
+            // } catch (error) {
+            //     results.weather = { error: `天气搜索失败: ${error.message}` };
+            //     console.log("✗ 天气搜索失败");
+            // }
 
-            // 6. 测试发送消息功能
-            console.log("测试发送短信功能...");
-            try {
-                // 使用测试号码 - 常用的中国运营商服务号码，适合测试
-                const testPhoneNumber = "10086";
-                const testMessage = "这是一条测试短信，不会实际发送";
+            // // 4. 测试设置提醒功能
+            // // console.log("测试设置提醒...");
+            // // try {
+            // //     const reminderResult = await set_reminder({
+            // //         title: "测试提醒",
+            // //         description: "这是一个测试提醒",
+            // //         // 可以设置未来时间
+            // //         due_date: new Date(Date.now() + 3600000).toISOString() // 1小时后
+            // //     });
+            // //     results.reminder = reminderResult;
+            // //     console.log("✓ 设置提醒成功");
+            // // } catch (error) {
+            // //     results.reminder = { error: `设置提醒失败: ${error.message}` };
+            // //     console.log("✗ 设置提醒失败");
+            // // }
 
-                // 直接调用发送短信功能
-                const smsResult = await send_message({
-                    phone_number: testPhoneNumber,
-                    message: testMessage
-                });
-                results.message = smsResult;
-                console.log("✓ 短信测试界面打开成功");
+            // // 5. 测试设置闹钟功能
+            // console.log("测试设置闹钟...");
+            // try {
+            //     // 获取当前时间，设置为5分钟后的闹钟
+            //     const now = new Date();
+            //     const hour = now.getHours();
+            //     const minute = (now.getMinutes() + 5) % 60;
 
-                // 等待用户查看短信界面
-                await sleep(5000);
-            } catch (error) {
-                results.message = { error: `短信测试失败: ${error.message}` };
-                console.log("✗ 短信测试失败");
-            }
+            //     const alarmResult = await set_alarm({
+            //         hour: hour.toString(),
+            //         minute: minute.toString(),
+            //         message: "测试闹钟",
+            //         // 可以添加重复日期测试，例如每周一和周五
+            //         // days: [2, 6]  // 2表示周一，6表示周五
+            //     });
+            //     results.alarm = alarmResult;
+            //     console.log("✓ 设置闹钟成功");
+            // } catch (error) {
+            //     results.alarm = { error: `设置闹钟失败: ${error.message}` };
+            //     console.log("✗ 设置闹钟失败");
+            // }
 
-            // 7. 测试拨打电话功能
-            console.log("测试拨号功能...");
-            try {
-                // 使用测试号码 - 常用的中国运营商服务号码，适合测试
-                const testPhoneNumber = "10086";
+            // // 6. 测试发送消息功能
+            // console.log("测试发送短信功能...");
+            // try {
+            //     // 使用测试号码 - 常用的中国运营商服务号码，适合测试
+            //     const testPhoneNumber = "10086";
+            //     const testMessage = "这是一条测试短信，不会实际发送";
 
-                // 直接调用拨号功能
-                const dialResult = await make_phone_call({
-                    phone_number: testPhoneNumber,
-                    emergency: false
-                });
-                results.call = dialResult;
-                console.log("✓ 拨号界面打开成功");
+            //     // 直接调用发送短信功能
+            //     const smsResult = await send_message({
+            //         phone_number: testPhoneNumber,
+            //         message: testMessage
+            //     });
+            //     results.message = smsResult;
+            //     console.log("✓ 短信测试界面打开成功");
 
-                // 等待用户查看拨号界面
-                await sleep(5000);
-            } catch (error) {
-                results.call = { error: `拨号测试失败: ${error.message}` };
-                console.log("✗ 拨号测试失败");
-            }
+            //     // 等待用户查看短信界面
+            //     await sleep(5000);
+            // } catch (error) {
+            //     results.message = { error: `短信测试失败: ${error.message}` };
+            //     console.log("✗ 短信测试失败");
+            // }
+
+            // // 7. 测试拨打电话功能
+            // console.log("测试拨号功能...");
+            // try {
+            //     // 使用测试号码 - 常用的中国运营商服务号码，适合测试
+            //     const testPhoneNumber = "10086";
+
+            //     // 直接调用拨号功能
+            //     const dialResult = await make_phone_call({
+            //         phone_number: testPhoneNumber,
+            //         emergency: false
+            //     });
+            //     results.call = dialResult;
+            //     console.log("✓ 拨号界面打开成功");
+
+            //     // 等待用户查看拨号界面
+            //     await sleep(5000);
+            // } catch (error) {
+            //     results.call = { error: `拨号测试失败: ${error.message}` };
+            //     console.log("✗ 拨号测试失败");
+            // }
+
+            // 8. Test toggling Wi-Fi
+            // console.log("测试Wi-Fi开关...");
+            // try {
+            //     // Turn Wi-Fi off, wait, then turn it on
+            //     await toggle_wifi({ state: 'off' });
+            //     await sleep(3000);
+            //     const wifiResult = await toggle_wifi({ state: 'on' });
+            //     results.wifi = wifiResult;
+            //     console.log("✓ Wi-Fi开关测试成功");
+            // } catch (error) {
+            //     results.wifi = { error: `Wi-Fi开关测试失败: ${error.message}` };
+            //     console.log("✗ Wi-Fi开关测试失败");
+            // }
+
+            // 9. Test taking a screenshot
+            // console.log("测试截图功能...");
+            // try {
+            //     const screenshotResult = await take_screenshot({});
+            //     results.screenshot = screenshotResult;
+            //     console.log("✓ 截图成功");
+            // } catch (error) {
+            //     results.screenshot = { error: `截图失败: ${error.message}` };
+            //     console.log("✗ 截图失败");
+            // }
+
+            // 10. Test taking a photo
+            // console.log("测试拍照功能...");
+            // try {
+            //     const photoResult = await take_photo();
+            //     results.photo = photoResult;
+            //     if (photoResult.success) {
+            //         console.log("✓ 打开相机成功");
+            //         await sleep(5000); // Wait for user to see camera
+            //     } else {
+            //         console.log(`✗ 打开相机失败: ${photoResult.message}`);
+            //     }
+            // } catch (error) {
+            //     results.photo = { error: `打开相机失败: ${error.message}` };
+            //     console.log("✗ 打开相机失败");
+            // }
+
+            // 11. Test toggling dark mode
+            // console.log("测试深夜模式切换...");
+            // try {
+            //     // Turn dark mode on, then set to auto
+            //     await toggle_dark_mode({ state: 'on' });
+            //     await sleep(2000);
+            //     const darkModeResult = await toggle_dark_mode({ state: 'auto' });
+            //     results.dark_mode = darkModeResult;
+            //     console.log("✓ 深夜模式切换成功");
+            // } catch (error) {
+            //     results.dark_mode = { error: `深夜模式切换失败: ${error.message}` };
+            //     console.log("✗ 深夜模式切换失败");
+            // }
 
             // 返回所有测试结果
             return {
@@ -831,11 +1236,47 @@ const dailyLife = (function () {
             "拨打电话成功",
             "拨打电话失败"
         ),
+        toggle_flashlight: async (params) => await daily_wrap(
+            toggle_flashlight,
+            params,
+            "手电筒操作成功",
+            "手电筒操作失败"
+        ),
+        adjust_volume: async (params) => await daily_wrap(
+            adjust_volume,
+            params,
+            "音量调节成功",
+            "音量调节失败"
+        ),
+        toggle_wifi: async (params) => await daily_wrap(
+            toggle_wifi,
+            params,
+            "Wi-Fi 操作成功",
+            "Wi-Fi 操作失败"
+        ),
+        take_screenshot: async (params) => await daily_wrap(
+            take_screenshot,
+            params,
+            "截图成功",
+            "截图失败"
+        ),
+        take_photo: async (params) => await daily_wrap(
+            take_photo,
+            params,
+            "打开相机成功",
+            "打开相机失败"
+        ),
+        toggle_dark_mode: async (params) => await daily_wrap(
+            toggle_dark_mode,
+            params,
+            "深夜模式操作成功",
+            "深夜模式操作失败"
+        ),
         main: async (params) => await daily_wrap(
             main,
             params,
-            "测试完成",
-            "测试失败"
+            "主函数执行成功",
+            "主函数执行失败"
         )
     }
 })();
@@ -848,4 +1289,10 @@ exports.set_reminder = dailyLife.set_reminder;
 exports.set_alarm = dailyLife.set_alarm;
 exports.send_message = dailyLife.send_message;
 exports.make_phone_call = dailyLife.make_phone_call;
+exports.toggle_flashlight = dailyLife.toggle_flashlight;
+exports.adjust_volume = dailyLife.adjust_volume;
 exports.main = dailyLife.main;
+exports.toggle_wifi = dailyLife.toggle_wifi;
+exports.take_screenshot = dailyLife.take_screenshot;
+exports.take_photo = dailyLife.take_photo;
+exports.toggle_dark_mode = dailyLife.toggle_dark_mode;

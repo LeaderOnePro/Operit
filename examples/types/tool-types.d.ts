@@ -12,73 +12,10 @@ import {
     DeviceInfoResultData, NotificationData, LocationData,
     UIPageResultData, UIActionResultData, CombinedOperationResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData,
-    FilePartContentData, FileApplyResultData
+    FilePartContentData, FileApplyResultData, WorkflowListResultData, WorkflowResultData, WorkflowDetailResultData,
+    StringResultData, ChatServiceStartResultData, ChatCreationResultData, ChatListResultData,
+    ChatSwitchResultData, MessageSendResultData, MemoryLinkResultData
 } from './results';
-
-// ============================================================================
-// Tool Name Types
-// ============================================================================
-
-/**
- * File tool names
- */
-export type FileToolName = 'list_files' | 'read_file' | 'read_file_part' | 'read_file_full' | 'write_file' | 'delete_file' | 'file_exists' |
-    'move_file' | 'copy_file' | 'make_directory' | 'find_files' | 'file_info' |
-    'zip_files' | 'unzip_files' | 'open_file' | 'share_file' | 'download_file' |
-    'convert_file' | 'get_supported_conversions' | 'apply_file';
-
-/**
- * Network tool names
- */
-export type NetToolName = 'http_request' | 'visit_web' | 'multipart_request' | 'manage_cookies';
-
-/**
- * System tool names
- */
-export type SystemToolName = 'sleep' | 'get_system_setting' | 'modify_system_setting' |
-    'install_app' | 'uninstall_app' | 'list_installed_apps' | 'start_app' | 'stop_app' |
-    'device_info' | 'execute_shell' | 'execute_intent' | 'execute_terminal' |
-    'get_notifications' | 'get_device_location';
-
-/**
- * UI tool names
- */
-export type UiToolName = 'get_page_info' | 'click_element' | 'tap' | 'set_input_text' | 'press_key' |
-    'swipe' | 'combined_operation';
-
-/**
- * Calculator tool names
- */
-export type CalculatorToolName = 'calculate';
-
-/**
- * Connection tool names
- */
-export type ConnectionToolName = 'establish_connection';
-
-/**
- * Package tool names
- */
-export type PackageToolName = 'use_package' | 'query_knowledge_library';
-
-/**
- * FFmpeg tool names
- * Available FFmpeg-related tools in the system
- */
-export type FFmpegToolName =
-    /** Execute custom FFmpeg commands */
-    | 'ffmpeg_execute'
-    /** Get FFmpeg system information */
-    | 'ffmpeg_info'
-    /** Convert video files with simplified parameters */
-    | 'ffmpeg_convert';
-
-/**
- * All tool names
- */
-export type ToolName = FileToolName | NetToolName | SystemToolName | UiToolName |
-    CalculatorToolName | ConnectionToolName | PackageToolName | FFmpegToolName | string;
-
 /**
  * Maps tool names to their result data types
  */
@@ -101,8 +38,6 @@ export interface ToolResultMap {
     'open_file': FileOperationData;
     'share_file': FileOperationData;
     'download_file': FileOperationData;
-    'convert_file': FileConversionResultData;
-    'get_supported_conversions': FileFormatConversionsResultData;
     'apply_file': FileApplyResultData;
 
     // Network operations
@@ -123,6 +58,7 @@ export interface ToolResultMap {
     'device_info': DeviceInfoResultData;
     'get_notifications': NotificationData;
     'get_device_location': LocationData;
+    'trigger_tasker_event': string;
 
     // UI operations
     'get_page_info': UIPageResultData;
@@ -138,7 +74,7 @@ export interface ToolResultMap {
 
     // Package operations
     'use_package': string;
-    'query_knowledge_library': string;
+    'query_memory': string;
 
     // FFmpeg operations
     'ffmpeg_execute': FFmpegResultData;
@@ -153,4 +89,22 @@ export interface ToolResultMap {
 
     // Terminal operations
     'execute_terminal': TerminalCommandResultData;
+
+    // Workflow operations
+    'get_all_workflows': WorkflowListResultData;
+    'create_workflow': WorkflowDetailResultData;
+    'get_workflow': WorkflowDetailResultData;
+    'update_workflow': WorkflowDetailResultData;
+    'delete_workflow': StringResultData;
+    'trigger_workflow': StringResultData;
+
+    // Chat Manager operations
+    'start_chat_service': ChatServiceStartResultData;
+    'create_new_chat': ChatCreationResultData;
+    'list_chats': ChatListResultData;
+    'switch_chat': ChatSwitchResultData;
+    'send_message_to_ai': MessageSendResultData;
+
+    // Memory operations
+    'link_memories': MemoryLinkResultData;
 } 

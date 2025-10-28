@@ -477,10 +477,38 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         return try {
             // 创建配置了ignoreUnknownKeys的JSON解析器
             val jsonConfig = Json { ignoreUnknownKeys = true }
-            jsonConfig.decodeFromString<List<String>>(packagesJson ?: "[]")
+            val packages = jsonConfig.decodeFromString<List<String>>(packagesJson ?: "[]")
+            
+            // 自动清理不存在的包
+            cleanupNonExistentPackages(packages)
+            
+            packages
         } catch (e: Exception) {
             Log.e(TAG, "Error decoding imported packages", e)
             emptyList()
+        }
+    }
+    
+    /**
+     * 清理导入列表中不存在的包
+     * 自动移除那些已经被删除但仍然在导入列表中的包
+     * @param currentPackages 当前的导入包列表
+     */
+    private fun cleanupNonExistentPackages(currentPackages: List<String>) {
+        val packagesToRemove = currentPackages.filter { packageName ->
+            // 如果包不在availablePackages中，说明已被删除
+            !availablePackages.containsKey(packageName)
+        }
+        
+        if (packagesToRemove.isNotEmpty()) {
+            Log.d(TAG, "Found ${packagesToRemove.size} non-existent packages in imported list: $packagesToRemove")
+            
+            val prefs = context.getSharedPreferences(PACKAGE_PREFS, Context.MODE_PRIVATE)
+            val cleanedPackages = currentPackages.filter { !packagesToRemove.contains(it) }
+            val updatedJson = Json.encodeToString(cleanedPackages)
+            prefs.edit().putString(IMPORTED_PACKAGES_KEY, updatedJson).apply()
+            
+            Log.d(TAG, "Cleaned up imported packages list. Removed: $packagesToRemove")
         }
     }
 

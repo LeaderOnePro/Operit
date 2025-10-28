@@ -438,11 +438,111 @@ class StreamMarkdownHeaderPlugin(private val includeMarker: Boolean = true) : St
  *
  * @param includeDelimiters If true, the link delimiters are included in the output.
  */
-class StreamMarkdownLinkPlugin(private val includeDelimiters: Boolean = true) : StreamPlugin {
+class StreamMarkdownLinkPlugin : StreamPlugin {
     override var state: PluginState = PluginState.IDLE
         private set
 
-    private val linkMatcher: StreamKmpGraph =
+    private val startMatcher: StreamKmpGraph =
+            StreamKmpGraphBuilder()
+                    .build(
+                            kmpPattern {
+                                literal("[")
+                            }
+                    )
+
+    private val linkContentMatcher: StreamKmpGraph =
+            StreamKmpGraphBuilder()
+                    .build(
+                            kmpPattern {
+                                group(GROUP_TEXT) { greedyStar { noneOf(']', '\n') } }
+                                literal("](")
+                                group(GROUP_URL) { greedyStar { noneOf(')', '\n') } }
+                                char(')')
+                            }
+                    )
+
+    override fun processChar(c: Char, atStartOfLine: Boolean): Boolean {
+        when (state) {
+            PluginState.IDLE -> {
+                when (startMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        state = PluginState.TRYING
+                        return true
+                    }
+                    else -> {
+                        return true
+                    }
+                }
+            }
+            PluginState.TRYING -> {
+                when (linkContentMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        reset()
+                        return true
+                    }
+                    is StreamKmpMatchResult.InProgress -> {
+                        state = PluginState.PROCESSING
+                        return true
+                    }
+                    is StreamKmpMatchResult.NoMatch -> {
+                        reset()
+                        return true
+                    }
+                }
+            }
+            PluginState.PROCESSING -> {
+                when (linkContentMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        reset()
+                        return true
+                    }
+                    is StreamKmpMatchResult.InProgress -> {
+                        return true
+                    }
+                    is StreamKmpMatchResult.NoMatch -> {
+                        reset()
+                        return true
+                    }
+                }
+            }
+            else -> return true
+        }
+    }
+
+    override fun initPlugin(): Boolean {
+        reset()
+        return true
+    }
+
+    override fun destroy() {}
+
+    override fun reset() {
+        state = PluginState.IDLE
+        startMatcher.reset()
+        linkContentMatcher.reset()
+    }
+}
+
+/**
+ * A stream plugin for identifying Markdown images in the format ![alt text](url).
+ *
+ * @param includeDelimiters If true, the image delimiters are included in the output.
+ */
+class StreamMarkdownImagePlugin(private val includeDelimiters: Boolean = true) : StreamPlugin {
+    override var state: PluginState = PluginState.IDLE
+        private set
+
+    // Matcher for the start of an image markdown "!"
+    private val startMatcher: StreamKmpGraph =
+            StreamKmpGraphBuilder()
+                    .build(
+                            kmpPattern {
+                                literal("!")
+                            }
+                    )
+    
+    // Matcher for the rest of the image markdown, starting from "["
+    private val imageContentMatcher: StreamKmpGraph =
             StreamKmpGraphBuilder()
                     .build(
                             kmpPattern {
@@ -456,19 +556,61 @@ class StreamMarkdownLinkPlugin(private val includeDelimiters: Boolean = true) : 
                     )
 
     override fun processChar(c: Char, atStartOfLine: Boolean): Boolean {
-        when (val result = linkMatcher.processChar(c)) {
-            is StreamKmpMatchResult.Match -> {
-                reset()
-                return includeDelimiters
-            }
-            is StreamKmpMatchResult.InProgress -> {
-                state = PluginState.PROCESSING
-                return includeDelimiters
-            }
-            is StreamKmpMatchResult.NoMatch -> {
-                if (state == PluginState.PROCESSING) {
-                    reset()
+        when (state) {
+            PluginState.IDLE -> {
+                when (startMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        state = PluginState.TRYING
+                        // Consume '!' but don't emit yet, wait for full match
+                        return includeDelimiters
+                    }
+                    else -> {
+                        // Not the start of an image, do nothing
+                        return true
+                    }
                 }
+            }
+            PluginState.TRYING -> {
+                when (imageContentMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        // Full image matched
+                        reset() // Reset for next potential image
+                        return includeDelimiters
+                    }
+                    is StreamKmpMatchResult.InProgress -> {
+                        // It's looking like an image, transition to PROCESSING
+                        state = PluginState.PROCESSING
+                        return includeDelimiters
+                    }
+                    is StreamKmpMatchResult.NoMatch -> {
+                        // It was a false alarm (e.g., "! not followed by [")
+                        reset()
+                        // The buffered characters (including '!') and the current char
+                        // will be re-processed as default text by the multiplexer.
+                        return true 
+                    }
+                }
+            }
+            PluginState.PROCESSING -> {
+                when (imageContentMatcher.processChar(c)) {
+                    is StreamKmpMatchResult.Match -> {
+                        // Full image matched
+                        reset()
+                        return includeDelimiters
+                    }
+                    is StreamKmpMatchResult.InProgress -> {
+                        // Continue processing
+                        return includeDelimiters
+                    }
+                    is StreamKmpMatchResult.NoMatch -> {
+                        // Pattern broke mid-way
+                        reset()
+                        return true
+                    }
+                }
+            }
+            else -> {
+                // Should not happen in this plugin's logic
                 return true
             }
         }
@@ -483,61 +625,8 @@ class StreamMarkdownLinkPlugin(private val includeDelimiters: Boolean = true) : 
 
     override fun reset() {
         state = PluginState.IDLE
-        linkMatcher.reset()
-    }
-}
-
-/**
- * A stream plugin for identifying Markdown images in the format ![alt text](url).
- *
- * @param includeDelimiters If true, the image delimiters are included in the output.
- */
-class StreamMarkdownImagePlugin(private val includeDelimiters: Boolean = true) : StreamPlugin {
-    override var state: PluginState = PluginState.IDLE
-        private set
-
-    private val imageMatcher: StreamKmpGraph =
-            StreamKmpGraphBuilder()
-                    .build(
-                            kmpPattern {
-                                literal("![")
-                                group(GROUP_TEXT) { greedyStar { noneOf(']', '\n') } }
-                                char(']')
-                                char('(')
-                                group(GROUP_URL) { greedyStar { noneOf(')', '\n') } }
-                                char(')')
-                            }
-                    )
-
-    override fun processChar(c: Char, atStartOfLine: Boolean): Boolean {
-        when (val result = imageMatcher.processChar(c)) {
-            is StreamKmpMatchResult.Match -> {
-                reset()
-                return includeDelimiters
-            }
-            is StreamKmpMatchResult.InProgress -> {
-                state = PluginState.PROCESSING
-                return includeDelimiters
-            }
-            is StreamKmpMatchResult.NoMatch -> {
-                if (state == PluginState.PROCESSING) {
-                    reset()
-                }
-                return true
-            }
-        }
-    }
-
-    override fun initPlugin(): Boolean {
-        reset()
-        return true
-    }
-
-    override fun destroy() {}
-
-    override fun reset() {
-        state = PluginState.IDLE
-        imageMatcher.reset()
+        startMatcher.reset()
+        imageContentMatcher.reset()
     }
 }
 

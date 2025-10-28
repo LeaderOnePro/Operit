@@ -19,10 +19,6 @@ class MCPProjectAnalyzer {
 
         // JSON配置块正则表达式
         private val JSON_CONFIG_REGEX = "\\{[\\s\\S]*?\"mcpServers\"[\\s\\S]*?\\}".toRegex()
-
-        // 模块名正则表达式
-        private val MODULE_NAME_REGEX =
-                "\"args\"\\s*:\\s*\\[[^\\]]*\"([^\"]+)\"[^\\]]*\\]".toRegex()
     }
 
     /**
@@ -114,11 +110,15 @@ class MCPProjectAnalyzer {
             tsConfigContent = tsConfigInfo.third
         }
 
+        // 解析 pyproject.toml 并提取 Python 包名
+        val pythonPackageName = if (hasPyprojectToml) {
+            parsePyprojectToml(pluginDir)
+        } else {
+            null
+        }
+
         // 从README中提取配置示例
         val configExample = extractConfigExample(readmeContent)
-
-        // 从配置示例中提取模块名
-        val moduleNameFromConfig = extractModuleNameFromConfig(configExample)
 
         // 确定项目类型
         val projectType =
@@ -136,6 +136,9 @@ class MCPProjectAnalyzer {
                     else -> ProjectType.UNKNOWN
                 }
 
+        // 验证提取的配置是否可信
+        val validatedConfigExample = validateConfigExample(configExample, projectType)
+
         return ProjectStructure(
                 type = projectType,
                 hasRequirementsTxt = hasRequirementsTxt,
@@ -147,23 +150,19 @@ class MCPProjectAnalyzer {
                 mainJsFile = mainJsFile,
                 mainTsFile = mainTsFile,
                 hasTsFiles = hasTsFiles,
-                configExample = configExample,
-                moduleNameFromConfig = moduleNameFromConfig,
+                configExample = validatedConfigExample,
+                moduleNameFromConfig = null,  // 已废弃，现在使用 pythonPackageName
                 hasTypeScriptDependency = hasTypeScriptDependency,
                 packageJsonScripts = packageJsonScripts,
                 packageJsonContent = packageJsonContent,
                 tsConfigOutDir = tsConfigOutDir,
                 tsConfigRootDir = tsConfigRootDir,
-                tsConfigContent = tsConfigContent
+                tsConfigContent = tsConfigContent,
+                pythonPackageName = pythonPackageName
         )
     }
 
-    /**
-     * 解析tsconfig.json文件，提取编译相关配置
-     *
-     * @param pluginDir 插件目录
-     * @return Triple(outDir, rootDir, tsConfigContent) - 输出目录、根目录和tsconfig内容
-     */
+    /** 解析tsconfig.json并提取outDir和rootDir配置 */
     private fun parseTsConfig(pluginDir: File): Triple<String?, String?, String?> {
         val tsConfigFile = File(pluginDir, "tsconfig.json")
         if (!tsConfigFile.exists()) {
@@ -172,31 +171,94 @@ class MCPProjectAnalyzer {
 
         try {
             val tsConfigContent = tsConfigFile.readText()
-            val tsConfig = JSONObject(tsConfigContent)
 
-            var outDir: String? = "dist" // 默认值
-            var rootDir: String? = "src" // 默认值
+            // 移除注释（简单处理，可能不完全准确但够用）
+            val contentWithoutComments =
+                    tsConfigContent
+                            .replace(Regex("//.*"), "") // 移除单行注释
+                            .replace(Regex("/\\*[\\s\\S]*?\\*/"), "") // 移除多行注释
 
-            // 获取编译选项
+            val tsConfig = JSONObject(contentWithoutComments)
             val compilerOptions = tsConfig.optJSONObject("compilerOptions")
-            if (compilerOptions != null) {
-                // 获取输出目录配置
-                if (compilerOptions.has("outDir")) {
-                    outDir = compilerOptions.getString("outDir").trim('/', '\\', '.', ' ')
-                    Log.d(TAG, "从tsconfig.json提取到outDir: $outDir")
-                }
 
-                // 获取根目录配置
-                if (compilerOptions.has("rootDir")) {
-                    rootDir = compilerOptions.getString("rootDir").trim('/', '\\', '.', ' ')
-                    Log.d(TAG, "从tsconfig.json提取到rootDir: $rootDir")
-                }
-            }
+            // 获取原始路径
+            val rawOutDir = compilerOptions?.optString("outDir")
+            val rawRootDir = compilerOptions?.optString("rootDir")
+            
+            // 标准化路径：移除 ./ 前缀和尾部斜杠
+            val outDir = rawOutDir?.removePrefix("./")?.removeSuffix("/")?.ifEmpty { null }
+            val rootDir = rawRootDir?.removePrefix("./")?.removeSuffix("/")?.ifEmpty { null }
+
+            Log.d(
+                    TAG,
+                    "解析tsconfig.json - outDir: $outDir (原始: $rawOutDir), rootDir: $rootDir (原始: $rawRootDir)"
+            )
 
             return Triple(outDir, rootDir, tsConfigContent)
         } catch (e: Exception) {
             Log.e(TAG, "解析tsconfig.json失败", e)
-            return Triple("dist", "src", null) // 返回默认值
+            return Triple(null, null, null)
+        }
+    }
+
+    /** 解析 pyproject.toml 并提取 Python 包名 */
+    private fun parsePyprojectToml(pluginDir: File): String? {
+        val pyprojectFile = File(pluginDir, "pyproject.toml")
+        if (!pyprojectFile.exists()) {
+            return null
+        }
+
+        try {
+            val content = pyprojectFile.readText()
+            Log.d(TAG, "开始解析 pyproject.toml")
+
+            // 方法1: 从 [project.scripts] 提取完整的模块路径
+            // 例如: word_mcp_server = "word_document_server.main:run_server"
+            // 应该提取 "word_document_server.main"
+            val scriptsSection = """\[project\.scripts\]([\s\S]*?)(?=\n\[|$)""".toRegex().find(content)
+            if (scriptsSection != null) {
+                val scriptsSectionContent = scriptsSection.groupValues[1]
+                // 匹配 script_name = "module.path:function"，提取完整的模块路径
+                val scriptPattern = """^\s*[\w-]+\s*=\s*"([^:"]+)""".toRegex(RegexOption.MULTILINE)
+                scriptPattern.find(scriptsSectionContent)?.let { match ->
+                    val modulePath = match.groupValues[1].trim()
+                    if (modulePath.isNotBlank() && !modulePath.contains("/")) {
+                        Log.d(TAG, "从 [project.scripts] 提取到模块路径: $modulePath")
+                        return modulePath
+                    }
+                }
+            }
+
+            // 方法2: 从 [tool.hatch.build.targets.wheel] 的 packages 提取
+            // 例如: packages = ["src/excel_mcp"]
+            val packagesPattern = """packages\s*=\s*\["([^"]+)"\]""".toRegex()
+            packagesPattern.find(content)?.let { match ->
+                val packagePath = match.groupValues[1]
+                // 提取最后一个路径部分作为包名
+                val packageName = packagePath.split('/').last()
+                if (packageName.isNotBlank()) {
+                    Log.d(TAG, "从 packages 提取到包名: $packageName")
+                    return packageName
+                }
+            }
+
+            // 方法3: 从 [project] 的 name 字段提取，转换为模块名格式
+            val namePattern = """^\s*name\s*=\s*"([^"]+)"\s*$""".toRegex(RegexOption.MULTILINE)
+            namePattern.find(content)?.let { match ->
+                val projectName = match.groupValues[1]
+                // 将连字符转换为下划线（Python 模块命名约定）
+                val packageName = projectName.replace("-", "_")
+                if (packageName.isNotBlank()) {
+                    Log.d(TAG, "从 [project] name 提取到包名: $packageName")
+                    return packageName
+                }
+            }
+
+            Log.w(TAG, "无法从 pyproject.toml 提取包名")
+            return null
+        } catch (e: Exception) {
+            Log.e(TAG, "解析 pyproject.toml 失败", e)
+            return null
         }
     }
 
@@ -283,6 +345,26 @@ class MCPProjectAnalyzer {
             try {
                 val packageJson = JSONObject(packageJsonFile.readText())
 
+                // 检查bin字段（优先级最高，因为它明确指定了可执行入口）
+                if (packageJson.has("bin")) {
+                    val binField = packageJson.get("bin")
+                    val binPath = when {
+                        binField is String -> binField
+                        binField is JSONObject -> binField.keys().asSequence().firstOrNull()?.let { binField.getString(it) }
+                        else -> null
+                    }
+                    if (binPath != null && binPath.endsWith(".js")) {
+                        // 尝试推断.ts源文件位置：dist/stdio.js -> src/stdio.ts
+                        val jsFileName = binPath.substringAfterLast('/')
+                        val tsFileName = jsFileName.replace(".js", ".ts")
+                        listOf("src/$tsFileName", tsFileName, binPath.replace(".js", ".ts")).forEach { 
+                            if (File(pluginDir, it).exists()) return it
+                        }
+                    } else if (binPath != null && binPath.endsWith(".ts")) {
+                        return binPath
+                    }
+                }
+
                 // 检查main字段
                 if (packageJson.has("main")) {
                     val mainField = packageJson.getString("main")
@@ -365,17 +447,29 @@ class MCPProjectAnalyzer {
         return null
     }
 
-    /** 从配置示例中提取模块名 */
-    private fun extractModuleNameFromConfig(configExample: String?): String? {
+    /** 验证配置示例是否可信 */
+    private fun validateConfigExample(configExample: String?, projectType: ProjectType): String? {
         if (configExample == null) return null
 
-        // 尝试从args数组中提取模块名
-        val moduleMatches = MODULE_NAME_REGEX.find(configExample)
-        moduleMatches?.let {
-            return it.groupValues[1]
+        val lowerCaseConfig = configExample.lowercase()
+
+        // 对于JS/Node/TS项目，只有包含@字符才可信
+        if (projectType == ProjectType.TYPESCRIPT || projectType == ProjectType.NODEJS) {
+            if (!configExample.contains("@")) {
+                Log.w(TAG, "JS/Node/TS项目配置中未找到@字符，该配置不可信，已过滤")
+                return null
+            }
         }
 
-        return null
+        // 对于Python项目，如果包含path/to或pathto/则一票否决
+        if (projectType == ProjectType.PYTHON) {
+            if (lowerCaseConfig.contains("path/to") || lowerCaseConfig.contains("pathto/")) {
+                Log.w(TAG, "Python项目配置中包含占位符路径(path/to或pathto/)，该配置不可信，已过滤")
+                return null
+            }
+        }
+
+        return configExample
     }
 
     /** 查找README文件 */

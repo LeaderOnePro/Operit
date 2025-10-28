@@ -15,7 +15,7 @@ import com.ai.assistance.operit.data.model.MessageEntity
 /** 应用数据库，包含问题记录表、聊天表和消息表 */
 @Database(
         entities = [ProblemEntity::class, ChatEntity::class, MessageEntity::class],
-        version = 6,
+        version = 7,
         exportSchema = false
 )
 @TypeConverters(StringListConverter::class)
@@ -111,6 +111,15 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 }
 
+        // 定义从版本6到7的迁移
+        private val MIGRATION_6_7 =
+                object : Migration(6, 7) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        // 向messages表添加roleName列
+                        db.execSQL("ALTER TABLE messages ADD COLUMN `roleName` TEXT NOT NULL DEFAULT ''")
+                    }
+                }
+
         /** 获取数据库实例，单例模式 */
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE
@@ -121,7 +130,7 @@ abstract class AppDatabase : RoomDatabase() {
                                                 AppDatabase::class.java,
                                                 "app_database"
                                         )
-                                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6) // 添加迁移
+                                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7) // 添加新的迁移
                                         .build()
                         INSTANCE = instance
                         instance

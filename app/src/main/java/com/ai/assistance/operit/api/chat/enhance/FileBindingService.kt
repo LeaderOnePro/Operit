@@ -15,16 +15,68 @@ class FileBindingService(context: Context) {
 
     companion object {
         private const val TAG = "FileBindingService"
+        private val EDIT_BLOCK_REGEX =
+            """//\s*\[START-(REPLACE|INSERT|DELETE):(?:after_line=)?([\d-]+)\]\n?(?:(?://\s*\[CONTEXT\]\s*(.*?)\s*//\s*\[/CONTEXT\]\s*(.*?))|(.*?))\s*//\s*\[END-\1\]""".toRegex(
+                RegexOption.DOT_MATCHES_ALL
+            )
+
+        /**
+         * A dedicated utility function to generate a diff-like view for brand new file content.
+         * This is intended for callers who handle file creation separately and just need to format the output,
+         * ensuring new files also get line numbers and a diff-like appearance.
+         *
+         * @param newContent The full content of the newly created file.
+         * @return A string formatted as a diff, with each line prefixed by '+' and a line number.
+         */
+        fun formatNewFileContentAsDiff(newContent: String): String {
+            val modifiedLines = if (newContent.isEmpty()) emptyList() else newContent.lines()
+            if (modifiedLines.isEmpty()) {
+                return "Changes: +0 -0 lines\n\n(File created with empty content)"
+            }
+
+            val additions = modifiedLines.size
+            val sb = StringBuilder()
+            sb.appendLine("Changes: +$additions -0 lines")
+            sb.appendLine()
+
+            modifiedLines.forEachIndexed { index, line ->
+                val newLineNum = index + 1
+                sb.appendLine("+${newLineNum.toString().padEnd(4)}|$line")
+            }
+
+            return sb.toString()
+        }
     }
 
+    private enum class EditAction {
+        REPLACE,
+        INSERT,
+        DELETE
+    }
+
+    private sealed class CorrectionResult {
+        data class Success(val correctedPatch: String) : CorrectionResult()
+        data class MappingFailed(val reason: String) : CorrectionResult()
+        data class SyntaxError(val errorMessage: String) : CorrectionResult()
+        object Error : CorrectionResult()
+    }
+
+    private data class EditOperation(
+            val action: EditAction,
+            val startLine: Int,
+            val endLine: Int, // For INSERT, this is the same as startLine
+            val content: String
+    )
+
     /**
-     * Processes file binding using a two-step approach to balance token cost and reliability.
-     * 1. Attempts a custom, low-token "loose text patch" that is whitespace-insensitive.
-     * 2. If that fails, falls back to a robust but more token-intensive full-content merge.
+     * Processes file binding using a three-tier approach:
+     * 1. Attempts a precise, line-number-based patch if structured edit blocks are found.
+     * 2. If no blocks are found, assumes a full file replacement.
+     * 3. A special `FORCE_AI_MERGE` flag can override all and jump to a robust AI-driven merge.
      *
      * @param originalContent The original content of the file.
-     * @param aiGeneratedCode The AI-generated code with placeholders, representing the desired
-     * changes.
+     * @param aiGeneratedCode The AI-generated code, which can be full content or structured edit
+     * blocks.
      * @param multiServiceManager The service manager for AI communication.
      * @return A Pair containing the final merged content and a diff string representing the
      * changes.
@@ -34,359 +86,526 @@ class FileBindingService(context: Context) {
             aiGeneratedCode: String,
             multiServiceManager: MultiServiceManager
     ): Pair<String, String> {
-        // Optimization: If the AI-generated code doesn't contain placeholders like
-        // "... existing code ...", it's likely a full file replacement. This avoids a
-        // costly and unnecessary patch generation call to the AI.
-        if (!aiGeneratedCode.contains("... existing code ...")) {
-            Log.d(TAG, "Attempt 1: Full file replacement detected. Skipping patch generation.")
-            val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
-            val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
-
-            // Generate a diff for the UI
-            val diffString =
-                    UnifiedDiffUtils.generateUnifiedDiff(
-                                    "a/file",
-                                    "b/file",
-                                    normalizedOriginalContent.lines(),
-                                    DiffUtils.diff(
-                                            normalizedOriginalContent.lines(),
-                                            normalizedAiGeneratedCode.lines()
-                                    ),
-                                    3
-                            )
-                            .joinToString("\n")
-
-            return Pair(normalizedAiGeneratedCode, diffString)
+        // Tier 1: Attempt precise, line-number-based patching
+        if (aiGeneratedCode.contains("// [START-")) {
+            Log.d(TAG, "Structured edit blocks detected. Attempting line-based patch.")
+            try {
+                // Tier 1: Invoke the sub-agent for correction directly for safety
+                Log.d(TAG, "Invoking sub-agent for semantic correction before patching.")
+                when (val correctionResult = runSubAgentCorrection(originalContent, aiGeneratedCode, multiServiceManager)) {
+                    is CorrectionResult.Success -> {
+                        // Second attempt with the corrected patch
+                        val (success, resultString) = applyLineBasedPatch(originalContent, correctionResult.correctedPatch)
+                        if (success) {
+                            Log.d(TAG, "Line-based patch succeeded after sub-agent correction.")
+                            val diffString = generateDiff(originalContent.replace("\r\n", "\n"), resultString)
+                            return Pair(resultString, diffString)
+                        }
+                        // If even the corrected patch fails, it's a hard error.
+                        Log.w(TAG, "Patch application failed even after sub-agent correction. Reporting as error.")
+                        return Pair(originalContent, "Error: The corrected patch could not be applied. Reason: $resultString")
+                    }
+                    is CorrectionResult.MappingFailed -> {
+                        Log.w(TAG, "Sub-agent explicitly failed to find mapping. Reporting as tool error.")
+                        val detailedMessage = "Error: Could not apply patch. The sub-agent failed to find the correct line numbers and provided the following reason:\n${correctionResult.reason}"
+                        return Pair(originalContent, detailedMessage)
+                    }
+                    is CorrectionResult.SyntaxError -> {
+                        Log.w(TAG, "Sub-agent reported a syntax error in the patch.")
+                        val detailedMessage = "Error: Could not apply patch. The sub-agent reported a syntax error in the AI-generated code patch:\n${correctionResult.errorMessage}"
+                        return Pair(originalContent, detailedMessage)
+                    }
+                    is CorrectionResult.Error -> {
+                        // This includes general exceptions and parsing failures.
+                        Log.w(TAG, "Sub-agent correction failed. Reporting as tool error.")
+                        return Pair(originalContent, "Error: The line number correction sub-agent failed due to an internal error.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during line-based patch. Reporting as tool error.", e)
+                return Pair(originalContent, "Error: An unexpected exception occurred during the patching process: ${e.message}")
+            }
         }
 
+        // Tier 2: Default to full file replacement if no special instructions are found
+        Log.d(TAG, "No structured blocks found. Assuming full file replacement.")
         val normalizedOriginalContent = originalContent.replace("\r\n", "\n")
         val normalizedAiGeneratedCode = aiGeneratedCode.replace("\r\n", "\n").trim()
+        val diffString = generateDiff(normalizedOriginalContent, normalizedAiGeneratedCode)
+        return Pair(normalizedAiGeneratedCode, diffString)
+    }
 
-        // --- Attempt 2: Direct Diff-like Patch (fast, no AI call) ---
-        Log.d(TAG, "Attempt 2: Trying Direct Diff-like Patch...")
-        try {
-            val (success, patchedContent) =
-                    applyDiffLikePatch(normalizedOriginalContent, normalizedAiGeneratedCode)
-            if (success) {
-                Log.d(TAG, "Attempt 2: Direct Diff-like Patch succeeded.")
+    private fun generateDiff(original: String, modified: String): String {
+        val originalLines = if (original.isEmpty()) emptyList() else original.lines()
+        val modifiedLines = if (modified.isEmpty()) emptyList() else modified.lines()
+        val patch = DiffUtils.diff(originalLines, modifiedLines)
 
-                val finalDiff =
-                        UnifiedDiffUtils.generateUnifiedDiff(
-                                        "a/file",
-                                        "b/file",
-                                        normalizedOriginalContent.lines(),
-                                        DiffUtils.diff(normalizedOriginalContent.lines(), patchedContent.lines()),
-                                        3
-                                )
-                                .joinToString("\n")
-
-                // No token usage to report here as no AI was called for patching.
-                return Pair(patchedContent, finalDiff)
-            } else {
-                Log.d(TAG, "Attempt 2: Direct Diff-like Patch failed or not applicable.")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 2: Error during Direct Diff-like Patch. Falling back...", e)
+        if (patch.deltas.isEmpty()) {
+            return "No changes detected (files are identical)"
         }
 
-        // --- Attempt 3: Custom Loose Text Patch (via Patcher AI) ---
-        Log.d(TAG, "Attempt 3: Trying Custom Loose Text Patch via Patcher AI...")
-        try {
-            val systemPrompt = FunctionalPrompts.FILE_BINDING_PATCH_PROMPT.trimIndent()
-
-            val userPrompt =
-"""
-**Original File Content:**
-```
-$normalizedOriginalContent
-```
-**AI's Edit Request:**
-```
-$normalizedAiGeneratedCode
-```
-Now, generate ONLY the patch in the custom format based on all the rules.
-""".trimIndent()
-            val modelParameters =
-                    multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
-            val fileBindingService =
-                    multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
-
-            val contentBuilder = StringBuilder()
-            fileBindingService.sendMessage(
-                            userPrompt,
-                            listOf(Pair("system", systemPrompt)),
-                            modelParameters
-                    )
-                    .collect { content -> contentBuilder.append(content) }
-
-            val patchResponse = ChatUtils.removeThinkingContent(contentBuilder.toString())
-
-            val (success, patchedContent) =
-                    applyLooseTextPatch(normalizedOriginalContent, patchResponse)
-
-            if (success) {
-                Log.d(TAG, "Attempt 3: Custom Loose Text Patch succeeded.")
-                apiPreferences.updateTokensForFunction(
-                        FunctionType.FILE_BINDING,
-                        fileBindingService.inputTokenCount,
-                        fileBindingService.outputTokenCount
-                )
-
-                val finalDiff =
-                        UnifiedDiffUtils.generateUnifiedDiff(
-                                        "a/file",
-                                        "b/file",
-                                        normalizedOriginalContent.lines(),
-                                        DiffUtils.diff(
-                                                normalizedOriginalContent.lines(),
-                                                patchedContent.lines()
-                                        ),
-                                        3
-                                )
-                                .joinToString("\n")
-
-                return Pair(patchedContent, finalDiff)
-            } else {
-                Log.w(
-                        TAG,
-                        "Attempt 3: Custom Loose Text Patch failed. Falling back to robust full merge."
-                )
+        // First, calculate stats
+        val sb = StringBuilder()
+        var additions = 0
+        var deletions = 0
+        patch.deltas.forEach { delta ->
+            when (delta.type) {
+                com.github.difflib.patch.DeltaType.INSERT -> additions += delta.target.lines.size
+                com.github.difflib.patch.DeltaType.DELETE -> deletions += delta.source.lines.size
+                com.github.difflib.patch.DeltaType.CHANGE -> {
+                    additions += delta.target.lines.size
+                    deletions += delta.source.lines.size
+                }
+                else -> {}
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 3: Error during Custom Loose Text Patch. Falling back...", e)
+        }
+        sb.appendLine("Changes: +$additions -$deletions lines")
+        sb.appendLine()
+
+        // Generate a standard unified diff to process
+        val unifiedDiffLines = UnifiedDiffUtils.generateUnifiedDiff(
+            "a/file",
+            "b/file",
+            originalLines,
+            patch,
+            3 // Context lines
+        )
+
+        val resultLines = mutableListOf<String>()
+        var origLineNum = 0
+        var newLineNum = 0
+        val hunkHeaderRegex = """^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*$""".toRegex()
+
+        for (line in unifiedDiffLines) {
+            when {
+                line.startsWith("---") || line.startsWith("+++") -> resultLines.add(line)
+                line.startsWith("@@") -> {
+                    resultLines.add(line)
+                    hunkHeaderRegex.find(line)?.let {
+                        origLineNum = it.groupValues[1].toInt()
+                        newLineNum = it.groupValues[3].toInt()
+                    }
+                }
+                line.startsWith("-") -> {
+                    resultLines.add("-${origLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    origLineNum++
+                }
+                line.startsWith("+") -> {
+                    resultLines.add("+${newLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    newLineNum++
+                }
+                line.startsWith(" ") -> {
+                    resultLines.add(" ${origLineNum.toString().padEnd(4)}|${line.substring(1)}")
+                    origLineNum++
+                    newLineNum++
+                }
+            }
         }
 
-        // --- Attempt 4: Robust Full-Content Merge (Fallback) ---
-        Log.d(TAG, "Attempt 4 (Fallback): Trying robust full-content merge...")
-        try {
-            val mergeSystemPrompt = FunctionalPrompts.FILE_BINDING_MERGE_PROMPT.trimIndent()
-
-            val mergeUserPrompt =
-"""
-**Original File Content:**
-```
-$normalizedOriginalContent
-```
-**AI-Generated Code (with placeholders):**
-```
-$normalizedAiGeneratedCode
-```
-Now, generate ONLY the complete and final merged file content.
-""".trimIndent()
-
-            val modelParameters =
-                    multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
-            val fileBindingService =
-                    multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
-
-            val contentBuilder = StringBuilder()
-            fileBindingService.sendMessage(
-                            mergeUserPrompt,
-                            listOf(Pair("system", mergeSystemPrompt)),
-                            modelParameters
-                    )
-                    .collect { content -> contentBuilder.append(content) }
-
-            val mergedContentFromAI =
-                    ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
-
-            if (mergedContentFromAI.isBlank()) {
-                Log.w(TAG, "Attempt 4: Full merge returned empty content. Returning original.")
-                return Pair(originalContent, "")
-            }
-
-            val diffString =
-                    UnifiedDiffUtils.generateUnifiedDiff(
-                                    "a/file",
-                                    "b/file",
-                                    normalizedOriginalContent.lines(),
-                                    DiffUtils.diff(
-                                            normalizedOriginalContent.lines(),
-                                            mergedContentFromAI.lines()
-                                    ),
-                                    3
-                            )
-                            .joinToString("\n")
-
-            Log.d(TAG, "Attempt 4: Robust full-content merge successful.")
-            apiPreferences.updateTokensForFunction(
-                    FunctionType.FILE_BINDING,
-                    fileBindingService.inputTokenCount,
-                    fileBindingService.outputTokenCount
-            )
-            return Pair(mergedContentFromAI, diffString)
-        } catch (e: Exception) {
-            Log.e(TAG, "Attempt 4: Error during robust full-merge fallback.", e)
-            return Pair(originalContent, "Error during fallback file binding: ${e.message}")
-        }
+        sb.append(resultLines.joinToString("\n"))
+        return sb.toString()
     }
 
     /**
-     * Normalizes a block of text for a "loose" comparison. This makes the comparison insensitive to
-     * leading/trailing whitespace on each line, and also to the amount of internal whitespace
-     * between non-whitespace characters. It preserves the number of lines (including blank ones) to
-     * ensure an unambiguous replacement.
-     */
-    private fun normalizeBlock(block: String): String {
-        return block.lines().joinToString("\n") { it.trim().replace("\\s+".toRegex(), " ") }
-    }
-
-    /**
-     * Applies a "diff-like" patch (using +/- prefixes) directly to the original content without
-     * needing a secondary AI call. It parses the diff format into search/replace blocks and uses
-     * loose matching to apply it.
+     * Parses the AI-generated code for structured edit blocks and applies them to the original
+     * content.
      *
-     * @return A Pair of (Boolean, String) indicating success and the modified content.
-     */
-    private fun applyDiffLikePatch(
-            originalContent: String,
-            aiGeneratedPatch: String
-    ): Pair<Boolean, String> {
-        val patchLines = aiGeneratedPatch.lines()
-
-        // Heuristic: If it doesn't contain +/- lines, or if it contains placeholders,
-        // it's not a simple diff that this function can handle.
-        val isDiffLike = patchLines.any { it.trim().startsWith("+") || it.trim().startsWith("-") }
-        val hasPlaceholders = patchLines.any { it.contains("... existing code ...") }
-
-        if (!isDiffLike || hasPlaceholders) {
-            return Pair(false, originalContent)
-        }
-
-        // The search block is the patch without '+' lines, and with '-' markers removed.
-        val searchBlock =
-                patchLines
-                        .filter { line -> !line.trim().startsWith("+") }
-                        .joinToString("\n") { line ->
-                            if (line.trim().startsWith("-")) {
-                                val minusIndex = line.indexOf('-')
-                                line.substring(minusIndex + 1)
-                            } else {
-                                line
-                            }
-                        }
-
-        // The replace block is the patch without '-' lines, and with '+' markers removed.
-        val replaceBlock =
-                patchLines
-                        .filter { line -> !line.trim().startsWith("-") }
-                        .joinToString("\n") { line ->
-                            if (line.trim().startsWith("+")) {
-                                val plusIndex = line.indexOf('+')
-                                line.substring(plusIndex + 1)
-                            } else {
-                                line
-                            }
-                        }
-
-        // If the context (non +/- lines) is empty and there's nothing to search for,
-        // we can't reliably place the patch.
-        val contextLines =
-                patchLines.filter { !it.trim().startsWith("+") && !it.trim().startsWith("-") }
-        if (contextLines.all { it.isBlank() } && searchBlock.isBlank()) {
-            Log.w(TAG, "Diff-like patch failed: pure insertion without any context.")
-            return Pair(false, originalContent)
-        }
-
-        return findAndReplaceBlock(originalContent, searchBlock, replaceBlock)
-    }
-
-    /**
-     * Applies a series of search-and-replace operations from a custom patch format using a "loose"
-     * matching algorithm that ignores leading/trailing whitespace on each line.
+     * Operations are applied in reverse line order to avoid index shifting issues.
      *
-     * @return A Pair of (Boolean, String) indicating success and the modified content.
+     * @return A Pair of (Boolean, String) indicating success and the modified content, or failure
+     * and a detailed error message.
      */
-    private fun applyLooseTextPatch(
+    private fun applyLineBasedPatch(
             originalContent: String,
-            patchText: String
+            aiPatchCode: String
     ): Pair<Boolean, String> {
-        var modifiedContent = originalContent
         try {
-            val patchRegex =
-                    """(?s)<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE""".toRegex()
             val operations =
-                    patchRegex
-                            .findAll(patchText)
-                            .map {
-                                // groupValues[1] is the SEARCH block, groupValues[2] is the REPLACE
-                                // block
-                                it.groupValues[1].trim() to it.groupValues[2].trim()
+                    EDIT_BLOCK_REGEX
+                            .findAll(aiPatchCode)
+                            .mapNotNull { matchResult ->
+                                val actionStr = matchResult.groupValues[1]
+                                val lineRangeStr = matchResult.groupValues[2]
+                                val context = matchResult.groupValues[3]
+                                val content = if (context.isNotBlank()) matchResult.groupValues[4] else matchResult.groupValues[5]
+
+                                val action = EditAction.valueOf(actionStr)
+                                val contentClean = content.trimEnd('\n')
+
+                                when (action) {
+                                    EditAction.REPLACE,
+                                    EditAction.DELETE -> {
+                                        val parts = lineRangeStr.split('-')
+                                        if (parts.size != 2) return@mapNotNull null
+                                        val start = parts[0].toIntOrNull() ?: return@mapNotNull null
+                                        val end = parts[1].toIntOrNull() ?: return@mapNotNull null
+                                        EditOperation(action, start, end, contentClean)
+                                    }
+                                    EditAction.INSERT -> {
+                                        val afterLine =
+                                                lineRangeStr.toIntOrNull() ?: return@mapNotNull null
+                                        EditOperation(action, afterLine, afterLine, contentClean)
+                                    }
+                                }
                             }
                             .toList()
 
             if (operations.isEmpty()) {
-                Log.w(TAG, "Custom patch was empty or did not match expected format.")
-                return Pair(false, originalContent)
+                Log.w(TAG, "Patch code contained START tags but no valid operations were parsed.")
+                return Pair(false, "Patch code contained START tags but no valid operations were parsed.")
             }
 
-            for ((searchBlock, replaceBlock) in operations) {
-                val (success, newContent) =
-                        findAndReplaceBlock(modifiedContent, searchBlock, replaceBlock)
-                if (!success) {
-                    // Log is already done inside findAndReplaceBlock
-                    return Pair(false, originalContent)
+            Log.d(TAG, "Starting line-based patch application. Found ${operations.size} operations.")
+
+            val originalLines = originalContent.lines().toMutableList()
+
+            // Operations must be sorted in descending order to apply from the bottom up.
+            // This prevents edit operations from shifting the line numbers of subsequent operations.
+            val sortedOps = operations.sortedByDescending { it.startLine }
+
+            for ((index, op) in sortedOps.withIndex()) {
+                Log.d(TAG, "--- Operation ${index + 1}/${sortedOps.size} ---")
+                Log.d(TAG, "Action: ${op.action}, Target Lines: ${op.startLine}-${op.endLine}")
+                if (op.content.isNotEmpty()) {
+                    Log.d(TAG, "Content to apply:\n---\n${op.content}\n---")
+                } else {
+                    Log.d(TAG, "Content to apply: [EMPTY]")
                 }
-                modifiedContent = newContent
+
+                // Convert to 0-based index for list manipulation
+                val startIndex = op.startLine - 1
+                val endIndex = op.endLine - 1
+                val maxLine = originalLines.size
+
+                // Log context around the change
+                val contextSize = 3
+                val contextStart = (startIndex - contextSize).coerceAtLeast(0)
+                val contextEnd = (endIndex + contextSize).coerceAtMost(originalLines.size - 1)
+                if (contextStart <= contextEnd) {
+                    val contextSnippet = originalLines.slice(contextStart..contextEnd)
+                            .mapIndexed { i, line -> "${contextStart + i + 1}| $line" }
+                            .joinToString("\n")
+                    Log.d(TAG, "Context (lines ${contextStart + 1}-${contextEnd + 1}):\n$contextSnippet")
+                }
+
+
+                // Boundary checks for the operation
+                // For INSERT, startLine can be 0 (insert at beginning) to maxLine (insert at end)
+                // For REPLACE/DELETE, startLine must be within [1, maxLine], endLine can exceed maxLine (will be clamped during execution)
+                when (op.action) {
+                    EditAction.INSERT -> {
+                        if (op.startLine < 0 || op.startLine > maxLine) {
+                            val errorMsg = "Invalid INSERT line: ${op.startLine}. File has $maxLine lines."
+                            Log.e(TAG, errorMsg)
+                            return Pair(false, errorMsg)
+                        }
+                    }
+                    EditAction.REPLACE, EditAction.DELETE -> {
+                        if (op.startLine <= 0 || op.startLine > maxLine || op.endLine < op.startLine) {
+                            val errorMsg = "Invalid ${op.action} range: ${op.startLine}-${op.endLine}. File has $maxLine lines."
+                            Log.e(TAG, errorMsg)
+                            return Pair(false, errorMsg)
+                        }
+                    }
+                }
+
+                when (op.action) {
+                    EditAction.REPLACE -> {
+                        // Use the AI-generated content as-is, without adding any extra indentation
+                        // The AI is responsible for providing correctly indented code
+                        val newContentLines = op.content.lines()
+
+                        val range = endIndex downTo startIndex
+                        var removedCount = 0
+
+                        for (i in range) {
+                            if (i >= 0 && i < originalLines.size) {
+                                originalLines.removeAt(i)
+                                removedCount++
+                            }
+                        }
+
+                        val insertionPoint = startIndex.coerceIn(0, originalLines.size)
+                        originalLines.addAll(insertionPoint, newContentLines)
+                    }
+                    EditAction.INSERT -> {
+                        // Use the AI-generated content as-is, without adding any extra indentation
+                        // The AI is responsible for providing correctly indented code
+                        val newContentLines = op.content.lines()
+
+                        // INSERT means "insert after line N", so the insertion point is op.startLine (not startIndex)
+                        val insertionPoint = op.startLine.coerceIn(0, originalLines.size)
+                        originalLines.addAll(insertionPoint, newContentLines)
+                    }
+                    EditAction.DELETE -> {
+                        val range = endIndex downTo startIndex
+                        var removedCount = 0
+                        for (i in range) {
+                            if (i >= 0 && i < originalLines.size) {
+                                originalLines.removeAt(i)
+                                removedCount++
+                            }
+                        }
+                    }
+                }
+                Log.d(TAG, "--- End Operation ${index + 1}/${sortedOps.size} ---")
             }
-            return Pair(true, modifiedContent)
+
+            Log.d(TAG, "Patch application finished successfully.")
+            return Pair(true, originalLines.joinToString("\n"))
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to apply custom loose text patch.", e)
-            return Pair(false, originalContent)
+            val errorMsg = "Failed to apply line-based patch due to an exception: ${e.message}"
+            Log.e(TAG, "Failed to apply line-based patch due to an exception.", e)
+            return Pair(false, errorMsg)
         }
     }
 
     /**
-     * Finds a unique, "loose" match for a search block within the content and replaces it. Loose
-     * matching is insensitive to whitespace and indentation differences.
+     * Invokes a sub-agent to correct the line numbers of a potentially outdated patch.
      *
-     * @param content The original content to modify.
-     * @param searchBlock The block of text to find.
-     * @param replaceBlock The block of text to replace with.
-     * @return A Pair of (Boolean, String) indicating success and the modified content.
+     * @param originalContent The current, full content of the file.
+     * @param aiPatchCode The original patch code from the main AI.
+     * @param multiServiceManager The service manager for AI communication.
+     * @return The corrected patch code from the sub-agent, or an empty string if it fails.
      */
-    private fun findAndReplaceBlock(
-            content: String,
-            searchBlock: String,
-            replaceBlock: String
-    ): Pair<Boolean, String> {
-        val normalizedSearch = normalizeBlock(searchBlock)
-        if (normalizedSearch.isEmpty()) {
-            if (searchBlock.isNotBlank()) {
-                Log.w(TAG, "Patch application failed: search block is empty after normalization.")
-            }
+    private suspend fun runSubAgentCorrection(
+        originalContent: String,
+        aiPatchCode: String,
+        multiServiceManager: MultiServiceManager
+    ): CorrectionResult {
+        try {
+            val contextualSnippet = generateContextualSnippet(originalContent, aiPatchCode)
 
-            return Pair(false, content)
-        }
+            val correctionSystemPrompt = FunctionalPrompts.SUB_AGENT_LINE_CORRECTION_PROMPT
+                .replace("{{SOURCE_CODE}}", contextualSnippet)
+                .replace("{{PATCH_CODE}}", aiPatchCode)
 
-        val originalLines = content.lines()
-        val searchLinesCount = searchBlock.lines().size
-        if (searchLinesCount == 0) return Pair(false, content)
-        var matchIndex = -1
+            // The user prompt for this agent is simple, as all context is in the system prompt.
+            val correctionUserPrompt = "Please correct the line numbers for the provided patch."
 
-        // Find a unique loose match
-        for (i in 0..(originalLines.size - searchLinesCount)) {
-            val windowBlock = originalLines.subList(i, i + searchLinesCount).joinToString("\n")
-            if (normalizeBlock(windowBlock) == normalizedSearch) {
-                if (matchIndex != -1) { // Ambiguous match
-                    Log.w(TAG, "Patch failed: ambiguous match for search block:\n$searchBlock")
-                    return Pair(false, content)
+            // Use a specific, likely cheaper/faster model for this sub-task if available
+            val subAgentService = multiServiceManager.getServiceForFunction(FunctionType.FILE_BINDING)
+            val modelParameters = multiServiceManager.getModelParametersForFunction(FunctionType.FILE_BINDING)
+
+            val contentBuilder = StringBuilder()
+            subAgentService.sendMessage(
+                correctionUserPrompt,
+                listOf(Pair("system", correctionSystemPrompt)),
+                            modelParameters
+            ).collect { content -> contentBuilder.append(content) }
+
+            val rawResponse = ChatUtils.removeThinkingContent(contentBuilder.toString().trim())
+            Log.d(TAG, "Sub-agent raw response: $rawResponse")
+
+            // Check for different response types from the sub-agent
+            return when {
+                rawResponse.startsWith("[MAPPING-SYNTAX-ERROR]") -> {
+                    Log.w(TAG, "Sub-agent reported a syntax error.")
+                    CorrectionResult.SyntaxError(rawResponse)
                 }
-                matchIndex = i
+                rawResponse.startsWith("[MAPPING-FAILED]") -> {
+                    Log.w(TAG, "Sub-agent explicitly failed to find mapping.")
+                    val reason = rawResponse.substringAfter("[MAPPING-FAILED]").trim()
+                    CorrectionResult.MappingFailed(reason)
+                }
+                rawResponse.startsWith("[MAPPING]") -> {
+                    val correctedPatch = applyMappingToPatch(aiPatchCode, rawResponse)
+                    if (correctedPatch.isNotBlank()) {
+                        Log.d(TAG, "Successfully constructed corrected patch from mapping.")
+                        CorrectionResult.Success(correctedPatch)
+                    } else {
+                        Log.e(TAG, "Failed to apply mapping to patch, though mapping block was present.")
+                        CorrectionResult.Error
+                    }
+                }
+                else -> {
+                    Log.w(TAG, "Sub-agent response did not contain any known mapping markers.")
+                    CorrectionResult.Error
+                }
             }
-        }
-
-        if (matchIndex != -1) { // Unique match found
-            val modifiedLinesList = originalLines.toMutableList()
-            repeat(searchLinesCount) { modifiedLinesList.removeAt(matchIndex) }
-            if (replaceBlock.isNotBlank()) {
-                modifiedLinesList.addAll(matchIndex, replaceBlock.lines())
-            }
-            val modifiedContent = modifiedLinesList.joinToString("\n")
-            return Pair(true, modifiedContent)
-        } else { // No match found
-            Log.w(TAG, "Patch failed: could not find a unique match for block:\n$searchBlock")
-            return Pair(false, content)
+        } catch (e: Exception) {
+            Log.e(TAG, "Sub-agent for line correction failed with an exception.", e)
+            return CorrectionResult.Error
         }
     }
+
+    /**
+     * Parses a mapping block from the sub-agent and applies the line number changes
+     * to the original patch code.
+     *
+     * @param originalPatch The original patch code from the main AI.
+     * @param mappingBlock The mapping block string from the sub-agent.
+     * @return The corrected patch code, or an empty string if parsing fails.
+     */
+    private fun applyMappingToPatch(originalPatch: String, mappingBlock: String): String {
+        if (!mappingBlock.contains("[MAPPING]")) {
+            Log.w(TAG, "Sub-agent output did not contain a valid mapping block.")
+            return ""
+        }
+
+        val mappingLines = mappingBlock.lines()
+            .map { it.trim() }
+            .filter { it.contains(" -> ") }
+
+        val lineMappings = mappingLines.mapNotNull { line ->
+            val parts = line.split(" -> ")
+            if (parts.size == 2) {
+                Pair(parts[0].trim(), parts[1].trim())
+            } else {
+                null
+            }
+        }.toMap()
+
+        if (lineMappings.isEmpty()) {
+            Log.w(TAG, "No valid line mappings found in the sub-agent output.")
+            // If mapping fails, we can't proceed with the patch.
+            // Returning the original patch might apply it to wrong lines, so we return empty.
+            return ""
+        }
+
+        var correctedPatch = originalPatch
+        lineMappings.forEach { (originalSpec, correctedSpec) ->
+            val (action, lines) = originalSpec.split(':', limit = 2)
+            val (correctedAction, correctedLines) = correctedSpec.split(':', limit = 2)
+
+            // Normalize the line spec by removing "after_line=" or "after_line " or "after_line:" prefix
+            val normalizedLines = lines.replace(Regex("^after_line[=:\\s]+"), "")
+            val normalizedCorrectedLines = correctedLines.replace(Regex("^after_line[=:\\s]+"), "")
+
+            // Build a list of possible original tag formats to find, accommodating different AI outputs
+            val possibleTagsToFind = if (action == "INSERT") {
+                listOf(
+                    "[START-$action:after_line=$normalizedLines]",
+                    "[START-$action:after_line $normalizedLines]",
+                    "[START-$action:$normalizedLines]"
+                )
+            } else { // For REPLACE, DELETE, the format is simpler
+                listOf(
+                    "[START-$action:$normalizedLines]"
+                    // We could add more variants here if the AI produces them, e.g. with spaces
+                )
+            }
+
+            // Build the single, canonical, correct format for the new tag based on its action type
+            val correctedTag = if (correctedAction == "INSERT") {
+                "[START-$correctedAction:after_line=$normalizedCorrectedLines]"
+            } else { // For REPLACE, DELETE
+                "[START-$correctedAction:$normalizedCorrectedLines]"
+            }
+
+            // Find which tag format exists in the patch and replace it with the canonical one
+            var replaced = false
+            for (tagToFind in possibleTagsToFind) {
+                if (correctedPatch.contains(tagToFind)) {
+                    // Using simple string replacement. This assumes tags are unique enough
+                    // not to partially match other parts of the code, which is a reasonable
+                    // assumption for this structured format.
+                    correctedPatch = correctedPatch.replace(tagToFind, correctedTag)
+                    replaced = true
+                    Log.d(TAG, "Replaced '$tagToFind' with '$correctedTag'")
+                    break
+                }
+            }
+
+            if (!replaced) {
+                Log.w(TAG, "Could not find tag for original spec: $originalSpec. Tried: ${possibleTagsToFind.joinToString()}")
+            }
+        }
+
+        Log.d(TAG, "Successfully constructed corrected patch from mapping.")
+        return correctedPatch
+    }
+
+    private data class EditRange(val start: Int, val end: Int)
+
+    private fun extractRangesFromPatch(aiPatchCode: String): List<EditRange> {
+        return EDIT_BLOCK_REGEX
+            .findAll(aiPatchCode)
+            .mapNotNull { matchResult ->
+                val (actionStr, lineRangeStr, _, _) = matchResult.destructured
+                try {
+                    val action = EditAction.valueOf(actionStr)
+                    when (action) {
+                        EditAction.REPLACE,
+                        EditAction.DELETE -> {
+                            val parts = lineRangeStr.split('-')
+                            if (parts.size != 2) return@mapNotNull null
+                            val start = parts[0].toIntOrNull() ?: return@mapNotNull null
+                            val end = parts[1].toIntOrNull() ?: return@mapNotNull null
+                            EditRange(start, end)
+                        }
+                        EditAction.INSERT -> {
+                            val afterLine = lineRangeStr.toIntOrNull() ?: return@mapNotNull null
+                            EditRange(afterLine, afterLine)
+                        }
+                    }
+                } catch (e: IllegalArgumentException) {
+                    null // Invalid action string
+                }
+                            }
+                            .toList()
+    }
+
+    private fun mergeRanges(ranges: List<EditRange>): List<EditRange> {
+        if (ranges.isEmpty()) return emptyList()
+
+        val sortedRanges = ranges.sortedBy { it.start }
+        val merged = mutableListOf<EditRange>()
+        var currentMerge = sortedRanges.first()
+
+        for (i in 1 until sortedRanges.size) {
+            val nextRange = sortedRanges[i]
+            // Merge if overlapping or adjacent
+            if (nextRange.start <= currentMerge.end + 1) {
+                currentMerge = EditRange(currentMerge.start, maxOf(currentMerge.end, nextRange.end))
+            } else {
+                merged.add(currentMerge)
+                currentMerge = nextRange
+            }
+        }
+        merged.add(currentMerge)
+        return merged
+    }
+
+    private fun generateContextualSnippet(originalContent: String, aiPatchCode: String): String {
+        val originalLines = originalContent.lines()
+        val totalLines = originalLines.size
+        val contextSize = 100
+
+        val initialRanges = extractRangesFromPatch(aiPatchCode)
+
+        if (initialRanges.isEmpty()) {
+            Log.w(TAG, "Could not extract any valid ranges from the patch. Using full file content as fallback.")
+            return originalLines.mapIndexed { i, line -> "${i + 1}| $line" }.joinToString("\n")
+        }
+
+        val contextRanges = initialRanges.map {
+            EditRange(
+                start = (it.start - contextSize).coerceAtLeast(1),
+                end = (it.end + contextSize).coerceAtMost(totalLines)
+            )
+        }
+
+        val mergedRanges = mergeRanges(contextRanges)
+
+        val snippetBuilder = StringBuilder()
+        var lastLine = 0
+
+        mergedRanges.forEach { range ->
+            if (range.start > lastLine + 1) {
+                snippetBuilder.appendLine("// ... [Code omitted for brevity] ...")
+            }
+
+            for (i in range.start..range.end) {
+                val lineIndex = i - 1
+                if (lineIndex in originalLines.indices) {
+                    snippetBuilder.appendLine("$i| ${originalLines[lineIndex]}")
+                }
+            }
+            lastLine = range.end
+        }
+
+        return snippetBuilder.toString().trim()
+    }
+
 } 

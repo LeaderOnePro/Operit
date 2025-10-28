@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.services.floating
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
@@ -9,6 +10,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -70,6 +72,12 @@ class FloatingWindowManager(
     private var statusIndicatorView: ComposeView? = null
     private var isViewAdded = false
     private var isIndicatorAdded = false
+    private var sizeAnimator: ValueAnimator? = null
+
+    companion object {
+        // Private flag to disable window move animations
+        private const val PRIVATE_FLAG_NO_MOVE_ANIMATION = 0x00000040
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
@@ -273,6 +281,9 @@ class FloatingWindowManager(
                 )
         params.gravity = Gravity.TOP or Gravity.START
 
+        // Disable system move animations to allow custom animations to take full control
+        setPrivateFlag(params, PRIVATE_FLAG_NO_MOVE_ANIMATION)
+
         when (state.currentMode.value) {
             FloatingMode.FULLSCREEN -> {
                 params.width = WindowManager.LayoutParams.MATCH_PARENT
@@ -298,7 +309,7 @@ class FloatingWindowManager(
                         )
                 state.y = state.y.coerceIn(safeMargin, screenHeight - minVisible - safeMargin)
             }
-            FloatingMode.WINDOW, FloatingMode.DragonBones -> {
+            FloatingMode.WINDOW -> {
                 val scale = state.windowScale.value
                 val windowWidthDp = state.windowWidth.value
                 val windowHeightDp = state.windowHeight.value
@@ -325,7 +336,26 @@ class FloatingWindowManager(
 
         params.x = state.x
         params.y = state.y
+
+        state.isAtEdge.value = isAtEdge(params.x, params.width)
+
         return params
+    }
+
+    private fun setPrivateFlag(params: WindowManager.LayoutParams, flags: Int) {
+        try {
+            val field = params.javaClass.getField("privateFlags")
+            field.setInt(params, field.getInt(params) or flags)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set privateFlags", e)
+        }
+    }
+
+    private fun isAtEdge(x: Int, width: Int): Boolean {
+        val screenWidth = context.resources.displayMetrics.widthPixels
+        // A small tolerance to account for rounding errors or slight offsets
+        val tolerance = 5 
+        return x <= tolerance || x >= screenWidth - width - tolerance
     }
 
     private fun updateWindowSizeInLayoutParams() {
@@ -366,6 +396,9 @@ class FloatingWindowManager(
         if (state.isTransitioning || state.currentMode.value == newMode) return
         state.isTransitioning = true
 
+        // 取消之前的动画
+        sizeAnimator?.cancel()
+
         val view = composeView ?: return
         val currentParams = view.layoutParams as WindowManager.LayoutParams
 
@@ -374,8 +407,15 @@ class FloatingWindowManager(
         val screenHeight = displayMetrics.heightPixels
         val density = displayMetrics.density
 
-        val currentWidth: Int
-        val currentHeight: Int
+        val startWidth = currentParams.width
+        val startHeight = currentParams.height
+        val startX = currentParams.x
+        val startY = currentParams.y
+        
+        android.util.Log.d("FloatingWindowManager", 
+            "switchMode: from=${state.currentMode.value} to=$newMode, " +
+            "startPos=($startX,$startY), startSize=($startWidth,$startHeight), " +
+            "screenSize=($screenWidth,$screenHeight)")
 
         // Logic for leaving a mode
         state.previousMode = state.currentMode.value
@@ -383,147 +423,189 @@ class FloatingWindowManager(
             FloatingMode.BALL, FloatingMode.VOICE_BALL -> {
                 state.lastBallPositionX = currentParams.x
                 state.lastBallPositionY = currentParams.y
-                currentWidth = (state.ballSize.value.value * density).toInt()
-                currentHeight = currentWidth
             }
             FloatingMode.WINDOW -> {
                 state.lastWindowPositionX = currentParams.x
                 state.lastWindowPositionY = currentParams.y
                 state.lastWindowScale = state.windowScale.value
-                currentWidth =
-                        (state.windowWidth.value.value * density * state.windowScale.value).toInt()
-                currentHeight =
-                        (state.windowHeight.value.value * density * state.windowScale.value).toInt()
             }
             FloatingMode.FULLSCREEN -> {
                 // Leaving fullscreen, no special state to save
-                currentWidth = screenWidth
-                currentHeight = screenHeight
-            }
-            FloatingMode.DragonBones -> {
-                // Treat DragonBones mode similar to Window mode when leaving
-                state.lastWindowPositionX = currentParams.x
-                state.lastWindowPositionY = currentParams.y
-                state.lastWindowScale = state.windowScale.value
-                currentWidth =
-                        (state.windowWidth.value.value * density * state.windowScale.value).toInt()
-                currentHeight =
-                        (state.windowHeight.value.value * density * state.windowScale.value).toInt()
             }
         }
 
         state.currentMode.value = newMode
         callback.saveState()
 
-        // Update layout for the new mode
-        updateViewLayout { params ->
-            when (newMode) {
+        // 计算目标尺寸和位置
+        data class TargetParams(
+            val width: Int,
+            val height: Int,
+            val x: Int,
+            val y: Int,
+            val flags: Int
+        )
+
+        val target = when (newMode) {
                 FloatingMode.BALL, FloatingMode.VOICE_BALL -> {
-                    params.flags =
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                     val ballSizeInPx = (state.ballSize.value.value * density).toInt()
-                    params.width = ballSizeInPx
-                    params.height = ballSizeInPx
-                    val (newX, newY) =
-                            calculateCenteredPosition(
-                                    currentParams.x,
-                                    currentParams.y,
-                                    currentWidth,
-                                    currentHeight,
-                                    ballSizeInPx,
-                                    ballSizeInPx
-                            )
-                    params.x = newX
-                    params.y = newY
-
-                    // Coerce position to be within screen bounds for ball mode
+                
+                // 如果从全屏模式切换，球应该出现在屏幕右侧中间位置
+                val (newX, newY) = if (state.previousMode == FloatingMode.FULLSCREEN) {
+                    // 球出现在屏幕右侧，垂直居中
+                    val rightX = screenWidth - ballSizeInPx
+                    val centerY = (screenHeight - ballSizeInPx) / 2
+                    Pair(rightX, centerY)
+                } else {
+                    // 处理 MATCH_PARENT (-1) 的情况，使用实际屏幕尺寸
+                    val actualStartWidth = if (startWidth == WindowManager.LayoutParams.MATCH_PARENT) {
+                        screenWidth
+                    } else {
+                        startWidth
+                    }
+                    val actualStartHeight = if (startHeight == WindowManager.LayoutParams.MATCH_PARENT) {
+                        screenHeight
+                    } else {
+                        startHeight
+                    }
+                    
+                    calculateCenteredPosition(
+                        startX, startY, actualStartWidth, actualStartHeight,
+                        ballSizeInPx, ballSizeInPx
+                    )
+                }
+                
+                android.util.Log.d("FloatingWindowManager", 
+                    "Ball target before coerce: newPos=($newX,$newY), ballSize=$ballSizeInPx")
                     val minVisible = ballSizeInPx / 2
-                    params.x =
-                            params.x.coerceIn(-ballSizeInPx + minVisible, screenWidth - minVisible)
-                    params.y = params.y.coerceIn(0, screenHeight - minVisible)
+                val finalX = newX.coerceIn(-ballSizeInPx + minVisible, screenWidth - minVisible)
+                val finalY = newY.coerceIn(0, screenHeight - minVisible)
+                android.util.Log.d("FloatingWindowManager", 
+                    "Ball target after coerce: finalPos=($finalX,$finalY)")
+                TargetParams(ballSizeInPx, ballSizeInPx, finalX, finalY, flags)
                 }
                 FloatingMode.WINDOW -> {
-                    params.flags =
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    val newWidth =
-                            (state.windowWidth.value.value * density * state.lastWindowScale)
-                                    .toInt()
-                    val newHeight =
-                            (state.windowHeight.value.value * density * state.lastWindowScale)
-                                    .toInt()
-                    params.width = newWidth
-                    params.height = newHeight
-                    if (state.previousMode == FloatingMode.BALL ||
+                val width = (state.windowWidth.value.value * density * state.lastWindowScale).toInt()
+                val height = (state.windowHeight.value.value * density * state.lastWindowScale).toInt()
+                
+                val (tempX, tempY) = if (state.previousMode == FloatingMode.BALL ||
                                     state.previousMode == FloatingMode.VOICE_BALL
                     ) {
-                        val (centeredX, centeredY) =
                                 calculateCenteredPosition(
-                                        currentParams.x,
-                                        currentParams.y,
-                                        currentWidth,
-                                        currentHeight,
-                                        newWidth,
-                                        newHeight
-                                )
-                        params.x = centeredX
-                        params.y = centeredY
+                        startX, startY, startWidth, startHeight,
+                        width, height
+                    )
                     } else {
-                        params.x = state.lastWindowPositionX
-                        params.y = state.lastWindowPositionY
+                    Pair(state.lastWindowPositionX, state.lastWindowPositionY)
                     }
                     state.windowScale.value = state.lastWindowScale
 
                     // Coerce position to be within screen bounds for window mode
-                    val minVisibleWidth = (params.width * 2 / 3)
-                    val minVisibleHeight = (params.height * 2 / 3)
-                    params.x =
-                            params.x.coerceIn(
-                                    -(params.width - minVisibleWidth),
+                val minVisibleWidth = (width * 2 / 3)
+                val minVisibleHeight = (height * 2 / 3)
+                val finalX = tempX.coerceIn(
+                    -(width - minVisibleWidth),
                                     screenWidth - minVisibleWidth / 2
                             )
-                    params.y = params.y.coerceIn(0, screenHeight - minVisibleHeight)
+                val finalY = tempY.coerceIn(0, screenHeight - minVisibleHeight)
+                TargetParams(width, height, finalX, finalY, flags)
                 }
                 FloatingMode.FULLSCREEN -> {
-                    params.flags = 0 // Remove all flags, making it focusable
-                    params.width = screenWidth
-                    params.height = screenHeight
-                    params.x = 0
-                    params.y = 0
-                }
-                FloatingMode.DragonBones -> {
-                    params.flags =
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    val newWidth =
-                            (state.windowWidth.value.value * density * state.lastWindowScale)
-                                    .toInt()
-                    val newHeight =
-                            (state.windowHeight.value.value * density * state.lastWindowScale)
-                                    .toInt()
-                    params.width = newWidth
-                    params.height = newHeight
-                    params.x = state.lastWindowPositionX
-                    params.y = state.lastWindowPositionY
+                val flags = 0 // Remove all flags, making it focusable
+                TargetParams(screenWidth, screenHeight, 0, 0, flags)
+            }
+        }
 
-                    // Coerce position to be within screen bounds for DragonBones mode
-                    val minVisibleWidth = (params.width * 2 / 3)
-                    val minVisibleHeight = (params.height * 2 / 3)
-                    params.x =
-                            params.x.coerceIn(
-                                    -(params.width - minVisibleWidth),
-                                    screenWidth - minVisibleWidth / 2
-                            )
-                    params.y = params.y.coerceIn(0, screenHeight - minVisibleHeight)
+        // 判断是否在球模式和其他模式之间切换
+        val isBallTransition = (state.previousMode == FloatingMode.BALL || 
+                                state.previousMode == FloatingMode.VOICE_BALL) ||
+                               (newMode == FloatingMode.BALL || newMode == FloatingMode.VOICE_BALL)
+        
+        if (isBallTransition) {
+            // 球模式切换：需要与 Compose AnimatedContent 动画同步
+            val isToBall = newMode == FloatingMode.BALL || newMode == FloatingMode.VOICE_BALL
+            val isFromBall = state.previousMode == FloatingMode.BALL || state.previousMode == FloatingMode.VOICE_BALL
+            
+            if (isToBall && !isFromBall) {
+                // 其他模式 -> 球模式
+                // AnimatedContent: 旧内容在 150ms 内 fadeOut + scaleOut，新内容延迟 150ms 后用 350ms fadeIn + scaleIn
+                // 策略：延迟 150ms 后再改变窗口物理尺寸，这样旧内容先消失，然后窗口变小，球再出现
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateViewLayout { params ->
+                        params.width = target.width
+                        params.height = target.height
+                        params.x = target.x
+                        params.y = target.y
+                        params.flags = target.flags
+                        
+                        // Sync state with params
+                        state.x = params.x
+                        state.y = params.y
+                    }
+                }, 150) // 与 fadeOut/scaleOut 的时长匹配
+                
+            } else if (isFromBall && !isToBall) {
+                // 球模式 -> 其他模式：触发淡出动画，球平滑消失
+                // 1. 触发淡出动画（100ms）
+                state.ballExploding.value = true
+                
+                // 2. 延迟 100ms 后改变窗口尺寸（此时球已经淡出消失）
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateViewLayout { params ->
+                        params.width = target.width
+                        params.height = target.height
+                        params.x = target.x
+                        params.y = target.y
+                        params.flags = target.flags
+                        
+                        // Sync state with params
+                        state.x = params.x
+                        state.y = params.y
+                    }
+                    
+                    // 重置淡出状态
+                    state.ballExploding.value = false
+                }, 100) // 与淡出动画时长匹配
+            } else {
+                // 球模式之间切换：立即更新窗口尺寸
+                updateViewLayout { params ->
+                    params.width = target.width
+                    params.height = target.height
+                    params.x = target.x
+                    params.y = target.y
+                    params.flags = target.flags
+                    
+                    // Sync state with params
+                    state.x = params.x
+                    state.y = params.y
                 }
             }
-            // Sync state with params to avoid inconsistency
-            state.x = params.x
-            state.y = params.y
+            
+            // 延迟标记过渡完成，与 AnimatedContent 动画时长匹配
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                state.isTransitioning = false
+            }, 500) // 匹配 AnimatedContent 的最长动画时长
+        } else {
+            // 非球模式切换（如窗口↔全屏）：立即改变窗口尺寸
+            updateViewLayout { params ->
+                params.width = target.width
+                params.height = target.height
+                params.x = target.x
+                params.y = target.y
+                params.flags = target.flags
+
+                // Sync state with params
+                state.x = params.x
+                state.y = params.y
+            }
+
+            // 立即标记过渡完成
+            state.isTransitioning = false
         }
-        // Use a Handler to reset the transitioning flag after a short delay
-        Handler(Looper.getMainLooper()).postDelayed({ state.isTransitioning = false }, 300)
     }
 
     private fun onMove(dx: Float, dy: Float, scale: Float) {

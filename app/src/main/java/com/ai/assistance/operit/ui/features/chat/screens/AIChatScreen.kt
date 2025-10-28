@@ -1,8 +1,11 @@
 package com.ai.assistance.operit.ui.features.chat.screens
 
+import android.os.Build
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import android.util.Log
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -10,8 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,6 +51,7 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModelFactory
 import com.ai.assistance.operit.ui.main.LocalTopBarActions
 import com.ai.assistance.operit.ui.main.components.LocalAppBarContentColor
 import com.ai.assistance.operit.ui.main.screens.GestureStateHolder
+import com.ai.assistance.operit.ui.main.SharedFileHandler
 import java.io.File
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -55,7 +59,12 @@ import kotlinx.coroutines.flow.sample
 import androidx.compose.runtime.snapshotFlow
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 
+
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview(showBackground = true)
@@ -83,6 +92,19 @@ fun AIChatScreen(
 
     // 设置权限系统的颜色方案
     LaunchedEffect(colorScheme) { actualViewModel.setPermissionSystemColorScheme(colorScheme) }
+
+    // Monitor shared files from external apps
+    val sharedFiles by SharedFileHandler.sharedFiles.collectAsState()
+    LaunchedEffect(sharedFiles) {
+        sharedFiles?.let { uris ->
+            if (uris.isNotEmpty()) {
+                // Process the shared files
+                actualViewModel.handleSharedFiles(uris)
+                // Clear the shared files
+                SharedFileHandler.clearSharedFiles()
+            }
+        }
+    }
 
     // 添加麦克风权限请求启动器
     val requestMicrophonePermissionLauncher =
@@ -139,16 +161,20 @@ fun AIChatScreen(
     val isConfigured by actualViewModel.isConfigured.collectAsState()
     val chatHistory by actualViewModel.chatHistory.collectAsState()
     val userMessage by actualViewModel.userMessage.collectAsState()
-    val isLoading by actualViewModel.isLoading.collectAsState()
+    // 仅对当前会话显示处理中状态（影响“停止/发送”按钮）
+    val isLoading by actualViewModel.currentChatIsLoading.collectAsState()
     val errorMessage by actualViewModel.errorMessage.collectAsState()
-    val inputProcessingState by actualViewModel.inputProcessingState.collectAsState()
-    val planItems by actualViewModel.planItems.collectAsState()
+    // 按会话隔离的输入处理状态（用于进度条文案）
+    val inputProcessingState by actualViewModel.currentChatInputProcessingState.collectAsState()
+
     val enableAiPlanning by actualViewModel.enableAiPlanning.collectAsState()
     val enableThinkingMode by actualViewModel.enableThinkingMode.collectAsState() // 收集思考模式状态
     val enableThinkingGuidance by
             actualViewModel.enableThinkingGuidance.collectAsState() // 收集思考引导状态
-    val enableMemoryAttachment by actualViewModel.enableMemoryAttachment.collectAsState()
+    val enableMemoryQuery by actualViewModel.enableMemoryQuery.collectAsState()
+    val enableTools by actualViewModel.enableTools.collectAsState()
     val summaryTokenThreshold by actualViewModel.summaryTokenThreshold.collectAsState()
+    val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
     val showChatHistorySelector by actualViewModel.showChatHistorySelector.collectAsState()
     val chatHistories by actualViewModel.chatHistories.collectAsState()
     val currentChatId by actualViewModel.currentChatId.collectAsState()
@@ -163,6 +189,9 @@ fun AIChatScreen(
 
     // 添加模型建议对话框状态
     var showModelSuggestionDialog by remember { mutableStateOf(false) }
+    
+    // 添加记忆文件夹选择对话框状态
+    var showMemoryFolderDialog by remember { mutableStateOf(false) }
 
     // 当模型名称加载后，检查是否为建议更换的模型
     LaunchedEffect(modelName) {
@@ -209,6 +238,9 @@ fun AIChatScreen(
     // 添加WebView刷新相关状态
     val webViewRefreshCounter by actualViewModel.webViewRefreshCounter.collectAsState()
 
+    // Collect reply state
+    val replyToMessage by actualViewModel.replyToMessage.collectAsState()
+
     // Floating window mode state
     val isFloatingMode by actualViewModel.isFloatingMode.collectAsState()
     val canDrawOverlays = remember { mutableStateOf(Settings.canDrawOverlays(context)) }
@@ -218,6 +250,8 @@ fun AIChatScreen(
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
+    
+
 
     // 确保每次应用启动时正确处理配置界面的显示逻辑
     LaunchedEffect(apiKey) {
@@ -304,20 +338,6 @@ fun AIChatScreen(
         }
     }
 
-    // 当聊天记录变化时，更新悬浮窗内容（使用采样限流）
-    LaunchedEffect(Unit) {
-        snapshotFlow { chatHistory }
-                .sample(300L) // 每300毫秒采样一次，比debounce更适合流式场景
-                .distinctUntilChanged()
-                .collect { history ->
-                    // 在收集器内部直接从StateFlow获取最新状态，避免竞态问题
-                    if (actualViewModel.isFloatingMode.value) {
-                        val filteredMessages = history.filter { it.sender != "think" }
-                        actualViewModel.updateFloatingWindowMessages(filteredMessages)
-                    }
-                }
-    }
-
     // 移除原有的 snackbar 错误处理
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -399,20 +419,25 @@ fun AIChatScreen(
 
     
 
-    // 当showWebView状态改变时，更新TopAppBar的actions
+    // 当showWebView或showAiComputer状态改变时，更新TopAppBar的actions
     // 使用DisposableEffect确保当AIChatScreen离开组合时，actions被清空
     DisposableEffect(showWebView, showAiComputer, appBarContentColor) {
         setTopBarActions {
             // AI电脑模式切换按钮
-            IconButton(onClick = { actualViewModel.onAiComputerButtonClick() }) {
+            IconButton(
+                    onClick = {
+                        actualViewModel.onAiComputerButtonClick()
+                    }
+            ) {
                 Icon(
-                        imageVector = Icons.Default.Computer,
+                        imageVector = Icons.Default.Terminal,
                         contentDescription = "AI电脑",
                         tint =
                                 if (showAiComputer) MaterialTheme.colorScheme.primaryContainer
                                 else appBarContentColor
                 )
             }
+            
             // Web开发模式切换按钮
             IconButton(
                     onClick = {
@@ -430,8 +455,7 @@ fun AIChatScreen(
         }
 
         onDispose {
-            // 当此Composable离开组合时，清空TopAppBar的actions
-            setTopBarActions {}
+            // 当此Composable离开组合时，不再清空TopAppBar的actions，以避免竞争条件
         }
     }
 
@@ -494,6 +518,14 @@ fun AIChatScreen(
                                     // 添加当前位置附件
                                     actualViewModel.captureLocation()
                                 },
+                                onAttachMemory = {
+                                    // 显示记忆文件夹选择对话框
+                                    showMemoryFolderDialog = true
+                                },
+                                onTakePhoto = { uri ->
+                                    // 处理拍摄的照片
+                                    actualViewModel.handleTakenPhoto(uri)
+                                },
                                 hasBackgroundImage = hasBackgroundImage,
                                 chatInputTransparent = chatInputTransparent,
                                 // 传递附件面板状态
@@ -501,7 +533,10 @@ fun AIChatScreen(
                                 onAttachmentPanelStateChange = { newState ->
                                     actualViewModel.updateAttachmentPanelState(newState)
                                 },
-                                showInputProcessingStatus = showInputProcessingStatus
+                                showInputProcessingStatus = showInputProcessingStatus,
+                                enableTools = enableTools,
+                                replyToMessage = replyToMessage,
+                                onClearReply = { actualViewModel.clearReplyToMessage() }
                         )
                     }
                 }
@@ -560,7 +595,6 @@ fun AIChatScreen(
                                 actualViewModel = actualViewModel,
                                 showChatHistorySelector = showChatHistorySelector,
                                 chatHistory = chatHistory,
-                                planItems = planItems,
                                 enableAiPlanning = enableAiPlanning,
                                 isLoading = isLoading,
                                 userMessageColor = userMessageColor,
@@ -624,9 +658,9 @@ fun AIChatScreen(
                                 onContextLengthChange = {
                                     actualViewModel.updateContextLength(it)
                                 },
-                                enableMemoryAttachment = enableMemoryAttachment,
-                                onToggleMemoryAttachment = {
-                                    actualViewModel.toggleMemoryAttachment()
+                                enableMemoryQuery = enableMemoryQuery,
+                                onToggleMemoryQuery = {
+                                    actualViewModel.toggleMemoryQuery()
                                 },
                                 summaryTokenThreshold = summaryTokenThreshold,
                                 onSummaryTokenThresholdChange = {
@@ -634,41 +668,27 @@ fun AIChatScreen(
                                 },
                                 onNavigateToUserPreferences = onNavigateToUserPreferences,
                                 onNavigateToModelConfig = onNavigateToModelConfig,
-                                onNavigateToModelPrompts = onNavigateToModelPrompts
+                                onNavigateToModelPrompts = onNavigateToModelPrompts,
+                                isAutoReadEnabled = isAutoReadEnabled,
+                                onToggleAutoRead = { actualViewModel.toggleAutoRead() },
+                                enableTools = enableTools,
+                                onToggleTools = { actualViewModel.toggleTools() },
+                                onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() }
                         )
                     }
                 }
             }
         }
 
-        // AI电脑作为浮层
-        Layout(
-            modifier = Modifier.fillMaxSize(),
-            content = {
-                // The content is composed unconditionally, keeping it "alive"
-                val currentChat = chatHistories.find { it.id == currentChatId }
-                ComputerScreen(
-                    actualViewModel = actualViewModel,
-                    currentChat = currentChat
-                )
-            }
-        ) { measurables, constraints ->
-            val placeable = measurables.first().measure(constraints)
-            layout(placeable.width, placeable.height) {
-                if (showAiComputer) {
-                    // When visible, place it on-screen.
-                    placeable.placeRelative(0, 0)
-                } else {
-                    // When not visible, place it off-screen to keep it alive but invisible.
-                    placeable.placeRelative(-placeable.width, -placeable.height)
-                }
-            }
-        }
+
 
 
         // Web开发模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
         Layout(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = if (showWebView) 1f else 0f)
+                .clipToBounds(),
             content = {
                 // The content is composed unconditionally, keeping it "alive"
                 val currentChat = chatHistories.find { it.id == currentChatId }
@@ -695,6 +715,33 @@ fun AIChatScreen(
                 val placeable = measurables.first().measure(constraints)
                 layout(placeable.width, placeable.height) {
                     if (showWebView) {
+                        // When visible, place it on-screen.
+                        placeable.placeRelative(0, 0)
+                    } else {
+                        // When not visible, place it off-screen to keep it alive but invisible.
+                        placeable.placeRelative(-placeable.width, -placeable.height)
+                    }
+                }
+            }
+        }
+
+        // AI电脑模式作为浮层，现在位于Scaffold外部，可以覆盖整个屏幕
+        Layout(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = if (showAiComputer) 1f else 0f)
+                .clipToBounds(),
+            content = {
+                // The content is composed unconditionally, keeping it "alive"
+                ComputerScreen()
+            }
+        ) { measurables, constraints ->
+            if (measurables.isEmpty()) {
+                layout(0, 0) {}
+            } else {
+                val placeable = measurables.first().measure(constraints)
+                layout(placeable.width, placeable.height) {
+                    if (showAiComputer) {
                         // When visible, place it on-screen.
                         placeable.placeRelative(0, 0)
                     } else {
@@ -833,30 +880,6 @@ fun AIChatScreen(
         )
     }
 
-    // New Invitation Explanation Dialog
-    val showInvitationExplanation by actualViewModel.showInvitationExplanation.collectAsState()
-    if (showInvitationExplanation) {
-        InvitationExplanationDialog(
-                onDismiss = { actualViewModel.dismissInvitationExplanation() },
-                onConfirm = { actualViewModel.onInvitationExplanationConfirmed() }
-        )
-    }
-
-    // New Invitation Panel Dialog
-    val showInvitationPanel by actualViewModel.showInvitationPanel.collectAsState()
-    if (showInvitationPanel) {
-        val invitationCount by actualViewModel.invitationCount.collectAsState(initial = 0)
-        val invitationMessage by actualViewModel.generatedInvitationMessage.collectAsState()
-
-        InvitationPanelDialog(
-                invitationCount = invitationCount,
-                invitationMessage = invitationMessage,
-                onDismiss = { actualViewModel.dismissInvitationPanel() },
-                onShare = { message -> actualViewModel.shareInvitationMessage(message) },
-                onVerifyCode = { code -> actualViewModel.verifyAndHandleConfirmationCode(code) }
-        )
-    }
-
     // Check for overlay permission on resume
     LaunchedEffect(Unit) {
         canDrawOverlays.value = Settings.canDrawOverlays(context)
@@ -864,12 +887,21 @@ fun AIChatScreen(
         // If floating mode is on but no permission, turn it off
         if (isFloatingMode && !canDrawOverlays.value) {
             actualViewModel.toggleFloatingMode()
-            android.widget.Toast.makeText(
+            Toast.makeText(
                             context,
                             "未获得悬浮窗权限，已关闭悬浮窗模式",
-                            android.widget.Toast.LENGTH_SHORT
+                            Toast.LENGTH_SHORT
                     )
                     .show()
         }
     }
+    
+    // 记忆文件夹选择对话框
+    MemoryFolderSelectionDialog(
+        visible = showMemoryFolderDialog,
+        onDismiss = { showMemoryFolderDialog = false },
+        onConfirm = { selectedFolders ->
+            actualViewModel.captureMemoryFolders(selectedFolders)
+        }
+    )
 }

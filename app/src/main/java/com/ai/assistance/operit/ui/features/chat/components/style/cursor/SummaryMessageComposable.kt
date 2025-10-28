@@ -31,7 +31,8 @@ fun SummaryMessageComposable(
     message: ChatMessage,
     backgroundColor: Color,
     textColor: Color,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     // 记住展开状态
     var showSummaryDialog by remember { mutableStateOf(false) }
@@ -43,7 +44,10 @@ fun SummaryMessageComposable(
         Row(
             modifier =
                 Modifier.fillMaxWidth()
-                    .clickable { showSummaryDialog = true }
+                    .clickable(enabled = enableDialog) {
+                        // 仅在启用弹窗时才允许点击
+                        if (enableDialog) showSummaryDialog = true
+                    }
                     .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
@@ -92,8 +96,8 @@ fun SummaryMessageComposable(
         }
     }
 
-    // 显示详细内容的对话框
-    if (showSummaryDialog) {
+    // 显示详细内容的对话框 - 仅在启用弹窗时显示
+    if (showSummaryDialog && enableDialog) {
         Dialog(onDismissRequest = { showSummaryDialog = false }) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -160,7 +164,8 @@ fun SummaryMessageComposable(
         }
     }
 
-    if (showDeleteConfirmDialog) {
+    // 删除确认对话框 - 仅在启用弹窗时显示
+    if (showDeleteConfirmDialog && enableDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = { Text("确认删除摘要") },

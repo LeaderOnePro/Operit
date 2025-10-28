@@ -11,7 +11,7 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.services.floating.FloatingWindowState
-import com.ai.assistance.operit.ui.floating.ui.window.ResizeEdge
+import com.ai.assistance.operit.ui.floating.ui.window.models.ResizeEdge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +59,9 @@ fun rememberFloatContext(
             ballSize,
             windowScale,
             onScaleChange,
+            currentMode, // <-- 添加 currentMode
+            previousMode, // <-- 添加 previousMode
+            onModeChange,
             onMove,
             snapToEdge,
             isAtEdge,
@@ -107,11 +110,6 @@ fun rememberFloatContext(
                 chatService = chatService,
                 windowState = windowState
         )
-    }
-
-    LaunchedEffect(currentMode, previousMode) {
-        floatContext.currentMode = currentMode
-        floatContext.previousMode = previousMode
     }
 
     return floatContext

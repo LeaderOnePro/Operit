@@ -16,6 +16,18 @@ METADATA
                     "required": true
                 }
             ]
+        },
+        {
+            "name": "get_douyin_video_info",
+            "description": "解析抖音分享链接或口令，仅获取视频信息和无水印下载链接，不下载视频",
+            "parameters": [
+                {
+                    "name": "input",
+                    "description": "抖音分享链接或包含链接的分享口令文本",
+                    "type": "string",
+                    "required": true
+                }
+            ]
         }
     ],
     "category": "NETWORK"
@@ -164,6 +176,43 @@ const douyin = (function () {
             throw new Error(message);
         }
     }
+    /**
+     * 获取抖音视频信息和无水印下载链接（不下载视频）
+     */
+    async function get_douyin_video_info(params) {
+        const { input } = params;
+        if (!input) {
+            throw new Error("输入内容不能为空");
+        }
+        console.log("开始解析抖音视频信息...");
+        try {
+            // 1. 提取URL
+            const douyinUrl = extractDouyinUrl(input);
+            if (!douyinUrl) {
+                throw new Error("未找到有效的抖音链接");
+            }
+            console.log(`找到抖音链接: ${douyinUrl}`);
+            // 2. 解析链接并获取视频信息
+            console.log("正在解析分享链接...");
+            const { videoId, downloadUrl, videoTitle } = await resolveDouyinUrl(douyinUrl);
+            console.log(`解析到视频ID: ${videoId}`);
+            console.log(`获取到无水印下载链接: ${downloadUrl}`);
+            console.log(`视频标题: ${videoTitle}`);
+            const result = {
+                videoId,
+                videoTitle,
+                downloadUrl,
+                originalUrl: douyinUrl
+            };
+            console.log("视频信息解析成功");
+            return result;
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`解析失败: ${message}`);
+            throw new Error(message);
+        }
+    }
     //region 测试函数
     /**
      * 抖音工具功能测试主函数
@@ -198,11 +247,13 @@ const douyin = (function () {
     //endregion
     return {
         get_douyin_download_link: (params) => douyin_wrap(get_douyin_download_link, params, '抖音视频下载完成', '抖音视频下载失败'),
+        get_douyin_video_info: (params) => douyin_wrap(get_douyin_video_info, params, '抖音视频信息获取成功', '抖音视频信息获取失败'),
         main: (params) => douyin_wrap(main, params, '抖音工具测试完成', '抖音工具测试失败'),
         test_download_link: (params) => douyin_wrap(test_download_link, params, '下载链接获取测试成功', '下载链接获取测试失败'),
     };
 })();
 // 导出所有功能
 exports.get_douyin_download_link = douyin.get_douyin_download_link;
+exports.get_douyin_video_info = douyin.get_douyin_video_info;
 exports.main = douyin.main;
 exports.test_download_link = douyin.test_download_link;

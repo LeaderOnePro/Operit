@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
@@ -32,13 +33,15 @@ class SpeechServicesPreferences(private val context: Context) {
         val httpMethod: String = "GET", // HTTP方法：GET 或 POST
         val requestBody: String = "", // POST请求的body模板，支持占位符如{text}
         val contentType: String = "application/json", // POST请求的Content-Type
-        val voiceId: String = "" // 特定于TTS提供商的音色ID
+        val voiceId: String = "", // 特定于TTS提供商的音色ID
+        val modelName: String = "" // TTS模型名称（用于SiliconFlow等）
     )
 
     companion object {
         // TTS Preference Keys
         val TTS_SERVICE_TYPE = stringPreferencesKey("tts_service_type")
         val TTS_HTTP_CONFIG = stringPreferencesKey("tts_http_config")
+        val TTS_CLEANER_REGEXS = stringSetPreferencesKey("tts_cleaner_regexs")
 
         // STT Preference Keys
         val STT_SERVICE_TYPE = stringPreferencesKey("stt_service_type")
@@ -56,7 +59,14 @@ class SpeechServicesPreferences(private val context: Context) {
             httpMethod = "GET",
             requestBody = "",
             contentType = "application/json",
-            voiceId = ""
+            voiceId = "",
+            modelName = ""
+        )
+        
+        // TTS Cleaner 的默认正则表达式列表（去除中英文括号内容）
+        val DEFAULT_TTS_CLEANER_REGEXS = listOf(
+            "\\([^)]+\\)",  // 英文括号
+            "（[^）]+）"     // 中文括号
         )
     }
 
@@ -80,6 +90,15 @@ class SpeechServicesPreferences(private val context: Context) {
         }
     }
 
+    val ttsCleanerRegexsFlow: Flow<List<String>> = dataStore.data.map { prefs ->
+        val storedRegexs = prefs[TTS_CLEANER_REGEXS]
+        if (storedRegexs == null) {
+            DEFAULT_TTS_CLEANER_REGEXS
+        } else {
+            storedRegexs.toList()
+        }
+    }
+
     // --- STT Flows ---
     val sttServiceTypeFlow: Flow<SpeechServiceFactory.SpeechServiceType> = dataStore.data.map { prefs ->
         SpeechServiceFactory.SpeechServiceType.valueOf(
@@ -90,11 +109,16 @@ class SpeechServicesPreferences(private val context: Context) {
     // --- Save TTS Settings ---
     suspend fun saveTtsSettings(
         serviceType: VoiceServiceFactory.VoiceServiceType,
-        httpConfig: TtsHttpConfig? = null
+        httpConfig: TtsHttpConfig? = null,
+        cleanerRegexs: List<String>? = null
     ) {
         dataStore.edit { prefs ->
             prefs[TTS_SERVICE_TYPE] = serviceType.name
             
+            cleanerRegexs?.let {
+                prefs[TTS_CLEANER_REGEXS] = it.filter { regex -> regex.isNotBlank() }.toSet()
+            }
+
             // 根据服务类型保存相应的配置
             when (serviceType) {
                 VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
@@ -107,6 +131,13 @@ class SpeechServicesPreferences(private val context: Context) {
                     httpConfig?.let { prefs[TTS_HTTP_CONFIG] = Json.encodeToString(it) }
                 }
             }
+        }
+    }
+
+    /** 只保存 TTS 清理正则列表 */
+    suspend fun saveTtsCleanerRegexs(regexs: List<String>) {
+        dataStore.edit { prefs ->
+            prefs[TTS_CLEANER_REGEXS] = regexs.filter { it.isNotBlank() }.toSet()
         }
     }
 

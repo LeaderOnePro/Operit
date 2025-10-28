@@ -16,11 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MicExternalOn
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -45,8 +45,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
@@ -60,19 +62,23 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import com.ai.assistance.operit.api.voice.SiliconFlowVoiceProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
+fun SpeechServicesSettingsScreen(
+    onBackPressed: () -> Unit,
+    onNavigateToTextToSpeech: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { SpeechServicesPreferences(context) }
-    
-    var showSaveSuccessMessage by remember { mutableStateOf(false) }
 
     // --- State for TTS Settings ---
     val ttsServiceType by prefs.ttsServiceTypeFlow.collectAsState(initial = VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS)
     val httpConfig by prefs.ttsHttpConfigFlow.collectAsState(initial = SpeechServicesPreferences.DEFAULT_HTTP_TTS_PRESET)
+    val ttsCleanerRegexs by prefs.ttsCleanerRegexsFlow.collectAsState(initial = emptyList())
 
     var ttsServiceTypeInput by remember(ttsServiceType) { mutableStateOf(ttsServiceType) }
     var ttsUrlTemplateInput by remember(httpConfig) { mutableStateOf(httpConfig.urlTemplate) }
@@ -82,88 +88,81 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
     var ttsRequestBodyInput by remember(httpConfig) { mutableStateOf(httpConfig.requestBody) }
     var ttsContentTypeInput by remember(httpConfig) { mutableStateOf(httpConfig.contentType) }
     var ttsVoiceIdInput by remember(httpConfig) { mutableStateOf(httpConfig.voiceId) }
+    var ttsModelNameInput by remember(httpConfig) { mutableStateOf(httpConfig.modelName) }
     var ttsJsonError by remember { mutableStateOf<String?>(null) }
     var httpMethodDropdownExpanded by remember { mutableStateOf(false) }
+    val ttsCleanerRegexsState = remember { mutableStateListOf<String>() }
 
     // --- State for STT Settings ---
     val sttServiceType by prefs.sttServiceTypeFlow.collectAsState(initial = SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN)
     var sttServiceTypeInput by remember(sttServiceType) { mutableStateOf(sttServiceType) }
 
-    // 验证配置是否有效
-    fun isConfigurationValid(): Boolean {
-        return when (ttsServiceTypeInput) {
-            VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
-                val basicValid = ttsJsonError == null && ttsUrlTemplateInput.isNotBlank()
-                if (ttsHttpMethodInput == "POST") {
-                    basicValid && ttsRequestBodyInput.isNotBlank() && ttsContentTypeInput.isNotBlank()
-                } else {
-                    basicValid
-                }
-            }
-            VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
-                ttsApiKeyInput.isNotBlank() && ttsVoiceIdInput.isNotBlank()
-            }
-            VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> true
+    // 同步 DataStore 的数据到 State
+    LaunchedEffect(ttsCleanerRegexs) {
+        if (ttsCleanerRegexs != ttsCleanerRegexsState.toList()) {
+            ttsCleanerRegexsState.clear()
+            ttsCleanerRegexsState.addAll(ttsCleanerRegexs)
         }
     }
 
-    // 保存设置的函数
-    fun saveSettings() {
-        val headersMap = try {
-            Json.decodeFromString<Map<String, String>>(ttsHeadersInput)
-        } catch (e: Exception) {
-            ttsJsonError = "无效的 JSON 格式"
-            return
-        }
-        
-        ttsJsonError = null
-        
+    // 保存状态和消息
+    var isSaving by remember { mutableStateOf(false) }
+    var saveMessage by remember { mutableStateOf<String?>(null) }
+    
+    // 保存函数
+    val saveSettings: () -> Unit = {
         scope.launch {
-            when (ttsServiceTypeInput) {
-                VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> {
-                    prefs.saveTtsSettings(
-                        serviceType = ttsServiceTypeInput,
-                        httpConfig = SpeechServicesPreferences.TtsHttpConfig(
-                            urlTemplate = ttsUrlTemplateInput,
-                            apiKey = ttsApiKeyInput,
-                            headers = headersMap,
-                            httpMethod = ttsHttpMethodInput,
-                            requestBody = ttsRequestBodyInput,
-                            contentType = ttsContentTypeInput
-                        )
-                    )
+            try {
+                isSaving = true
+                saveMessage = null
+                
+                // 验证 JSON headers
+                val headers = try {
+                    Json.decodeFromString<Map<String, String>>(ttsHeadersInput)
+                } catch (e: Exception) {
+                    if (ttsHeadersInput.isNotBlank() && ttsHeadersInput != "{}") {
+                        throw IllegalArgumentException(context.getString(R.string.speech_services_http_headers_error))
+                    }
+                    emptyMap()
                 }
-                VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
-                    prefs.saveTtsSettings(
-                        serviceType = ttsServiceTypeInput,
-                        httpConfig = SpeechServicesPreferences.TtsHttpConfig(
-                            urlTemplate = "",
-                            apiKey = ttsApiKeyInput,
-                            headers = emptyMap(),
-                            httpMethod = "",
-                            requestBody = "",
-                            contentType = "",
-                            voiceId = ttsVoiceIdInput
-                        )
-                    )
-                }
-                VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> {
-                    prefs.saveTtsSettings(serviceType = ttsServiceTypeInput)
-                }
+                
+                val httpConfigData = SpeechServicesPreferences.TtsHttpConfig(
+                    urlTemplate = ttsUrlTemplateInput,
+                    apiKey = ttsApiKeyInput,
+                    headers = headers,
+                    httpMethod = ttsHttpMethodInput,
+                    requestBody = ttsRequestBodyInput,
+                    contentType = ttsContentTypeInput,
+                    voiceId = ttsVoiceIdInput,
+                    modelName = ttsModelNameInput
+                )
+                
+                // 保存 TTS 设置
+                prefs.saveTtsSettings(
+                    serviceType = ttsServiceTypeInput,
+                    httpConfig = httpConfigData,
+                    cleanerRegexs = ttsCleanerRegexsState.toList()
+                )
+                
+                // 保存 STT 设置
+                prefs.saveSttSettings(sttServiceTypeInput)
+                
+                // 重置服务实例以应用新设置
+                VoiceServiceFactory.resetInstance()
+                SpeechServiceFactory.resetInstance()
+                
+                saveMessage = context.getString(R.string.speech_services_save_success)
+            } catch (e: Exception) {
+                saveMessage = context.getString(R.string.speech_services_save_error, e.message ?: "Unknown error")
+            } finally {
+                isSaving = false
+                // 3秒后清除消息
+                delay(3000)
+                saveMessage = null
             }
-            
-            prefs.saveSttSettings(
-                serviceType = sttServiceTypeInput
-            )
-            
-            VoiceServiceFactory.resetInstance()
-            SpeechServiceFactory.resetInstance()
-            
-            showSaveSuccessMessage = true
-            delay(3000)
-            showSaveSuccessMessage = false
         }
     }
+
 
     CustomScaffold { paddingValues ->
         Box(modifier = Modifier
@@ -200,7 +199,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "文本转语音 (TTS) 设置",
+                                    text = stringResource(R.string.speech_services_tts_title),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -208,14 +207,14 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                         }
                         
                         Text(
-                            text = "配置如何将文本转换为语音输出",
+                            text = stringResource(R.string.speech_services_tts_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
                         Text(
-                            text = "服务类型",
+                            text = stringResource(R.string.speech_services_service_type),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 4.dp)
@@ -229,15 +228,15 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                         ) {
                             OutlinedTextField(
                                 value = when(ttsServiceTypeInput) {
-                                    VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> "系统 TTS (简单)"
-                                    VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> "HTTP API (远程)"
-                                    VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> "硅基流动 TTS"
+                                    VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> stringResource(R.string.speech_services_tts_type_simple)
+                                    VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> stringResource(R.string.speech_services_tts_type_http)
+                                    VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> stringResource(R.string.speech_services_tts_type_siliconflow)
                                 },
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("TTS 引擎") },
+                                label = { Text(stringResource(R.string.speech_services_tts_engine)) },
                                 trailingIcon = { 
-                                    Icon(Icons.Default.ArrowDropDown, "展开下拉菜单")
+                                    Icon(Icons.Default.ArrowDropDown, stringResource(R.string.speech_services_dropdown_expand))
                                 },
                                 modifier = Modifier.menuAnchor().fillMaxWidth()
                             )
@@ -250,9 +249,9 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                         text = { 
                                             Text(
                                                 text = when(type) {
-                                                    VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> "系统 TTS (简单)"
-                                                    VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> "HTTP API (远程)"
-                                                    VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> "硅基流动 TTS"
+                                                    VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> stringResource(R.string.speech_services_tts_type_simple)
+                                                    VoiceServiceFactory.VoiceServiceType.HTTP_TTS -> stringResource(R.string.speech_services_tts_type_http)
+                                                    VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> stringResource(R.string.speech_services_tts_type_siliconflow)
                                                 },
                                                 fontWeight = if (ttsServiceTypeInput == type) FontWeight.Medium else FontWeight.Normal
                                             ) 
@@ -266,10 +265,114 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             }
                         }
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // TTS Cleaner Regex List
+                        Text(
+                            text = stringResource(R.string.speech_services_tts_cleaner_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        
+                        Text(
+                            text = stringResource(R.string.speech_services_tts_cleaner_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Column {
+                            ttsCleanerRegexsState.forEachIndexed { index, regex ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = regex,
+                                        onValueChange = { ttsCleanerRegexsState[index] = it },
+                                        placeholder = { Text(stringResource(R.string.speech_services_tts_cleaner_placeholder)) },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                    )
+                                    IconButton(onClick = { ttsCleanerRegexsState.removeAt(index) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.speech_services_tts_cleaner_delete))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { ttsCleanerRegexsState.add("") },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(R.string.speech_services_tts_cleaner_add))
+                                }
+                                
+                                var showTemplateMenu by remember { mutableStateOf(false) }
+                                OutlinedButton(
+                                    onClick = { showTemplateMenu = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(stringResource(R.string.speech_services_tts_cleaner_template))
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                }
+                                
+                                DropdownMenu(
+                                    expanded = showTemplateMenu,
+                                    onDismissRequest = { showTemplateMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.speech_services_tts_cleaner_template_asterisk)) },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\*[^*]+\\*")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.speech_services_tts_cleaner_template_double_asterisk)) },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\*\\*[^*]+\\*\\*")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.speech_services_tts_cleaner_template_parenthesis)) },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("\\([^)]+\\)")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.speech_services_tts_cleaner_template_chinese_parenthesis)) },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("（[^）]+）")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.speech_services_tts_cleaner_template_xml)) },
+                                        onClick = {
+                                            ttsCleanerRegexsState.add("<[^>]+>")
+                                            showTemplateMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         AnimatedVisibility(visible = ttsServiceTypeInput == VoiceServiceFactory.VoiceServiceType.HTTP_TTS) {
                             Column(modifier = Modifier.padding(top = 16.dp)) {
                                 Text(
-                                    text = "HTTP TTS 配置",
+                                    text = stringResource(R.string.speech_services_http_tts_config),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -279,8 +382,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 OutlinedTextField(
                                     value = ttsUrlTemplateInput,
                                     onValueChange = { ttsUrlTemplateInput = it },
-                                    label = { Text("URL 模板") },
-                                    placeholder = { Text("例如: https://api.example.com/tts?text={text}") },
+                                    label = { Text(stringResource(R.string.speech_services_http_url_template)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_http_url_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
                                 )
@@ -290,8 +393,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 OutlinedTextField(
                                     value = ttsApiKeyInput,
                                     onValueChange = { ttsApiKeyInput = it },
-                                    label = { Text("API 密钥") },
-                                    placeholder = { Text("可选，某些服务需要") },
+                                    label = { Text(stringResource(R.string.speech_services_http_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_http_api_key_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
                                 )
@@ -307,14 +410,14 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                             ttsJsonError = null
                                         } catch (e: Exception) {
                                             if (it.isNotBlank() && it != "{}") {
-                                                ttsJsonError = "无效的 JSON 格式"
+                                                ttsJsonError = context.getString(R.string.speech_services_http_headers_error)
                                             } else {
                                                 ttsJsonError = null
                                             }
                                         }
                                     },
-                                    label = { Text("HTTP 头部 (JSON)") },
-                                    placeholder = { Text("{\"Content-Type\": \"application/json\"}") },
+                                    label = { Text(stringResource(R.string.speech_services_http_headers)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_http_headers_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     minLines = 2,
                                     isError = ttsJsonError != null
@@ -334,7 +437,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                     OutlinedTextField(
                                         value = ttsHttpMethodInput,
                                         onValueChange = { },
-                                        label = { Text("HTTP 方法") },
+                                        label = { Text(stringResource(R.string.speech_services_http_method)) },
                                         readOnly = true,
                                         modifier = Modifier.weight(1f),
                                         trailingIcon = {
@@ -353,7 +456,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                                 }
                                             }
                                             IconButton(onClick = { httpMethodDropdownExpanded = true }) {
-                                                Icon(Icons.Default.ArrowDropDown, "选择HTTP方法")
+                                                Icon(Icons.Default.ArrowDropDown, stringResource(R.string.speech_services_http_method_select))
                                             }
                                         }
                                     )
@@ -363,8 +466,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                     OutlinedTextField(
                                         value = ttsContentTypeInput,
                                         onValueChange = { ttsContentTypeInput = it },
-                                        label = { Text("Content-Type") },
-                                        placeholder = { Text("application/json") },
+                                        label = { Text(stringResource(R.string.speech_services_http_content_type)) },
+                                        placeholder = { Text(stringResource(R.string.speech_services_http_content_type_placeholder)) },
                                         modifier = Modifier.weight(1f),
                                         singleLine = true
                                     )
@@ -376,8 +479,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                     OutlinedTextField(
                                         value = ttsRequestBodyInput,
                                         onValueChange = { ttsRequestBodyInput = it },
-                                        label = { Text("请求体模板") },
-                                        placeholder = { Text("{\"text\": \"{text}\"}") },
+                                        label = { Text(stringResource(R.string.speech_services_http_request_body)) },
+                                        placeholder = { Text(stringResource(R.string.speech_services_http_request_body_placeholder)) },
                                         modifier = Modifier.fillMaxWidth(),
                                         minLines = 3
                                     )
@@ -388,7 +491,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                         AnimatedVisibility(visible = ttsServiceTypeInput == VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS) {
                             Column(modifier = Modifier.padding(top = 16.dp)) {
                                 Text(
-                                    text = "硅基流动 TTS 配置",
+                                    text = stringResource(R.string.speech_services_siliconflow_config),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -398,23 +501,50 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 OutlinedTextField(
                                     value = ttsApiKeyInput,
                                     onValueChange = { ttsApiKeyInput = it },
-                                    label = { Text("API 密钥") },
-                                    placeholder = { Text("请输入您的硅基流动API密钥") },
+                                    label = { Text(stringResource(R.string.speech_services_siliconflow_api_key)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_siliconflow_api_key_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
                                 )
 
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // 模型设置
+                                Text(
+                                    text = stringResource(R.string.speech_services_siliconflow_model_settings),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+
                                 Spacer(modifier = Modifier.height(8.dp))
+
+                                OutlinedTextField(
+                                    value = ttsModelNameInput,
+                                    onValueChange = { ttsModelNameInput = it },
+                                    label = { Text(stringResource(R.string.speech_services_siliconflow_model_name)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_siliconflow_model_name_placeholder)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    supportingText = {
+                                        Text(
+                                            text = stringResource(R.string.speech_services_siliconflow_model_name_hint),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
 
                                 // 音色选择
                                 var voiceDropdownExpanded by remember { mutableStateOf(false) }
                                 val availableVoices = remember { SiliconFlowVoiceProvider.AVAILABLE_VOICES }
                                 val selectedVoiceName = remember(ttsVoiceIdInput) {
-                                    availableVoices.find { it.id == ttsVoiceIdInput }?.name ?: "自定义音色"
+                                    availableVoices.find { it.id == ttsVoiceIdInput }?.name ?: context.getString(R.string.speech_services_siliconflow_voice_custom)
                                 }
 
                                 Text(
-                                    text = "音色设置",
+                                    text = stringResource(R.string.speech_services_siliconflow_voice_settings),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -430,9 +560,9 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                         value = selectedVoiceName,
                                         onValueChange = {},
                                         readOnly = true,
-                                        label = { Text("选择预设音色") },
+                                        label = { Text(stringResource(R.string.speech_services_siliconflow_voice_select)) },
                                         trailingIcon = {
-                                            Icon(Icons.Default.ArrowDropDown, "选择音色")
+                                            Icon(Icons.Default.ArrowDropDown, stringResource(R.string.speech_services_siliconflow_voice_select_icon))
                                         },
                                         modifier = Modifier.menuAnchor().fillMaxWidth()
                                     )
@@ -458,13 +588,13 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                 OutlinedTextField(
                                     value = ttsVoiceIdInput,
                                     onValueChange = { ttsVoiceIdInput = it },
-                                    label = { Text("音色ID（可直接输入）") },
-                                    placeholder = { Text("例如：FunAudioLLM/CosyVoice2-0.5B:charles 或用户自定义音色ID") },
+                                    label = { Text(stringResource(R.string.speech_services_siliconflow_voice_id)) },
+                                    placeholder = { Text(stringResource(R.string.speech_services_siliconflow_voice_id_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     supportingText = {
                                         Text(
-                                            text = "支持系统预置音色和用户上传的自定义音色",
+                                            text = stringResource(R.string.speech_services_siliconflow_voice_id_hint),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -500,21 +630,21 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "语音转文本 (STT) 设置",
+                                text = stringResource(R.string.speech_services_stt_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         
                         Text(
-                            text = "配置如何将语音转换为文本",
+                            text = stringResource(R.string.speech_services_stt_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
                         Text(
-                            text = "服务类型",
+                            text = stringResource(R.string.speech_services_service_type),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 4.dp)
@@ -528,13 +658,13 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                         ) {
                             OutlinedTextField(
                                 value = when(sttServiceTypeInput) {
-                                    SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN -> "Sherpa NCNN (本地)"
+                                    SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN -> stringResource(R.string.speech_services_stt_type_sherpa)
                                 },
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("STT 引擎") },
+                                label = { Text(stringResource(R.string.speech_services_stt_engine)) },
                                 trailingIcon = { 
-                                    Icon(Icons.Default.ArrowDropDown, "展开下拉菜单")
+                                    Icon(Icons.Default.ArrowDropDown, stringResource(R.string.speech_services_dropdown_expand))
                                 },
                                 modifier = Modifier.menuAnchor().fillMaxWidth()
                             )
@@ -547,7 +677,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                                         text = { 
                                             Text(
                                                 text = when(type) {
-                                                    SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN -> "Sherpa NCNN (本地)"
+                                                    SpeechServiceFactory.SpeechServiceType.SHERPA_NCNN -> stringResource(R.string.speech_services_stt_type_sherpa)
                                                 },
                                                 fontWeight = if (sttServiceTypeInput == type) FontWeight.Medium else FontWeight.Normal
                                             ) 
@@ -579,7 +709,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "目前仅支持本地 Sherpa-NCNN 引擎。",
+                                text = stringResource(R.string.speech_services_stt_info),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -610,7 +740,7 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "关于语音服务",
+                                text = stringResource(R.string.speech_services_info_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -618,8 +748,8 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                         
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SettingsInfoRow(
-                                title = "文本转语音 (TTS)",
-                                description = "TTS 服务将文本转换为语音。您可以使用内置的系统 TTS 引擎或连接到远程 HTTP API。"
+                                title = stringResource(R.string.speech_services_info_tts_title),
+                                description = stringResource(R.string.speech_services_info_tts_desc)
                             )
                             
                             Divider(
@@ -628,51 +758,71 @@ fun SpeechServicesSettingsScreen(onBackPressed: () -> Unit) {
                             )
                             
                             SettingsInfoRow(
-                                title = "语音转文本 (STT)",
-                                description = "STT 服务将语音转换为文本。目前仅支持内置的 Sherpa NCNN 引擎，该引擎在本地设备上运行，不需要网络连接。"
+                                title = stringResource(R.string.speech_services_info_stt_title),
+                                description = stringResource(R.string.speech_services_info_stt_desc)
                             )
                         }
                     }
                 }
                 
-                // 显示保存成功的消息
-                AnimatedVisibility(visible = showSaveSuccessMessage) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                // 底部保存按钮区域
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Button(
+                            onClick = saveSettings,
+                            enabled = !isSaving,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isSaving) {
+                                Text(stringResource(R.string.speech_services_saving))
+                            } else {
+                                Text(stringResource(R.string.speech_services_save_button))
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedButton(
+                            onClick = onNavigateToTextToSpeech,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = Icons.Default.VolumeUp,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.speech_services_test_tts))
+                        }
+                        
+                        // 显示保存消息
+                        saveMessage?.let { message ->
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "设置已保存",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
+                                text = message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (message.contains(context.getString(R.string.speech_services_save_success))) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
-                }
-                
-                // 保存按钮
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = { saveSettings() },
-                    enabled = isConfigurationValid(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("保存设置")
                 }
                 
                 // 底部空间

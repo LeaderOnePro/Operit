@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -297,13 +298,25 @@ fun GraphVisualizer(
                 if (sourcePos != null && targetPos != null) {
                     val start = sourcePos * scale + offset
                     val end = targetPos * scale + offset
+                    val strokeWidth = (edge.weight * 3f).coerceIn(1f, 12f)
                     
-                    drawLine(
-                        color = if (edge.id == selectedEdgeId) colorScheme.error else colorScheme.outline,
-                        start = start,
-                        end = end,
-                        strokeWidth = (edge.weight * 3f).coerceIn(1f, 12f)
-                    )
+                    // 如果是跨文件夹连接，使用虚线绘制
+                    if (edge.isCrossFolderLink) {
+                        drawLine(
+                            color = if (edge.id == selectedEdgeId) colorScheme.error else colorScheme.outline,
+                            start = start,
+                            end = end,
+                            strokeWidth = strokeWidth,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+                    } else {
+                        drawLine(
+                            color = if (edge.id == selectedEdgeId) colorScheme.error else colorScheme.outline,
+                            start = start,
+                            end = end,
+                            strokeWidth = strokeWidth
+                        )
+                    }
                     
                     edge.label?.let { label ->
                         val center = (start + end) / 2f

@@ -39,23 +39,40 @@ class ApiPreferences private constructor(private val context: Context) {
                 instance
             }
         }
-        // 动态生成FunctionType的Token键
-        fun getTokenInputKey(functionType: FunctionType) =
-                intPreferencesKey("token_input_${functionType.name}")
+        // 动态生成供应商:模型的Token键
+        fun getTokenInputKey(providerModel: String) =
+                intPreferencesKey("token_input_${providerModel.replace(":", "_")}")
 
-        fun getTokenOutputKey(functionType: FunctionType) =
-                intPreferencesKey("token_output_${functionType.name}")
+        fun getTokenCachedInputKey(providerModel: String) =
+                intPreferencesKey("token_cached_input_${providerModel.replace(":", "_")}")
+
+        fun getTokenOutputKey(providerModel: String) =
+                intPreferencesKey("token_output_${providerModel.replace(":", "_")}")
+
+        // 模型定价键
+        fun getModelInputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_input_price_${providerModel.replace(":", "_")}")
+
+        fun getModelCachedInputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_cached_input_price_${providerModel.replace(":", "_")}")
+
+        fun getModelOutputPriceKey(providerModel: String) =
+                floatPreferencesKey("model_output_price_${providerModel.replace(":", "_")}")
 
         val SHOW_FPS_COUNTER = booleanPreferencesKey("show_fps_counter")
         val ENABLE_AI_PLANNING = booleanPreferencesKey("enable_ai_planning")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val ENABLE_REPLY_NOTIFICATION = booleanPreferencesKey("enable_reply_notification")
 
         // Keys for Thinking Mode and Thinking Guidance
         val ENABLE_THINKING_MODE = booleanPreferencesKey("enable_thinking_mode")
         val ENABLE_THINKING_GUIDANCE = booleanPreferencesKey("enable_thinking_guidance")
 
         // Key for Memory Attachment
-        val ENABLE_MEMORY_ATTACHMENT = booleanPreferencesKey("enable_memory_attachment")
+        val ENABLE_MEMORY_QUERY = booleanPreferencesKey("enable_memory_query")
+
+        // Key for Auto Read
+        val ENABLE_AUTO_READ = booleanPreferencesKey("enable_auto_read")
 
         // Key for Waifu Mode
         val ENABLE_WAIFU_MODE = booleanPreferencesKey("enable_waifu_mode")
@@ -65,6 +82,14 @@ class ApiPreferences private constructor(private val context: Context) {
         val WAIFU_ENABLE_EMOTICONS = booleanPreferencesKey("waifu_enable_emoticons") // 是否启用表情包
         val WAIFU_ENABLE_SELFIE = booleanPreferencesKey("waifu_enable_selfie") // 是否启用自拍功能
         val WAIFU_SELFIE_PROMPT = stringPreferencesKey("waifu_selfie_prompt") // 自拍功能的外貌提示词
+
+        // Key for Tools Enable/Disable
+        val ENABLE_TOOLS = booleanPreferencesKey("enable_tools")
+
+        // Keys for Summary Settings
+        val ENABLE_SUMMARY = booleanPreferencesKey("enable_summary")
+        val ENABLE_SUMMARY_BY_MESSAGE_COUNT = booleanPreferencesKey("enable_summary_by_message_count")
+        val SUMMARY_MESSAGE_COUNT_THRESHOLD = intPreferencesKey("summary_message_count_threshold")
 
         // Key for Context Length
         val CONTEXT_LENGTH = floatPreferencesKey("context_length")
@@ -78,16 +103,26 @@ class ApiPreferences private constructor(private val context: Context) {
         // Custom System Prompt Template (Advanced Configuration)
         val CUSTOM_SYSTEM_PROMPT_TEMPLATE = stringPreferencesKey("custom_system_prompt_template")
 
+        // Keys for Truncation Settings (文件和结果截断配置)
+        val MAX_FILE_SIZE_BYTES = intPreferencesKey("max_file_size_bytes")
+        val PART_SIZE = intPreferencesKey("part_size")
+        val MAX_TEXT_RESULT_LENGTH = intPreferencesKey("max_text_result_length")
+        val MAX_HTTP_RESPONSE_LENGTH = intPreferencesKey("max_http_response_length")
+
         const val DEFAULT_SHOW_FPS_COUNTER = false
         const val DEFAULT_ENABLE_AI_PLANNING = false
         const val DEFAULT_KEEP_SCREEN_ON = true
+        const val DEFAULT_ENABLE_REPLY_NOTIFICATION = true
 
         // Default values for Thinking Mode and Thinking Guidance
         const val DEFAULT_ENABLE_THINKING_MODE = false
         const val DEFAULT_ENABLE_THINKING_GUIDANCE = false
 
         // Default value for Memory Attachment
-        const val DEFAULT_ENABLE_MEMORY_ATTACHMENT = true
+        const val DEFAULT_ENABLE_MEMORY_QUERY = true
+
+        // Default value for Auto Read
+        const val DEFAULT_ENABLE_AUTO_READ = false
 
         // Default value for Waifu Mode
         const val DEFAULT_ENABLE_WAIFU_MODE = false
@@ -96,7 +131,15 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_WAIFU_DISABLE_ACTIONS = false // 默认允许动作表情
         const val DEFAULT_WAIFU_ENABLE_EMOTICONS = false // 默认不启用表情包
         const val DEFAULT_WAIFU_ENABLE_SELFIE = false // 默认不启用自拍功能
-        const val DEFAULT_WAIFU_SELFIE_PROMPT = "kipfel (vrchat), long hair, Matcha color hair, purple eyes, sweater vest,  black skirt, black necktie, collared shirt, long sleeves, black headwear, beanie, pleated skirt, hair bun, white shirt, hair ribbon,  hairclip, hair between eyes, black footwear, blush, hair ornament, cat hat,  very long hair,sweater, animal ear headwear, bag, bandaid on leg, socks" // 默认外貌提示词
+        const val DEFAULT_WAIFU_SELFIE_PROMPT = "kipfel vrchat, long hair, Matcha color hair, purple eyes, sweater vest, black skirt, black necktie, collared shirt, long sleeves, black headwear, beanie, pleated skirt, hair bun, white shirt, hair ribbon, hairclip, hair between eyes, black footwear, blush, hair ornament, cat hat, very long hair, sweater, animal ear headwear, bag, bandaid on leg, socks" // 默认外貌提示词
+
+        // Default value for Tools Enable/Disable
+        const val DEFAULT_ENABLE_TOOLS = true
+
+        // Default values for Summary Settings
+        const val DEFAULT_ENABLE_SUMMARY = true
+        const val DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT = true
+        const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 8
 
         // Default value for Context Length (in K)
         const val DEFAULT_CONTEXT_LENGTH = 48.0f
@@ -109,6 +152,12 @@ class ApiPreferences private constructor(private val context: Context) {
         
         // Default system prompt template (empty means use built-in template)
         const val DEFAULT_SYSTEM_PROMPT_TEMPLATE = ""
+
+        // Default values for Truncation Settings (文件和结果截断的默认值)
+        const val DEFAULT_MAX_FILE_SIZE_BYTES = 32000  // 文件读取操作的最大字节数限制
+        const val DEFAULT_PART_SIZE = 200  // 分段读取文件时，每个部分的行数
+        const val DEFAULT_MAX_TEXT_RESULT_LENGTH = 5000  // 通用文本结果的最大字符数限制
+        const val DEFAULT_MAX_HTTP_RESPONSE_LENGTH = 5000000  // 网络请求响应的最大字符数限制（5MB）
 
         // 自定义参数存储键
         val CUSTOM_PARAMETERS = stringPreferencesKey("custom_parameters")
@@ -136,16 +185,6 @@ class ApiPreferences private constructor(private val context: Context) {
             }
         }
     }
-
-    // 获取指定功能类型的token计数
-    fun getTokensForFunctionFlow(functionType: FunctionType): Flow<Pair<Int, Int>> {
-        return context.apiDataStore.data.map { preferences ->
-            val inputTokens = preferences[getTokenInputKey(functionType)] ?: 0
-            val outputTokens = preferences[getTokenOutputKey(functionType)] ?: 0
-            Pair(inputTokens, outputTokens)
-        }
-    }
-
     // Get FPS Counter Display setting as Flow
     val showFpsCounterFlow: Flow<Boolean> =
             context.apiDataStore.data.map { preferences ->
@@ -164,6 +203,12 @@ class ApiPreferences private constructor(private val context: Context) {
                 preferences[KEEP_SCREEN_ON] ?: DEFAULT_KEEP_SCREEN_ON
             }
 
+    // Get Reply Notification setting as Flow
+    val enableReplyNotificationFlow: Flow<Boolean> =
+            context.apiDataStore.data.map { preferences ->
+                preferences[ENABLE_REPLY_NOTIFICATION] ?: DEFAULT_ENABLE_REPLY_NOTIFICATION
+            }
+
     // Flow for Thinking Mode
     val enableThinkingModeFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
@@ -177,9 +222,15 @@ class ApiPreferences private constructor(private val context: Context) {
             }
 
     // Flow for Memory Attachment
-    val enableMemoryAttachmentFlow: Flow<Boolean> =
+    val enableMemoryQueryFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
-            preferences[ENABLE_MEMORY_ATTACHMENT] ?: DEFAULT_ENABLE_MEMORY_ATTACHMENT
+            preferences[ENABLE_MEMORY_QUERY] ?: DEFAULT_ENABLE_MEMORY_QUERY
+        }
+
+    // Flow for Auto Read
+    val enableAutoReadFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_AUTO_READ] ?: DEFAULT_ENABLE_AUTO_READ
         }
 
     // Flow for Waifu Mode
@@ -218,6 +269,28 @@ class ApiPreferences private constructor(private val context: Context) {
             preferences[WAIFU_SELFIE_PROMPT] ?: DEFAULT_WAIFU_SELFIE_PROMPT
         }
 
+    // Flow for Tools Enable/Disable
+    val enableToolsFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_TOOLS] ?: DEFAULT_ENABLE_TOOLS
+        }
+
+    // Flows for Summary Settings
+    val enableSummaryFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_SUMMARY] ?: DEFAULT_ENABLE_SUMMARY
+        }
+
+    val enableSummaryByMessageCountFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] ?: DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
+        }
+
+    val summaryMessageCountThresholdFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] ?: DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
+        }
+
     // Flow for Context Length
     val contextLengthFlow: Flow<Float> =
         context.apiDataStore.data.map { preferences ->
@@ -250,6 +323,27 @@ class ApiPreferences private constructor(private val context: Context) {
             preferences[CUSTOM_HEADERS] ?: DEFAULT_CUSTOM_HEADERS
         }
 
+    // Flows for Truncation Settings (文件和结果截断配置的Flow)
+    val maxFileSizeBytesFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[MAX_FILE_SIZE_BYTES] ?: DEFAULT_MAX_FILE_SIZE_BYTES
+        }
+
+    val partSizeFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[PART_SIZE] ?: DEFAULT_PART_SIZE
+        }
+
+    val maxTextResultLengthFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[MAX_TEXT_RESULT_LENGTH] ?: DEFAULT_MAX_TEXT_RESULT_LENGTH
+        }
+
+    val maxHttpResponseLengthFlow: Flow<Int> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[MAX_HTTP_RESPONSE_LENGTH] ?: DEFAULT_MAX_HTTP_RESPONSE_LENGTH
+        }
+
     // Save FPS Counter Display setting
     suspend fun saveShowFpsCounter(showFpsCounter: Boolean) {
         context.apiDataStore.edit { preferences -> preferences[SHOW_FPS_COUNTER] = showFpsCounter }
@@ -265,6 +359,11 @@ class ApiPreferences private constructor(private val context: Context) {
         context.apiDataStore.edit { preferences -> preferences[KEEP_SCREEN_ON] = isEnabled }
     }
 
+    // Save Reply Notification setting
+    suspend fun saveEnableReplyNotification(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences -> preferences[ENABLE_REPLY_NOTIFICATION] = isEnabled }
+    }
+
     // Save Thinking Mode setting
     suspend fun saveEnableThinkingMode(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences -> preferences[ENABLE_THINKING_MODE] = isEnabled }
@@ -278,9 +377,16 @@ class ApiPreferences private constructor(private val context: Context) {
     }
 
     // Save Memory Attachment setting
-    suspend fun saveEnableMemoryAttachment(isEnabled: Boolean) {
+    suspend fun saveEnableMemoryQuery(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences ->
-            preferences[ENABLE_MEMORY_ATTACHMENT] = isEnabled
+            preferences[ENABLE_MEMORY_QUERY] = isEnabled
+        }
+    }
+
+    // Save Auto Read setting
+    suspend fun saveEnableAutoRead(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_AUTO_READ] = isEnabled
         }
     }
 
@@ -327,6 +433,32 @@ class ApiPreferences private constructor(private val context: Context) {
         }
     }
 
+    // Save Tools Enable/Disable setting
+    suspend fun saveEnableTools(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_TOOLS] = isEnabled
+        }
+    }
+
+    // Save Summary Settings
+    suspend fun saveEnableSummary(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_SUMMARY] = isEnabled
+        }
+    }
+
+    suspend fun saveEnableSummaryByMessageCount(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = isEnabled
+        }
+    }
+
+    suspend fun saveSummaryMessageCountThreshold(threshold: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = threshold
+        }
+    }
+
     // Save Context Length
     suspend fun saveContextLength(length: Float) {
         context.apiDataStore.edit { preferences ->
@@ -366,27 +498,106 @@ class ApiPreferences private constructor(private val context: Context) {
     }
 
     /**
-     * 更新指定功能类型的token计数
-     * @param functionType 要更新的功能类型
+     * 更新指定供应商:模型的token计数
+     * @param providerModel 供应商:模型标识符，格式如"DEEPSEEK:deepseek-chat"
      * @param inputTokens 新增的输入token
      * @param outputTokens 新增的输出token
+     * @param cachedInputTokens 新增的缓存命中token
      */
-    suspend fun updateTokensForFunction(
-            functionType: FunctionType,
+    suspend fun updateTokensForProviderModel(
+            providerModel: String,
             inputTokens: Int,
-            outputTokens: Int
+            outputTokens: Int,
+            cachedInputTokens: Int = 0
     ) {
         context.apiDataStore.edit { preferences ->
-            val inputKey = getTokenInputKey(functionType)
-            val outputKey = getTokenOutputKey(functionType)
+            val inputKey = getTokenInputKey(providerModel)
+            val cachedInputKey = getTokenCachedInputKey(providerModel)
+            val outputKey = getTokenOutputKey(providerModel)
 
             val currentInputTokens = preferences[inputKey] ?: 0
+            val currentCachedInputTokens = preferences[cachedInputKey] ?: 0
             val currentOutputTokens = preferences[outputKey] ?: 0
 
             preferences[inputKey] = currentInputTokens + inputTokens
+            preferences[cachedInputKey] = currentCachedInputTokens + cachedInputTokens
             preferences[outputKey] = currentOutputTokens + outputTokens
         }
     }
+
+    /**
+     * 获取指定供应商:模型的输入token数量
+     */
+    suspend fun getInputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenInputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取指定供应商:模型的缓存输入token数量
+     */
+    suspend fun getCachedInputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenCachedInputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取指定供应商:模型的输出token数量
+     */
+    suspend fun getOutputTokensForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getTokenOutputKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取所有供应商:模型的token统计
+     * @return Map<供应商:模型, Triple<输入tokens, 输出tokens, 缓存tokens>>
+     */
+    suspend fun getAllProviderModelTokens(): Map<String, Triple<Int, Int, Int>> {
+        val preferences = context.apiDataStore.data.first()
+        val result = mutableMapOf<String, Triple<Int, Int, Int>>()
+        
+        // 遍历所有preferences，查找token相关的key
+        preferences.asMap().forEach { (key, value) ->
+            val keyName = key.name
+            if (keyName.startsWith("token_input_")) {
+                val providerModel = keyName.removePrefix("token_input_").replace("_", ":")
+                val inputTokens = value as? Int ?: 0
+                val outputTokens = preferences[getTokenOutputKey(providerModel)] ?: 0
+                val cachedInputTokens = preferences[getTokenCachedInputKey(providerModel)] ?: 0
+                if (inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0) {
+                    result[providerModel] = Triple(inputTokens, outputTokens, cachedInputTokens)
+                }
+            }
+        }
+        
+        return result
+    }
+
+    /**
+     * 获取所有供应商:模型的token统计的Flow
+     * @return Flow<Map<供应商:模型, Triple<输入tokens, 输出tokens, 缓存tokens>>>
+     */
+    val allProviderModelTokensFlow: Flow<Map<String, Triple<Int, Int, Int>>> =
+        context.apiDataStore.data.map { preferences ->
+            val result = mutableMapOf<String, Triple<Int, Int, Int>>()
+            
+            // 遍历所有preferences，查找token相关的key
+            preferences.asMap().forEach { (key, value) ->
+                val keyName = key.name
+                if (keyName.startsWith("token_input_")) {
+                    val providerModel = keyName.removePrefix("token_input_").replace("_", ":")
+                    val inputTokens = value as? Int ?: 0
+                    val outputTokens = preferences[getTokenOutputKey(providerModel)] ?: 0
+                    val cachedInputTokens = preferences[getTokenCachedInputKey(providerModel)] ?: 0
+                    if (inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0) {
+                        result[providerModel] = Triple(inputTokens, outputTokens, cachedInputTokens)
+                    }
+                }
+            }
+            
+            result
+        }
 
     // Save custom prompts
     suspend fun saveCustomPrompts(introPrompt: String) {
@@ -416,13 +627,156 @@ class ApiPreferences private constructor(private val context: Context) {
         }
     }
 
-    // 重置所有功能类型的token计数
-    suspend fun resetAllFunctionTokenCounts() {
+    // 重置所有供应商:模型的token计数
+    suspend fun resetAllProviderModelTokenCounts() {
         context.apiDataStore.edit { preferences ->
-            for (functionType in FunctionType.values()) {
-                preferences[getTokenInputKey(functionType)] = 0
-                preferences[getTokenOutputKey(functionType)] = 0
+            val keysToRemove = mutableListOf<Preferences.Key<*>>()
+            preferences.asMap().forEach { (key, _) ->
+                val keyName = key.name
+                if (keyName.startsWith("token_input_") || keyName.startsWith("token_output_") || keyName.startsWith("token_cached_input_")) {
+                    keysToRemove.add(key)
+                }
             }
+            keysToRemove.forEach { key ->
+                preferences.remove(key)
+            }
+        }
+    }
+
+    // 重置指定供应商:模型的token计数
+    suspend fun resetProviderModelTokenCounts(providerModel: String) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getTokenInputKey(providerModel)] = 0
+            preferences[getTokenCachedInputKey(providerModel)] = 0
+            preferences[getTokenOutputKey(providerModel)] = 0
+        }
+    }
+
+    // 获取模型输入价格（每百万tokens的美元价格）
+    suspend fun getModelInputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelInputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 获取模型缓存输入价格（每百万tokens的美元价格）
+    suspend fun getModelCachedInputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelCachedInputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 获取模型输出价格（每百万tokens的美元价格）
+    suspend fun getModelOutputPrice(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getModelOutputPriceKey(providerModel)]?.toDouble() ?: 0.0
+    }
+
+    // 设置模型输入价格（每百万tokens的美元价格）
+    suspend fun setModelInputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelInputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // 设置模型缓存输入价格（每百万tokens的美元价格）
+    suspend fun setModelCachedInputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelCachedInputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // 设置模型输出价格（每百万tokens的美元价格）
+    suspend fun setModelOutputPrice(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getModelOutputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // ===== Truncation Settings 截断设置相关方法 =====
+
+    // 保存文件读取最大字节数
+    suspend fun saveMaxFileSizeBytes(sizeBytes: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[MAX_FILE_SIZE_BYTES] = sizeBytes
+        }
+    }
+
+    // 保存分段读取的行数
+    suspend fun savePartSize(size: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[PART_SIZE] = size
+        }
+    }
+
+    // 保存文本结果最大长度
+    suspend fun saveMaxTextResultLength(length: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[MAX_TEXT_RESULT_LENGTH] = length
+        }
+    }
+
+    // 保存HTTP响应最大长度
+    suspend fun saveMaxHttpResponseLength(length: Int) {
+        context.apiDataStore.edit { preferences ->
+            preferences[MAX_HTTP_RESPONSE_LENGTH] = length
+        }
+    }
+
+    // 获取文件读取最大字节数
+    suspend fun getMaxFileSizeBytes(): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[MAX_FILE_SIZE_BYTES] ?: DEFAULT_MAX_FILE_SIZE_BYTES
+    }
+
+    // 获取分段读取的行数
+    suspend fun getPartSize(): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[PART_SIZE] ?: DEFAULT_PART_SIZE
+    }
+
+    // 获取文本结果最大长度
+    suspend fun getMaxTextResultLength(): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[MAX_TEXT_RESULT_LENGTH] ?: DEFAULT_MAX_TEXT_RESULT_LENGTH
+    }
+
+    // 获取HTTP响应最大长度
+    suspend fun getMaxHttpResponseLength(): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[MAX_HTTP_RESPONSE_LENGTH] ?: DEFAULT_MAX_HTTP_RESPONSE_LENGTH
+    }
+
+    // 重置上下文、总结和截断设置为默认值
+    suspend fun resetContextSummaryAndTruncationSettings() {
+        context.apiDataStore.edit { preferences ->
+            // Context Settings
+            preferences[CONTEXT_LENGTH] = DEFAULT_CONTEXT_LENGTH
+
+            // Summary Settings
+            preferences[ENABLE_SUMMARY] = DEFAULT_ENABLE_SUMMARY
+            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
+            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
+            preferences[SUMMARY_TOKEN_THRESHOLD] = DEFAULT_SUMMARY_TOKEN_THRESHOLD
+
+            // Truncation Settings
+            preferences[MAX_FILE_SIZE_BYTES] = DEFAULT_MAX_FILE_SIZE_BYTES
+            preferences[PART_SIZE] = DEFAULT_PART_SIZE
+            preferences[MAX_TEXT_RESULT_LENGTH] = DEFAULT_MAX_TEXT_RESULT_LENGTH
+            preferences[MAX_HTTP_RESPONSE_LENGTH] = DEFAULT_MAX_HTTP_RESPONSE_LENGTH
+        }
+    }
+
+    // 批量保存所有截断设置
+    suspend fun saveTruncationSettings(
+        maxFileSizeBytes: Int,
+        partSize: Int,
+        maxTextResultLength: Int,
+        maxHttpResponseLength: Int
+    ) {
+        context.apiDataStore.edit { preferences ->
+            preferences[MAX_FILE_SIZE_BYTES] = maxFileSizeBytes
+            preferences[PART_SIZE] = partSize
+            preferences[MAX_TEXT_RESULT_LENGTH] = maxTextResultLength
+            preferences[MAX_HTTP_RESPONSE_LENGTH] = maxHttpResponseLength
         }
     }
 }

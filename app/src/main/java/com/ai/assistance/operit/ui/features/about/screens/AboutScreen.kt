@@ -9,33 +9,24 @@ import android.widget.TextView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.Source
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.*
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,64 +40,64 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.updates.UpdateManager
 import com.ai.assistance.operit.data.updates.UpdateStatus
+import com.ai.assistance.operit.util.GithubReleaseUtil
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.History
+import com.ai.assistance.operit.ui.components.CustomScaffold
+
+private const val GITHUB_PROJECT_URL = "https://github.com/AAswordman/Operit"
 
 @Composable
 fun HtmlText(
-        html: String,
-        modifier: Modifier = Modifier,
-        style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium
+    html: String,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium
 ) {
     val context = LocalContext.current
     val textColor = style.color.toArgb()
 
     AndroidView(
-            modifier = modifier,
-            factory = { context ->
-                TextView(context).apply {
-                    this.textSize = style.fontSize.value
-                    this.setTextColor(textColor)
-                    this.movementMethod = LinkMovementMethod.getInstance()
-                }
-            },
-            update = { textView ->
-                textView.text =
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                            Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT)
-                        } else {
-                            @Suppress("DEPRECATION") Html.fromHtml(html)
-                        }
+        modifier = modifier,
+        factory = { context ->
+            TextView(context).apply {
+                this.textSize = style.fontSize.value
+                this.setTextColor(textColor)
+                this.movementMethod = LinkMovementMethod.getInstance()
             }
+        },
+        update = { textView ->
+            textView.text =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT)
+                } else {
+                    @Suppress("DEPRECATION") Html.fromHtml(html)
+                }
+        }
     )
 }
 
 @Composable
 fun InfoItem(
-        icon: ImageVector,
-        title: String,
-        content: @Composable () -> Unit,
-        modifier: Modifier = Modifier
+    icon: ImageVector,
+    title: String,
+    content: @Composable () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-            modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalAlignment = Alignment.Top
+        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 16.dp, top = 2.dp)
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 16.dp, top = 2.dp)
         )
         Column {
             Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Box(modifier = Modifier.padding(top = 4.dp)) { content() }
         }
@@ -175,108 +166,49 @@ private fun getOpenSourceLibraries(): List<OpenSourceLibrary> {
 fun LicenseDialog(onDismiss: () -> Unit) {
     val libraries = remember { getOpenSourceLibraries() }
     val context = LocalContext.current
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Source,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    stringResource(id = R.string.open_source_licenses),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
+        title = { Text(stringResource(id = R.string.open_source_licenses)) },
         text = {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(libraries) { library ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = library.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (library.description.isNotEmpty()) {
+                    ListItem(
+                        headlineContent = { Text(library.name, fontWeight = FontWeight.Bold) },
+                        supportingContent = {
+                            Column {
+                                if (library.description.isNotEmpty()) {
+                                    Text(
+                                        text = library.description,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                                 Text(
-                                    text = library.description,
+                                    text = stringResource(id = R.string.license_format, library.license),
                                     style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
                             }
-                            Text(
-                                text = stringResource(id = R.string.license_format, library.license),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(top = 4.dp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
+                        },
+                        trailingContent = {
                             if (library.website.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp)
-                                        .clickable {
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                data = Uri.parse(library.website)
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
-                                            onDismiss()
-                                            context.startActivity(intent)
-                                        },
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    Text(
-                                        text = stringResource(id = R.string.visit_project),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .padding(start = 4.dp)
-                                    )
+                                IconButton(onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(library.website)).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                }) {
+                                    Icon(Icons.Default.OpenInBrowser, contentDescription = stringResource(id = R.string.visit_project))
                                 }
                             }
                         }
-                    }
+                    )
+                    Divider()
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
+            Button(onClick = onDismiss) {
                 Text(stringResource(id = R.string.ok))
             }
         }
@@ -299,8 +231,7 @@ fun AboutScreen(
 
     // 观察UpdateManager的LiveData
     DisposableEffect(updateManager) {
-        val observer =
-                androidx.lifecycle.Observer<UpdateStatus> { newStatus -> updateStatus = newStatus }
+        val observer = androidx.lifecycle.Observer<UpdateStatus> { newStatus -> updateStatus = newStatus }
         updateManager.updateStatus.observeForever(observer)
 
         onDispose { updateManager.updateStatus.removeObserver(observer) }
@@ -315,14 +246,10 @@ fun AboutScreen(
     var showLicenseDialog by remember { mutableStateOf(false) }
 
     // 检查更新按钮动画
-    val buttonAlpha =
-            animateFloatAsState(
-                    targetValue =
-                            if (updateStatus is UpdateStatus.Checking)
-                                    0.6f
-                            else 1f,
-                    label = "ButtonAlpha"
-            )
+    val buttonAlpha = animateFloatAsState(
+        targetValue = if (updateStatus is UpdateStatus.Checking) 0.6f else 1f,
+        label = "ButtonAlpha"
+    )
 
     // 获取应用版本信息
     val appVersion = remember {
@@ -352,10 +279,10 @@ fun AboutScreen(
     // 处理下载更新 - 显示下载源选择对话框
     fun handleDownload() {
         val status = updateStatus as? UpdateStatus.Available ?: return
-        if (status.downloadUrl.isNotEmpty()) {
+        if (status.downloadUrl.isNotEmpty() && status.downloadUrl.endsWith(".apk")) {
             showDownloadSourceMenu = true // 显示下载源选择对话框
         } else {
-            // 如果没有下载链接，则直接打开更新页面
+            // 如果没有APK下载链接，则直接打开更新页面
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 data = Uri.parse(status.updateUrl)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -366,21 +293,7 @@ fun AboutScreen(
     }
 
     // 从指定源下载
-    fun downloadFromSource(sourceType: String) {
-        val status = updateStatus as? UpdateStatus.Available ?: return
-        val downloadUrl = when (sourceType) {
-            "github" -> status.downloadUrl // 原始GitHub链接
-            "ghfast" -> {
-                // 使用 ghfast.top 镜像加速 GitHub 下载
-                if (status.downloadUrl.contains("github.com") && status.downloadUrl.endsWith(".apk")) {
-                    UpdateManager.getAcceleratedDownloadUrl(status.newVersion, status.downloadUrl)
-                } else {
-                    status.downloadUrl
-                }
-            }
-            else -> status.downloadUrl
-        }
-        
+    fun downloadFromUrl(downloadUrl: String) {
         // 打开浏览器下载
         val intent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse(downloadUrl)
@@ -398,514 +311,470 @@ fun AboutScreen(
 
     // 更新对话框
     if (showUpdateDialog) {
-        AlertDialog(
-                onDismissRequest = { showUpdateDialog = false },
-                title = {
-                    Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val icon =
-                                when (updateStatus) {
-                                    is UpdateStatus.Available -> Icons.Default.Update
-                                    is UpdateStatus.Checking -> Icons.Default.Download
-                                    is UpdateStatus.UpToDate -> Icons.Default.CheckCircle
-                                    is UpdateStatus.Error -> Icons.Default.Error
-                                    else -> Icons.Default.Update
-                                }
-
-                        val iconTint =
-                                when (updateStatus) {
-                                    is UpdateStatus.Available -> MaterialTheme.colorScheme.primary
-                                    is UpdateStatus.Checking -> MaterialTheme.colorScheme.primary
-                                    is UpdateStatus.UpToDate -> Color(0xFF4CAF50) // Green
-                                    is UpdateStatus.Error -> Color(0xFFF44336) // Red
-                                    else -> MaterialTheme.colorScheme.primary
-                                }
-
-                        Icon(imageVector = icon, contentDescription = null, tint = iconTint)
-
-                        Text(
-                                text =
-                                        when (updateStatus) {
-                                            is UpdateStatus.Available -> stringResource(id = R.string.new_version_found)
-                                            is UpdateStatus.Checking -> stringResource(id = R.string.checking_updates)
-                                            is UpdateStatus.UpToDate -> stringResource(id = R.string.check_complete)
-                                            is UpdateStatus.Error -> stringResource(id = R.string.check_failed)
-                                            else -> stringResource(id = R.string.update_check)
-                                        }
-                        )
-                    }
-                },
-                text = {
-                    when (val status = updateStatus) {
-                        is UpdateStatus.Available -> {
-                            Column {
-                                Text(
-                                        stringResource(id = R.string.new_version, appVersion, status.newVersion),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                )
-
-                                if (status.releaseNotes.isNotEmpty()) {
-                                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                                    Text(
-                                            stringResource(id = R.string.update_content),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(bottom = 4.dp)
-                                    )
-
-                                    Text(
-                                            status.releaseNotes,
-                                            style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-                            }
-                        }
-                        is UpdateStatus.UpToDate -> {
-                            Text(stringResource(id = R.string.already_latest_version, appVersion))
-                        }
-                        is UpdateStatus.Error -> {
-                            Text(status.message)
-                        }
-                        else -> {
-                            Text(stringResource(id = R.string.checking_updates))
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                            onClick = {
-                                if (updateStatus is UpdateStatus.Available) {
-                                    handleDownload()
-                                } else if (updateStatus !is UpdateStatus.Checking) {
-                                    showUpdateDialog = false
-                                }
-                            },
-                            enabled =
-                                    updateStatus is UpdateStatus.Available ||
-                                            (updateStatus !is UpdateStatus.Checking)
-                    ) {
-                        Text(
-                                when (updateStatus) {
-                                    is UpdateStatus.Available -> stringResource(id = R.string.download)
-                                    else -> stringResource(id = R.string.ok)
-                                }
-                        )
-                    }
-                },
-                dismissButton = {
-                    if (updateStatus !is UpdateStatus.Checking) {
-                        TextButton(onClick = { showUpdateDialog = false }) { Text(stringResource(id = R.string.close)) }
-                    }
+        UpdateDialog(
+            updateStatus = updateStatus,
+            appVersion = appVersion,
+            onDismiss = { showUpdateDialog = false },
+            onConfirm = {
+                if (updateStatus is UpdateStatus.Available) {
+                    handleDownload()
+                } else if (updateStatus !is UpdateStatus.Checking) {
+                    showUpdateDialog = false
                 }
+            }
         )
     }
 
     // 下载源选择对话框
     if (showDownloadSourceMenu) {
-        AlertDialog(
-            onDismissRequest = { showDownloadSourceMenu = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudDownload,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        stringResource(id = R.string.select_download_source),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        stringResource(id = R.string.select_download_source_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    // 国内加速镜像选项 - 使用Card而不是Button
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { downloadFromSource("ghfast") },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Storage,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    stringResource(id = R.string.china_mirror),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Text(
-                                    stringResource(id = R.string.china_mirror_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // GitHub原始链接选项
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { downloadFromSource("github") },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Language,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    stringResource(id = R.string.github_source),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    stringResource(id = R.string.github_source_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(
-                    onClick = { showDownloadSourceMenu = false },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(
-                        stringResource(id = R.string.cancel),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
+        DownloadSourceDialog(
+            updateStatus = updateStatus,
+            onDismiss = { showDownloadSourceMenu = false },
+            onDownload = { downloadFromUrl(it) }
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Column(
-                modifier =
-                        Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+    val backgroundBrush = androidx.compose.ui.graphics.Brush.verticalGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            MaterialTheme.colorScheme.surface
+        )
+    )
+
+    CustomScaffold() { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundBrush)
+                .padding(innerPadding)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // App Logo with circular background
-            Box(
-                    modifier =
-                            Modifier.size(140.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .padding(20.dp),
-                    contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "App Logo",
-                        modifier = Modifier.size(100.dp)
-                )
-            }
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Surface(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .then(
+                            Modifier.border(
+                                androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                ),
+                                CircleShape
+                            )
+                        ),
+                    shape = CircleShape,
+                    tonalElevation = 3.dp,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = stringResource(R.string.app_logo_description),
+                            modifier = Modifier.size(84.dp)
+                        )
+                    }
+                }
 
-            // App Name
-            Text(
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
                     text = stringResource(id = R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-            )
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-            // App Version
-            Text(
+                Text(
                     text = stringResource(id = R.string.about_version, appVersion),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-            )
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
+                )
 
-            // 添加检查更新按钮 - 美化版
-            Button(
+                Button(
                     onClick = { checkForUpdates() },
-                    modifier =
-                            Modifier.fillMaxWidth(0.8f)
-                                    .height(48.dp)
-                                    .alpha(buttonAlpha.value)
-                                    .padding(horizontal = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .alpha(buttonAlpha.value),
                     shape = RoundedCornerShape(24.dp),
-                    colors =
-                            ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp, pressedElevation = 3.dp),
                     enabled = updateStatus !is UpdateStatus.Checking
-            ) {
-                Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
                 ) {
-                    if (updateStatus is UpdateStatus.Checking) {
-                        // 使用简单的点代替复杂的加载指示器
-                        Box(
-                                modifier =
-                                        Modifier.size(20.dp)
-                                                .background(
-                                                        color =
-                                                                MaterialTheme.colorScheme.onPrimary
-                                                                        .copy(alpha = 0.7f),
-                                                        shape = CircleShape
-                                                )
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    } else {
-                        Icon(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (updateStatus is UpdateStatus.Checking) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        } else {
+                            Icon(
                                 imageVector = Icons.Default.Update,
                                 contentDescription = null,
                                 modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = if (updateStatus is UpdateStatus.Checking)
+                                stringResource(id = R.string.checking_updates)
+                            else stringResource(id = R.string.check_for_updates),
+                            style = MaterialTheme.typography.labelLarge
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(
-                            text = if (updateStatus is UpdateStatus.Checking) 
-                                    stringResource(id = R.string.checking_updates) 
-                                else stringResource(id = R.string.check_for_updates),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Card with app information - 美化版
-            Card(
-                    modifier =
-                            Modifier.fillMaxWidth()
-                                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(16.dp)),
-                    shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.Start
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
                             text = stringResource(id = R.string.about_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
 
-                    Text(
+                        Text(
                             text = stringResource(id = R.string.about_description),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 20.dp)
+                        )
 
-                    // 使用InfoItem组件展示信息
-                    InfoItem(
+                        // 使用InfoItem组件展示信息
+                        InfoItem(
                             icon = Icons.Rounded.Info,
                             title = stringResource(id = R.string.developer),
                             content = {
                                 HtmlText(
-                                        html = stringResource(id = R.string.about_developer),
-                                        style = MaterialTheme.typography.bodyMedium
+                                    html = stringResource(id = R.string.about_developer),
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
-                    )
+                        )
 
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    InfoItem(
+                        InfoItem(
                             icon = Icons.Rounded.Info,
                             title = stringResource(id = R.string.contact),
                             content = {
                                 Text(
-                                        text = stringResource(id = R.string.about_contact),
-                                        style = MaterialTheme.typography.bodyMedium
+                                    text = stringResource(id = R.string.about_contact),
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
-                    )
+                        )
 
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    InfoItem(
+                        InfoItem(
                             icon = Icons.Rounded.Info,
                             title = stringResource(id = R.string.project_url),
                             content = {
                                 HtmlText(
-                                        html = stringResource(id = R.string.about_website),
-                                        style = MaterialTheme.typography.bodyMedium
+                                    html = stringResource(id = R.string.about_website),
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
-                    )
+                        )
 
-                    Divider(modifier = Modifier.padding(vertical = 16.dp))
+                        Divider(modifier = Modifier.padding(vertical = 12.dp))
 
-                    Text(
+                        Text(
                             text = stringResource(id = R.string.about_copyright),
                             style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 添加更新日志卡片
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(16.dp))
-                    .clickable { navigateToUpdateHistory() },
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = "更新日志",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // 添加开源许可卡片
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(16.dp))
-                    .clickable { showLicenseDialog = true },
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
+                ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_PROJECT_URL)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = stringResource(R.string.github_star_description),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = stringResource(R.string.star_on_github),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                         Icon(
-                            imageVector = Icons.Default.Source,
+                            imageVector = Icons.Default.ArrowForward,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = stringResource(id = R.string.open_source_licenses),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navigateToUpdateHistory() },
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = stringResource(R.string.update_log),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                ElevatedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLicenseDialog = true },
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Source,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = stringResource(id = R.string.open_source_licenses),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UpdateDialog(
+    updateStatus: UpdateStatus,
+    appVersion: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            val icon = when (updateStatus) {
+                is UpdateStatus.Available -> Icons.Default.Update
+                is UpdateStatus.Checking -> Icons.Default.Download
+                is UpdateStatus.UpToDate -> Icons.Default.CheckCircle
+                is UpdateStatus.Error -> Icons.Default.Error
+                else -> Icons.Default.Update
+            }
+            Icon(icon, contentDescription = null)
+        },
+        title = {
+            val titleText = when (updateStatus) {
+                is UpdateStatus.Available -> stringResource(id = R.string.new_version_found)
+                is UpdateStatus.Checking -> stringResource(id = R.string.checking_updates)
+                is UpdateStatus.UpToDate -> stringResource(id = R.string.check_complete)
+                is UpdateStatus.Error -> stringResource(id = R.string.check_failed)
+                else -> stringResource(id = R.string.update_check)
+            }
+            Text(text = titleText)
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                when (val status = updateStatus) {
+                    is UpdateStatus.Available -> {
+                        Text(
+                            stringResource(id = R.string.new_version, appVersion, status.newVersion),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        if (status.releaseNotes.isNotEmpty()) {
+                            Divider(modifier = Modifier.padding(vertical = 8.dp))
+                            Text(
+                                stringResource(id = R.string.update_content),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Text(status.releaseNotes, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    is UpdateStatus.UpToDate -> {
+                        Text(stringResource(id = R.string.already_latest_version, appVersion))
+                    }
+                    is UpdateStatus.Error -> {
+                        Text(status.message)
+                    }
+                    else -> {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = updateStatus !is UpdateStatus.Checking
+            ) {
+                Text(
+                    when (updateStatus) {
+                        is UpdateStatus.Available -> stringResource(id = R.string.download)
+                        else -> stringResource(id = R.string.ok)
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            if (updateStatus !is UpdateStatus.Checking) {
+                TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.close)) }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadSourceDialog(
+    updateStatus: UpdateStatus,
+    onDismiss: () -> Unit,
+    onDownload: (String) -> Unit
+) {
+    val status = updateStatus as? UpdateStatus.Available
+    val mirroredUrls = remember(status) {
+        status?.let { GithubReleaseUtil.getMirroredUrls(it.downloadUrl) } ?: emptyMap()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(id = R.string.select_download_source)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(id = R.string.select_download_source_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                LazyColumn {
+                    items(mirroredUrls.toList()) { (name, url) ->
+                        ListItem(
+                            headlineContent = { Text(stringResource(id = R.string.mirror_download, name)) },
+                            leadingContent = { Icon(Icons.Default.Storage, contentDescription = null) },
+                            modifier = Modifier.clickable { onDownload(url) }
+                        )
+                    }
+                    if (status != null) {
+                        item {
+                            ListItem(
+                                headlineContent = { Text(stringResource(id = R.string.github_source)) },
+                                supportingContent = { Text(stringResource(id = R.string.github_source_desc)) },
+                                leadingContent = { Icon(Icons.Default.Language, contentDescription = null) },
+                                modifier = Modifier.clickable { onDownload(status.downloadUrl) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.cancel))
+            }
+        }
+    )
 }

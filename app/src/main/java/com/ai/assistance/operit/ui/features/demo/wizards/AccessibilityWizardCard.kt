@@ -319,8 +319,11 @@ fun AccessibilityWizardCard(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (confirmText.trim().equals("明白", ignoreCase = true) || 
-                            confirmText.trim().equals("ok", ignoreCase = true)) {
+                        val expectedTextCn = "我已明确并知晓无障碍权限导致的其他应用封号、限制账号功能风险，并后果自己承担"
+                        val expectedTextEn = "I understand and acknowledge the risks of account bans and restricted account functions caused by accessibility permissions, and I bear the consequences myself"
+                        
+                        if (confirmText.trim().equals(expectedTextCn, ignoreCase = true) || 
+                            confirmText.trim().equals(expectedTextEn, ignoreCase = true)) {
                             showWarningDialog = false
                             onInstallProvider()
                         } else {

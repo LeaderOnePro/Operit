@@ -149,30 +149,35 @@ export interface FindFilesResultData {
 }
 
 /**
- * File conversion result data
+ * Line match in grep result
  */
-export interface FileConversionResultData {
-    sourcePath: string;
-    targetPath: string;
-    sourceFormat: string;
-    targetFormat: string;
-    conversionType: string;  // "document", "image", "audio", "video", "archive", "extract"
-    quality?: string;
-    fileSize: number;
-    duration: number;
-    metadata: Record<string, string>; // Contains extra info like error details, password status for encrypted archives
-    toString(): string;
+export interface GrepLineMatch {
+    lineNumber: number;
+    lineContent: string;
+    matchContext?: string;
 }
 
 /**
- * File format conversion support data
+ * File match in grep result
  */
-export interface FileFormatConversionsResultData {
-    formatType?: string;
-    conversions: Record<string, string[]>;
-    fileTypes: Record<string, string[]>;
+export interface GrepFileMatch {
+    filePath: string;
+    lineMatches: GrepLineMatch[];
+}
+
+/**
+ * Grep search result data
+ */
+export interface GrepResultData {
+    searchPath: string;
+    pattern: string;
+    filePattern?: string;
+    matches: GrepFileMatch[];
+    totalMatches: number;
+    filesSearched: number;
     toString(): string;
 }
+
 
 // ============================================================================
 // HTTP and Network Types
@@ -435,6 +440,30 @@ export interface TerminalCommandResultData {
     toString(): string;
 }
 
+/**
+ * Terminal session creation result data
+ */
+export interface TerminalSessionCreationResultData {
+    /** ID of the created or retrieved session */
+    sessionId: string;
+    /** Name of the session */
+    sessionName: string;
+    /** Whether a new session was created */
+    isNewSession: boolean;
+}
+
+/**
+ * Terminal session close result data
+ */
+export interface TerminalSessionCloseResultData {
+    /** ID of the closed session */
+    sessionId: string;
+    /** Whether the session was closed successfully */
+    success: boolean;
+    /** A message describing the result */
+    message: string;
+}
+
 // ============================================================================
 // FFmpeg Types
 // ============================================================================
@@ -561,13 +590,6 @@ export interface UIActionResult extends BaseResult {
 
 
 
-export interface FileConversionResult extends BaseResult {
-    data: FileConversionResultData;
-}
-
-export interface FileFormatConversionsResult extends BaseResult {
-    data: FileFormatConversionsResultData;
-}
 
 export interface ADBResult extends BaseResult {
     data: ADBResultData;
@@ -581,10 +603,322 @@ export interface TerminalCommandResult extends BaseResult {
     data: TerminalCommandResultData;
 }
 
+export interface TerminalSessionCreationResult extends BaseResult {
+    data: TerminalSessionCreationResultData;
+}
+
+export interface TerminalSessionCloseResult extends BaseResult {
+    data: TerminalSessionCloseResultData;
+}
+
 export interface DeviceInfoResult extends BaseResult {
     data: DeviceInfoResultData;
 }
 
 export interface CombinedOperationResult extends BaseResult {
     data: CombinedOperationResultData;
+}
+
+// ============================================================================
+// Workflow Types
+// ============================================================================
+
+/**
+ * 工作流基本信息结果数据
+ */
+export interface WorkflowResultData {
+    /** 工作流 ID */
+    id: string;
+    /** 工作流名称 */
+    name: string;
+    /** 工作流描述 */
+    description: string;
+    /** 节点数量 */
+    nodeCount: number;
+    /** 连接数量 */
+    connectionCount: number;
+    /** 是否启用 */
+    enabled: boolean;
+    /** 创建时间戳 */
+    createdAt: number;
+    /** 更新时间戳 */
+    updatedAt: number;
+    /** 最后执行时间 */
+    lastExecutionTime?: number | null;
+    /** 最后执行状态 */
+    lastExecutionStatus?: string | null;
+    /** 总执行次数 */
+    totalExecutions: number;
+    /** 成功执行次数 */
+    successfulExecutions: number;
+    /** 失败执行次数 */
+    failedExecutions: number;
+    /** Returns a formatted string representation of the workflow */
+    toString(): string;
+}
+
+/**
+ * 工作流列表结果数据
+ */
+export interface WorkflowListResultData {
+    /** 工作流列表 */
+    workflows: WorkflowResultData[];
+    /** 工作流总数 */
+    totalCount: number;
+    /** Returns a formatted string representation of the workflow list */
+    toString(): string;
+}
+
+/**
+ * 工作流节点位置
+ */
+export interface NodePosition {
+    x: number;
+    y: number;
+}
+
+/**
+ * 触发节点
+ */
+export interface TriggerNode {
+    /** 节点 ID */
+    id: string;
+    /** 节点类型 */
+    type: 'trigger';
+    /** 节点名称 */
+    name: string;
+    /** 节点描述 */
+    description: string;
+    /** 节点位置 */
+    position: NodePosition;
+    /** 触发类型 */
+    triggerType: string;
+    /** 触发配置 */
+    triggerConfig: Record<string, string>;
+}
+
+/**
+ * 执行节点
+ */
+export interface ExecuteNode {
+    /** 节点 ID */
+    id: string;
+    /** 节点类型 */
+    type: 'execute';
+    /** 节点名称 */
+    name: string;
+    /** 节点描述 */
+    description: string;
+    /** 节点位置 */
+    position: NodePosition;
+    /** 动作类型（工具名称） */
+    actionType: string;
+    /** 动作配置（工具参数） */
+    actionConfig: Record<string, string>;
+    /** JavaScript 代码（可选） */
+    jsCode?: string | null;
+}
+
+/**
+ * 工作流节点（联合类型）
+ */
+export type WorkflowNode = TriggerNode | ExecuteNode;
+
+/**
+ * 工作流节点连接
+ */
+export interface WorkflowNodeConnection {
+    /** 连接 ID */
+    id: string;
+    /** 源节点 ID */
+    sourceNodeId: string;
+    /** 目标节点 ID */
+    targetNodeId: string;
+    /** 连接条件（可选） */
+    condition?: string | null;
+}
+
+/**
+ * 工作流详细信息结果数据（包含完整的节点和连接信息）
+ */
+export interface WorkflowDetailResultData {
+    /** 工作流 ID */
+    id: string;
+    /** 工作流名称 */
+    name: string;
+    /** 工作流描述 */
+    description: string;
+    /** 节点列表 */
+    nodes: WorkflowNode[];
+    /** 连接列表 */
+    connections: WorkflowNodeConnection[];
+    /** 是否启用 */
+    enabled: boolean;
+    /** 创建时间戳 */
+    createdAt: number;
+    /** 更新时间戳 */
+    updatedAt: number;
+    /** 最后执行时间 */
+    lastExecutionTime?: number | null;
+    /** 最后执行状态 */
+    lastExecutionStatus?: string | null;
+    /** 总执行次数 */
+    totalExecutions: number;
+    /** 成功执行次数 */
+    successfulExecutions: number;
+    /** 失败执行次数 */
+    failedExecutions: number;
+    /** Returns a formatted string representation of the workflow details */
+    toString(): string;
+}
+
+/**
+ * 字符串结果数据
+ */
+export interface StringResultData {
+    /** 字符串值 */
+    value: string;
+    /** Returns the string value */
+    toString(): string;
+}
+
+// ============================================================================
+// Chat Manager Types
+// ============================================================================
+
+/**
+ * Chat service start result data
+ */
+export interface ChatServiceStartResultData {
+    /** Whether the service is connected */
+    isConnected: boolean;
+    /** Connection timestamp */
+    connectionTime: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat creation result data
+ */
+export interface ChatCreationResultData {
+    /** The ID of the newly created chat */
+    chatId: string;
+    /** Creation timestamp */
+    createdAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat information
+ */
+export interface ChatInfo {
+    /** Chat ID */
+    id: string;
+    /** Chat title */
+    title: string;
+    /** Number of messages in the chat */
+    messageCount: number;
+    /** Creation timestamp */
+    createdAt: string;
+    /** Last updated timestamp */
+    updatedAt: string;
+    /** Whether this is the current active chat */
+    isCurrent: boolean;
+    /** Total input tokens used */
+    inputTokens: number;
+    /** Total output tokens used */
+    outputTokens: number;
+}
+
+/**
+ * Chat list result data
+ */
+export interface ChatListResultData {
+    /** Total number of chats */
+    totalCount: number;
+    /** The ID of the current active chat */
+    currentChatId: string | null;
+    /** List of chat information */
+    chats: ChatInfo[];
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Chat switch result data
+ */
+export interface ChatSwitchResultData {
+    /** The ID of the chat switched to */
+    chatId: string;
+    /** The title of the chat */
+    chatTitle: string;
+    /** Switch timestamp */
+    switchedAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Message send result data
+ */
+export interface MessageSendResultData {
+    /** The ID of the chat the message was sent to */
+    chatId: string;
+    /** The message content that was sent */
+    message: string;
+    /** Sent timestamp */
+    sentAt: number;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+/**
+ * Result type wrappers for Chat Manager operations
+ */
+export interface ChatServiceStartResult extends BaseResult {
+    data: ChatServiceStartResultData;
+}
+
+export interface ChatCreationResult extends BaseResult {
+    data: ChatCreationResultData;
+}
+
+export interface ChatListResult extends BaseResult {
+    data: ChatListResultData;
+}
+
+export interface ChatSwitchResult extends BaseResult {
+    data: ChatSwitchResultData;
+}
+
+export interface MessageSendResult extends BaseResult {
+    data: MessageSendResultData;
+}
+
+// ============================================================================
+// Memory Management Types
+// ============================================================================
+
+/**
+ * Memory link result data
+ */
+export interface MemoryLinkResultData {
+    /** The title of the source memory */
+    sourceTitle: string;
+    /** The title of the target memory */
+    targetTitle: string;
+    /** The type of link (e.g., "related", "causes", "explains", "part_of") */
+    linkType: string;
+    /** The strength of the link (0.0-1.0) */
+    weight: number;
+    /** Optional description of the link */
+    description: string;
+    /** Returns a formatted string representation */
+    toString(): string;
+}
+
+export interface MemoryLinkResult extends BaseResult {
+    data: MemoryLinkResultData;
 } 

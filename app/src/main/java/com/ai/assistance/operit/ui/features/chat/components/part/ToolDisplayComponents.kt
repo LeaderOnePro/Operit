@@ -43,15 +43,16 @@ fun CompactToolDisplay(
         toolName: String,
         params: String = "",
         textColor: Color,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     // 弹窗状态
     var showDetailDialog by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
     val hasParams = params.isNotBlank()
 
-    // 显示详细内容的弹窗
-    if (showDetailDialog && hasParams) {
+    // 显示详细内容的弹窗 - 仅在启用弹窗时显示
+    if (showDetailDialog && hasParams && enableDialog) {
         ToolParamsDetailDialog(
                 toolName = toolName,
                 params = params,
@@ -64,8 +65,9 @@ fun CompactToolDisplay(
             modifier =
                     modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(4.dp))
-                            .clickable(enabled = hasParams) {
-                                if (hasParams) showDetailDialog = true
+                            .clickable(enabled = hasParams && enableDialog) {
+                                // 仅在启用弹窗时才允许点击打开详情
+                                if (hasParams && enableDialog) showDetailDialog = true
                             }
                             .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -111,15 +113,16 @@ fun DetailedToolDisplay(
         toolName: String,
         params: String = "",
         textColor: Color,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     // 弹窗状态
     var showDetailDialog by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
     val hasParams = params.isNotBlank()
 
-    // 显示详细内容的弹窗
-    if (showDetailDialog && hasParams) {
+    // 显示详细内容的弹窗 - 仅在启用弹窗时显示
+    if (showDetailDialog && hasParams && enableDialog) {
         ToolParamsDetailDialog(
                 toolName = toolName,
                 params = params,
@@ -130,8 +133,9 @@ fun DetailedToolDisplay(
 
     Card(
             modifier =
-                    modifier.fillMaxWidth().padding(top = 4.dp).clickable(enabled = hasParams) {
-                        if (hasParams) showDetailDialog = true
+                    modifier.fillMaxWidth().padding(top = 4.dp).clickable(enabled = hasParams && enableDialog) {
+                        // 仅在启用弹窗时才允许点击打开详情
+                        if (hasParams && enableDialog) showDetailDialog = true
                     },
             colors =
                     CardDefaults.cardColors(

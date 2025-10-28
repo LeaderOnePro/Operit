@@ -36,7 +36,8 @@ fun AiMessageComposable(
     backgroundColor: Color,
     textColor: Color,
     onLinkClick: ((String) -> Unit)? = null,
-    overrideStream: Stream<String>? = null
+    overrideStream: Stream<String>? = null,
+    enableDialogs: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { UserPreferencesManager(context) }
@@ -48,16 +49,29 @@ fun AiMessageComposable(
     var linkToPreview by remember { mutableStateOf("") }
 
     // 创建自定义XML渲染器
-    val xmlRenderer = remember(showThinkingProcess, showStatusTags) {
+    val xmlRenderer = remember(showThinkingProcess, showStatusTags, enableDialogs) {
         CustomXmlRenderer(
             showThinkingProcess = showThinkingProcess,
-            showStatusTags = showStatusTags
+            showStatusTags = showStatusTags,
+            enableDialogs = enableDialogs  // 传递弹窗启用状态
         )
     }
-    val rememberedOnLinkClick = remember(context, onLinkClick) {
+    val rememberedOnLinkClick = remember(context, onLinkClick, enableDialogs) {
         onLinkClick ?: { url ->
-            linkToPreview = url
-            showLinkDialog = true
+            // 如果启用了弹窗，显示链接预览；否则使用系统浏览器打开
+            if (enableDialogs) {
+                linkToPreview = url
+                showLinkDialog = true
+            } else {
+                // 在Service层，直接使用系统浏览器打开链接
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    // 忽略打开失败
+                }
+            }
         }
     }
 
@@ -101,8 +115,8 @@ fun AiMessageComposable(
             }
         }
 
-        // 链接预览弹窗
-        if (showLinkDialog && linkToPreview.isNotEmpty()) {
+        // 链接预览弹窗 - 仅在启用弹窗时显示
+        if (showLinkDialog && linkToPreview.isNotEmpty() && enableDialogs) {
             LinkPreviewDialog(
                 url = linkToPreview,
                 onDismiss = {

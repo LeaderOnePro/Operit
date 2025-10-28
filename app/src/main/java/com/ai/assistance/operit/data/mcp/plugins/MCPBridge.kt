@@ -3,15 +3,14 @@ package com.ai.assistance.operit.data.mcp.plugins
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import com.ai.assistance.operit.ui.features.toolbox.screens.terminal.model.TerminalSessionManager
+import com.ai.assistance.operit.core.tools.system.Terminal
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -22,21 +21,19 @@ import org.json.JSONArray
  * MCPBridge - 用于与TCP桥接器通信的插件类 支持以下命令:
  * - spawn: 启动新的MCP服务
  * - shutdown: 关闭当前MCP服务
- * - describe: 获取MCP服务描述
  * - listtools: 列出所有可用工具
  * - toolcall: 调用特定工具
- * - ping: 健康检查
- * - status: 获取服务状态
- * - list: 列出已注册的MCP服务
+ * - list: 列出已注册的MCP服务或查询单个服务状态
  * - register: 注册新的MCP服务
  * - unregister: 取消注册MCP服务
+ * - reset: 重置桥接器
  */
 class MCPBridge private constructor(private val context: Context) {
     companion object {
         private const val TAG = "MCPBridge"
         private const val DEFAULT_HOST = "127.0.0.1"
         private const val DEFAULT_PORT = 8752
-        private const val TERMUX_BRIDGE_PATH = "/data/data/com.termux/files/home/bridge"
+        private const val TERMUX_BRIDGE_PATH = "~/bridge"
         private var appContext: Context? = null
         
         @Volatile
@@ -51,17 +48,14 @@ class MCPBridge private constructor(private val context: Context) {
             }
         }
 
-        // 部署桥接器到Termux
-        suspend fun deployBridge(context: Context): Boolean {
+        // 部署桥接器到终端
+        suspend fun deployBridge(context: Context, sessionId: String? = null): Boolean {
             appContext = context.applicationContext
             return withContext(Dispatchers.IO) {
                 try {
-                    // 1. 首先将桥接器从assets复制到Download/Operit/bridge目录
-                    val downloadsDir =
-                            Environment.getExternalStoragePublicDirectory(
-                                    Environment.DIRECTORY_DOWNLOADS
-                            )
-                    val operitDir = File(downloadsDir, "Operit")
+                    // 1. 首先将桥接器从assets复制到sdcard/Download/Operit/bridge目录
+                    val sdcardPath = "/sdcard"
+                    val operitDir = File("$sdcardPath/Download/Operit")
                     if (!operitDir.exists()) {
                         operitDir.mkdirs()
                     }
@@ -77,6 +71,13 @@ class MCPBridge private constructor(private val context: Context) {
                     val outputFile = File(publicBridgeDir, "index.js")
                     outputFile.writeText(indexJsContent)
                     inputStream.close()
+
+                    // 复制 spawn-helper.js 到公共目录
+                    val spawnHelperInputStream = context.assets.open("bridge/spawn-helper.js")
+                    val spawnHelperJsContent = spawnHelperInputStream.bufferedReader().use { it.readText() }
+                    val spawnHelperOutputFile = File(publicBridgeDir, "spawn-helper.js")
+                    spawnHelperOutputFile.writeText(spawnHelperJsContent)
+                    spawnHelperInputStream.close()
 
                     // 创建package.json文件
                     val packageJsonContent =
@@ -97,52 +98,51 @@ class MCPBridge private constructor(private val context: Context) {
 
                     Log.d(TAG, "桥接器文件已复制到公共目录: ${publicBridgeDir.absolutePath}")
 
-                    // 2. 确保Termux目录存在并复制文件
-                    // 创建会话
-                    val session = TerminalSessionManager.createSession("MCPBridge")
+                    // 2. 确保终端目录存在并复制文件
+                    // 获取终端管理器
+                    val terminal = Terminal.getInstance(context)
+                    
+                    // 确保已连接到终端服务
+                    if (!terminal.isConnected()) {
+                        val connected = terminal.initialize()
+                        if (!connected) {
+                            Log.e(TAG, "无法连接到终端服务")
+                            return@withContext false
+                        }
+                    }
 
+                    // 使用传入的sessionId或创建新的会话
+                    val actualSessionId = sessionId ?: run {
+                        val newSessionId = terminal.createSessionAndWait("mcp-bridge-deploy")
+                        if (newSessionId == null) {
+                            Log.e(TAG, "无法创建终端会话或会话初始化超时")
+                            return@withContext false
+                        }
+                        newSessionId
+                    }
+
+                    // 使用sdcard路径而不是Android storage路径
+                    val sdcardBridgePath = "/sdcard/Download/Operit/bridge"
+                    
                     // 以非阻塞方式创建目录并复制文件
                     val deployCommand =
                             """
                         mkdir -p $TERMUX_BRIDGE_PATH && 
-                        cp -f ${outputFile.absolutePath} $TERMUX_BRIDGE_PATH/ && 
-                        cp -f ${packageJson.absolutePath} $TERMUX_BRIDGE_PATH/ && 
+                        cp -f $sdcardBridgePath/index.js $TERMUX_BRIDGE_PATH/ && 
+                        cp -f $sdcardBridgePath/spawn-helper.js $TERMUX_BRIDGE_PATH/ &&
+                        cp -f $sdcardBridgePath/package.json $TERMUX_BRIDGE_PATH/ && 
                         cd $TERMUX_BRIDGE_PATH && 
-                        ([ -d node_modules/uuid ] && [ -d node_modules/mcp-client ]) || npm install
+                        if [ ! -d "node_modules/mcp-client" ] || [ ! -d "node_modules/uuid" ]; then pnpm install; fi
                     """.trimIndent()
 
                     // 执行命令
-                    var exitCode = -1
-                    val completionLatch = CountDownLatch(1)
+                    terminal.executeCommand(actualSessionId, deployCommand)
 
-                    TerminalSessionManager.executeSessionCommand(
-                            context = context,
-                            session = session,
-                            command = deployCommand,
-                            onOutput = { output -> Log.d(TAG, "Termux部署输出: $output") },
-                            onInteractivePrompt = { _, _ -> },
-                            onComplete = { code, success ->
-                                exitCode = code
-                                Log.d(TAG, "Termux部署命令完成，退出码: $code, 成功: $success")
-                                completionLatch.countDown()
-                            }
-                    )
+                    // 等待命令执行完成
+                    delay(100) // 给命令执行时间
 
-                    // 等待命令完成，最多等待30秒
-                    val commandFinished = completionLatch.await(30, TimeUnit.SECONDS)
-                    if (!commandFinished) {
-                        Log.e(TAG, "桥接器部署命令执行超时")
-                        return@withContext false
-                    }
-
-                    val success = exitCode == 0
-                    if (success) {
-                        Log.d(TAG, "桥接器成功部署到Termux")
-                    } else {
-                        Log.e(TAG, "桥接器部署失败，退出码: $exitCode")
-                    }
-
-                    return@withContext success
+                    Log.d(TAG, "桥接器成功部署到终端")
+                    return@withContext true
                 } catch (e: Exception) {
                     Log.e(TAG, "部署桥接器异常", e)
                     return@withContext false
@@ -150,12 +150,13 @@ class MCPBridge private constructor(private val context: Context) {
             }
         }
 
-        // 在Termux中启动桥接器
+        // 在终端中启动桥接器
         suspend fun startBridge(
                 context: Context? = null,
                 port: Int = DEFAULT_PORT,
                 mcpCommand: String? = null,
-                mcpArgs: List<String>? = null
+                mcpArgs: List<String>? = null,
+                sessionId: String? = null
         ): Boolean =
                 withContext(Dispatchers.IO) {
                     try {
@@ -167,17 +168,33 @@ class MCPBridge private constructor(private val context: Context) {
                         }
 
                         // 首先检查桥接器是否已经在运行
-                        val pingResult = ping(ctx)
-                        if (pingResult != null) {
+                        val listResult = getInstance(ctx).listMcpServices()
+                        if (listResult != null && listResult.optBoolean("success", false)) {
                             Log.d(TAG, "桥接器已经在运行，无需重新启动")
                             return@withContext true
                         }
 
-                        // 创建会话
-                        val session = TerminalSessionManager.createSession("MCPBridge")
+                        // 获取终端管理器
+                        val terminal = Terminal.getInstance(ctx)
+                        
+                        // 确保已连接到终端服务
+                        if (!terminal.isConnected()) {
+                            val connected = terminal.initialize()
+                            if (!connected) {
+                                Log.e(TAG, "无法连接到终端服务")
+                                return@withContext false
+                            }
+                        }
 
-                        // 清理日志文件
-                        Log.d(TAG, "清理日志文件")
+                        // 使用传入的sessionId或创建新的会话
+                        val actualSessionId = sessionId ?: run {
+                            val newSessionId = terminal.createSessionAndWait("mcp-bridge-daemon")
+                            if (newSessionId == null) {
+                                Log.e(TAG, "无法创建终端会话或会话初始化超时")
+                                return@withContext false
+                            }
+                            newSessionId
+                        }
 
                         // 构建启动命令 - 使用后台方式运行
                         val command = StringBuilder("cd $TERMUX_BRIDGE_PATH && node index.js $port")
@@ -187,21 +204,13 @@ class MCPBridge private constructor(private val context: Context) {
                                 command.append(" ${mcpArgs.joinToString(" ")}")
                             }
                         }
-                        command.append(" > bridge.log 2>&1 &")
+                        command.append(" &")
 
                         Log.d(TAG, "发送启动命令: $command")
 
                         // 异步方式发送启动命令 - 不等待完成，因为它会作为后台进程一直运行
-                        TerminalSessionManager.executeSessionCommand(
-                                context = ctx,
-                                session = session,
-                                command = command.toString(),
-                                onOutput = { output -> Log.d(TAG, "启动输出: $output") },
-                                onInteractivePrompt = { _, _ -> },
-                                onComplete = { code, _ ->
-                                    Log.d(TAG, "启动命令返回码: $code（这不表示桥接器是否成功启动）")
-                                }
-                        )
+                        Log.d(TAG, "进行桥接器启动...")
+                        terminal.executeCommand(actualSessionId, command.toString())
 
                         // 等待一段时间让桥接器启动
                         Log.d(TAG, "等待桥接器启动...")
@@ -210,30 +219,19 @@ class MCPBridge private constructor(private val context: Context) {
                         // 验证桥接器是否成功启动 - 尝试三次
                         var isRunning = false
                         for (i in 1..3) {
-                            val checkResult = ping(ctx)
-                            if (checkResult != null) {
-                                Log.d(TAG, "桥接器成功启动，ping响应: $checkResult")
+                            val checkResult = getInstance(ctx).listMcpServices()
+                            if (checkResult != null && checkResult.optBoolean("success", false)) {
+                                Log.d(TAG, "桥接器成功启动，list响应: $checkResult")
                                 isRunning = true
                                 break
                             }
-                            Log.d(TAG, "第${i}次尝试ping桥接器失败，等待1秒后重试")
+                            Log.d(TAG, "第${i}次尝试连接桥接器失败，等待1秒后重试")
                             delay(1000)
                         }
 
                         // 如果三次尝试后仍然无法ping通，检查日志
                         if (!isRunning) {
-                            Log.e(TAG, "桥接器可能未成功启动，检查日志...")
-
-                            // 异步读取日志而不阻塞
-                            val logCmd = "tail -n 20 $TERMUX_BRIDGE_PATH/bridge.log"
-                            TerminalSessionManager.executeSessionCommand(
-                                    context = ctx,
-                                    session = session,
-                                    command = logCmd,
-                                    onOutput = { output -> Log.e(TAG, "桥接器日志: $output") },
-                                    onInteractivePrompt = { _, _ -> },
-                                    onComplete = { _, _ -> }
-                            )
+                            Log.e(TAG, "桥接器可能未成功启动。请检查终端会话 'mcp-bridge-daemon' 的输出。")
                         }
 
                         return@withContext isRunning
@@ -243,19 +241,26 @@ class MCPBridge private constructor(private val context: Context) {
                     }
                 }
 
-        // 简单的健康检查
-        suspend fun ping(context: Context? = null): JSONObject? =
+        // 重置桥接器（静态方法）
+        suspend fun reset(context: Context? = null): JSONObject? =
                 withContext(Dispatchers.IO) {
                     try {
+                        Log.d(TAG, "重置桥接器 - 关闭所有服务并清空注册表...")
                         val command =
                                 JSONObject().apply {
-                                    put("command", "ping")
+                                    put("command", "reset")
                                     put("id", UUID.randomUUID().toString())
                                 }
 
-                        return@withContext sendCommand(command)
+                        val response = sendCommand(command)
+                        if (response?.optBoolean("success", false) == true) {
+                            Log.i(TAG, "桥接器重置成功")
+                        } else {
+                            Log.w(TAG, "桥接器重置失败")
+                        }
+                        return@withContext response
                     } catch (e: Exception) {
-                        Log.e(TAG, "Ping失败", e)
+                        Log.e(TAG, "重置桥接器异常", e)
                         return@withContext null
                     }
                 }
@@ -291,7 +296,7 @@ class MCPBridge private constructor(private val context: Context) {
                         // Create socket with timeout and proper options
                         socket = Socket()
                         socket.reuseAddress = true
-                        socket.soTimeout = 60000 // 60 seconds read timeout
+                        socket.soTimeout = 180000 // 180 seconds read timeout (3 minutes)
                         socket.connect(
                                 java.net.InetSocketAddress(host, port),
                                 5000
@@ -477,12 +482,15 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(command)
     }
 
-    // 列出所有注册的MCP服务
-    suspend fun listMcpServices(): JSONObject? {
+    // 列出所有注册的MCP服务或查询单个服务
+    suspend fun listMcpServices(serviceName: String? = null): JSONObject? {
         val command =
                 JSONObject().apply {
                     put("command", "list")
                     put("id", UUID.randomUUID().toString())
+                    if (serviceName != null) {
+                        put("params", JSONObject().apply { put("name", serviceName) })
+                    }
                 }
 
         return sendCommand(command)
@@ -532,6 +540,18 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(commandObj)
     }
 
+    // 停止MCP服务（不注销）
+    suspend fun unspawnMcpService(name: String): JSONObject? {
+        val command =
+                JSONObject().apply {
+                    put("command", "unspawn")
+                    put("id", UUID.randomUUID().toString())
+                    put("params", JSONObject().apply { put("name", name) })
+                }
+
+        return sendCommand(command)
+    }
+
     // 获取工具列表
     suspend fun listTools(serviceName: String? = null): JSONObject? {
         val params = JSONObject()
@@ -558,13 +578,25 @@ class MCPBridge private constructor(private val context: Context) {
         return sendCommand(command)
     }
 
-    // 获取MCP服务状态
-    suspend fun getStatus(): JSONObject? {
-        val command =
-                JSONObject().apply {
-                    put("command", "status")
-                    put("id", UUID.randomUUID().toString())
-                }
+    // 缓存工具列表到bridge（用于已有缓存的插件）
+    suspend fun cacheTools(serviceName: String, tools: List<JSONObject>): JSONObject? {
+        val toolsArray = JSONArray()
+        tools.forEach { tool ->
+            toolsArray.put(tool)
+        }
+
+        val params = JSONObject().apply {
+            put("name", serviceName)
+            put("tools", toolsArray)
+        }
+
+        val command = JSONObject().apply {
+            put("command", "cachetools")
+            put("id", UUID.randomUUID().toString())
+            put("params", params)
+        }
+
+        Log.d(TAG, "缓存工具列表到bridge 服务: $serviceName 工具数: ${tools.size}")
 
         return sendCommand(command)
     }
@@ -595,50 +627,49 @@ class MCPBridge private constructor(private val context: Context) {
     }
 
     /**
-     * pingMcpService - 专门针对服务的ping操作，用于验证特定服务的状态
+     * 查询特定MCP服务的状态
      *
-     * @param serviceName 要ping的服务名称
-     * @return ping响应，如果失败则返回null
+     * @param serviceName 要查询的服务名称
+     * @return 服务信息响应，如果失败则返回null
      */
-    suspend fun pingMcpService(serviceName: String): JSONObject? =
+    suspend fun getServiceStatus(serviceName: String): JSONObject? =
             withContext(Dispatchers.IO) {
                 try {
-                    Log.d(TAG, "开始执行针对服务 $serviceName 的ping操作")
+                    Log.d(TAG, "查询服务 $serviceName 的状态")
+                    return@withContext listMcpServices(serviceName)
+                } catch (e: Exception) {
+                    Log.e(TAG, "查询服务状态时出错: ${e.message}")
+                    return@withContext null
+                }
+            }
 
-                    // 构建带有服务名参数的ping命令
+    /**
+     * 重置桥接器 - 关闭所有服务、清空注册表和池子
+     * 
+     * @return 重置是否成功
+     */
+    suspend fun resetBridge(): JSONObject? =
+            withContext(Dispatchers.IO) {
+                try {
+                    Log.d(TAG, "开始重置桥接器，关闭所有服务并清空注册表...")
+
                     val command =
                             JSONObject().apply {
-                                put("command", "ping")
+                                put("command", "reset")
                                 put("id", UUID.randomUUID().toString())
-                                put("params", JSONObject().apply { put("name", serviceName) })
                             }
 
                     val response = sendCommand(command)
 
                     if (response?.optBoolean("success", false) == true) {
-                        val result = response.optJSONObject("result")
-
-                        // 检查服务状态
-                        val status = result?.optString("status")
-                        val active = result?.optBoolean("active", false) ?: false
-                        val ready = result?.optBoolean("ready", false) ?: false
-
-                        if (status == "ok") {
-                            Log.d(TAG, "服务 $serviceName 正在运行并响应")
-                            return@withContext response
-                        } else if (active) {
-                            Log.d(TAG, "服务 $serviceName 正在运行但可能尚未完全准备好")
-                            return@withContext response
-                        } else {
-                            Log.d(TAG, "服务 $serviceName 已注册但未运行")
-                            return@withContext response
-                        }
+                        Log.i(TAG, "桥接器重置成功")
+                        return@withContext response
+                    } else {
+                        Log.w(TAG, "桥接器重置失败")
+                        return@withContext null
                     }
-
-                    Log.w(TAG, "Ping服务 $serviceName 失败")
-                    return@withContext null
                 } catch (e: Exception) {
-                    Log.e(TAG, "Ping服务时出错: ${e.message}")
+                    Log.e(TAG, "重置桥接器时出错: ${e.message}")
                     return@withContext null
                 }
             }

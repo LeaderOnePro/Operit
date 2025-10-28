@@ -4,6 +4,5 @@ enum class FloatingMode {
     WINDOW,
     BALL,
     VOICE_BALL,
-    FULLSCREEN,
-    DragonBones
+    FULLSCREEN
 }

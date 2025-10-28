@@ -69,7 +69,9 @@ class SimpleVoiceProvider(private val context: Context) : VoiceService {
                                     ) {
                                         Log.e(TAG, "语言不支持: $locale")
                                         _isInitialized.value = false
-                                        continuation.resume(false)
+                                        continuation.resumeWith(Result.failure(
+                                            TtsException("系统TTS语言不支持: $locale")
+                                        ))
                                     } else {
                                         // 设置默认语速和音调
                                         tts?.setSpeechRate(currentRate)
@@ -112,7 +114,9 @@ class SimpleVoiceProvider(private val context: Context) : VoiceService {
                                 } else {
                                     Log.e(TAG, "TTS初始化失败: $status")
                                     _isInitialized.value = false
-                                    continuation.resume(false)
+                                    continuation.resumeWith(Result.failure(
+                                        TtsException("系统TTS初始化失败，状态码: $status")
+                                    ))
                                 }
                             }
 

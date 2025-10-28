@@ -12,6 +12,7 @@ import org.json.JSONArray
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.map
+import com.ai.assistance.operit.integrations.tasker.triggerAIAgentAction
 
 /**
  * This file contains all tool registrations centralized for easier maintenance and integration It
@@ -43,27 +44,51 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
 
     // 终端命令执行工具 - 一次性收集输出
     handler.registerTool(
-            name = "execute_terminal",
+            name = "create_terminal_session",
+            category = ToolCategory.SYSTEM_OPERATION,
+            dangerCheck = { false },
+            descriptionGenerator = { tool ->
+                val sessionName = tool.parameters.find { it.name == "session_name" }?.value
+                "创建或获取终端会话: ${sessionName ?: "未命名"}"
+            },
+            executor = { tool ->
+                val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
+                terminalTool.createOrGetSession(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "execute_in_terminal_session",
             category = ToolCategory.SYSTEM_OPERATION,
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val command = tool.parameters.find { it.name == "command" }?.value ?: ""
                 val sessionId = tool.parameters.find { it.name == "session_id" }?.value
-                if (sessionId != null) {
-                    "执行终端命令 (会话: $sessionId): $command"
-                } else {
-                    "执行终端命令: $command"
-                }
+                "在终端会话 '$sessionId' 中执行: $command"
             },
             executor = { tool ->
                 val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
-                terminalTool.invoke(tool)
+                terminalTool.executeCommandInSession(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "close_terminal_session",
+            category = ToolCategory.SYSTEM_OPERATION,
+            dangerCheck = { false },
+            descriptionGenerator = { tool ->
+                val sessionId = tool.parameters.find { it.name == "session_id" }?.value
+                "关闭终端会话: $sessionId"
+            },
+            executor = { tool ->
+                val terminalTool = ToolGetter.getTerminalCommandExecutor(context)
+                terminalTool.closeSession(tool)
             }
     )
 
     // 注册问题库查询工具
     handler.registerTool(
-            name = "query_knowledge_library",
+            name = "query_memory",
             category = ToolCategory.FILE_READ,
             dangerCheck = null,
             descriptionGenerator = { tool ->
@@ -73,6 +98,109 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             executor = { tool ->
                 val problemLibraryTool = ToolGetter.getMemoryQueryToolExecutor(context)
                 problemLibraryTool.invoke(tool)
+            }
+    )
+    
+    // 注册根据标题获取单个记忆工具
+    handler.registerTool(
+            name = "get_memory_by_title",
+            category = ToolCategory.FILE_READ,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "根据标题获取记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册用户偏好更新工具
+    handler.registerTool(
+            name = "update_user_preferences",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val params = mutableListOf<String>()
+                tool.parameters.forEach { param ->
+                    when (param.name) {
+                        "birth_date" -> params.add("生日")
+                        "gender" -> params.add("性别")
+                        "personality" -> params.add("性格")
+                        "identity" -> params.add("身份")
+                        "occupation" -> params.add("职业")
+                        "ai_style" -> params.add("AI风格")
+                    }
+                }
+                "更新用户偏好: ${params.joinToString(", ")}"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册创建记忆工具
+    handler.registerTool(
+            name = "create_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "创建记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册更新记忆工具
+    handler.registerTool(
+            name = "update_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val oldTitle = tool.parameters.find { it.name == "old_title" }?.value ?: ""
+                val newTitle = tool.parameters.find { it.name == "new_title" }?.value ?: oldTitle
+                "更新记忆: $oldTitle -> $newTitle"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册删除记忆工具
+    handler.registerTool(
+            name = "delete_memory",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: ""
+                "删除记忆: $title"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
+            }
+    )
+
+    // 注册链接记忆工具
+    handler.registerTool(
+            name = "link_memories",
+            category = ToolCategory.FILE_WRITE,
+            dangerCheck = null,
+            descriptionGenerator = { tool ->
+                val sourceTitle = tool.parameters.find { it.name == "source_title" }?.value ?: ""
+                val targetTitle = tool.parameters.find { it.name == "target_title" }?.value ?: ""
+                val linkType = tool.parameters.find { it.name == "link_type" }?.value ?: "related"
+                "链接记忆: '$sourceTitle' -> '$targetTitle' (类型: $linkType)"
+            },
+            executor = { tool ->
+                val memoryTool = ToolGetter.getMemoryQueryToolExecutor(context)
+                memoryTool.invoke(tool)
             }
     )
 
@@ -196,6 +324,171 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 deviceInfoTool.invoke(tool)
             }
     )
+    
+    // Tasker事件触发工具
+    handler.registerTool(
+            name = "trigger_tasker_event",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val taskType = tool.parameters.find { it.name == "task_type" }?.value ?: ""
+                val args = tool.parameters.filter { it.name.startsWith("arg1") }.joinToString(",")
+                "触发Tasker事件: $taskType ($args)"
+            },
+            executor = { tool ->
+                val params = tool.parameters.associate { it.name to it.value }
+                val taskType = params["task_type"]
+                if (taskType.isNullOrBlank()) {
+                    ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "缺少必需参数: task_type"
+                    )
+                } else {
+                    val args = params.filterKeys { it != "task_type" }
+                    try {
+                        context.triggerAIAgentAction(
+                            taskType,
+                            args
+                        )
+                        ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result = StringResultData("Triggered Tasker event: $taskType")
+                        )
+                    } catch (e: Exception) {
+                        ToolResult(
+                            toolName = tool.name,
+                            success = false,
+                            result = StringResultData(""),
+                            error = "Failed to trigger Tasker event: ${e.message}"
+                        )
+                    }
+                }
+            }
+    )
+
+    
+    // 工作流工具
+    val workflowTools = ToolGetter.getWorkflowTools(context)
+
+    // 获取所有工作流
+    handler.registerTool(
+            name = "get_all_workflows",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "获取所有工作流列表" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.getAllWorkflows(tool) } }
+    )
+
+    // 创建工作流
+    handler.registerTool(
+            name = "create_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val name = tool.parameters.find { it.name == "name" }?.value ?: ""
+                "创建工作流: $name"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.createWorkflow(tool) } }
+    )
+
+    // 获取工作流详情
+    handler.registerTool(
+            name = "get_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "获取工作流详情: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.getWorkflow(tool) } }
+    )
+
+    // 更新工作流
+    handler.registerTool(
+            name = "update_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                val name = tool.parameters.find { it.name == "name" }?.value
+                if (name != null) {
+                    "更新工作流: $id (新名称: $name)"
+                } else {
+                    "更新工作流: $id"
+                }
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.updateWorkflow(tool) } }
+    )
+
+    // 删除工作流
+    handler.registerTool(
+            name = "delete_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "删除工作流: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.deleteWorkflow(tool) } }
+    )
+
+    // 触发工作流执行
+    handler.registerTool(
+            name = "trigger_workflow",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val id = tool.parameters.find { it.name == "workflow_id" }?.value ?: ""
+                "触发工作流: $id"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { workflowTools.triggerWorkflow(tool) } }
+    )
+
+    // 对话管理工具
+    val chatManagerTool = ToolGetter.getChatManagerTool(context)
+
+    // 启动聊天服务
+    handler.registerTool(
+            name = "start_chat_service",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "启动对话服务（悬浮窗）" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.startChatService(tool) } }
+    )
+
+    // 新建对话
+    handler.registerTool(
+            name = "create_new_chat",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "创建新的对话" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.createNewChat(tool) } }
+    )
+
+    // 列出所有对话
+    handler.registerTool(
+            name = "list_chats",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { _ -> "列出所有对话" },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.listChats(tool) } }
+    )
+
+    // 切换对话
+    handler.registerTool(
+            name = "switch_chat",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val chatId = tool.parameters.find { it.name == "chat_id" }?.value ?: ""
+                "切换到对话: $chatId"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.switchChat(tool) } }
+    )
+
+    // 发送消息给AI
+    handler.registerTool(
+            name = "send_message_to_ai",
+            category = ToolCategory.SYSTEM_OPERATION,
+            descriptionGenerator = { tool ->
+                val message = tool.parameters.find { it.name == "message" }?.value ?: ""
+                val preview = if (message.length > 30) "${message.take(30)}..." else message
+                "发送消息给AI: $preview"
+            },
+            executor = { tool -> kotlinx.coroutines.runBlocking { chatManagerTool.sendMessageToAI(tool) } }
+    )
 
     // 文件系统工具
     val fileSystemTools = ToolGetter.getFileSystemTools(context)
@@ -206,7 +499,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "列出目录内容: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "列出目录内容: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.listFiles(tool) }
@@ -219,7 +514,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "读取文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "读取文件: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.readFile(tool) } }
     )
@@ -230,8 +527,10 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val partIndex = tool.parameters.find { it.name == "partIndex" }?.value ?: "0"
-                "分段读取文件 (部分 $partIndex): $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "分段读取文件 (部分 $partIndex): $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.readFilePart(tool) }
@@ -244,7 +543,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "读取完整文件内容: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "读取完整文件内容: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.readFileFull(tool) } }
     )
@@ -256,8 +557,11 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val append = tool.parameters.find { it.name == "append" }?.value == "true"
-                if (append) "追加内容到文件: $path" else "写入内容到文件: $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val operation = if (append) "追加内容到文件" else "写入内容到文件"
+                "$operation: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.writeFile(tool) }
@@ -271,7 +575,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
         dangerCheck = { true }, // 总是危险操作
         descriptionGenerator = { tool ->
             val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-            "将Base64内容写入二进制文件: $path"
+            val environment = tool.parameters.find { it.name == "environment" }?.value
+            val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+            "将Base64内容写入二进制文件: $path$envInfo"
         },
         executor = { tool ->
             kotlinx.coroutines.runBlocking { fileSystemTools.writeFileBinary(tool) }
@@ -285,8 +591,11 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive = tool.parameters.find { it.name == "recursive" }?.value == "true"
-                if (recursive) "递归删除: $path" else "删除文件: $path"
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val operation = if (recursive) "递归删除" else "删除文件"
+                "$operation: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.deleteFile(tool) }
@@ -420,7 +729,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "检查文件存在: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "检查文件存在: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.fileExists(tool) }
@@ -435,7 +746,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "移动文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "移动文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.moveFile(tool) } }
     )
@@ -447,7 +760,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "复制文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "复制文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.copyFile(tool) } }
     )
@@ -458,7 +773,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_WRITE,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "创建目录: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "创建目录: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.makeDirectory(tool) }
@@ -472,7 +789,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: "*"
-                "搜索文件: 在 $path 中查找 $pattern"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "搜索文件: 在 $path 中查找 $pattern$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.findFiles(tool) }
@@ -485,7 +804,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "获取文件信息: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "获取文件信息: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.fileInfo(tool) } }
     )
@@ -497,7 +818,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { true }, // 总是危险操作
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "智能合并AI代码到文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "智能合并AI代码到文件: $path$envInfo"
             },
             executor =
                     object : ToolExecutor {
@@ -520,7 +843,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "压缩文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "压缩文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.zipFiles(tool) } }
     )
@@ -532,7 +857,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "解压文件: $source -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "解压文件: $source -> $destination$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.unzipFiles(tool) }
@@ -545,7 +872,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "打开文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "打开文件: $path$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.openFile(tool) } }
     )
@@ -556,10 +885,34 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_WRITE,
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-                "分享文件: $path"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "分享文件: $path$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.shareFile(tool) }
+            }
+    )
+
+    // Grep代码搜索
+    handler.registerTool(
+            name = "grep_code",
+            category = ToolCategory.FILE_READ,
+            descriptionGenerator = { tool ->
+                val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+                val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+                val filePattern = tool.parameters.find { it.name == "file_pattern" }?.value
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                val baseDescription = "在 $path 中搜索代码: '$pattern'$envInfo"
+                if (filePattern != null && filePattern != "*") {
+                    "$baseDescription (文件类型: $filePattern)"
+                } else {
+                    baseDescription
+                }
+            },
+            executor = { tool ->
+                kotlinx.coroutines.runBlocking { fileSystemTools.grepCode(tool) }
             }
     )
 
@@ -570,7 +923,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val url = tool.parameters.find { it.name == "url" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
-                "下载文件: $url -> $destination"
+                val environment = tool.parameters.find { it.name == "environment" }?.value
+                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                "下载文件: $url -> $destination$envInfo"
             },
             executor = { tool ->
                 kotlinx.coroutines.runBlocking { fileSystemTools.downloadFile(tool) }
@@ -792,130 +1147,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
-    // 文件格式转换工具
-    val fileConverterTool = ToolGetter.getFileConverterToolExecutor(context)
-
-    // 文件格式转换
-    handler.registerTool(
-            name = "convert_file",
-            category = ToolCategory.FILE_WRITE,
-            dangerCheck = { true }, // 总是危险操作，因为会创建新文件
-            descriptionGenerator = { tool ->
-                val sourcePath = tool.parameters.find { it.name == "source_path" }?.value ?: ""
-                val targetPath = tool.parameters.find { it.name == "target_path" }?.value ?: ""
-                "转换文件格式: $sourcePath → $targetPath"
-            },
-            executor = { tool -> fileConverterTool.invoke(tool) }
-    )
-
-    // 获取支持的文件转换格式
-    handler.registerTool(
-            name = "get_supported_conversions",
-            category = ToolCategory.FILE_READ,
-            descriptionGenerator = { _ -> "获取支持的文件转换格式" },
-            executor = { tool -> fileConverterTool.invoke(tool) }
-    )
-
-    // AI电脑桌面工具
-    val computerDesktopTools = ToolGetter.getComputerDesktopTools(context)
-
-    handler.registerTool(
-        name = "computer_get_tabs",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { "获取所有打开的电脑标签页" },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_switch_to_tab",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val tabId = tool.parameters.find { it.name == "tab_id" }?.value
-            val tabIndex = tool.parameters.find { it.name == "tab_index" }?.value
-            "切换到电脑标签页: ${tabId ?: tabIndex}"
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_open_desktop",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { "打开一个新的电脑桌面主页标签" },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_await_page_load",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { "等待电脑页面加载完成" },
-        executor = { tool -> runBlocking { computerDesktopTools.awaitPageLoaded(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_go_back",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { "返回电脑浏览器中的上一个页面" },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_open_browser",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val url = tool.parameters.find { it.name == "url" }?.value
-            "在电脑中打开一个新的浏览器标签" + (if (url != null) "，访问URL: $url" else "")
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_get_page_info",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { "获取电脑当前页面的可交互元素信息" },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_click_element",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val interaction_id = tool.parameters.find { it.name == "interaction_id" }?.value
-            "点击电脑页面上的元素: ID $interaction_id"
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_scroll_by",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val x = tool.parameters.find { it.name == "x" }?.value
-            val y = tool.parameters.find { it.name == "y" }?.value
-            "在电脑当前激活的标签页中，滚动页面，x: $x, y: $y"
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_input_text",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val interaction_id = tool.parameters.find { it.name == "interaction_id" }?.value
-            "在电脑页面上的输入框中输入文本: ID $interaction_id"
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
-
-    handler.registerTool(
-        name = "computer_close_tab",
-        category = ToolCategory.UI_AUTOMATION,
-        descriptionGenerator = { tool ->
-            val tabId = tool.parameters.find { it.name == "tab_id" }?.value
-            val tabIndex = tool.parameters.find { it.name == "tab_index" }?.value
-            "关闭指定的电脑标签页: ${tabId ?: tabIndex}"
-        },
-        executor = { tool -> runBlocking { computerDesktopTools.executeTool(tool) } }
-    )
 
     // UI自动化工具
     val automationTools = com.ai.assistance.operit.core.tools.automatic.AutomationTools(context, handler)

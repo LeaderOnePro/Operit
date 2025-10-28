@@ -4,13 +4,18 @@ import xml.etree.ElementTree as ET
 import os
 import sys
 
+# 设置stdout编码为utf-8
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 def parse_strings_file(filepath):
     """解析strings.xml文件，返回键值对字典和重复项"""
     strings_dict = {}
     duplicates = []
     
     if not os.path.exists(filepath):
-        print(f"❌ 文件不存在: {filepath}")
+        print(f"[X] 文件不存在: {filepath}")
         return strings_dict, duplicates
     
     try:
@@ -25,7 +30,7 @@ def parse_strings_file(filepath):
                 strings_dict[name] = string_elem.text or ""
                 
     except Exception as e:
-        print(f"❌ 解析文件失败 {filepath}: {e}")
+        print(f"[X] 解析文件失败 {filepath}: {e}")
         
     return strings_dict, duplicates
 
@@ -33,13 +38,13 @@ def main():
     files = {
         '中文': 'app/src/main/res/values/strings.xml',
         '英文': 'app/src/main/res/values-en/strings.xml', 
-        '西班牙语': 'app/src/main/res/values-es/strings.xml'
+        # '西班牙语': 'app/src/main/res/values-es/strings.xml'
     }
     
     # 检查是否使用简化模式
     simple_mode = len(sys.argv) > 1 and sys.argv[1] == "--simple"
     
-    print("📊 Android Strings.xml 检查结果")
+    print("Android Strings.xml 检查结果")
     print("=" * 50)
     
     all_data = {}
@@ -58,24 +63,24 @@ def main():
         
         print(f"{lang}: {len(data)} 个字符串, {len(duplicates)} 个重复项")
     
-    print(f"\n📈 总计: {len(all_keys)} 个唯一字符串键")
-    print(f"🔄 总重复项: {total_duplicates}")
+    print(f"\n总计: {len(all_keys)} 个唯一字符串键")
+    print(f"总重复项: {total_duplicates}")
     
     if not simple_mode:
         # 详细输出重复项
         print("\n" + "=" * 50)
-        print("🔄 重复项详情:")
+        print("重复项详情:")
         for lang, duplicates in all_duplicates.items():
             if duplicates:
-                print(f"\n❌ {lang} 重复项 ({len(duplicates)}个):")
+                print(f"\n[X] {lang} 重复项 ({len(duplicates)}个):")
                 for dup in duplicates:
                     print(f"   - {dup}")
             else:
-                print(f"\n✅ {lang}: 无重复项")
+                print(f"\n[OK] {lang}: 无重复项")
         
         # 详细输出缺失项
         print("\n" + "=" * 50)
-        print("❌ 缺失项详情:")
+        print("缺失项详情:")
     
     total_missing = 0
     for lang, data in all_data.items():
@@ -83,9 +88,9 @@ def main():
         total_missing += len(missing)
         if missing:
             if simple_mode:
-                print(f"❌ {lang}: 缺少 {len(missing)} 个字符串")
+                print(f"[X] {lang}: 缺少 {len(missing)} 个字符串")
             else:
-                print(f"\n❌ {lang} 缺失项 ({len(missing)}个):")
+                print(f"\n[X] {lang} 缺失项 ({len(missing)}个):")
                 # 按类别分组显示，更容易阅读
                 categories = {}
                 for key in missing:
@@ -107,16 +112,16 @@ def main():
                         print(f"     ... 还有 {len(keys) - 10} 个")
         else:
             if simple_mode:
-                print(f"✅ {lang}: 完整")
+                print(f"[OK] {lang}: 完整")
             else:
-                print(f"\n✅ {lang}: 完整")
+                print(f"\n[OK] {lang}: 完整")
     
-    print(f"\n🎯 总缺失项: {total_missing}")
+    print(f"\n总缺失项: {total_missing}")
     
     if total_duplicates == 0 and total_missing == 0:
-        print("\n🎉 所有文件都已完整且无重复项！")
+        print("\n[SUCCESS] 所有文件都已完整且无重复项！")
     else:
-        print(f"\n⚠️  还需修复: {total_duplicates} 个重复项 + {total_missing} 个缺失项")
+        print(f"\n[WARNING] 还需修复: {total_duplicates} 个重复项 + {total_missing} 个缺失项")
 
 if __name__ == "__main__":
     main()

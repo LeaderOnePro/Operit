@@ -1,7 +1,6 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.ai.assistance.operit.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.ai.assistance.operit.api.chat.AIServiceFactory
+import com.ai.assistance.operit.api.chat.llmprovider.AIServiceFactory
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigSummary
@@ -376,11 +375,10 @@ fun FunctionConfigCard(
 
                                             val service =
                                                     AIServiceFactory.createService(
-                                                            apiProviderType = fullConfig.apiProviderType,
-                                                            apiEndpoint = fullConfig.apiEndpoint,
-                                                            apiKey = fullConfig.apiKey,
-                                                            modelName = fullConfig.modelName,
-                                                            customHeadersJson = customHeadersJson
+                                                            config = fullConfig,
+                                                            customHeadersJson = customHeadersJson,
+                                                            modelConfigManager = modelConfigManager,
+                                                            context = context
                                                     )
                                             testResult = service.testConnection()
                                         } catch (e: Exception) {
@@ -524,6 +522,7 @@ fun getFunctionDisplayName(functionType: FunctionType): String {
         FunctionType.FILE_BINDING -> stringResource(id = R.string.function_type_file_binding)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_type_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_type_translation)
+        FunctionType.IMAGE_RECOGNITION -> stringResource(id = R.string.function_type_image_recognition)
     }
 }
 
@@ -537,5 +536,6 @@ fun getFunctionDescription(functionType: FunctionType): String {
         FunctionType.FILE_BINDING -> stringResource(id = R.string.function_desc_file_binding)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_desc_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_desc_translation)
+        FunctionType.IMAGE_RECOGNITION -> stringResource(id = R.string.function_desc_image_recognition)
     }
 }

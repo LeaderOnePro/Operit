@@ -8,22 +8,21 @@ import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Color
+import androidx.core.content.FileProvider
+import com.ai.assistance.operit.ui.features.chat.components.ChatStyle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
-import com.ai.assistance.operit.core.invitation.InvitationManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.preferences.ApiPreferences
-import com.ai.assistance.operit.data.preferences.InvitationRepository
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.data.model.PromptFunctionType
-import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentManager
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
@@ -35,12 +34,26 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
+import com.ai.assistance.operit.util.WaifuMessageProcessor
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
+import com.ai.assistance.operit.util.TtsCleaner
+import android.net.Uri
+// 使用 services/core 的 Delegate 类
+import com.ai.assistance.operit.services.core.MessageProcessingDelegate
+import com.ai.assistance.operit.services.core.ChatHistoryDelegate
+import com.ai.assistance.operit.services.core.ApiConfigDelegate
+import com.ai.assistance.operit.services.core.TokenStatisticsDelegate
+import com.ai.assistance.operit.services.core.AttachmentDelegate
+import com.ai.assistance.operit.services.core.MessageCoordinationDelegate
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -48,76 +61,20 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         private const val TAG = "ChatViewModel"
     }
 
-    // Invitation and feature unlock management
-    private val invitationRepository = InvitationRepository(context)
-    private val invitationManager = InvitationManager(context)
-
-    val isWorkspaceUnlocked = invitationRepository.isWorkspaceUnlockedFlow
-    val isFloatingWindowUnlocked = invitationRepository.isFloatingWindowUnlockedFlow
-    val invitationCount = invitationRepository.invitationCountFlow
-
-    private val _showInvitationExplanation = MutableStateFlow(false)
-    val showInvitationExplanation = _showInvitationExplanation.asStateFlow()
-
-    private val _showInvitationPanel = MutableStateFlow(false)
-    val showInvitationPanel = _showInvitationPanel.asStateFlow()
-
-    private val _generatedInvitationMessage = MutableStateFlow("")
-    val generatedInvitationMessage = _generatedInvitationMessage.asStateFlow()
-
     // 添加语音服务
     private var voiceService: VoiceService? = null
+    private val speechServicesPreferences = SpeechServicesPreferences(context)
 
     // 添加语音播放状态
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    fun showInvitationPanel() {
-        _generatedInvitationMessage.value = invitationManager.generateInvitationMessage()
-        _showInvitationPanel.value = true
-    }
+    // 添加自动朗读状态 - Now managed by ApiConfigDelegate
+    val isAutoReadEnabled: StateFlow<Boolean> by lazy { apiConfigDelegate.enableAutoRead }
 
-    fun dismissInvitationPanel() {
-        _showInvitationPanel.value = false
-    }
-
-    fun onInvitationExplanationConfirmed() {
-        // After user confirms, hide explanation and show the main panel
-        _showInvitationExplanation.value = false
-        showInvitationPanel()
-    }
-
-    fun dismissInvitationExplanation() {
-        _showInvitationExplanation.value = false
-    }
-
-    fun shareInvitationMessage(message: String) {
-        val sendIntent: Intent = Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, message)
-            type = "text/plain"
-        }
-        val shareIntent = Intent.createChooser(sendIntent, null)
-        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(shareIntent)
-    }
-
-    fun verifyAndHandleConfirmationCode(code: String) {
-        viewModelScope.launch {
-            val success = invitationManager.verifyConfirmationCode(code)
-            if (success) {
-                showToast("邀请成功！感谢你的助力！")
-                // Dismiss the panel on success
-                dismissInvitationPanel()
-            } else {
-                showToast("返回码无效，请检查后重试。")
-            }
-        }
-    }
-
-
-    // 服务收集器设置状态跟踪
-    private var serviceCollectorSetupComplete = false
+    // 添加回复相关状态
+    private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
+    val replyToMessage: StateFlow<ChatMessage?> = _replyToMessage.asStateFlow()
 
     // API服务
     private var enhancedAiService: EnhancedAIService? = null
@@ -128,42 +85,38 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 工具权限系统
     private val toolPermissionSystem = ToolPermissionSystem.getInstance(context)
 
-    // 附件管理器
-    private val attachmentManager = AttachmentManager(context, toolHandler)
+    // 附件管理器 - 使用 services/core 版本
+    private val attachmentDelegate = AttachmentDelegate(context, toolHandler)
 
-    // 委托类
+    // 委托类 - 使用 services/core 版本
     val uiStateDelegate = UiStateDelegate()
     private val tokenStatsDelegate =
             TokenStatisticsDelegate(
-                    viewModelScope = viewModelScope,
+                    coroutineScope = viewModelScope,  // 改用 coroutineScope 参数
                     getEnhancedAiService = { enhancedAiService }
             )
     private val apiConfigDelegate =
             ApiConfigDelegate(
                     context = context,
-                    viewModelScope = viewModelScope,
+                    coroutineScope = viewModelScope,  // 改用 coroutineScope 参数
                     onConfigChanged = { service ->
                         enhancedAiService = service
                         // API配置变更后，异步设置服务收集器
                         viewModelScope.launch {
-                            // 重置服务收集器状态，因为服务实例已变更
-                            serviceCollectorSetupComplete = false
-                            Log.d(TAG, "API配置变更，重置服务收集器状态并重新设置")
-                            setupServiceCollectors()
+                            Log.d(TAG, "API配置变更，设置 token 统计收集器")
                             tokenStatsDelegate.setupCollectors()
                         }
+                        // 设置输入处理状态监听
+                        setupInputProcessingStateListener(service)
                     }
             )
-    private val planItemsDelegate =
-            PlanItemsDelegate(
-                    viewModelScope = viewModelScope,
-                    getEnhancedAiService = { enhancedAiService }
-            )
+
 
     // Break circular dependency with lateinit
     private lateinit var chatHistoryDelegate: ChatHistoryDelegate
     private lateinit var messageProcessingDelegate: MessageProcessingDelegate
     private lateinit var floatingWindowDelegate: FloatingWindowDelegate
+    private lateinit var messageCoordinationDelegate: MessageCoordinationDelegate
 
     // Use lazy initialization for exposed properties to avoid circular reference issues
     // API配置相关
@@ -191,9 +144,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 思考模式和思考引导状态现在由ApiConfigDelegate管理
     val enableThinkingMode: StateFlow<Boolean> by lazy { apiConfigDelegate.enableThinkingMode }
     val enableThinkingGuidance: StateFlow<Boolean> by lazy { apiConfigDelegate.enableThinkingGuidance }
-    val enableMemoryAttachment: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMemoryAttachment }
+    val enableMemoryQuery: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMemoryQuery }
+    val enableTools: StateFlow<Boolean> by lazy { apiConfigDelegate.enableTools }
 
     val summaryTokenThreshold: StateFlow<Float> by lazy { apiConfigDelegate.summaryTokenThreshold }
+    val enableSummary: StateFlow<Boolean> by lazy { apiConfigDelegate.enableSummary }
+    val enableSummaryByMessageCount: StateFlow<Boolean> by lazy { apiConfigDelegate.enableSummaryByMessageCount }
+    val summaryMessageCountThreshold: StateFlow<Int> by lazy { apiConfigDelegate.summaryMessageCountThreshold }
 
     // 上下文长度
     val maxWindowSizeInK: StateFlow<Float> by lazy { apiConfigDelegate.contextLength }
@@ -211,6 +168,36 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val isLoading: StateFlow<Boolean> by lazy { messageProcessingDelegate.isLoading }
     val inputProcessingState: StateFlow<com.ai.assistance.operit.data.model.InputProcessingState> by lazy {
         messageProcessingDelegate.inputProcessingState
+    }
+
+    // 会话隔离：仅当“当前聊天ID == 正在流式的聊天ID”时，才显示处理中/停止按钮
+    val activeStreamingChatId: StateFlow<String?> by lazy { messageProcessingDelegate.activeStreamingChatId }
+    val currentChatIsLoading: StateFlow<Boolean> by lazy {
+        kotlinx.coroutines.flow.combine(
+            messageProcessingDelegate.isLoading,
+            chatHistoryDelegate.currentChatId,
+            messageProcessingDelegate.activeStreamingChatId
+        ) { isLoading, currentId, activeId ->
+            isLoading && activeId != null && activeId == currentId
+        }.stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.Eagerly,
+            initialValue = false
+        )
+    }
+    val currentChatInputProcessingState: StateFlow<com.ai.assistance.operit.data.model.InputProcessingState> by lazy {
+        kotlinx.coroutines.flow.combine(
+            messageProcessingDelegate.inputProcessingState,
+            chatHistoryDelegate.currentChatId,
+            messageProcessingDelegate.activeStreamingChatId
+        ) { state, currentId, activeId ->
+            if (activeId != null && activeId == currentId) state
+            else com.ai.assistance.operit.data.model.InputProcessingState.Idle
+        }.stateIn(
+            scope = viewModelScope,
+            started = kotlinx.coroutines.flow.SharingStarted.Eagerly,
+            initialValue = com.ai.assistance.operit.data.model.InputProcessingState.Idle
+        )
     }
 
     val scrollToBottomEvent: SharedFlow<Unit> by lazy {
@@ -231,14 +218,22 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val outputTokenCount: StateFlow<Int> by lazy { tokenStatsDelegate.cumulativeOutputTokensFlow }
     val perRequestTokenCount: StateFlow<Pair<Int, Int>?> by lazy { tokenStatsDelegate.perRequestTokenCountFlow }
 
-    // 计划项相关
-    val planItems: StateFlow<List<PlanItem>> by lazy { planItemsDelegate.planItems }
+
 
     // 悬浮窗相关
     val isFloatingMode: StateFlow<Boolean> by lazy { floatingWindowDelegate.isFloatingMode }
 
     // 附件相关
-    val attachments: StateFlow<List<AttachmentInfo>> by lazy { attachmentManager.attachments }
+    val attachments: StateFlow<List<AttachmentInfo>> by lazy { attachmentDelegate.attachments }
+    
+    // 总结状态
+    val isSummarizing: StateFlow<Boolean> by lazy { 
+        if (::messageCoordinationDelegate.isInitialized) {
+            messageCoordinationDelegate.isSummarizing
+        } else {
+            MutableStateFlow(false)
+        }
+    }
 
     // 添加一个用于跟踪附件面板状态的变量
     private val _attachmentPanelState = MutableStateFlow(false)
@@ -248,11 +243,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showWebView = MutableStateFlow(false)
     val showWebView: StateFlow<Boolean> = _showWebView
 
-    // 添加“AI电脑”附加层显示状态
+    // 添加AI电脑显示状态的状态流
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
-
-    private val _isSummarizing = MutableStateFlow(false)
 
     // 添加WebView刷新控制流 - 使用Int计数器避免重复刷新问题
     private val _webViewRefreshCounter = MutableStateFlow(0)
@@ -267,7 +260,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
         // Setup additional components
         setupPermissionSystemCollection()
-        setupAttachmentManagerToastCollection()
+        setupAttachmentDelegateToastCollection()
 
         // 初始化语音服务
         initializeVoiceService()
@@ -287,14 +280,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         chatHistoryDelegate =
                 ChatHistoryDelegate(
                         context = context,
-                        viewModelScope = viewModelScope,
+                        coroutineScope = viewModelScope,  // 改用 coroutineScope 参数
                         onChatHistoryLoaded = { messages: List<ChatMessage> ->
-                            if (::floatingWindowDelegate.isInitialized &&
-                                            floatingWindowDelegate.isFloatingMode.value
-                            ) {
-                                floatingWindowDelegate.updateFloatingWindowMessages(messages)
-                            }
-
+                            // 移除了手动同步悬浮窗的逻辑，现在通过订阅chatHistory StateFlow自动同步
+                            
                             // 当聊天记录加载时，更新实际的上下文窗口大小
                             // 修复：直接使用从数据库加载的窗口大小，即使是0也不回退到最大值
                             val currentChat = chatHistories.value.find { it.id == currentChatId.value }
@@ -304,7 +293,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         onTokenStatisticsLoaded = { inputTokens, outputTokens, windowSize ->
                             tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, windowSize)
                         },
-                        resetPlanItems = { planItemsDelegate.clearPlanItems() },
+
                         getEnhancedAiService = { enhancedAiService },
                         ensureAiServiceAvailable = { ensureAiServiceAvailable() },
                         getChatStatistics = {
@@ -319,11 +308,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         messageProcessingDelegate =
                 MessageProcessingDelegate(
                         context = context,
-                        viewModelScope = viewModelScope,
+                        coroutineScope = viewModelScope,  // 改用 coroutineScope 参数
                         getEnhancedAiService = { enhancedAiService },
                         getChatHistory = { chatHistoryDelegate.chatHistory.value },
-                        addMessageToChat = { message ->
-                            chatHistoryDelegate.addMessageToChat(message)
+                        addMessageToChat = { targetChatId, message ->
+                            // 将消息固定写入指定聊天，避免在切换会话后串流到新会话
+                            chatHistoryDelegate.addMessageToChat(message, targetChatId)
                         },
                         saveCurrentChat = {
                             val (inputTokens, outputTokens) =
@@ -351,25 +341,36 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                                 tokenStatsDelegate.getCumulativeTokenCounts()
                             val windowSize = tokenStatsDelegate.getLastCurrentWindowSize()
                             chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, windowSize)
-                        }
+                        },
+                        // 传递自动朗读状态和方法
+                        getIsAutoReadEnabled = { isAutoReadEnabled.value },
+                        speakMessage = ::speakMessage
+                )
+
+        // Initialize message coordination delegate
+        messageCoordinationDelegate = 
+                MessageCoordinationDelegate(
+                        coroutineScope = viewModelScope,
+                        chatHistoryDelegate = chatHistoryDelegate,
+                        messageProcessingDelegate = messageProcessingDelegate,
+                        tokenStatsDelegate = tokenStatsDelegate,
+                        apiConfigDelegate = apiConfigDelegate,
+                        attachmentDelegate = attachmentDelegate,
+                        uiStateDelegate = uiStateDelegate,
+                        getEnhancedAiService = { enhancedAiService },
+                        updateWebServerForCurrentChat = ::updateWebServerForCurrentChat,
+                        resetAttachmentPanelState = ::resetAttachmentPanelState,
+                        clearReplyToMessage = ::clearReplyToMessage,
+                        getReplyToMessage = { replyToMessage.value }
                 )
 
         // Finally initialize floating window delegate
         floatingWindowDelegate =
                 FloatingWindowDelegate(
                         context = context,
-                        viewModelScope = viewModelScope,
-                        onMessageReceived = { message, type ->
-                            updateUserMessage(message)
-                            sendUserMessage(type)
-                        },
-                        onAttachmentRequested = { type -> processAttachmentRequest(type) },
-                        onAttachmentRemoveRequested = { filePath -> removeAttachment(filePath) },
-                        onCancelMessageRequested = {
-                            // 取消当前消息
-                            cancelCurrentMessage()
-                        },
-                        inputProcessingState = this.inputProcessingState
+                        coroutineScope = viewModelScope,
+                        inputProcessingState = this.inputProcessingState,
+                        chatHistoryFlow = chatHistoryDelegate.chatHistory
                 )
     }
 
@@ -381,9 +382,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    private fun setupAttachmentManagerToastCollection() {
+    private fun setupAttachmentDelegateToastCollection() {
         viewModelScope.launch {
-            attachmentManager.toastEvent.collect { message -> uiStateDelegate.showToast(message) }
+            attachmentDelegate.toastEvent.collect { message -> uiStateDelegate.showToast(message) }
         }
     }
 
@@ -397,24 +398,17 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     /** 设置服务相关的流收集逻辑 */
-    private fun setupServiceCollectors() {
-        // 避免重复设置服务收集器
-        if (serviceCollectorSetupComplete) {
-            Log.d(TAG, "服务收集器已经设置完成，跳过重复设置")
-            return
-        }
-
-        // 确保enhancedAiService不为null
-        if (enhancedAiService == null) {
-            Log.d(TAG, "EnhancedAIService尚未初始化，跳过服务收集器设置")
-            return
-        }
-
-        // 设置输入处理状态收集
+    /**
+     * 设置输入处理状态监听
+     * 当 EnhancedAIService 初始化或更新时调用
+     */
+    private fun setupInputProcessingStateListener(service: EnhancedAIService) {
+        Log.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
         viewModelScope.launch {
             try {
-                enhancedAiService?.inputProcessingState?.collect { state ->
-                    if (state is com.ai.assistance.operit.data.model.InputProcessingState.Completed && _isSummarizing.value) {
+                service.inputProcessingState.collect { state ->
+                    if (state is com.ai.assistance.operit.data.model.InputProcessingState.Completed && 
+                        ::messageCoordinationDelegate.isInitialized && messageCoordinationDelegate.isSummarizing.value) {
                         messageProcessingDelegate.handleInputProcessingState(
                             com.ai.assistance.operit.data.model.InputProcessingState.Summarizing("正在总结记忆...")
                         )
@@ -425,74 +419,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "输入处理状态收集出错: ${e.message}", e)
                 uiStateDelegate.showErrorMessage("输入处理状态收集失败: ${e.message}")
-            }
-        }
-
-        // 设置单次请求Token计数器收集
-        viewModelScope.launch {
-            try {
-                enhancedAiService?.perRequestTokenCounts?.collect { counts ->
-                    // uiStateDelegate.updatePerRequestTokenCount(counts) // Removed
-                    // 当收到新的单次请求token数时，更新TokenStatisticsDelegate中的lastCurrentWindowSize
-                    counts?.let {
-                        // tokenStatsDelegate.updateLastWindowSize(it.first) // Removed
-                        // uiStateDelegate.updateCurrentWindowSize(it.first) // Removed
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "单次请求Token计数收集出错: ${e.message}", e)
-                uiStateDelegate.showErrorMessage("单次请求Token计数收集失败: ${e.message}")
-            }
-        }
-
-        // 设置输入处理状态收集和计划项收集
-        viewModelScope.launch {
-            try {
-                var planItemsSetupComplete = false
-                var retryCount = 0
-                val maxRetries = 3
-
-                while (!planItemsSetupComplete && retryCount < maxRetries) {
-                    // 设置计划项收集
-                    if (!planItemsSetupComplete) {
-                        try {
-                            Log.d(TAG, "设置计划项收集，尝试 ${retryCount + 1}/${maxRetries}")
-                            planItemsDelegate.setupPlanItemsCollection()
-                            planItemsSetupComplete = true
-                            Log.d(TAG, "计划项收集设置成功")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "设置计划项收集时出错: ${e.message}", e)
-                            // 修改：对于重要的初始化错误，使用错误弹窗而不是仅记录日志
-                            if (retryCount == maxRetries - 1) {
-                                uiStateDelegate.showErrorMessage("无法初始化计划项: ${e.message}")
-                            }
-                        }
-                    }
-
-                    // 如果都已完成，直接退出循环
-                    if (planItemsSetupComplete) {
-                        break
-                    }
-
-                    // 如果还未完成设置，则等待一段时间后重试
-                    retryCount++
-                    if (retryCount < maxRetries) {
-                        kotlinx.coroutines.delay(500L) // 延迟500毫秒后重试
-                    }
-                }
-
-                // 记录最终设置状态
-                if (!planItemsSetupComplete) {
-                    Log.e(TAG, "无法设置计划项收集，已达到最大重试次数")
-                }
-
-                // 只要有一项设置成功，就标记整体服务收集器设置为已完成
-                if (planItemsSetupComplete) {
-                    serviceCollectorSetupComplete = true
-                    Log.d(TAG, "服务收集器设置已标记为完成")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "设置服务收集器时发生异常: ${e.message}", e)
             }
         }
     }
@@ -530,8 +456,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     // 切换记忆附着的方法现在委托给ApiConfigDelegate
-    fun toggleMemoryAttachment() {
-        apiConfigDelegate.toggleMemoryAttachment()
+    fun toggleMemoryQuery() {
+        apiConfigDelegate.toggleMemoryQuery()
     }
 
     // 更新上下文长度
@@ -541,6 +467,22 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun updateSummaryTokenThreshold(threshold: Float) {
         apiConfigDelegate.updateSummaryTokenThreshold(threshold)
+    }
+
+    fun toggleEnableSummary() {
+        apiConfigDelegate.toggleEnableSummary()
+    }
+
+    fun toggleEnableSummaryByMessageCount() {
+        apiConfigDelegate.toggleEnableSummaryByMessageCount()
+    }
+
+    fun updateSummaryMessageCountThreshold(threshold: Int) {
+        apiConfigDelegate.updateSummaryMessageCountThreshold(threshold)
+    }
+
+    fun toggleTools() {
+        apiConfigDelegate.toggleTools()
     }
 
     // 聊天历史相关方法
@@ -573,12 +515,99 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     /** 删除单条消息 */
     fun deleteMessage(index: Int) {
+        Log.d(TAG, "准备删除消息，索引: $index")
         chatHistoryDelegate.deleteMessage(index)
     }
 
     /** 从指定索引删除后续所有消息 */
     fun deleteMessagesFrom(index: Int) {
-        chatHistoryDelegate.deleteMessagesFrom(index)
+        viewModelScope.launch {
+            Log.d(TAG, "准备从索引 $index 开始删除后续消息")
+            chatHistoryDelegate.deleteMessagesFrom(index)
+        }
+    }
+
+    /** 批量删除消息 */
+    fun deleteMessages(indices: Set<Int>) {
+        viewModelScope.launch {
+            Log.d(TAG, "准备批量删除消息，索引: $indices")
+            // 按降序排列索引后依次删除，避免索引偏移问题
+            val sortedIndices = indices.sortedDescending()
+            sortedIndices.forEach { index ->
+                chatHistoryDelegate.deleteMessage(index)
+            }
+            Log.d(TAG, "批量删除完成")
+        }
+    }
+
+    /** 分享消息为图片 */
+    fun shareMessages(
+        context: Context,
+        messageIndices: Set<Int>,
+        userMessageColor: Color,
+        aiMessageColor: Color,
+        userTextColor: Color,
+        aiTextColor: Color,
+        systemMessageColor: Color,
+        systemTextColor: Color,
+        thinkingBackgroundColor: Color,
+        thinkingTextColor: Color,
+        chatStyle: ChatStyle,
+        onSuccess: (Uri) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "开始生成分享图片，消息索引: $messageIndices")
+                
+                // 获取当前聊天历史
+                val currentHistory = chatHistoryDelegate.chatHistory.value
+                
+                // 验证索引有效性
+                if (messageIndices.any { it < 0 || it >= currentHistory.size }) {
+                    onError("无效的消息索引")
+                    return@launch
+                }
+                
+                // 获取选中的消息
+                val selectedMessages = messageIndices.sorted().map { currentHistory[it] }
+                
+                Log.d(TAG, "准备生成图片，选中消息数量: ${selectedMessages.size}")
+                
+                // 生成图片（内部会自动处理线程切换）
+                val imageFile = com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
+                    .generateMessageImage(
+                        context = context,
+                        messages = selectedMessages,
+                        userMessageColor = userMessageColor,
+                        aiMessageColor = aiMessageColor,
+                        userTextColor = userTextColor,
+                        aiTextColor = aiTextColor,
+                        systemMessageColor = systemMessageColor,
+                        systemTextColor = systemTextColor,
+                        thinkingBackgroundColor = thinkingBackgroundColor,
+                        thinkingTextColor = thinkingTextColor,
+                        chatStyle = chatStyle
+                    )
+                
+                Log.d(TAG, "图片文件生成成功: ${imageFile.absolutePath}, 大小: ${imageFile.length()} bytes")
+                
+                // 使用 FileProvider 获取 Uri
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    imageFile
+                )
+                
+                Log.d(TAG, "Uri 获取成功: $uri")
+                
+                onSuccess(uri)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "生成分享图片失败", e)
+                onError("生成图片失败: ${e.message}")
+            }
+        }
     }
 
     fun saveCurrentChat() {
@@ -649,40 +678,50 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 获取目标消息
                 val targetMessage = currentHistory[index]
 
-                // 检查目标消息是否是用户消息，如果不是，选择前一条用户消息
-                val finalIndex: Int
-                val finalMessage: ChatMessage
-
-                if (targetMessage.sender == "user") {
-                    finalIndex = index
-                    finalMessage = targetMessage.copy(content = editedContent)
-                } else {
-                    // 查找该消息前最近的用户消息
-                    var userMessageIndex = index - 1
-                    while (userMessageIndex >= 0 &&
-                            currentHistory[userMessageIndex].sender != "user") {
-                        userMessageIndex--
-                    }
-
-                    if (userMessageIndex < 0) {
-                        uiStateDelegate.showErrorMessage("找不到有效的用户消息进行回档")
+                // 检查目标消息是否是用户消息
+                if (targetMessage.sender != "user") {
+                    uiStateDelegate.showErrorMessage("只能对用户消息执行此操作")
                         return@launch
                     }
 
-                    finalIndex = userMessageIndex
-                    finalMessage = currentHistory[userMessageIndex].copy(content = editedContent)
+                // **核心修复**: 确定回滚的时间戳。
+                // 我们需要恢复到目标消息 *之前* 的状态,
+                // 所以我们使用前一条消息的时间戳。
+                // 如果目标是第一条消息，则回滚到初始状态 (时间戳 0)。
+                val rewindTimestamp = if (index > 0) {
+                    currentHistory[index - 1].timestamp
+                } else {
+                    0L
+                }
+
+                // 获取当前工作区路径
+                val chatId = currentChatId.value
+                val currentChat = chatHistories.value.find { it.id == chatId }
+                val workspacePath = currentChat?.workspace
+
+                Log.d(TAG, "[Rewind] Target message timestamp: ${targetMessage.timestamp}")
+                if (index > 0) {
+                    Log.d(TAG, "[Rewind] Previous message timestamp: ${currentHistory[index - 1].timestamp}")
+                } else {
+                    Log.d(TAG, "[Rewind] No previous message, target is the first message.")
+                }
+                Log.d(TAG, "[Rewind] Timestamp passed to syncState: $rewindTimestamp")
+
+                // 如果绑定了工作区，则执行回滚
+                if (!workspacePath.isNullOrBlank()) {
+                    Log.d(TAG, "Rewinding workspace to timestamp: $rewindTimestamp")
+                    withContext(Dispatchers.IO) {
+                        WorkspaceBackupManager.getInstance(context)
+                            .syncState(workspacePath, rewindTimestamp)
+                    }
+                    Log.d(TAG, "Workspace rewind complete.")
                 }
 
                 // 截取到指定消息的历史记录（不包含该消息本身）
-                val rewindHistory = currentHistory.subList(0, finalIndex)
+                val rewindHistory = currentHistory.subList(0, index)
+                
                 // 获取要删除的第一条消息的时间戳
-                val timestampOfFirstDeletedMessage =
-                        if (finalIndex < currentHistory.size) {
-                            currentHistory[finalIndex].timestamp
-                        } else {
-                            // 如果finalIndex是列表末尾，则没有消息需要删除
-                            null
-                        }
+                val timestampOfFirstDeletedMessage = currentHistory[index].timestamp
 
                 // **核心修复**：调用新的委托方法，原子性地更新数据库和内存
                 chatHistoryDelegate.truncateChatHistory(
@@ -694,9 +733,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 uiStateDelegate.showToast("正在准备重新发送消息")
 
                 // 使用修改后的消息内容来发送
-                chatHistoryDelegate.updateChatHistory(rewindHistory)
-
-                messageProcessingDelegate.updateUserMessage(finalMessage.content)
+                messageProcessingDelegate.updateUserMessage(editedContent)
                 sendUserMessage()
             } catch (e: Exception) {
                 Log.e(TAG, "回档并重新发送消息失败", e)
@@ -709,143 +746,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun updateUserMessage(message: String) = messageProcessingDelegate.updateUserMessage(message)
 
     fun sendUserMessage(promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT) {
-        // 检查是否有当前对话，如果没有则创建一个新对话
-        if (currentChatId.value == null) {
-            Log.d(TAG, "当前没有活跃对话，自动创建新对话")
-
-            // 使用viewModelScope启动协程
-            viewModelScope.launch {
-                // 使用现有的createNewChat方法创建新对话
-                chatHistoryDelegate.createNewChat()
-
-                // 等待对话ID更新
-                var waitCount = 0
-                while (currentChatId.value == null && waitCount < 10) {
-                    delay(100) // 短暂延迟等待对话创建完成
-                    waitCount++
-                }
-
-                if (currentChatId.value == null) {
-                    Log.e(TAG, "创建新对话超时，无法发送消息")
-                    uiStateDelegate.showErrorMessage("无法创建新对话，请重试")
-                    return@launch
-                }
-
-                Log.d(TAG, "新对话创建完成，ID: ${currentChatId.value}，现在发送消息")
-
-                // 对话创建完成后，发送消息
-                sendMessageInternal(promptFunctionType)
-            }
-        } else {
-            // 已有对话，直接发送消息
-            sendMessageInternal(promptFunctionType)
-        }
-    }
-
-    // 提取内部发送消息的逻辑为一个私有方法
-    private fun sendMessageInternal(promptFunctionType: PromptFunctionType) {
-        // 获取当前聊天ID和工作区路径
-        val chatId = currentChatId.value
-        val currentChat = chatHistories.value.find { it.id == chatId }
-        val workspacePath = currentChat?.workspace
-
-        // 更新本地Web服务器的聊天ID
-        chatId?.let { updateWebServerForCurrentChat(it) }
-
-        // 获取当前附件列表
-        val currentAttachments = attachmentManager.attachments.value
-
-        
-        // 使用 AIMessageManager 检查是否应该生成总结
-        val currentMessages = chatHistoryDelegate.chatHistory.value
-        val currentTokens = currentWindowSize.value
-        val maxTokens = (maxWindowSizeInK.value * 1024).toInt()
-
-        val isShouldGenerateSummary = AIMessageManager.shouldGenerateSummary(
-                messages = currentMessages,
-                currentTokens = currentTokens,
-                maxTokens = maxTokens,
-                tokenUsageThreshold = summaryTokenThreshold.value.toDouble()
-            )
-        
-        if (isShouldGenerateSummary) {
-            _isSummarizing.value = true
-            // 1. 在调用挂起函数之前，根据当前的消息快照预先计算好插入位置
-            val insertPosition = chatHistoryDelegate.findProperSummaryPosition(currentMessages)
-
-            // 2. 异步触发总结生成
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    enhancedAiService?.let { service ->
-                        // 传入快照进行总结
-                        val summaryMessage = AIMessageManager.summarizeMemory(service, currentMessages)
-                        summaryMessage?.let {
-                            // 3. 使用预先计算好的位置插入总结消息
-                            chatHistoryDelegate.addSummaryMessage(it, insertPosition)
-
-                            // 4. 更新窗口大小
-                            val newHistoryForTokens = AIMessageManager.getMemoryFromMessages(chatHistoryDelegate.chatHistory.value)
-                            val chatService = service.getAIServiceForFunction(com.ai.assistance.operit.data.model.FunctionType.CHAT)
-                            val newWindowSize = chatService.calculateInputTokens("", newHistoryForTokens)
-                            val inputTokens = tokenStatsDelegate.cumulativeInputTokensFlow.value
-                            val outputTokens = tokenStatsDelegate.cumulativeOutputTokensFlow.value
-                            chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, newWindowSize)
-                            // 更新UI上的显示
-                            withContext(Dispatchers.Main){
-                                tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, newWindowSize)
-                            }
-                            Log.d(TAG, "总结完成，更新窗口大小为: $newWindowSize")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "生成总结时出错: ${e.message}", e)
-                    uiStateDelegate.showErrorMessage("生成聊天总结时出错: ${e.message}")
-                } finally {
-                    _isSummarizing.value = false
-                    // 如果UI还在显示总结状态，则更新为完成
-                    if (messageProcessingDelegate.inputProcessingState.value is com.ai.assistance.operit.data.model.InputProcessingState.Summarizing) {
-                        messageProcessingDelegate.handleInputProcessingState(
-                            com.ai.assistance.operit.data.model.InputProcessingState.Completed
-                        )
-                    }
-                }
-            }
-        }
-
-        // 调用messageProcessingDelegate发送消息，并传递附件信息和工作区路径
-        messageProcessingDelegate.sendUserMessage(
-                attachments = currentAttachments,
-                chatId = chatId,
-                workspacePath = workspacePath,
-                promptFunctionType = promptFunctionType,
-                enableThinking = enableThinkingMode.value, // 传递思考模式的状态
-                thinkingGuidance = enableThinkingGuidance.value, // 传递思考引导的状态
-                enableMemoryAttachment = enableMemoryAttachment.value, // 传递记忆附着的状态
-                enableWorkspaceAttachment = !workspacePath.isNullOrBlank(), // 当工作区绑定了路径时启用工作区附着
-                maxTokens = maxTokens,
-                //如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
-                tokenUsageThreshold = if (isShouldGenerateSummary) summaryTokenThreshold.value.toDouble() + 0.5 else summaryTokenThreshold.value.toDouble()
-        )
-
-        // 在sendMessageInternal中，添加对nonFatalErrorEvent的收集
-        viewModelScope.launch {
-            messageProcessingDelegate.nonFatalErrorEvent.collect { errorMessage ->
-                uiStateDelegate.showToast(errorMessage)
-            }
-        }
-
-
-        
-
-        // 发送后清空附件列表
-        if (currentAttachments.isNotEmpty()) {
-            attachmentManager.clearAttachments()
-            // 更新悬浮窗附件列表
-            updateFloatingWindowAttachments()
-        }
-
-        // 重置附件面板状态 - 在发送消息后关闭附件面板
-        resetAttachmentPanelState()
+        messageCoordinationDelegate.sendUserMessage(promptFunctionType)
     }
 
     fun cancelCurrentMessage() {
@@ -876,8 +777,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 }
                 FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
                 FloatingMode.BALL,
-                FloatingMode.VOICE_BALL,
-                FloatingMode.DragonBones -> {
+                FloatingMode.VOICE_BALL -> {
                     // 这些模式暂时不处理，或者可以添加默认行为
                     Log.d(TAG, "未实现的悬浮窗模式: $mode")
                 }
@@ -888,14 +788,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun toggleFloatingMode(colorScheme: ColorScheme? = null, typography: Typography? = null) {
         floatingWindowDelegate.toggleFloatingMode(colorScheme, typography)
-    }
-
-    fun updateFloatingWindowMessages(messages: List<ChatMessage>) {
-        floatingWindowDelegate.updateFloatingWindowMessages(messages)
-    }
-
-    fun updateFloatingWindowAttachments() {
-        floatingWindowDelegate.updateFloatingWindowAttachments(attachments.value)
     }
 
     // 权限相关方法
@@ -914,43 +806,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     // 附件相关方法
-    /** 处理从悬浮窗接收的附件请求 */
-    private fun processAttachmentRequest(request: String) {
-        viewModelScope.launch {
-            try {
-                // 显示附件请求处理进度
-                messageProcessingDelegate.setInputProcessingState(true, "正在处理附件请求...")
-
-                when {
-                    request == "screen_capture" -> {
-                        // 捕获屏幕内容
-                        captureScreenContent()
-                    }
-                    request == "notifications_capture" -> {
-                        // 捕获通知
-                        captureNotifications()
-                    }
-                    request == "location_capture" -> {
-                        // 捕获位置
-                        captureLocation()
-                    }
-                    else -> {
-                        // 处理普通文件附件
-                        handleAttachment(request)
-                    }
-                }
-
-                // 在各子方法中都已经有设置进度条状态的代码，不需要在这里重复清除
-            } catch (e: Exception) {
-                Log.e(TAG, "Error processing attachment request", e)
-                // 修改: 使用错误弹窗而不是 Toast 显示附件处理错误
-                uiStateDelegate.showErrorMessage("处理附件失败: ${e.message}")
-                // 确保出错时清除进度显示
-                messageProcessingDelegate.setInputProcessingState(false, "")
-            }
-        }
-    }
-
     /** Handles a file or image attachment selected by the user */
     fun handleAttachment(filePath: String) {
         viewModelScope.launch {
@@ -958,10 +813,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 显示附件处理进度
                 messageProcessingDelegate.setInputProcessingState(true, "正在处理附件...")
 
-                attachmentManager.handleAttachment(filePath)
-
-                // 处理完附件后立即更新悬浮窗中的附件列表
-                updateFloatingWindowAttachments()
+                attachmentDelegate.handleAttachment(filePath)
 
                 // 清除附件处理进度显示
                 messageProcessingDelegate.setInputProcessingState(false, "")
@@ -977,15 +829,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     /** Removes an attachment by its file path */
     fun removeAttachment(filePath: String) {
-        attachmentManager.removeAttachment(filePath)
-        // 移除附件后立即更新悬浮窗中的附件列表
-        updateFloatingWindowAttachments()
+        attachmentDelegate.removeAttachment(filePath)
     }
 
     /** Inserts a reference to an attachment at the current cursor position in the user's message */
     fun insertAttachmentReference(attachment: AttachmentInfo) {
         val currentMessage = userMessage.value
-        val attachmentRef = attachmentManager.createAttachmentReference(attachment)
+        val attachmentRef = attachmentDelegate.createAttachmentReference(attachment)
 
         // Insert at the end of the current message
         updateUserMessage("$currentMessage $attachmentRef ")
@@ -1003,11 +853,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取屏幕内容...")
                 uiStateDelegate.showToast("正在获取屏幕内容...")
 
-                // 直接委托给attachmentManager执行
-                attachmentManager.captureScreenContent()
-
-                // 完成后立即更新悬浮窗中的附件列表
-                updateFloatingWindowAttachments()
+                // 直接委托给attachmentDelegate执行
+                attachmentDelegate.captureScreenContent()
 
                 // 清除进度显示
                 messageProcessingDelegate.setInputProcessingState(false, "")
@@ -1028,11 +875,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取当前通知...")
                 uiStateDelegate.showToast("正在获取当前通知...")
 
-                // 直接委托给attachmentManager执行
-                attachmentManager.captureNotifications()
-
-                // 完成后立即更新悬浮窗中的附件列表
-                updateFloatingWindowAttachments()
+                // 直接委托给attachmentDelegate执行
+                attachmentDelegate.captureNotifications()
 
                 // 清除进度显示
                 messageProcessingDelegate.setInputProcessingState(false, "")
@@ -1053,17 +897,106 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取位置信息...")
                 uiStateDelegate.showToast("正在获取位置信息...")
 
-                // 直接委托给attachmentManager执行
-                attachmentManager.captureLocation()
+                // 直接委托给attachmentDelegate执行
+                attachmentDelegate.captureLocation()
+                
+                // 隐藏进度状态
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error capturing location", e)
+                uiStateDelegate.showToast("获取位置失败: ${e.message}")
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            }
+        }
+    }
 
-                // 完成后立即更新悬浮窗中的附件列表
-                updateFloatingWindowAttachments()
+    /**
+     * 捕获记忆文件夹作为附件
+     */
+    fun captureMemoryFolders(folderPaths: List<String>) {
+        viewModelScope.launch {
+            try {
+                messageProcessingDelegate.updateUserMessage("")
+                // 显示记忆文件夹附着进度
+                messageProcessingDelegate.setInputProcessingState(true, "正在附着记忆文件夹...")
+                uiStateDelegate.showToast("正在附着记忆文件夹...")
+
+                // 直接委托给attachmentDelegate执行
+                attachmentDelegate.captureMemoryFolders(folderPaths)
 
                 // 清除进度显示
                 messageProcessingDelegate.setInputProcessingState(false, "")
             } catch (e: Exception) {
-                Log.e(TAG, "获取位置数据失败", e)
-                uiStateDelegate.showErrorMessage("获取位置数据失败: ${e.message}")
+                Log.e(TAG, "附着记忆文件夹失败", e)
+                uiStateDelegate.showErrorMessage("附着记忆文件夹失败: ${e.message}")
+                messageProcessingDelegate.setInputProcessingState(false, "")
+            }
+        }
+    }
+
+    /** Handles a photo taken by the camera */
+    fun handleTakenPhoto(uri: Uri) {
+        viewModelScope.launch {
+            attachmentDelegate.handleTakenPhoto(uri)
+        }
+    }
+
+    /**
+     * Handles shared files from external apps
+     * Creates a new chat, attaches files, and pre-fills message
+     */
+    fun handleSharedFiles(uris: List<Uri>) {
+        Log.d(TAG, "handleSharedFiles called with ${uris.size} file(s)")
+        uris.forEachIndexed { index, uri ->
+            Log.d(TAG, "  [$index] URI: $uri")
+        }
+        
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Creating new chat for shared files...")
+                // Create a new chat for the shared file(s)
+                createNewChat()
+                
+                // Wait for chat to be created
+                var waitCount = 0
+                while (currentChatId.value == null && waitCount < 20) {
+                    delay(50)
+                    waitCount++
+                }
+                
+                if (currentChatId.value == null) {
+                    Log.e(TAG, "Failed to create chat after waiting")
+                    uiStateDelegate.showErrorMessage("创建新对话失败")
+                    return@launch
+                }
+                
+                Log.d(TAG, "Chat created successfully: ${currentChatId.value}")
+                
+                // Show processing state
+                messageProcessingDelegate.setInputProcessingState(true, "正在处理分享的文件...")
+                
+                // Attach each file
+                Log.d(TAG, "Starting to attach ${uris.size} file(s)...")
+                uris.forEachIndexed { index, uri ->
+                    val filePath = uri.toString()
+                    Log.d(TAG, "Attaching file [$index]: $filePath")
+                    attachmentDelegate.handleAttachment(filePath)
+                    delay(100) // Small delay between files
+                }
+                Log.d(TAG, "All files attached successfully")
+                
+                // Set the pre-filled message
+                Log.d(TAG, "Setting pre-filled message")
+                messageProcessingDelegate.updateUserMessage("帮我看看这个文件")
+                
+                // Clear processing state
+                messageProcessingDelegate.setInputProcessingState(false, "")
+                
+                Log.d(TAG, "Successfully processed shared files")
+                uiStateDelegate.showToast("已添加 ${uris.size} 个文件")
+            } catch (e: Exception) {
+                Log.e(TAG, "处理分享文件失败", e)
+                uiStateDelegate.showErrorMessage("处理分享文件失败: ${e.message}")
                 messageProcessingDelegate.setInputProcessingState(false, "")
             }
         }
@@ -1113,6 +1046,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // WebView控制方法
     fun toggleWebView() {
+        // 如果要显示WebView，先关闭AI电脑
+        if (!_showWebView.value && _showAiComputer.value) {
+            _showAiComputer.value = false
+            Log.d(TAG, "AI电脑已关闭（由于打开工作区）")
+        }
+        
         // 如果要显示WebView，确保本地Web服务器已启动
         if (!_showWebView.value) {
             // Get the WORKSPACE server instance and ensure it's running
@@ -1156,45 +1095,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         val newShowState = !_showWebView.value
         _showWebView.value = newShowState
 
-        // 如果打开WebView，则关闭AI电脑
-        if (newShowState) {
-            _showAiComputer.value = false
-        }
-        
         // 每次切换时，增加刷新计数器
         if (_showWebView.value) {
             _webViewRefreshCounter.value += 1
         }
     }
 
-    // AI电脑控制方法
-    fun toggleAiComputer() {
-        val newShowState = !_showAiComputer.value
-        _showAiComputer.value = newShowState
-
-        // 如果打开AI电脑，则关闭WebView
-        if (newShowState) {
-            _showWebView.value = false
-        }
-    }
-
-    // 初始化本地Web服务器
-    private fun initLocalWebServer() {
-        try {
-            // 使用单例模式获取LocalWebServer实例
-            val webServer = LocalWebServer.getInstance(context, LocalWebServer.ServerType.WORKSPACE)
-            // 只有当服务器未运行时才启动
-            if (!webServer.isRunning()) {
-                webServer.start()
-                Log.d(TAG, "本地Web服务器已启动")
-            } else {
-                Log.d(TAG, "本地Web服务器已经在运行中")
-            }
-        } catch (e: IOException) {
-            Log.e(TAG, "初始化本地Web服务器失败", e)
-            uiStateDelegate.showErrorMessage("无法启动Web服务器: ${e.message}")
-        }
-    }
 
     // 更新当前聊天ID的Web服务器工作空间
     fun updateWebServerForCurrentChat(chatId: String) {
@@ -1276,6 +1182,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     ) {
         floatingWindowDelegate.launchInMode(mode, colorScheme, typography)
     }
+    
+    /**
+     * 从Widget启动悬浮窗到指定模式（使用默认主题）
+     */
+    fun launchFloatingWindowInMode(mode: FloatingMode) {
+        launchFloatingModeIn(mode, null, null)
+    }
 
     fun launchFloatingWindowWithPermissionCheck(
             launcher: ActivityResultLauncher<String>,
@@ -1292,7 +1205,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             val intent =
                     Intent(
                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            android.net.Uri.parse("package:${context.packageName}")
+                            Uri.parse("package:${context.packageName}")
                     )
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
@@ -1427,6 +1340,35 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         toggleAiComputer()
     }
 
+    // AI电脑控制方法
+    fun toggleAiComputer() {
+        viewModelScope.launch {
+            // 如果要显示AI电脑，先关闭工作区
+            if (!_showAiComputer.value && _showWebView.value) {
+                _showWebView.value = false
+                Log.d(TAG, "工作区已关闭（由于打开AI电脑）")
+            }
+            
+            val newShowState = !_showAiComputer.value
+            _showAiComputer.value = newShowState
+            
+            if (newShowState) {
+                // 初始化AI电脑管理器
+                try {
+                    Log.d(TAG, "AI电脑已启动")
+                } catch (e: Exception) {
+                    Log.e(TAG, "启动AI电脑失败", e)
+                    _showAiComputer.value = false
+                    uiStateDelegate.showErrorMessage("启动AI电脑失败: ${e.message}")
+                }
+            } else {
+                Log.d(TAG, "AI电脑已关闭")
+            }
+        }
+    }
+
+
+
     /** 初始化语音服务 */
     private fun initializeVoiceService() {
         viewModelScope.launch {
@@ -1456,14 +1398,18 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     // 等待初始化完成
                     delay(500)
                 }
-                
+
+                val cleanerRegexs = speechServicesPreferences.ttsCleanerRegexsFlow.first()
+                val cleanedText = TtsCleaner.clean(message, cleanerRegexs)
+                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(cleanedText)
+
                 val success = voiceService?.speak(
-                    text = message,
+                    text = cleanMessage,
                     interrupt = true, // 中断当前播放
                     rate = 1.0f,
                     pitch = 1.0f
                 ) ?: false
-                
+
                 if (!success) {
                     uiStateDelegate.showToast("朗读失败")
                 }
@@ -1484,4 +1430,46 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             }
         }
     }
+
+    fun toggleAutoRead() {
+        apiConfigDelegate.toggleAutoRead()
+        // Stop speaking if auto-read is being turned off.
+        // We check the new value directly from the delegate's state flow.
+        viewModelScope.launch {
+            // A small delay to allow the state flow to update, although it's often fast.
+            delay(50)
+            if (!isAutoReadEnabled.value) {
+                stopSpeaking()
+            }
+        }
+    }
+
+    fun disableAutoRead() {
+        if (isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to false
+            stopSpeaking()
+        }
+    }
+
+    fun enableAutoReadAndSpeak(content: String) {
+        if (!isAutoReadEnabled.value) {
+            apiConfigDelegate.toggleAutoRead() // This will set it to true
+        }
+        speakMessage(content)
+    }
+
+    /** 设置回复目标消息 */
+    fun setReplyToMessage(message: ChatMessage) {
+        _replyToMessage.value = message
+    }
+
+    /** 清除回复状态 */
+    fun clearReplyToMessage() {
+        _replyToMessage.value = null
+    }
+
+    fun manuallyUpdateMemory() {
+        messageCoordinationDelegate.manuallyUpdateMemory()
+    }
+
 }

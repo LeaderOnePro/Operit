@@ -132,7 +132,7 @@
     <string name="device_model">Modelo de dispositivo: %1$s %2$s</string>
     <string name="shizuku_status">Estado de Shizuku</string>
     <string name="refresh">Actualizar</string>
-    <string name="installed">Instalado: %1$s</string>
+    <string name="installed">Instalado</string>
     <string name="service_running">Servicio en ejecución: %1$s</string>
     <string name="permission_status">Estado del permiso: %1$s</string>
     <string name="yes">Sí</string>
@@ -256,7 +256,6 @@
     <!-- File Manager -->
     <string name="files_selected">%1$d archivos seleccionados</string>
     <string name="file_count">%1$d elementos</string>
-    <string name="exit_multi_select">Salir del modo de selección múltiple</string>
 
     <!-- Search Dialog -->
     <string name="search_files">Buscar archivos</string>
@@ -453,8 +452,8 @@
     <string name="accessibility_risk_warning_title">Advertencia de riesgo del servicio de accesibilidad</string>
     <string name="accessibility_risk_warning_message">Aunque habilitar el servicio de accesibilidad puede acelerar las operaciones de UI, algunas aplicaciones pueden detectar este servicio e imponer restricciones, incluyendo prohibiciones de cuenta. Habilítelo solo después de entender y aceptar los riesgos relacionados.</string>
     <string name="accessibility_risk_warning_additional">Tenga en cuenta: El modo de depuración ya tiene capacidades de operación de UI por defecto. Habilitar el servicio de accesibilidad solo se usa para acelerar operaciones de UI, pero aumenta el riesgo de prohibición de cuenta. Si no necesita velocidad extrema, se recomienda no habilitarlo. Si ya está habilitado, se recomienda deshabilitarlo inmediatamente después del uso.</string>
-    <string name="accessibility_risk_warning_input">Escriba \"entiendo\" u \"ok\" para confirmar</string>
-    <string name="accessibility_risk_warning_input_error">Escriba \"entiendo\" u \"ok\" para confirmar que entiende los riesgos</string>
+    <string name="accessibility_risk_warning_input">Escriba \"Entiendo y reconozco los riesgos de prohibición de cuentas y funciones de cuenta restringidas causados por los permisos de accesibilidad, y asumo las consecuencias yo mismo\" para confirmar</string>
+    <string name="accessibility_risk_warning_input_error">Escriba \"Entiendo y reconozco los riesgos de prohibición de cuentas y funciones de cuenta restringidas causados por los permisos de accesibilidad, y asumo las consecuencias yo mismo\" para confirmar que entiende los riesgos</string>
     <string name="accessibility_risk_warning_confirm">Confirmar continuar</string>
     <string name="accessibility_risk_warning_cancel">Cancelar</string>
     
@@ -580,8 +579,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">Centro de pruebas de herramientas</string>
     <string name="tool_test_center_desc">Probar la disponibilidad y funcionalidad de las herramientas de IA</string>
-    <string name="tool_format_converter">Conversor de formato universal</string>
-    <string name="tool_format_converter_desc">Soporte para conversión entre múltiples formatos de archivo, conveniente y rápido</string>
     <string name="tool_file_manager">Gestor de archivos</string>
     <string name="tool_file_manager_desc">Navegar y gestionar archivos del dispositivo con soporte para varias operaciones</string>
     <string name="tool_tts">Texto a voz</string>
@@ -689,6 +686,10 @@
     <string name="settings_section_display">Visualización y Comportamiento</string>
     <string name="settings_keep_screen_on">Mantener Pantalla Encendida</string>
     <string name="settings_keep_screen_on_desc">Mantener pantalla encendida durante salida de IA para evitar que se apague</string>
+    <string name="settings_reply_notification">Notificación de Respuesta</string>
+    <string name="settings_reply_notification_desc">Enviar notificación cuando la IA complete una respuesta</string>
+    <string name="notification_ai_reply_title">Asistente IA</string>
+    <string name="notification_ai_reply_content">La IA ha completado la respuesta</string>
     <string name="settings_auto_accessibility">Auto-conceder Permiso de Accesibilidad</string>
     <string name="settings_auto_accessibility_desc">Cuando esté deshabilitado, se requiere autorización manual cada vez que se abre la aplicación</string>
     
@@ -936,6 +937,8 @@
     <string name="settings_user_preferences_subtitle">Preferencias personales y configuración de comportamiento</string>
     <string name="settings_language_subtitle">Cambio de idioma de la interfaz</string>
     <string name="settings_theme_subtitle">Personalización de tema y apariencia</string>
+    <string name="layout_adjustment">Ajuste de Diseño</string>
+    <string name="layout_adjustment_subtitle">Ajustar posiciones y márgenes de elementos de UI</string>
     <string name="settings_model_params_subtitle">Parámetros del modelo y configuración de API</string>
     <string name="settings_functional_model_subtitle">Configuración específica del modelo funcional</string>
     <string name="settings_speech_services">Configuración de Servicios de Voz</string>
@@ -953,6 +956,7 @@
     <string name="settings_data_backup_subtitle">Gestión de respaldo del historial de chat</string>
     <string name="settings_token_usage_stats">Estadísticas de Uso de Tokens</string>
     <string name="settings_function_label">Función</string>
+    <string name="settings_model_label">Modelo</string>
     <string name="settings_no_token_records">Aún no hay registros de uso de tokens para módulos funcionales.</string>
     <string name="settings_reset_all_counts">Restablecer Todos los Conteos</string>
     <string name="settings_input_tokens">Entrada</string>
@@ -1231,9 +1235,35 @@
     <!-- Context Menu -->
     <string name="copy_message">Copiar Mensaje</string>
     <string name="edit_and_resend">Editar y Reenviar</string>
-    <string name="select_copy">Seleccionar y Copiar</string>
     <string name="modify_memory">Modificar Memoria</string>
     <string name="delete_from_here">Eliminar desde aquí</string>
+    <string name="multi_select">Selección múltiple</string>
+    <string name="exit_multi_select">Salir de selección múltiple</string>
+    <string name="delete_selected">Eliminar seleccionados</string>
+    <string name="share_selected">Compartir</string>
+    <string name="selected_count">%d seleccionados</string>
+    <string name="generating_image">Generando imagen...</string>
+    <string name="share_failed">Error al compartir</string>
+    <string name="image_generated">Imagen generada</string>
     <string name="load_more_history">Cargar más mensajes del historial...</string>
+    
+    <!-- Layout Adjustment Settings -->
+    <string name="layout_adjustment_settings_title">Configuración de Ajuste de Diseño</string>
+    <string name="layout_adjustment_description">Ajustar la posición y el espaciado de los elementos de la interfaz para personalizar su experiencia</string>
+    <string name="chat_settings_bar_section">Barra de Configuración de Chat</string>
+    <string name="chat_settings_bar_right_margin">Margen Derecho</string>
+    <string name="chat_settings_bar_right_margin_desc">Ajustar la distancia entre el botón de configuración de chat y el borde derecho de la pantalla, en dp</string>
+    <string name="chat_settings_button_end_padding">Margen Final del Botón de Configuración de Chat</string>
+    <string name="chat_settings_button_end_padding_desc">Ajustar la distancia entre el botón de configuración de chat y el borde derecho de la pantalla, en dp</string>
+    <string name="current_value">Valor Actual</string>
+    <string name="closer_to_edge">Más Cerca del Borde</string>
+    <string name="farther_from_edge">Más Lejos del Borde</string>
+    <string name="invalid_value_range">Valor inválido. Por favor ingrese un número entre %.1f y %.1f</string>
+    <string name="reset_to_default">Restablecer por Defecto</string>
+    <string name="layout_reset_settings">Restablecer Configuración de Diseño</string>
+    <string name="layout_reset_settings_desc">Restablecer todas las configuraciones de ajuste de diseño a valores predeterminados</string>
+    
+    <!-- Screen Titles -->
+    <string name="screen_title_layout_adjustment">Ajuste de Diseño</string>
     
 </resources>

@@ -1,6 +1,9 @@
 package com.ai.assistance.operit.ui.main.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -50,7 +53,13 @@ fun DrawerContent(
                 modifier =
                         Modifier.fillMaxHeight()
                                 .verticalScroll(rememberScrollState())
-                                .padding(end = 8.dp) // Add some end padding
+                                .padding(
+                                        end = 8.dp,
+                                        // Ensure bottom items aren’t obscured by system nav bar
+                                        bottom = WindowInsets.navigationBars
+                                                .asPaddingValues()
+                                                .calculateBottomPadding()
+                                )
         ) {
                 // 抽屉标题
                 Spacer(modifier = Modifier.height(54.dp))

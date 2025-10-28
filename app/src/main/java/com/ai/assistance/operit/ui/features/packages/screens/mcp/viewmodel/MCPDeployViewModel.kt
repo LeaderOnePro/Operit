@@ -5,10 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.mcp.MCPRepository
-import com.ai.assistance.operit.data.mcp.plugins.MCPCommandGenerator
 import com.ai.assistance.operit.data.mcp.plugins.MCPDeployer
-import com.ai.assistance.operit.data.mcp.plugins.MCPProjectAnalyzer
-import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,42 +56,31 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
             return false
         }
 
-        try {
-            val pluginDir = File(pluginPath)
-            if (!pluginDir.exists() || !pluginDir.isDirectory) {
-                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("插件目录不存在: $pluginPath")
-                return false
-            }
-
-            // 创建项目分析器
-            val projectAnalyzer = MCPProjectAnalyzer()
-
-            // 查找README文件
-            val readmeFile = projectAnalyzer.findReadmeFile(pluginDir)
-            val readmeContent = readmeFile?.readText() ?: ""
-
-            // 分析项目结构
-            val projectStructure = projectAnalyzer.analyzeProjectStructure(pluginDir, readmeContent)
-
-            // 创建命令生成器
-            val commandGenerator = MCPCommandGenerator()
-
-            // 生成部署命令
-            val deployCommands =
-                    commandGenerator.generateDeployCommands(projectStructure, readmeContent)
-            if (deployCommands.isEmpty()) {
-                _deploymentStatus.value =
-                        MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
-                return false
-            }
-
-            // 保存生成的命令
-            _generatedCommands.value = deployCommands
+        // 对于虚拟路径（npx/uvx 插件），直接返回空命令列表
+        if (pluginPath.startsWith("virtual://")) {
+            _generatedCommands.value = emptyList()
             return true
-        } catch (e: Exception) {
-            _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
-            return false
         }
+
+        // 在协程中调用挂起函数
+        viewModelScope.launch {
+            try {
+                // 使用MCPDeployer的getDeployCommands方法
+                val deployCommands = mcpDeployer.getDeployCommands(pluginId, pluginPath)
+                
+                if (deployCommands.isEmpty()) {
+                    _deploymentStatus.value =
+                            MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
+                } else {
+                    // 保存生成的命令
+                    _generatedCommands.value = deployCommands
+                }
+            } catch (e: Exception) {
+                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
+            }
+        }
+        
+        return true
     }
 
     /**
@@ -140,16 +126,41 @@ class MCPDeployViewModel(private val context: Context, private val mcpRepository
      * @param pluginId 要部署的插件ID
      */
     fun deployPlugin(pluginId: String) {
-        if (_generatedCommands.value.isEmpty()) {
-            // 如果没有预先获取命令，先获取
-            if (!getDeployCommands(pluginId)) {
-                // 获取命令失败，状态已在getDeployCommands中更新
-                return
+        viewModelScope.launch {
+            val pluginPath = mcpRepository.getInstalledPluginPath(pluginId)
+            if (pluginPath == null) {
+                _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法获取插件路径: $pluginId")
+                return@launch
             }
-        }
+            
+            // 对于 npx/uvx 类型的插件（虚拟路径），使用空命令列表直接部署
+            if (pluginPath.startsWith("virtual://")) {
+                deployPluginWithCommands(pluginId, emptyList())
+                return@launch
+            }
+            
+            // 确保命令已生成（普通插件）
+            if (_generatedCommands.value.isEmpty()) {
+                // 先获取命令
+                val deployCommands = try {
+                    mcpDeployer.getDeployCommands(pluginId, pluginPath)
+                } catch (e: Exception) {
+                    _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("分析插件时出错: ${e.message}")
+                    return@launch
+                }
+                
+                if (deployCommands.isEmpty()) {
+                    _deploymentStatus.value = MCPDeployer.DeploymentStatus.Error("无法确定如何部署此插件，请查看README手动部署")
+                    return@launch
+                }
+                
+                // 保存生成的命令
+                _generatedCommands.value = deployCommands
+            }
 
-        // 使用生成的命令部署
-        deployPluginWithCommands(pluginId, _generatedCommands.value)
+            // 使用生成的命令部署
+            deployPluginWithCommands(pluginId, _generatedCommands.value)
+        }
     }
 
     /**

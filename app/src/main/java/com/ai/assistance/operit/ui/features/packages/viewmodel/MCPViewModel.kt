@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.mcp.InstallProgress
 import com.ai.assistance.operit.data.mcp.InstallResult
 import com.ai.assistance.operit.data.mcp.MCPRepository
-import com.ai.assistance.operit.ui.features.packages.screens.mcp.model.MCPServer
+import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,8 +25,8 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     val installResult: StateFlow<InstallResult?> = _installResult.asStateFlow()
 
     // 当前正在操作的服务器
-    private val _currentServer = MutableStateFlow<MCPServer?>(null)
-    val currentServer: StateFlow<MCPServer?> = _currentServer.asStateFlow()
+    private val _currentServer = MutableStateFlow<MCPLocalServer.PluginMetadata?>(null)
+    val currentServer: StateFlow<MCPLocalServer.PluginMetadata?> = _currentServer.asStateFlow()
 
     // 插件已安装路径缓存
     private val installedPathsCache = mutableMapOf<String, String?>()
@@ -40,7 +40,7 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
 
     /** 安装服务器插件 */
-    fun installServer(server: MCPServer) {
+    fun installServer(server: MCPLocalServer.PluginMetadata) {
         viewModelScope.launch {
             _currentServer.value = server
             _installProgress.value = InstallProgress.Preparing
@@ -59,7 +59,7 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
     
     /** 安装服务器插件 - 使用服务器对象（用于导入Git URL） */
-    fun installServerWithObject(server: MCPServer) {
+    fun installServerWithObject(server: MCPLocalServer.PluginMetadata) {
         viewModelScope.launch {
             _currentServer.value = server
             _installProgress.value = InstallProgress.Preparing
@@ -78,7 +78,7 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
     
     /** 从ZIP文件安装服务器插件 */
-    fun installServerFromZip(server: MCPServer, zipFilePath: String) {
+    fun installServerFromZip(server: MCPLocalServer.PluginMetadata, zipFilePath: String) {
         viewModelScope.launch {
             _currentServer.value = server
             _installProgress.value = InstallProgress.Preparing
@@ -116,7 +116,7 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
 
     /** 卸载服务器插件 */
-    fun uninstallServer(server: MCPServer) {
+    fun uninstallServer(server: MCPLocalServer.PluginMetadata) {
         viewModelScope.launch {
             _currentServer.value = server
             _installProgress.value = InstallProgress.Preparing
@@ -143,14 +143,14 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
 
     /** Adds a remote server to the repository */
-    fun addRemoteServer(server: com.ai.assistance.operit.data.mcp.MCPServer) {
+    fun addRemoteServer(server: MCPLocalServer.PluginMetadata) {
         viewModelScope.launch {
             repository.addRemoteServer(server)
         }
     }
 
     /** Updates a remote server's metadata */
-    fun updateRemoteServer(server: com.ai.assistance.operit.data.mcp.MCPServer) {
+    fun updateRemoteServer(server: MCPLocalServer.PluginMetadata) {
         viewModelScope.launch {
             repository.updateRemoteServer(server)
         }
@@ -177,7 +177,7 @@ class MCPViewModel(private val repository: MCPRepository) : ViewModel() {
     }
 
     /** 获取本地插件信息，无需网络请求 */
-    fun getLocalPluginDetails(serverId: String): MCPServer? {
+    fun getLocalPluginDetails(serverId: String): MCPLocalServer.PluginMetadata? {
         // 如果插件没有安装，返回null
         if (!repository.isPluginInstalled(serverId)) {
             return null

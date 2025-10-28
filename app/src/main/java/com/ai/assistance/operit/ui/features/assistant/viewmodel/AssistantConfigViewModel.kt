@@ -6,32 +6,33 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.data.model.DragonBonesConfig
-import com.ai.assistance.operit.data.model.DragonBonesModel
-import com.ai.assistance.operit.data.repository.DragonBonesRepository
+import com.ai.assistance.operit.core.avatar.common.model.AvatarModel
+import com.ai.assistance.operit.core.avatar.impl.factory.AvatarModelFactoryImpl
+import com.ai.assistance.operit.data.repository.AvatarConfig
+import com.ai.assistance.operit.data.repository.AvatarInstanceSettings
+import com.ai.assistance.operit.data.repository.AvatarRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import com.ai.assistance.operit.data.model.ModelType
 
-/** 助手配置视图模型 负责管理DragonBones模型的UI状态和业务逻辑 */
+/** 助手配置视图模型 负责管理助手的UI状态和业务逻辑 */
 class AssistantConfigViewModel(
-    private val repository: DragonBonesRepository,
+    private val repository: AvatarRepository,
     private val context: Context
 ) : ViewModel() {
 
     // UI状态
     data class UiState(
             val isLoading: Boolean = false,
-            val models: List<DragonBonesModel> = emptyList(),
-            val currentModel: DragonBonesModel? = null,
-            val config: DragonBonesConfig? = null,
+            val avatarConfigs: List<AvatarConfig> = emptyList(),
+            val currentAvatarConfig: AvatarConfig? = null,
+            val currentAvatarModel: AvatarModel? = null,
+            val config: AvatarInstanceSettings? = null,
             val errorMessage: String? = null,
             val operationSuccess: Boolean = false,
-            val isScanning: Boolean = false,
             val scrollPosition: Int = 0,
             val isImporting: Boolean = false
     )
@@ -43,16 +44,21 @@ class AssistantConfigViewModel(
     init {
         // 合并模型和配置流，以确保UI状态的一致性
         viewModelScope.launch {
-            combine(repository.models, repository.currentConfig) { models, config ->
-                // 当配置或模型列表更新时，重新查找当前模型
-                val currentModel = config?.let { cfg -> models.find { it.id == cfg.modelId } }
-                // 将所有相关状态捆绑在一起发出
-                Triple(models, config, currentModel)
-            }.collectLatest { (models, config, currentModel) ->
+            combine(
+                repository.configs,
+                repository.currentAvatar,
+                repository.instanceSettings
+            ) { configs, currentAvatar, instanceSettings ->
+                val currentSettings = currentAvatar?.let { instanceSettings[it.id] } ?: AvatarInstanceSettings()
+                val currentConfig = currentAvatar?.let { avatar -> configs.find { it.id == avatar.id } }
+                Triple(configs, currentConfig, currentSettings to currentAvatar)
+            }.collectLatest { (configs, currentConfig, settingsAndAvatar) ->
+                val (currentSettings, currentAvatar) = settingsAndAvatar
                 updateUiState(
-                    models = models,
-                    config = config,
-                    currentModel = currentModel
+                    avatarConfigs = configs,
+                    currentAvatarConfig = currentConfig,
+                    currentAvatarModel = currentAvatar,
+                    config = currentSettings
                 )
             }
         }
@@ -61,82 +67,64 @@ class AssistantConfigViewModel(
     /** 更新UI状态 */
     private fun updateUiState(
             isLoading: Boolean? = null,
-            models: List<DragonBonesModel>? = null,
-            currentModel: DragonBonesModel? = null,
-            config: DragonBonesConfig? = null,
+            avatarConfigs: List<AvatarConfig>? = null,
+            currentAvatarConfig: AvatarConfig? = null,
+            currentAvatarModel: AvatarModel? = null,
+            config: AvatarInstanceSettings? = null,
             errorMessage: String? = null,
             operationSuccess: Boolean? = null,
-            isScanning: Boolean? = null,
             isImporting: Boolean? = null
     ) {
         val currentState = _uiState.value
         _uiState.value =
                 currentState.copy(
                         isLoading = isLoading ?: currentState.isLoading,
-                        models = models ?: currentState.models,
-                        currentModel = currentModel ?: currentState.currentModel,
+                        avatarConfigs = avatarConfigs ?: currentState.avatarConfigs,
+                        currentAvatarConfig = currentAvatarConfig ?: currentState.currentAvatarConfig,
+                        currentAvatarModel = currentAvatarModel ?: currentState.currentAvatarModel,
                         config = config ?: currentState.config,
                         errorMessage = errorMessage,
                         operationSuccess = operationSuccess ?: currentState.operationSuccess,
-                        isScanning = isScanning ?: currentState.isScanning,
                         scrollPosition = currentState.scrollPosition,
                         isImporting = isImporting ?: currentState.isImporting
                 )
     }
 
     /** 切换模型 */
-    fun switchModel(modelId: String) {
-        viewModelScope.launch { repository.switchModel(modelId) }
+    fun switchAvatar(modelId: String) {
+        viewModelScope.launch { repository.switchAvatar(modelId) }
     }
 
     /** 更新缩放比例 */
     fun updateScale(scale: Float) {
         val currentConfig = _uiState.value.config ?: return
+        val avatarId = _uiState.value.currentAvatarConfig?.id ?: return
         val updatedConfig = currentConfig.copy(scale = scale)
-        viewModelScope.launch { repository.updateConfig(updatedConfig) }
+        viewModelScope.launch { repository.updateAvatarSettings(avatarId, updatedConfig) }
     }
 
     /** 更新X轴偏移 */
     fun updateTranslateX(translateX: Float) {
         val currentConfig = _uiState.value.config ?: return
+        val avatarId = _uiState.value.currentAvatarConfig?.id ?: return
         val updatedConfig = currentConfig.copy(translateX = translateX)
-        viewModelScope.launch { repository.updateConfig(updatedConfig) }
+        viewModelScope.launch { repository.updateAvatarSettings(avatarId, updatedConfig) }
     }
 
     /** 更新Y轴偏移 */
     fun updateTranslateY(translateY: Float) {
         val currentConfig = _uiState.value.config ?: return
+        val avatarId = _uiState.value.currentAvatarConfig?.id ?: return
         val updatedConfig = currentConfig.copy(translateY = translateY)
-        viewModelScope.launch { repository.updateConfig(updatedConfig) }
-    }
-
-    /** 扫描用户模型 */
-    fun scanUserModels() {
-        updateUiState(isScanning = true)
-        viewModelScope.launch {
-            try {
-                val success = repository.scanUserModels()
-                updateUiState(
-                        isScanning = false,
-                        operationSuccess = success,
-                        errorMessage = if (!success) context.getString(R.string.error_occurred_simple) else null
-                )
-            } catch (e: Exception) {
-                updateUiState(
-                        isScanning = false,
-                        operationSuccess = false,
-                        errorMessage = context.getString(R.string.error_occurred, e.message)
-                )
-            }
-        }
+        viewModelScope.launch { repository.updateAvatarSettings(avatarId, updatedConfig) }
     }
 
     /** 删除用户模型 */
-    fun deleteUserModel(modelId: String) {
+    fun deleteAvatar(modelId: String) {
         updateUiState(isLoading = true)
         viewModelScope.launch {
             try {
-                val success = repository.deleteUserModel(modelId)
+                val success = repository.deleteAvatar(modelId)
                 updateUiState(
                         isLoading = false,
                         operationSuccess = success,
@@ -152,12 +140,12 @@ class AssistantConfigViewModel(
         }
     }
 
-    /** 导入DragonBones模型ZIP文件 */
-    fun importModelFromZip(uri: Uri) {
+    /** 导入模型ZIP文件 */
+    fun importAvatarFromZip(uri: Uri) {
         updateUiState(isLoading = true, isImporting = true)
         viewModelScope.launch {
             try {
-                val success = repository.importModelFromZip(uri)
+                val success = repository.importAvatarFromZip(uri)
                 updateUiState(
                         isLoading = false,
                         isImporting = false,
@@ -200,7 +188,8 @@ class AssistantConfigViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(AssistantConfigViewModel::class.java)) {
-                val repository = DragonBonesRepository.getInstance(context)
+                val modelFactory = AvatarModelFactoryImpl()
+                val repository = AvatarRepository.getInstance(context, modelFactory)
                 return AssistantConfigViewModel(repository, context) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")

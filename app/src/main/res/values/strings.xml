@@ -22,9 +22,28 @@
     <string name="nav_toolbox">工具箱</string>
     <string name="nav_item_agreement">用户协议</string>
     <string name="nav_help">使用手册</string>
+    <string name="nav_workflow">工作流</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
+    <string name="desktop_pet_start">启动桌宠</string>
     
+    <!-- 工作流相关 -->
+    <string name="workflow_list_title">工作流列表</string>
+    <string name="workflow_create">创建工作流</string>
+    <string name="workflow_name">工作流名称</string>
+    <string name="workflow_description">描述</string>
+    <string name="workflow_nodes">节点</string>
+    <string name="workflow_trigger">触发执行</string>
+    <string name="workflow_delete">删除工作流</string>
+    <string name="workflow_empty_state">暂无工作流，点击右上角创建</string>
+    <string name="workflow_nodes_empty">暂无节点</string>
+    <string name="workflow_create_connection">创建连接</string>
+    <string name="workflow_delete_connection">删除连接</string>
+    <string name="workflow_select_target_node">选择目标节点</string>
+    <string name="workflow_manage_connections">管理连接</string>
+    <string name="workflow_existing_connections">已有连接</string>
+    <string name="workflow_close">关闭</string>
+
     <!-- 附件面板 -->
     <string name="screen_content">屏幕内容</string>
     <string name="current_notifications">当前通知</string>
@@ -56,7 +75,7 @@
     <string name="importing_model">正在导入模型...</string>
     <string name="processing">处理中...</string>
     <string name="error_occurred">发生错误: %1$s</string>
-    <string name="dragon_bones_config">龙骨配置</string>
+    <string name="avatar_config">虚拟形象配置</string>
     <string name="select_model">选择模型</string>
     <string name="current_model">当前模型</string>
     <string name="scale">缩放: %1$s</string>
@@ -66,18 +85,24 @@
     <string name="confirm_delete_model_message">删除后不可恢复，确定要删除该模型吗？</string>
     <string name="no_models_available">没有可用的模型</string>
     <string name="please_select_model">请选择一个模型</string>
+    <string name="unsupported_model_type">不支持的模型类型: %1$s</string>
     <string name="how_to_import">如何制作和导入模型?</string>
     <string name="enter">进入</string>
-    <string name="dragon_bones_renamed">DragonBones现已更名为 LoongBones，并推出了新版在线编辑器。\nLoongBones支持IK反向动力学、网格形变、骨骼绑定等专业级动画功能。</string>
+    <string name="about_avatar_formats">本应用支持多种虚拟形象格式，包括DragonBones。以下是制作和导入模型的说明。</string>
+    <string name="dragon_bones_config">DragonBones配置</string>
+    <string name="dragon_bones_renamed">DragonBones已更名为LoongBones，并推出了新的在线编辑器。\nLoongBones支持IK、网格变形、骨骼绑定等专业动画功能。</string>
     <string name="making_models">1. 制作模型：</string>
     <string name="making_models_desc">    · 推荐：使用新版在线编辑器。\n    · 备选：从第三方存档网站下载旧版 v5.6.3 离线编辑器。</string>
+    <string name="making_models_desc_general">    · 您可以使用多种工具来创建您的虚拟形象模型。\n    · 对于DragonBones，推荐使用新版在线编辑器，也可使用旧版 v5.6.3 离线编辑器。</string>
     <string name="exporting_files">2. 导出文件：</string>
     <string name="exporting_files_desc">    · 无论使用哪个版本，导出数据时类型请选择 JSON，版本请选择 5.5（当前还不支持 6.0 运行时）。\n    · 导出的核心文件为：*_ske.json、*_tex.json、*_tex.png。</string>
+    <string name="exporting_files_desc_general">    · 请遵循您所选格式的导出指南。\n    · 对于DragonBones，导出数据时类型请选择 JSON，版本请选择 5.5（当前还不支持 6.0 运行时）。\n    · 导出的核心文件为：*_ske.json、*_tex.json、*_tex.png。</string>
     <string name="configuring_interaction">3. 配置交互：</string>
     <string name="configuring_interaction_desc">    · 如需实现头部跟随，请添加 IK 约束，并将其目标骨骼命名为 ik_target。\n    · idle 动画：请确保有一个命名为 idle 的动画，作为基础待机动画，会自动循环播放。\n    · 随机动画：可添加如 blink（眨眼）、shake_head（摇头）、wag_tail（摇尾巴）等动画，\n      系统会随机自动触发这些动画，丰富宠物表现。</string>
     <string name="packaging_and_importing">4. 打包与导入：</string>
     <string name="packaging_and_importing_desc">    · 将导出的三个文件打包成一个 .zip 文件后导入。</string>
     <string name="important_tip">重要提示：旧版编辑器下载页面中，Windows和Mac的下载链接放反了，请注意选择正确的链接下载。</string>
+    <string name="dragonbones_important_tip">重要提示：旧版编辑器下载页面中，Windows和Mac的下载链接放反了，请注意选择正确的链接下载。</string>
     <string name="download_old_editor">下载旧版编辑器</string>
     <string name="visit_online_editor">访问在线编辑器</string>
     
@@ -131,7 +156,11 @@
     <string name="about_contact">联系我们: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
     <string name="about_copyright">© 2023-2024 Operit. 保留所有权利。</string>
-    
+    <string name="star_on_github">在 GitHub 点个 Star</string>
+    <string name="update_log">更新日志</string>
+    <string name="app_logo_description">应用图标</string>
+    <string name="github_star_description">GitHub Star</string>
+
     <!-- AI Chat Screen -->
     <string name="configure_ai">配置 AI 接口</string>
     <string name="save_and_start">保存并开始对话</string>
@@ -223,6 +252,9 @@
     <string name="plugin_complete_success">已完成启动，成功率: %1$d%%</string>
     <string name="plugin_no_plugins_to_start">没有需要启动的插件</string>
     <string name="plugin_copyright">© 2023 AI Assistance</string>
+    <string name="plugin_registered">已注册</string>
+    <string name="plugin_registration_failed">注册失败</string>
+    <string name="plugin_verification_failed">验证失败</string>
     
     <!-- Theme Settings Screen -->
     <string name="theme_title_mode">主题模式</string>
@@ -275,9 +307,14 @@
     <string name="theme_toolbar_transparent">工具栏设置</string>
     <string name="theme_toolbar_transparent_desc">透明工具栏</string>
     <string name="theme_toolbar_transparent_desc_desc">开启后，工具栏将变为透明</string>
+    <string name="theme_appbar_color">顶栏颜色</string>
+    <string name="theme_use_custom_appbar_color">自定义顶栏颜色</string>
+    <string name="theme_use_custom_appbar_color_desc">开启后可以自定义顶栏的颜色</string>
     <string name="theme_statusbar_color">状态栏颜色</string>
     <string name="theme_use_custom_statusbar_color">自定义状态栏颜色</string>
     <string name="theme_use_custom_statusbar_color_desc">开启后可以自定义状态栏的颜色</string>
+    <string name="theme_statusbar_hidden">隐藏状态栏</string>
+    <string name="theme_statusbar_hidden_desc">开启后将完全隐藏状态栏，获得更大的显示空间</string>
     <string name="theme_statusbar_transparent">透明状态栏</string>
     <string name="theme_statusbar_transparent_desc">开启后状态栏将变为透明，与背景融为一体</string>
     <string name="theme_chat_history_selector_transparent">透明历史选择器</string>
@@ -312,12 +349,15 @@
     <string name="tools_completed">工具执行完成</string>
     <string name="tools_failed">工具执行失败: %1$s</string>
     <string name="tool_result">工具执行结果</string>
+    <string name="disable_tools">禁用工具</string>
+    <string name="disable_tools_desc">禁用后，AI将无法调用文件系统、HTTP等常规工具。但如果"记忆附着"开关开启，AI仍可访问记忆库进行知识查询和管理</string>
+    <string name="tools_disabled">工具已禁用</string>
     <string name="processing_input">正在处理输入...</string>
     <string name="references">参考资料:</string>
     <string name="tool_weather">天气查询</string>
     <string name="tool_calculator">计算器</string>
     <string name="tool_web_search">网络搜索</string>
-    <string name="ai_planning_desc">允许AI创建并执行多步骤任务计划。启用后，AI将以更结构化的方式展示其思考和执行过程。关闭后，AI将恢复为普通的对话模式。</string>
+    <string name="ai_planning_desc">将会进行任务分解和触发多个子agent去搜集信息，最后汇总。子agent的工具调用能力和聊天用的agent相同。这会变得非常耗时，仅建议搜集信息的时候开启。</string>
     <string name="enhanced_service_not_initialized">增强AI服务未初始化，请检查设置</string>
     <string name="ui_automation_in_progress">正在执行界面任务...</string>
     
@@ -354,10 +394,24 @@
     <string name="settings_functional_model_desc">为不同功能（如对话、总结、问题库等）配置专用的模型与API设置</string>
     <string name="settings_configure_function">配置功能</string>
     
+    <string name="settings_section_context_summary">上下文与总结</string>
+    <string name="settings_enable_summary">启用对话总结</string>
+    <string name="settings_enable_summary_desc">当上下文过长时自动生成对话总结，节省Token消耗</string>
+    <string name="settings_enable_summary_by_message_count">按消息条数触发总结</string>
+    <string name="settings_enable_summary_by_message_count_desc">当新消息数量达到阈值时触发总结</string>
+    <string name="settings_summary_message_count_threshold">消息条数阈值</string>
+    <string name="settings_summary_message_count_threshold_subtitle">触发总结的新消息数量(1-20条)</string>
+
     <string name="settings_section_display">显示与行为</string>
 
     <string name="settings_keep_screen_on">屏幕常亮</string>
     <string name="settings_keep_screen_on_desc">AI输出时保持屏幕常亮，避免屏幕熄灭</string>
+    <string name="settings_reply_notification">回复通知</string>
+    <string name="settings_reply_notification_desc">AI完成回复后发送通知提醒</string>
+    <string name="notification_ai_reply_title">AI助手</string>
+    <string name="notification_ai_reply_content">AI已完成回复</string>
+    <string name="notification_permission_rationale">为了在AI完成回复后及时通知您，需要授予通知权限</string>
+    <string name="notification_permission_denied">通知权限被拒绝，您将无法收到AI回复提醒</string>
     <string name="settings_auto_accessibility">自动授予无障碍权限</string>
     <string name="settings_auto_accessibility_desc">关闭后需每次打开软件手动授权</string>
     
@@ -368,6 +422,8 @@
     
     <string name="settings_section_usage">使用统计</string>
     <string name="settings_token_statistics">Token统计</string>
+    <string name="settings_total_tokens_breakdown">输入: %1$d (缓存: %2$d) / 输出: %3$d</string>
+    <string name="settings_cached_tokens">(缓存: %1$d)</string>
     <string name="settings_reset_analysis_count">重置偏好分析计数</string>
     <string name="settings_why_token_stats">为什么我要关心Token统计？</string>
     <string name="settings_token_stats_explanation">因为它就像一个饭店账单，只不过这里的\'饭\'是AI的思考，而\'钱\'是以人民币计算的！偏好分析是AI暗中观察你的口味，为你定制下次的\'菜单\'。别担心，即使你聊到手指抽筋，这些费用可能还不够买一杯奶茶～</string>
@@ -384,7 +440,7 @@
     <string name="device_model">设备型号: %1$s %2$s</string>
     <string name="shizuku_status">Shizuku 状态</string>
     <string name="refresh">刷新</string>
-    <string name="installed">已安装: %1$s</string>
+    <string name="installed">已安装</string>
     <string name="service_running">服务运行: %1$s</string>
     <string name="permission_status">权限状态: %1$s</string>
     <string name="yes">是</string>
@@ -539,7 +595,6 @@
     <!-- File Manager -->
     <string name="files_selected">已选择 %1$d 个文件</string>
     <string name="file_count">%1$d 个项目</string>
-    <string name="exit_multi_select">退出多选模式</string>
     
     <!-- Search Dialog -->
     <string name="search_files">搜索文件</string>
@@ -767,7 +822,7 @@
     <string name="overlay_permission">悬浮窗权限</string>
     <string name="battery_optimization">电池优化豁免</string>
     <string name="location_permission">位置权限</string>
-    <string name="termux_terminal">Termux终端</string>
+    <string name="operit_terminal">Operit终端</string>
     
     <!-- 权限级别描述 -->
     <string name="permission_level_standard">标准权限</string>
@@ -891,6 +946,10 @@
     <string name="desktop_pet_function">桌宠功能</string>
     <string name="desktop_pet_function_desc">桌面宠物功能，自定义桌宠的性格和互动方式</string>
     
+    <!-- 桌宠服务通知 -->
+    <string name="pet_service_notification_title">桌面宠物服务</string>
+    <string name="pet_service_notification_text">桌面宠物正在运行中</string>
+    
     <!-- 设置屏幕新增字符串 -->
     <string name="settings_prompt_section">提示词配置</string>
     <string name="settings_prompt_title">提示词编辑</string>
@@ -916,10 +975,12 @@
     <string name="ok">确定</string>
     <string name="select_download_source">选择下载源</string>
     <string name="select_download_source_desc">请选择适合您网络环境的下载源：</string>
+    <string name="mirror_download">%1$s 镜像下载</string>
     <string name="china_mirror">国内加速镜像</string>
-    <string name="china_mirror_desc">通过ghfast.top加速，推荐国内用户使用</string>
+    <string name="china_mirror_desc">通过国内镜像服务器下载，速度更快</string>
     <string name="github_source">GitHub原始链接</string>
     <string name="github_source_desc">直接从GitHub官方服务器下载，速度可能较慢</string>
+    <string name="no_mirrors_found">未找到可用的镜像源</string>
     <string name="developer">开发者</string>
     <string name="contact">联系方式</string>
     <string name="project_url">项目地址</string>
@@ -943,11 +1004,25 @@
     <!-- Context Menu -->
     <string name="copy_message">复制消息</string>
     <string name="read_message">朗读消息</string>
+    <string name="auto_read_message">自动朗读</string>
+    <string name="auto_read_desc">启用后，AI回复会自动朗读</string>
+    <string name="auto_read_active">自动朗读已启用</string>
+    <string name="reply_message">回复</string>
     <string name="stop_reading">停止朗读</string>
     <string name="edit_and_resend">编辑并重发</string>
-    <string name="select_copy">框选复制</string>
+    <string name="select_copy">选择并复制</string>
+
     <string name="modify_memory">修改记忆</string>
     <string name="delete_from_here">删除到此</string>
+    <string name="multi_select">多选</string>
+    <string name="exit_multi_select">退出多选</string>
+    <string name="delete_selected">删除选中</string>
+    <string name="share_selected">分享</string>
+    <string name="selected_count">已选择 %d 条</string>
+    <string name="generating_image">正在生成图片...</string>
+    <string name="share_failed">分享失败</string>
+    <string name="image_generated">图片已生成</string>
+    <string name="image_preview">图片预览</string>
     <string name="load_more_history">加载更多历史消息...</string>
 
     <!-- Permission Guide Screen -->
@@ -967,8 +1042,8 @@
     <string name="accessibility_risk_warning_message">启用无障碍服务虽然可以加速UI操作，但某些应用可能会检测到此服务并采取限制措施，包括封号。请仅在了解并接受相关风险后开启。</string>
     
     <string name="accessibility_risk_warning_additional">请注意: 调试模式默认已具备UI操作能力，开启无障碍服务仅用于加速UI操作，但会增加被封号风险。若无极速需求，建议不要开启。若已开启，建议用完后立即关闭。</string>
-    <string name="accessibility_risk_warning_input">请输入\"明白\"或\"ok\"确认</string>
-    <string name="accessibility_risk_warning_input_error">请输入\"明白\"或\"ok\"确认您已了解风险</string>
+    <string name="accessibility_risk_warning_input">请输入\"我已明确并知晓无障碍权限导致的其他应用封号、限制账号功能风险，并后果自己承担\"确认</string>
+    <string name="accessibility_risk_warning_input_error">请输入\"我已明确并知晓无障碍权限导致的其他应用封号、限制账号功能风险，并后果自己承担\"确认您已了解风险</string>
     <string name="accessibility_risk_warning_confirm">确认继续</string>
     <string name="accessibility_risk_warning_cancel">取消</string>
 
@@ -1057,7 +1132,8 @@
     <string name="ai_assistant">AI助手</string>
     <string name="send_message">发送消息</string>
     <string name="chat_with_pet">和宠物对话</string>
-    <string name="dragonbones_mode">龙骨模式</string>
+    <string name="dragonbones_mode">DragonBones模式</string>
+    <string name="avatar_mode">虚拟形象模式</string>
     <string name="loading_failed">加载失败: %1$s</string>
     <string name="loading">正在加载...</string>
     <string name="floating_service_description">显示AI助手的悬浮窗服务</string>
@@ -1078,6 +1154,8 @@
     <string name="request_microphone_permission">请求麦克风权限</string>
     <string name="recognition_result">识别结果</string>
     <string name="speech_recognition_result_placeholder">语音识别结果将显示在这里</string>
+    <string name="copy_text">复制文本</string>
+    <string name="no_text_to_copy">没有可复制的文本</string>
     <string name="recognition_settings">识别设置</string>
     <string name="recognition_engine">识别引擎</string>
     <string name="sherpa_ncnn_best">Sherpa-ncnn (最佳)</string>
@@ -1221,6 +1299,7 @@
     <string name="interface_text">界面文本</string>
 
     <!-- MCP and Plugin Related -->
+    <string name="repo">仓库</string>
     <string name="uninstall">卸载</string>
     <string name="install">安装</string>
     <string name="import_from_repo">仓库</string>
@@ -1240,8 +1319,6 @@
     <!-- Tool Names -->
     <string name="tool_test_center">工具测试中心</string>
     <string name="tool_test_center_desc">测试AI工具的可用性和功能状态</string>
-    <string name="tool_format_converter">万能格式转换</string>
-    <string name="tool_format_converter_desc">支持多种文件格式之间的转换，方便快捷</string>
     <string name="tool_file_manager">文件管理器</string>
     <string name="tool_file_manager_desc">浏览和管理设备文件，支持多种操作</string>
     <string name="tool_tts">文本转语音</string>
@@ -1328,7 +1405,7 @@
     <!-- Toast 消息 -->
     <string name="confirmation_code_copied">返回码已复制！</string>
     <string name="message_copied">消息已复制到剪贴板</string>
-    <string name="selection_copied">已复制选中内容</string>
+
     <string name="requesting_root">正在请求Root权限...</string>
     <string name="root_granted">Root权限已授予</string>
     <string name="root_denied">Root权限请求被拒绝</string>
@@ -1403,13 +1480,6 @@
     <string name="permission_group_other_denied">其他未授权权限</string>
     <string name="permission_group_other">其他权限</string>
     
-    <!-- Format Converter -->
-    <string name="format_converter_no_file_path">无法获取文件路径</string>
-    <string name="format_converter_select_file_error">选择文件失败: %s</string>
-    <string name="format_converter_complete_selection">请完成所有必要的选择</string>
-    <string name="format_converter_failed">转换失败，请重试</string>
-    <string name="format_converter_open_file_error">无法打开文件: %s</string>
-    <string name="format_converter_select_format">选择转换格式</string>
     <string name="target_format">目标格式</string>
     <string name="start_conversion">开始转换</string>
     <string name="conversion_success">转换成功</string>
@@ -1657,6 +1727,86 @@
     <string name="stt_result_saved">识别结果已保存</string>
     <string name="stt_save_failed">保存结果失败</string>
     
+    <!-- Speech Services Settings -->
+    <string name="speech_services_tts_title">文本转语音 (TTS) 设置</string>
+    <string name="speech_services_tts_desc">配置如何将文本转换为语音输出</string>
+    <string name="speech_services_stt_title">语音转文本 (STT) 设置</string>
+    <string name="speech_services_stt_desc">配置如何将语音转换为文本</string>
+    <string name="speech_services_service_type">服务类型</string>
+    <string name="speech_services_tts_engine">TTS 引擎</string>
+    <string name="speech_services_stt_engine">STT 引擎</string>
+    <string name="speech_services_dropdown_expand">展开下拉菜单</string>
+    
+    <!-- TTS Service Types -->
+    <string name="speech_services_tts_type_simple">系统 TTS (简单)</string>
+    <string name="speech_services_tts_type_http">HTTP API (远程)</string>
+    <string name="speech_services_tts_type_siliconflow">硅基流动 TTS</string>
+    
+    <!-- STT Service Types -->
+    <string name="speech_services_stt_type_sherpa">Sherpa NCNN (本地)</string>
+    
+    <!-- TTS Cleaner Regex -->
+    <string name="speech_services_tts_cleaner_title">TTS 清理正则列表</string>
+    <string name="speech_services_tts_cleaner_desc">在朗读前，使用这些正则表达式移除匹配的文本。</string>
+    <string name="speech_services_tts_cleaner_placeholder">例如：\\[.*?\\]</string>
+    <string name="speech_services_tts_cleaner_delete">删除正则</string>
+    <string name="speech_services_tts_cleaner_add">添加</string>
+    <string name="speech_services_tts_cleaner_template">模板</string>
+    <string name="speech_services_tts_cleaner_template_asterisk">删除 *xxxx*</string>
+    <string name="speech_services_tts_cleaner_template_double_asterisk">删除 **xxxx**</string>
+    <string name="speech_services_tts_cleaner_template_parenthesis">删除 (xxx)</string>
+    <string name="speech_services_tts_cleaner_template_chinese_parenthesis">删除 （xxxx）</string>
+    <string name="speech_services_tts_cleaner_template_xml">删除 XML 标签</string>
+    
+    <!-- HTTP TTS Configuration -->
+    <string name="speech_services_http_tts_config">HTTP TTS 配置</string>
+    <string name="speech_services_http_url_template">URL 模板</string>
+    <string name="speech_services_http_url_placeholder">例如: https://api.example.com/tts?text={text}</string>
+    <string name="speech_services_http_api_key">API 密钥</string>
+    <string name="speech_services_http_api_key_placeholder">可选，某些服务需要</string>
+    <string name="speech_services_http_headers">HTTP 头部 (JSON)</string>
+    <string name="speech_services_http_headers_placeholder">{\"Content-Type\": \"application/json\"}</string>
+    <string name="speech_services_http_headers_error">无效的 JSON 格式</string>
+    <string name="speech_services_http_method">HTTP 方法</string>
+    <string name="speech_services_http_method_select">选择HTTP方法</string>
+    <string name="speech_services_http_content_type">Content-Type</string>
+    <string name="speech_services_http_content_type_placeholder">application/json</string>
+    <string name="speech_services_http_request_body">请求体模板</string>
+    <string name="speech_services_http_request_body_placeholder">{\"text\": \"{text}\"}</string>
+    
+    <!-- SiliconFlow TTS Configuration -->
+    <string name="speech_services_siliconflow_config">硅基流动 TTS 配置</string>
+    <string name="speech_services_siliconflow_api_key">API 密钥</string>
+    <string name="speech_services_siliconflow_api_key_placeholder">请输入您的硅基流动API密钥</string>
+    <string name="speech_services_siliconflow_model_settings">模型设置</string>
+    <string name="speech_services_siliconflow_model_name">TTS 模型</string>
+    <string name="speech_services_siliconflow_model_name_placeholder">例如：FunAudioLLM/CosyVoice2-0.5B</string>
+    <string name="speech_services_siliconflow_model_name_hint">留空使用默认模型 FunAudioLLM/CosyVoice2-0.5B，支持 fishaudio/fish-speech-1.4 等模型</string>
+    <string name="speech_services_siliconflow_voice_settings">音色设置</string>
+    <string name="speech_services_siliconflow_voice_select">选择预设音色</string>
+    <string name="speech_services_siliconflow_voice_select_icon">选择音色</string>
+    <string name="speech_services_siliconflow_voice_custom">自定义音色</string>
+    <string name="speech_services_siliconflow_voice_id">音色 ID</string>
+    <string name="speech_services_siliconflow_voice_id_placeholder">例如：charles 或 speech:kll:32w2b3aj5b:orvmnmpjkqchqalegwvi</string>
+    <string name="speech_services_siliconflow_voice_id_hint">预设音色（alex/benjamin/charles等）或自定义音色（speech:开头的URI）</string>
+    
+    <!-- STT Configuration -->
+    <string name="speech_services_stt_info">目前仅支持本地 Sherpa-NCNN 引擎。</string>
+    
+    <!-- Save Actions -->
+    <string name="speech_services_save_button">保存设置</string>
+    <string name="speech_services_saving">正在保存...</string>
+    <string name="speech_services_save_success">设置已保存</string>
+    <string name="speech_services_save_error">保存失败：%1$s</string>
+    <string name="speech_services_test_tts">测试 TTS 功能</string>
+    
+    <!-- Info Card -->
+    <string name="speech_services_info_title">关于语音服务</string>
+    <string name="speech_services_info_tts_title">文本转语音 (TTS)</string>
+    <string name="speech_services_info_tts_desc">TTS 服务将文本转换为语音。您可以使用内置的系统 TTS 引擎或连接到远程 HTTP API。</string>
+    <string name="speech_services_info_stt_title">语音转文本 (STT)</string>
+    <string name="speech_services_info_stt_desc">STT 服务将语音转换为文本。目前仅支持内置的 Sherpa NCNN 引擎，该引擎在本地设备上运行，不需要网络连接。</string>
+    
     <!-- UI Debugger -->
     <string name="ui_debugger_title">UI调试器</string>
     <string name="ui_debugger_start">开始调试</string>
@@ -1753,6 +1903,19 @@
     <string name="perm_desc_receive_wap_push">允许应用接收WAP推送消息</string>
     <string name="perm_desc_receive_mms">允许应用接收彩信</string>
     
+    <!-- OperitTerminal Wizard Card -->
+    <string name="operit_terminal_wizard_title">OperitTerminal 设置向导</string>
+    <string name="operit_terminal_not_installed">OperitTerminal 未安装</string>
+    <string name="operit_terminal_update_available">OperitTerminal 有更新可用</string>
+    <string name="operit_terminal_up_to_date">OperitTerminal 已是最新版本</string>
+    <string name="operit_terminal_install_description">OperitTerminal 是一个功能强大的终端应用，提供完整的 Linux 环境和包管理功能。我们需要先安装这个应用。</string>
+    <string name="operit_terminal_install_button">安装 OperitTerminal</string>
+    <string name="operit_terminal_update_description">发现 OperitTerminal 的新版本，建议更新以获得更好的功能和兼容性。</string>
+    <string name="operit_terminal_release_notes">更新说明：%1$s</string>
+    <string name="operit_terminal_update_button">更新 OperitTerminal</string>
+    <string name="operit_terminal_latest_description">恭喜！您已安装最新版本的 OperitTerminal，可以开始使用其强大的终端功能。</string>
+    <string name="operit_terminal_open_button">打开 OperitTerminal</string>
+    
     <!-- Functional Config Screen -->
     <string name="functional_model_config_title">功能模型配置设置</string>
     <string name="functional_model_config_desc">为不同功能设置单独的模型配置，使每个功能都能使用最适合的API设置。</string>
@@ -1776,6 +1939,7 @@
     <string name="function_type_file_binding">文件绑定处理</string>
     <string name="function_type_ui_controller">UI 控制器</string>
     <string name="function_type_translation">翻译功能</string>
+    <string name="function_type_image_recognition">图像识别</string>
     
     <!-- Function Descriptions -->
     <string name="function_desc_chat">主要的对话功能，用于与用户进行日常对话交互</string>
@@ -1784,6 +1948,7 @@
     <string name="function_desc_file_binding">处理文件内容的智能绑定与混合，提供更精确的代码处理能力。建议使用快速的廉价模型如Gemini Flash，不建议使用DeepSeek R1</string>
     <string name="function_desc_ui_controller">用于UI界面的自动遍历与操作，会被主模型调用。建议使用廉价快速模型。</string>
     <string name="function_desc_translation">提供多语言翻译功能，支持文本内容的语言转换。建议使用支持多语言的模型。</string>
+    <string name="function_desc_image_recognition">用于图像内容识别和分析，调用read_file工具读取图片时支持intent参数进行深度理解。建议使用支持视觉的多模态模型。</string>
     
     <!-- Functional Prompt Config Screen -->
     <string name="advanced_config_notice">如需修改系统提示模板等高级配置，请前往「管理所有提示词」页面。</string>
@@ -1833,7 +1998,6 @@
     <string name="move_file_test">移动文件</string>
     <string name="zip_files_test">压缩文件</string>
     <string name="unzip_files_test">解压文件</string>
-    <string name="convert_file_test">格式转换</string>
     <string name="list_apps_test">列出应用</string>
     <string name="get_notifications_test">获取通知</string>
     <string name="device_location_test">设备位置</string>
@@ -1869,7 +2033,6 @@
     <string name="move_file_test_desc">移动并重命名文件</string>
     <string name="zip_files_test_desc">压缩测试目录</string>
     <string name="unzip_files_test_desc">解压测试文件</string>
-    <string name="convert_file_test_desc">将PNG转换为JPG</string>
     <string name="list_apps_test_desc">获取用户安装的应用列表</string>
     <string name="get_notifications_test_desc">获取最新的5条通知</string>
     <string name="device_location_test_desc">获取低精度设备位置</string>
@@ -1933,7 +2096,7 @@
     <string name="memory_attachment">记忆附着</string>
     <string name="memory_attachment_desc">开启后，发送消息时会自动从记忆库中检索并附加相关内容，但这可能会影响AI回答的焦点。</string>
     <string name="thinking_mode">思考模式</string>
-    <string name="thinking_mode_desc">目前只支持Gemini、Qwen3和Claude，能够启用内置的思考。</string>
+    <string name="thinking_mode_desc">目前支持Gemini、Qwen3、Claude、硅基流动和MNN本地模型，能够启用内置的思考。</string>
     <string name="thinking_guidance">思考引导</string>
     <string name="thinking_guidance_desc">能够让不能思考的模型强制进行思考。该选项不建议对思考模型开启。</string>
     <string name="details">详情</string>
@@ -1973,6 +2136,8 @@
     <string name="settings_user_preferences_subtitle">个人偏好和行为设置</string>
     <string name="settings_language_subtitle">界面语言切换</string>
     <string name="settings_theme_subtitle">主题和外观定制</string>
+    <string name="layout_adjustment">布局调整</string>
+    <string name="layout_adjustment_subtitle">调整界面元素位置和边距</string>
     <string name="settings_model_params_subtitle">模型参数和API配置</string>
     <string name="settings_functional_model_subtitle">功能模型专项配置</string>
     <string name="settings_speech_services">语音服务配置</string>
@@ -1983,18 +2148,68 @@
     <string name="settings_functional_prompts_subtitle">功能专用提示词模板</string>
     <string name="settings_context_length">上下文长度</string>
     <string name="settings_context_length_subtitle">模型记忆对话长度(k tokens)</string>
-    <string name="settings_summary_threshold">摘要Token阈值</string>
-    <string name="settings_summary_threshold_subtitle">触发聊天摘要的阈值(0.1-0.95)</string>
+    <string name="settings_summary_threshold">上下文使用比例阈值</string>
+    <string name="settings_summary_threshold_subtitle">当上下文使用超过此比例时触发总结(0.1-0.95)</string>
+    
+    <!-- 截断设置 -->
+    <string name="settings_truncation_title">文件和响应截断设置</string>
+    <string name="settings_max_file_size">文件读取最大字节数</string>
+    <string name="settings_max_file_size_subtitle">单个文件读取操作的最大字节数限制</string>
+    <string name="settings_part_size">分段读取行数</string>
+    <string name="settings_part_size_subtitle">分段读取文件时，每个部分的行数</string>
+    <string name="settings_max_text_result">文本结果最大长度</string>
+    <string name="settings_max_text_result_subtitle">通用文本结果的最大字符数限制</string>
+    <string name="settings_max_http_response">HTTP响应最大长度</string>
+    <string name="settings_max_http_response_subtitle">网络请求响应的最大字符数限制</string>
+    <string name="settings_reset_truncation">重置截断设置</string>
+    <string name="settings_reset_truncation_desc">重置所有截断设置为默认值</string>
+    
+    <!-- 布局调整设置 -->
+    <string name="layout_adjustment_settings_title">布局调整设置</string>
+    <string name="layout_adjustment_description">在这里可以调整界面元素的位置和边距，自定义您的使用体验</string>
+    <string name="chat_settings_bar_section">聊天设置栏</string>
+    <string name="chat_settings_bar_right_margin">右边距</string>
+    <string name="chat_settings_bar_right_margin_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="chat_settings_button_end_padding">聊天设置按钮右边距</string>
+    <string name="chat_settings_button_end_padding_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="current_value">当前值</string>
+    <string name="closer_to_edge">靠近边缘</string>
+    <string name="farther_from_edge">远离边缘</string>
+    <string name="invalid_value_range">无效值。请输入%.1f到%.1f之间的数字</string>
+    <string name="reset_to_default">恢复默认</string>
+    <string name="layout_reset_settings">重置布局设置</string>
+    <string name="layout_reset_settings_desc">将所有布局调整设置恢复为默认值</string>
+    
     <string name="settings_data_permissions">数据和权限</string>
     <string name="settings_tool_permissions_subtitle">工具权限和安全设置</string>
     <string name="settings_data_backup_subtitle">聊天记录备份管理</string>
     <string name="settings_token_usage_stats">Token使用统计</string>
     <string name="settings_function_label">功能</string>
+    <string name="settings_model_label">模型</string>
     <string name="settings_no_token_records">暂无功能模块的Token使用记录。</string>
     <string name="settings_reset_all_counts">重置所有计数</string>
-    <string name="settings_input_tokens">输入</string>
-    <string name="settings_output_tokens">输出</string>
-        <string name="settings_cost">费用</string>
+    <string name="settings_token_usage_subtitle">查看详细的Token使用统计和自定义定价</string>
+    <string name="settings_usage_summary">使用统计</string>
+    <string name="settings_total_tokens">总Token数</string>
+    <string name="settings_total_cost">总费用</string>
+    <string name="settings_model_details">模型详情</string>
+    <string name="settings_click_to_edit_pricing">点击编辑定价</string>
+    <string name="settings_edit_model_pricing">编辑模型定价 - %1$s</string>
+    <string name="settings_pricing_description">设置每百万Token的人民币价格</string>
+    <string name="settings_input_price_per_million">输入价格（每百万Token）</string>
+    <string name="settings_output_price_per_million">输出价格（每百万Token）</string>
+    <string name="settings_cached_input_price_per_million">缓存输入价格（每百万Token）</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_reset_confirmation">重置确认</string>
+    <string name="settings_reset_warning">这将清除所有Token使用记录，此操作不可恢复。</string>
+    <string name="settings_reset">重置</string>
+    <string name="settings_edit_pricing">编辑定价</string>
+    <string name="settings_input_tokens">输入Token</string>
+    <string name="settings_output_tokens">输出Token</string>
+    <string name="settings_cached_tokens_label">缓存Token</string>
+    <string name="settings_price_format">¥%.2f/1M</string>
+    <string name="settings_cost">费用</string>
     
     <!-- User Preferences Guide Screen -->
     <string name="user_male">男</string>
@@ -2116,7 +2331,17 @@
     <string name="enter_new_profile_name">请输入新的配置名称</string>
     <string name="confirm_rename">确认重命名</string>
     <string name="confirm_delete_profile">确认删除配置</string>
-    <string name="delete_profile_warning">您确定要删除该偏好配置吗？此操作会同时删除其绑定的知识库数据，且无法恢复。\n\n建议您提前备份重要内容。</string>
+    <string name="delete_profile_warning">您确定要删除该偏好配置吗？此操作会同时删除其绑定的记忆库数据，且无法恢复。\n\n建议您提前备份重要内容。</string>
+    
+    <!-- Profile Selection for Import/Export -->
+    <string name="select_profile">选择配置</string>
+    <string name="export_from_profile">从配置导出</string>
+    <string name="import_to_profile">导入到配置</string>
+    <string name="source_profile">源配置</string>
+    <string name="target_profile">目标配置</string>
+    <string name="current_profile">当前配置</string>
+    <string name="select_export_profile">选择要导出的配置</string>
+    <string name="select_import_profile">选择要导入到的配置</string>
 
     
     <!-- User Preferences Guide Screen Dialog -->
@@ -2215,6 +2440,8 @@
     <string name="select_api_provider">点击选择API提供商</string>
     <string name="select">选择</string>
     <string name="default_config_model_restriction">使用默认配置时，只能使用deepseek-chat模型</string>
+    <string name="enable_direct_image_processing">启用直接图片处理</string>
+    <string name="enable_direct_image_processing_desc">启用后，图片将直接发送给AI处理，而不是让AI通过OCR工具读取</string>
     <string name="api_settings_saved">API设置已保存</string>
     <string name="save_api_settings">保存API设置</string>
     <string name="available_models_list">可用模型列表</string>
@@ -2241,7 +2468,9 @@
     <string name="provider_siliconflow">硅基流动</string>
     <string name="provider_openrouter">OpenRouter (多模型聚合)</string>
     <string name="provider_infiniai">无问芯穹</string>
+    <string name="provider_alipay_bailing">支付宝百灵大模型</string>
     <string name="provider_lmstudio">LM Studio</string>
+    <string name="provider_ppinfra">派欧云</string>
     <string name="provider_other">其他提供商</string>
     <string name="select_api_provider_title">选择API提供商</string>
     <string name="search_providers">搜索提供商</string>
@@ -2277,6 +2506,7 @@
     <string name="value">值</string>
     <string name="range_format">范围: %1$s - %2$s</string>
     <string name="must_be_float">必须是浮点数</string>
+    <string name="must_be_valid_json">必须是有效的 JSON</string>
     <string name="default_value_format">默认值: %s</string>
     <string name="temperature_recommendation">温度推荐设置</string>
     <string name="parameter_value">参数值</string>
@@ -2316,6 +2546,7 @@
     <string name="value_type_float">小数</string>
     <string name="value_type_string">文本</string>
     <string name="value_type_boolean">布尔值</string>
+    <string name="value_type_object">对象(JSON)</string>
     <string name="other_parameters">其他参数</string>
     <string name="parameter_type">参数类型</string>
 
@@ -2351,9 +2582,9 @@
     <string name="screen_title_model_prompts_settings">模型提示词设置</string>
     <string name="screen_title_functional_config">功能模型配置</string>
     <string name="screen_title_theme_settings">主题设置</string>
+    <string name="screen_title_layout_adjustment">布局调整</string>
     <string name="screen_title_chat_history_settings">聊天记录管理</string>
     <string name="screen_title_language_settings">语言设置</string>
-    <string name="screen_title_format_converter">万能格式转换</string>
     <string name="screen_title_file_manager">文件管理器</string>
     <string name="screen_title_terminal">命令终端</string>
     <string name="screen_title_terminal_auto_config">终端自动配置</string>
@@ -2366,7 +2597,10 @@
     <string name="screen_title_tool_tester">工具测试中心</string>
     <string name="screen_title_text_to_speech">文本转语音</string>
     <string name="screen_title_speech_to_text">语音识别</string>
-    
+    <string name="screen_title_mcp_market">MCP 市场</string>
+    <string name="screen_title_mcp_publish">发布 MCP 插件</string>
+    <string name="screen_title_mcp_manage">管理我的插件</string>
+
     <!-- Model Prompts Settings Screen -->
     <string name="unknown_error">未知错误</string>
     <string name="file_read_error">读取文件失败: %1$s</string>
@@ -2374,10 +2608,12 @@
     <string name="tags">标签</string>
     <string name="old_config">旧配置</string>
     <string name="save_successful">保存成功</string>
+    <string name="duplicate_successful">创建副本成功</string>
     <string name="character_card_management">角色卡管理</string>
     <string name="create_new">新建</string>
     <string name="ai_creation">AI创作</string>
     <string name="edit">编辑</string>
+    <string name="duplicate">创建副本</string>
     <string name="delete">删除</string>
     <string name="character_setting_preview">角色设定：%1$s...</string>
     <string name="other_content_preview">其他内容：%1$s...</string>
@@ -2399,7 +2635,6 @@
     <string name="other_content_prompt">其他内容（引导词）</string>
     <string name="select_tags">选择标签</string>
     <string name="system_tags_auto_added">系统标签（自动加入）</string>
-    <string name="advanced_custom_prompt">高级自定义（引导词）</string>
     <string name="notes_info_not_appended">备注信息（不会被拼接到提示词中）</string>
     <string name="notes_placeholder">可以记录角色卡来源、作者信息等</string>
     <string name="save">保存</string>
@@ -2450,7 +2685,6 @@
     <string name="settings_saved_message">设置已保存</string>
     
     <!-- 角色卡对话框 -->
-    <string name="character_card_name">名称</string>
     <string name="character_card_description">描述</string>
     <string name="character_card_character_setting">角色设定</string>
     <string name="character_card_character_setting_placeholder">描述角色的性格特点...</string>
@@ -2481,9 +2715,298 @@
     <string name="character_card_add">添加</string>
     
     <!-- 权限请求 -->
-    <string name="delete_character_card">删除角色卡</string>
     <string name="delete_character_card_confirm">确定要删除角色卡「%1$s」吗？此操作不可撤销。</string>
     <string name="delete_tag">删除标签</string>
     <string name="delete_tag_confirm">确定要删除标签「%1$s」吗？此操作不可撤销。</string>
+
+    <!-- Token Config WebView & URL Config Dialog -->
+    <string name="custom_url_config">自定义URL配置</string>
+    <string name="config_name_label">配置名称</string>
+    <string name="signin_url">登录页面URL</string>
+    <string name="tab_config">Tab配置</string>
+    <string name="tab_number">Tab %1$d</string>
+    <string name="title_label">标题</string>
+    <string name="url_label">URL</string>
+    <string name="settings_config">设置</string>
+
+    <!-- Terminal Environment Wizard -->
+    <string name="configure_terminal_environment">配置终端环境</string>
+    <string name="nodejs_pip_environment_ready">NodeJS和pip环境已就绪</string>
+    <string name="pnpm_installed_need_pip">已安装pnpm，需要配置pip</string>
+    <string name="pip_installed_need_pnpm">已安装pip，需要配置pnpm</string>
+    <string name="need_configure_nodejs_pip">需要配置NodeJS和pip环境</string>
+    <string name="terminal_environment_setup_description">需要在终端中配置NodeJS（pnpm）和pip环境以支持MCP插件运行。点击下方按钮进入终端配置界面完成设置。</string>
+    <string name="go_to_terminal_config">前往终端配置</string>
+    <string name="nodejs_pip_environment_configured">NodeJS和pip环境已经配置完成，可以正常使用MCP插件功能。</string>
+    <string name="open_terminal">打开终端</string>
+
+    <!-- MCP市场界面 -->
+    <string name="login_github_to_manage_mcp_plugins">登录 GitHub 以发布和管理您的 MCP 插件</string>
+    <string name="browse">浏览</string>
+    <string name="my_tab">我的</string>
+    <string name="user_avatar">用户头像</string>
+    <string name="clear_search">清空搜索</string>
+    <string name="available_mcp_plugins">可用的 MCP 插件</string>
+    <string name="no_matching_plugins_found">未找到匹配的插件</string>
+    <string name="no_available_mcp_plugins">暂无可用的 MCP 插件</string>
+    <string name="refresh_or_try_later">刷新或稍后再试</string>
+    <string name="recommended_feature">推荐功能</string>
+    <string name="premium_mcp_plugins_coming_soon">即将推出精选的优质 MCP 插件</string>
+    <string name="please_login_github_first">请先登录 GitHub</string>
+    <string name="login_to_view_manage_mcp_plugins">登录后可以查看和管理您发布的 MCP 插件</string>
+    <string name="publish_new_plugin">发布新插件</string>
+    <string name="manage_my_plugins">管理我的插件</string>
+    <string name="logout">退出登录</string>
+    <string name="author_avatar">作者头像</string>
+    <string name="sharer_avatar">分享者头像</string>
+    <string name="available">可用</string>
+    <string name="closed">已关闭</string>
+
+    <string name="github_account">GitHub 账户</string>
+    <string name="login_github">登录 GitHub</string>
+    <string name="publish_mcp_plugins_to_market">• 发布您的 MCP 插件到市场</string>
+    <string name="manage_published_plugins">• 管理您已发布的插件</string>
+    <string name="better_installation_experience">• 获得更好的安装体验</string>
+
+    <!-- MCP发布界面 -->
+    <string name="edit_description">编辑说明</string>
+    <string name="publish_description">发布说明</string>
+    <string name="only_alphanumeric_underscore_plugin_id">只允许英文字母、数字和下划线，此名称将作为插件ID使用</string>
+    <string name="install_command">安装命令</string>
+    <string name="install_config">安装配置</string>
+    <string name="please_fill_all_required_fields">请填写所有必填字段</string>
+    <string name="update_plugin">更新插件</string>
+    <string name="publish_to_market">发布到市场</string>
+    <string name="confirm_update">确认更新</string>
+    <string name="confirm_publish">确认发布</string>
+    <string name="confirm_mcp_git_import_deployment">我已确认mcp可以通过软件git导入得方式，并正常部署和运行</string>
+    <string name="update_failed_check_network">更新失败，请检查网络连接</string>
+    <string name="publish_failed_check_network_repo">发布失败，请检查网络连接和仓库地址</string>
+    <string name="update_success">更新成功</string>
+    <string name="publish_success">发布成功</string>
+
+    <!-- MCP配置界面 -->
+    <string name="mcp_community_resources">MCP 社区资源</string>
+    <string name="mcp_official_repo">MCP 官方仓库</string>
+    <string name="anthropic_official_mcp_servers">Anthropic官方维护的MCP服务器集合</string>
+    <string name="link_copied">链接已复制</string>
+    <string name="mcp_server_directory">MCP 服务器目录</string>
+    <string name="complete_mcp_server_list_177">完整的MCP服务器列表，包含177+个服务器</string>
+    <string name="claude_mcp_community">Claude MCP 社区</string>
+    <string name="claude_mcp_community_website">专注于Claude MCP的社区网站</string>
+    <string name="modelscope_community">魔搭社区</string>
+    <string name="modelscope_ai_community_mcp_resources">ModelScope AI模型社区，包含MCP相关资源</string>
+    <string name="github_awesome_mcp_resources">GitHub上精选的MCP资源和工具集合</string>
+    <string name="mcp_market">MCP市场</string>
+    <string name="more">更多</string>
+    <string name="copy_link">复制链接</string>
+
+    <!-- MCP管理界面 -->
+    <string name="need_login_github_manage_plugins">需要登录 GitHub 才能管理您发布的插件</string>
+    <string name="no_published_plugins_yet">还没有发布任何插件</string>
+    <string name="click_button_publish_first_mcp_plugin">点击上方按钮发布您的第一个 MCP 插件</string>
+    <string name="confirm_delete_action">确定删除</string>
+    <string name="published">已发布</string>
+    <string name="removed">已移除</string>
+    <string name="remove">移除</string>
+    <string name="republish">重新发布</string>
+
+    <!-- 附加字符串 -->
+    <string name="author_colon">作者:</string>
+    <string name="share_colon">分享:</string>
+    <string name="downloading_progress">下载中 %1$s</string>
+    <string name="extracting_progress">解压中...</string>
+    <string name="installing_progress">安装中...</string>
+    <string name="after_logging_in_you_can">登录 GitHub 账户后，您可以：</string>
+    <string name="publish_your_mcp_plugin_to_the_market">发布您的 MCP 插件到市场</string>
+    <string name="manage_your_published_plugins">管理您已发布的插件</string>
+    <string name="no_mcp_plugins_available">暂无可用的 MCP 插件</string>
+    <string name="try_changing_keywords">尝试更换关键词</string>
+    <string name="refresh_or_try_again_later">刷新或稍后再试</string>
+    <string name="recommended_features">推荐功能</string>
+    <string name="coming_soon_for_mcp_plugins">即将推出精选的优质 MCP 插件</string>
+    <string name="after_logging_in_you_can_view_and_manage_your_mcp_plugins">登录后可以查看和管理您发布的 MCP 插件</string>
+    <string name="get_mcp">获取MCP</string>
+    <string name="plugin_name_description">只允许英文字母、数字和下划线，此名称将作为插件ID使用</string>
+    <string name="choose_mcp_community_to_get_plugins">选择以下优质MCP社区获取插件：</string>
+    <string name="awesome_mcp">Awesome MCP</string>
+    <string name="loading_your_plugins">正在加载您的插件...</string>
+    <string name="confirm_remove_plugin_from_market">确定要从市场移除插件「%1$s」吗？此操作会关闭对应的 Issue，但不会删除您的代码仓库。</string>
+
+    <!-- MCPPublishScreen 额外字符串 -->
+    <string name="edit_plugin_info_description">您正在编辑已发布的插件信息。修改后的信息将更新到市场仓库的对应 Issue 中。</string>
+    <string name="publish_plugin_info_description">您的插件信息将作为 GitHub Issue 发布到市场仓库。请确保提供的信息准确完整。表单内容会自动保存为草稿，直到成功发布后才会清空。</string>
+    <string name="plugin_name_required">插件名称 *</string>
+    <string name="plugin_description_required">插件描述 *</string>
+    <string name="github_repo_address_required">GitHub 仓库地址 *</string>
+    <string name="install_command_example">例如：pnpm install xxx@xxxx</string>
+    <string name="install_command_optional_description">如果无填写则使用软件自动识别项目结构。建议为空。</string>
+    <string name="install_config_example">{"mcpServers": {"example": {"command": "npx", "args": ["example@latest"]}}}</string>
+    <string name="install_config_optional_description">提供 MCP 配置 JSON，用户可以直接导入。选填。</string>
+    <string name="install_config_colon">安装配置: %1$s</string>
+    <string name="updating_progress">更新中...</string>
+    <string name="publishing_progress">发布中...</string>
+    <string name="please_check_submitted_info">请检查您提交的信息：</string>
+    <string name="name_colon">名称: %1$s</string>
+    <string name="description_colon">描述: %1$s</string>
+    <string name="repository_colon">仓库: %1$s</string>
+    <string name="install_command_colon">安装命令: %1$s</string>
+    <string name="update_failed_with_error">更新失败：%1$s</string>
+    <string name="publish_failed_with_error">发布失败：%1$s</string>
+    <string name="mcp_plugin_update_success_message">您的 MCP 插件信息已成功更新。</string>
+    <string name="mcp_plugin_publish_success_message">您的 MCP 插件已成功发布到市场，等待审核通过后即可被其他用户发现和使用。</string>
+
+    <!-- MCP Plugin Detail Screen -->
+    <string name="mcp_plugin_detail_title">插件详情</string>
+    <string name="mcp_plugin_author">作者: %1$s</string>
+    <string name="mcp_plugin_shared_by">分享者: %1$s</string>
+    <string name="mcp_plugin_repository">查看仓库</string>
+    <string name="mcp_plugin_install">安装插件</string>
+    <string name="mcp_plugin_installed">已安装</string>
+    <string name="mcp_plugin_description_title">插件描述</string>
+    <string name="mcp_plugin_metadata">插件信息</string>
+    <string name="mcp_plugin_status_available">可用</string>
+    <string name="mcp_plugin_status_closed">已关闭</string>
+    <string name="mcp_plugin_stars">%1$d Stars</string>
+    <string name="mcp_plugin_created_at">创建于: %1$s</string>
+    <string name="mcp_plugin_updated_at">更新于: %1$s</string>
+    <string name="mcp_plugin_community_feedback">社区反馈</string>
+    <string name="mcp_plugin_login_required">请先登录GitHub账号以参与点赞</string>
+    <string name="mcp_plugin_comments">评论 (%1$d)</string>
+    <string name="mcp_plugin_no_comments">暂无评论</string>
+    <string name="mcp_plugin_be_first_comment">成为第一个评论的人吧！</string>
+    <string name="mcp_plugin_add_comment">添加评论</string>
+    <string name="mcp_plugin_comment_hint">分享您的想法或提出问题...</string>
+    <string name="mcp_plugin_post_comment">发布</string>
+    <string name="mcp_plugin_cancel">取消</string>
+    <string name="mcp_plugin_refresh_comments">刷新评论</string>
+    <string name="mcp_plugin_unknown_author">未知</string>
+
+    <!-- Advanced Settings Section -->
+    <string name="advanced_settings">高级设置</string>
+    <string name="use_api_key_pool">使用API密钥池</string>
+    <string name="api_key_pool_desc">启用后可管理多个API密钥，系统将自动轮换使用</string>
+    <string name="api_key_pool_empty">API密钥池为空，点击下方按钮添加密钥</string>
+    <string name="add_api_key">添加API密钥</string>
+    <string name="edit_api_key">编辑API密钥</string>
+    <string name="delete_api_key">删除API密钥</string>
+    <string name="advanced_settings_saved">高级设置已保存</string>
+    <string name="batch_import_keys">批量导入密钥</string>
+    <string name="batch_import_keys_desc">从文本文件批量导入密钥，一行一个密钥</string>
+    <string name="select_txt_file">选择文本文件</string>
+    <string name="batch_import_success">批量导入成功</string>
+    <string name="batch_import_failed">批量导入失败</string>
+    <string name="import_format_desc">请选择包含API密钥的文本文件，每行一个密钥</string>
+    <string name="imported_keys_count">成功导入 %1$d 个密钥</string>
+    <string name="invalid_file_format">无效的文件格式，请选择文本文件</string>
+    <string name="no_valid_keys_found">未找到有效的密钥</string>
+
+    <!-- 手动更新记忆 -->
+    <string name="manual_memory_update">手动更新记忆</string>
+    <string name="manual_memory_update_desc">当AI在任务完成后忘记总结时，手动触发记忆保存，将本次对话的有价值内容存入长期记忆库。</string>
+
+    <!-- Context and Summary Settings Screen -->
+    <string name="screen_title_context_summary_settings">上下文和总结设置</string>
+    <string name="settings_context_title">上下文设置</string>
+    <string name="settings_summary_title">总结设置</string>
+    <string name="settings_context_summary_subtitle">管理上下文长度、总结和截断设置</string>
+
+    <!-- Custom Emoji Management -->
+    <string name="manage_custom_emoji">管理自定义表情</string>
+    <string name="add_emoji">添加表情</string>
+    <string name="delete_emoji">删除表情</string>
+    <string name="create_category">新建类别</string>
+    <string name="delete_category">删除类别</string>
+    <string name="category_name">类别名称</string>
+    <string name="category_name_hint">只能包含小写字母、数字和下划线</string>
+    <string name="select_category">选择类别</string>
+    <string name="confirm_delete_category">确认删除类别"%1$s"及其所有表情吗？</string>
+    <string name="confirm_delete_emoji">确认删除此表情吗？</string>
+    <string name="custom_emoji_desc">添加您喜欢的表情图片，AI将在Waifu模式中使用它们</string>
+    <string name="emoji_added_success">成功添加 %1$d 个表情</string>
+    <string name="emoji_deleted_success">表情已删除</string>
+    <string name="category_created">类别已创建</string>
+    <string name="invalid_category_name">类别名称只能包含小写字母、数字和下划线</string>
+
+    <!-- Voice Assistant Widget -->
+    <string name="voice_assistant_widget_description">快速启动 Operit 语音助手</string>
+
+    <!-- MNN Model Download -->
+    <string name="screen_title_mnn_model_download">MNN模型下载</string>
+    <string name="mnn_model_download">下载MNN模型</string>
+    <string name="mnn_model_management">模型管理</string>
+    <string name="mnn_download_from_modelscope">从ModelScope下载</string>
+    <string name="mnn_model_size">模型大小: %1$.2f GB</string>
+    <string name="mnn_downloading">下载中</string>
+    <string name="mnn_download_speed">速度: %1$s</string>
+    <string name="mnn_download_complete">下载完成</string>
+    <string name="mnn_download_failed">下载失败: %1$s</string>
+    <string name="mnn_no_models_downloaded">暂无已下载的模型</string>
+    <string name="mnn_select_downloaded_model">选择已下载的模型</string>
+    <string name="mnn_model_name_only">模型名称</string>
+    <string name="mnn_download_progress">进度: %1$d%%</string>
+    <string name="mnn_pause_download">暂停下载</string>
+    <string name="mnn_resume_download">继续下载</string>
+    <string name="mnn_delete_model">删除模型</string>
+    <string name="mnn_confirm_delete">确认删除此模型吗？</string>
+    <string name="mnn_loading_models">加载模型列表中...</string>
+    <string name="mnn_connecting">正在连接...</string>
+    <string name="mnn_load_failed">加载失败</string>
+    <string name="mnn_retry">重试</string>
+    <string name="mnn_start_download">开始下载</string>
+    <string name="mnn_no_local_models">尚未下载任何模型</string>
+    <string name="mnn_go_download">去下载</string>
+    <string name="mnn_search_models">搜索模型...</string>
+    <string name="mnn_no_search_results">没有找到匹配的模型</string>
+
+    <!-- Persona Card Generation Screen -->
+    <string name="persona_card_generation_title">将修改的角色卡</string>
+    <string name="no_character_card">无角色卡</string>
+    <string name="character_card_config">角色卡配置</string>
+    <string name="current_character_card">当前角色卡</string>
+    <string name="create_new_character_card">+ 新建角色卡</string>
+    <string name="delete_current_character_card">删除当前角色卡</string>
+    <string name="new_character_card">新建角色卡</string>
+    <string name="character_card_name">角色卡名称</string>
+    <string name="character_card_name_example">例如：小昔-校园版</string>
+    <string name="delete_character_card">删除角色卡</string>
+    <string name="confirm_delete_character_card">确定删除当前角色卡吗？此操作不可撤销。</string>
+    <string name="current_character_card_content">当前角色卡内容</string>
+    <string name="character_name">角色名称</string>
+    <string name="character_description">角色描述</string>
+    <string name="character_setting">角色设定</string>
+    <string name="opening_statement">开场白</string>
+    <string name="other_content">其他内容</string>
+    <string name="advanced_custom_prompt">高级自定义提示词</string>
+    <string name="character_marks">备注信息（不会被拼接到提示词）</string>
+    <string name="please_select_or_create_card">请在侧边栏选择或创建一个角色卡以开始。</string>
+    <string name="persona_generation_welcome">🎭 欢迎使用角色卡生成助手！\n\n我们现在来编辑 \'%1$s\' 吧！\n请告诉我你想创建什么角色，或者想修改哪个部分？</string>
+    <string name="new_character">新角色</string>
+    <string name="generating">生成中…</string>
+    <string name="send_failed">发送失败：%1$s</string>
+    <string name="currently_generating">正在生成…</string>
+    <string name="describe_character_hint">描述你想要的角色…</string>
+    <string name="character_card_complete">🎉 角色卡生成完成！所有信息都已保存。</string>
+    <string name="confirm_clear_chat_history">确定要清空当前角色卡的对话记录吗？此操作不可撤销。</string>
+    <string name="message_limit_reached_title">对话数量已达上限</string>
+    <string name="message_limit_reached_message">当前对话数量已达 %1$d 条上限。\n为了保持对话质量和性能，请清空历史记录后继续。</string>
+    <string name="go_clear">去清空</string>
+    
+    <!-- MNN 本地推理 -->
+    <string name="provider_mnn">MNN (本地推理)</string>
+    <string name="mnn_local_model_tip">本地运行模型理解能力较差，建议关闭记忆链接、开启禁用工具进行对话</string>
+    <string name="mnn_model_path">模型文件路径</string>
+    <string name="mnn_model_path_placeholder">输入MNN模型文件的完整路径</string>
+    <string name="mnn_forward_type">计算类型</string>
+    <string name="mnn_thread_count">线程数</string>
+    
+    <!-- 工作流执行状态 -->
+    <string name="workflow_execution_running">执行中…</string>
+    <string name="workflow_execution_success">执行成功</string>
+    <string name="workflow_execution_failed">执行失败</string>
+    <string name="workflow_node_pending">待执行</string>
+    <string name="workflow_node_running">执行中</string>
+    <string name="workflow_node_success">成功</string>
+    <string name="workflow_node_failed">失败</string>
 
 </resources>

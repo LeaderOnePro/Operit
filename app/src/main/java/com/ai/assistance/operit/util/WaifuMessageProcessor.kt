@@ -1,5 +1,9 @@
 package com.ai.assistance.operit.util
 
+import android.content.Context
+import com.ai.assistance.operit.data.repository.CustomEmojiRepository
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -7,6 +11,18 @@ import java.io.File
  * 负责将AI回复按句号分割并模拟逐句发送
  */
 object WaifuMessageProcessor {
+    
+    // 用于访问自定义表情的 Context 和 Repository
+    private var context: Context? = null
+    private var customEmojiRepository: CustomEmojiRepository? = null
+    
+    /**
+     * 初始化处理器（需要在应用启动时调用）
+     */
+    fun initialize(appContext: Context) {
+        context = appContext.applicationContext
+        customEmojiRepository = CustomEmojiRepository.getInstance(appContext)
+    }
     
     /**
      * 将完整的消息按句号分割成句子
@@ -77,8 +93,25 @@ object WaifuMessageProcessor {
             resultWithPlaceholders.addAll(sentences)
         }
         
+        // 3.5. 合并仅包含标点符号的句子到前一句
+        val mergedResultWithPlaceholders = mutableListOf<String>()
+        if (resultWithPlaceholders.isNotEmpty()) {
+            mergedResultWithPlaceholders.add(resultWithPlaceholders[0])
+            for (i in 1 until resultWithPlaceholders.size) {
+                val currentSentence = resultWithPlaceholders[i]
+                val trimmedSentence = currentSentence.trim()
+                // 正则表达式匹配一个或多个结尾标点符号
+                if (trimmedSentence.isNotEmpty() && trimmedSentence.matches(Regex("^[。！？~～.!?…]+$"))) {
+                    val lastIndex = mergedResultWithPlaceholders.size - 1
+                    mergedResultWithPlaceholders[lastIndex] = mergedResultWithPlaceholders[lastIndex] + currentSentence
+                } else {
+                    mergedResultWithPlaceholders.add(currentSentence)
+                }
+            }
+        }
+        
         // 4. 将占位符恢复为原始的Markdown实体
-        val finalResult = resultWithPlaceholders.map { sentence ->
+        val finalResult = mergedResultWithPlaceholders.map { sentence ->
             var currentSentence = sentence
             val placeholderRegex = Regex("$placeholderPrefix(\\d+)$placeholderSuffix")
             
@@ -109,20 +142,41 @@ object WaifuMessageProcessor {
             // 移除状态标签
             .replace(Regex("<status[^>]*>.*?</status>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<status[^>]*/>"), "")
-            // 移除思考标签
-            .replace(Regex("<think[^>]*>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
-            .replace(Regex("<think[^>]*/>"), "")
+            // 移除思考标签（包括 <think> 和 <thinking>）
+            .replace(Regex("<think(?:ing)?[^>]*>.*?</think(?:ing)?>", RegexOption.DOT_MATCHES_ALL), "")
+            .replace(Regex("<think(?:ing)?[^>]*/>"), "")
             // 移除工具标签
             .replace(Regex("<tool[^>]*>.*?</tool>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<tool[^>]*/>"), "")
             // 移除工具结果标签
             .replace(Regex("<tool_result[^>]*>.*?</tool_result>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<tool_result[^>]*/>"), "")
-            // 移除计划项标签
-            .replace(Regex("<plan_item[^>]*>.*?</plan_item>", RegexOption.DOT_MATCHES_ALL), "")
-            .replace(Regex("<plan_item[^>]*/>"), "")
             // 移除emotion标签（因为已经在processEmotionTags中处理过了）
             .replace(Regex("<emotion[^>]*>.*?</emotion>", RegexOption.DOT_MATCHES_ALL), "")
+            
+            // --- 新增：移除Markdown相关标记 ---
+            // 1. 移除图片和链接，保留替代文本或链接文本
+            .replace(Regex("!?\\[(.*?)\\]\\(.*?\\)"), "$1")
+            // 2. 移除标题标记
+            .replace(Regex("^#+\\s*", RegexOption.MULTILINE), "")
+            // 3. 移除引用标记
+            .replace(Regex("^>\\s*", RegexOption.MULTILINE), "")
+            // 4. 移除列表标记
+            .replace(Regex("^[\\*\\-\\+]\\s+", RegexOption.MULTILINE), "")
+            .replace(Regex("^\\d+\\.\\s+", RegexOption.MULTILINE), "")
+            // 5. 移除代码块标记
+            .replace(Regex("```[a-zA-Z]*\\n?|\\n?```"), "")
+            // 6. 移除加粗、斜体、删除线 (注意顺序和互斥)
+            .replace(Regex("(\\*\\*\\*|___)(.+?)\\1"), "$2") // 加粗斜体
+            .replace(Regex("(\\*\\*|__(?!MD_ENTITY__))(.+?)\\1"), "$2") // 加粗 (避免匹配占位符)
+            .replace(Regex("(\\*|_)(.+?)\\1"), "$2")        // 斜体
+            .replace(Regex("~~(.+?)~~"), "$1")              // 删除线
+            // 7. 移除行内代码
+            .replace(Regex("`(.+?)`"), "$1")
+            // 8. 移除水平线
+            .replace(Regex("^[-_*]{3,}\\s*$", RegexOption.MULTILINE), "")
+            // --- Markdown移除结束 ---
+            
             // 移除其他常见的XML标签
             .replace(Regex("<[^>]*>"), "")
             // 清理多余的空白
@@ -214,10 +268,17 @@ object WaifuMessageProcessor {
             val emojiPath = getRandomEmojiPath(emotion)
             
             if (emojiPath != null) {
-                // 返回Markdown格式的图片链接，使用正确的Android assets路径
-                // 对文件名进行URL编码，处理空格和特殊字符
-                val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                "![$emotion](file:///android_asset/emoji/$encodedPath)"
+                // 判断是自定义表情（绝对路径）还是assets表情（相对路径）
+                val imageUrl = if (emojiPath.startsWith("/")) {
+                    // 自定义表情：使用绝对路径
+                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+                    "file://$encodedPath"
+                } else {
+                    // assets表情：使用相对路径
+                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+                    "file:///android_asset/emoji/$encodedPath"
+                }
+                "![$emotion]($imageUrl)"
             } else {
                 // 如果找不到对应的表情，返回原始文本
                 matchResult.value
@@ -252,9 +313,17 @@ object WaifuMessageProcessor {
             val emojiPath = getRandomEmojiPath(emotion)
             
             if (emojiPath != null) {
-                // 添加表情包作为单独的元素，对文件名进行URL编码
-                val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                result.add("![$emotion](file:///android_asset/emoji/$encodedPath)")
+                // 判断是自定义表情（绝对路径）还是assets表情（相对路径）
+                val imageUrl = if (emojiPath.startsWith("/")) {
+                    // 自定义表情：使用绝对路径
+                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+                    "file://$encodedPath"
+                } else {
+                    // assets表情：使用相对路径
+                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+                    "file:///android_asset/emoji/$encodedPath"
+                }
+                result.add("![$emotion]($imageUrl)")
             }
             
             lastEnd = match.range.last + 1
@@ -278,45 +347,39 @@ object WaifuMessageProcessor {
     /**
      * 根据情绪名称获取随机的表情图片路径
      * @param emotion 情绪名称（如：happy、sad、miss_you等）
-     * @return 表情图片的相对路径，如果找不到则返回null
+     * @return 表情图片的完整路径（file:// 格式），如果找不到则返回null
      */
     private fun getRandomEmojiPath(emotion: String): String? {
         try {
-            // 由于在Android运行时无法直接访问assets目录的文件系统，
-            // 我们直接返回相对路径，让UI层去处理图片加载
-            // 根据assets目录结构，我们知道存在这些情绪文件夹
-            val supportedEmotions = listOf("crying", "like_you", "happy", "surprised", "miss_you", "speechless", "angry", "confused", "sad")
-            
-            if (emotion !in supportedEmotions) {
-                android.util.Log.w("WaifuMessageProcessor", "不支持的情绪类型: $emotion")
-                return null
+            // 只从自定义表情中查找
+            val customEmoji = try {
+                customEmojiRepository?.let { repo ->
+                    runBlocking {
+                        val emojis = repo.getEmojisForCategory(emotion).first()
+                        if (emojis.isNotEmpty()) {
+                            val randomEmoji = emojis.random()
+                            val file = repo.getEmojiFile(randomEmoji)
+                            if (file.exists()) {
+                                android.util.Log.d("WaifuMessageProcessor", "使用自定义表情: ${file.absolutePath}")
+                                return@runBlocking file.absolutePath
+                            }
+                        }
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("WaifuMessageProcessor", "查询自定义表情失败", e)
+                null
             }
             
-            // 根据情绪类型返回对应的图片文件名（使用规范化后的文件名）
-            val imageFiles = when (emotion) {
-                "happy" -> listOf("happy_4.webp", "happy_5.webp", "happy_1.jpg", "happy_2.jpg", "happy_3.jpg")
-                "sad" -> listOf("sad_4.webp", "sad_5.gif", "sad_6.gif", "sad_1.jpg", "sad_2.jpg", "sad_3.jpg")
-                "speechless" -> listOf("speechless_4.webp", "speechless_5.jpg", "speechless_6.jpg", "speechless_1.jpg", "speechless_2.jpg", "speechless_3.jpg")
-                "angry" -> listOf("angry_5.webp", "angry_6.gif", "angry_4.gif", "angry_1.jpg", "angry_2.jpg", "angry_3.jpg")
-                "surprised" -> listOf("surprised_1.webp", "surprised_2.webp", "surprised_3.gif", "surprised_4.jpg", "surprised_5.gif")
-                "confused" -> listOf("confused_4.webp", "confused_5.png", "confused_6.jpg", "confused_1.jpg", "confused_2.jpg", "confused_3.jpg", "confused_7.jpg")
-                "miss_you" -> listOf("miss_you_1.webp", "miss_you_2.webp", "miss_you_3.jpg", "miss_you_4.jpg", "miss_you_5.jpg", "miss_you_6.jpg")
-                "like_you" -> listOf("like_you_5.webp", "like_you_6.gif", "like_you_1.jpg", "like_you_2.jpg", "like_you_3.jpg", "like_you_4.jpg")
-                "crying" -> listOf("crying_4.webp", "crying_5.webp", "crying_6.png", "crying_1.jpg", "crying_2.jpg", "crying_3.jpg")
-                else -> emptyList()
+            // 如果找到自定义表情，直接返回（已经是完整路径）
+            if (customEmoji != null) {
+                return customEmoji
             }
             
-            if (imageFiles.isEmpty()) {
-                android.util.Log.w("WaifuMessageProcessor", "情绪文件夹中没有图片文件: $emotion")
-                return null
-            }
-            
-            // 随机选择一张图片
-            val randomImage = imageFiles.random()
-            val relativePath = "$emotion/$randomImage"
-            
-            android.util.Log.d("WaifuMessageProcessor", "选择表情图片: $relativePath")
-            return relativePath
+            // 如果自定义表情中没有找到，则直接返回null
+            android.util.Log.w("WaifuMessageProcessor", "在自定义表情中未找到对于情绪 '$emotion' 的表情")
+            return null
             
         } catch (e: Exception) {
             android.util.Log.e("WaifuMessageProcessor", "获取表情图片失败: $emotion", e)

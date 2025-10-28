@@ -48,7 +48,7 @@ fun HelpScreen(onBackPressed: () -> Unit = {}) {
     }
     
     LaunchedEffect(Unit) {
-        webView.loadUrl("https://operit.dev.tc/")
+        webView.loadUrl("https://aaswordman.github.io/OperitWeb/")
     }
     
     Box(modifier = Modifier.fillMaxSize()) {

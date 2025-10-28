@@ -1,7 +1,6 @@
 package com.ai.assistance.operit.api.chat.enhance
 
 import android.util.Log
-import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.ToolResult
 
 /**
@@ -145,79 +144,6 @@ class ConversationMarkupManager {
             return "<status type=\"error\"><title>$title</title><message>$message</message></status>"
         }
 
-        /**
-         * Creates a plan item markup element.
-         *
-         * @param description Description of the plan item
-         * @return The formatted plan item element
-         */
-        fun createPlanItem(description: String): String {
-            // 委托给PlanItemParser
-            return PlanItemParser.createPlanItem(description)
-        }
 
-        /**
-         * Updates the status of a plan item.
-         *
-         * @param id The ID of the plan item
-         * @param status The new status of the plan item
-         * @param message Optional message to include with the status update
-         * @return The formatted plan status update element
-         */
-        fun createPlanStatusUpdate(id: String, status: String, message: String? = null): String {
-            // 委托给PlanItemParser
-            return PlanItemParser.createPlanStatusUpdate(id, status, message)
-        }
-
-        /**
-         * Creates a plan task completion marker.
-         *
-         * @param id The ID of the plan item
-         * @param success Whether the task was completed successfully
-         * @param message Optional message about the completion
-         * @return The formatted plan task completion element
-         */
-        fun createPlanTaskCompletion(
-                id: String,
-                success: Boolean,
-                message: String? = null
-        ): String {
-            // 委托给PlanItemParser
-            return PlanItemParser.createPlanTaskCompletion(id, success, message)
-        }
-
-        /**
-         * Extract plan items from a string of text.
-         *
-         * @param content The text content to extract plan items from
-         * @return List of extracted plan items
-         */
-        fun extractPlanItems(content: String): List<PlanItem> {
-            // 委托给专门的PlanItemParser处理
-            return PlanItemParser.extractPlanItems(content)
-        }
-
-        /**
-         * Extract plan items from a string of text, using existing items for updates.
-         *
-         * @param content The text content to extract plan items from
-         * @param existingItems The existing plan items to update
-         * @return List of extracted and updated plan items
-         */
-        fun extractPlanItems(content: String, existingItems: List<PlanItem>): List<PlanItem> {
-            // 委托给专门的PlanItemParser处理，传入现有的计划项列表
-            Log.d(TAG, "调用PlanItemParser提取计划项，传入 ${existingItems.size} 个现有计划项")
-            return PlanItemParser.extractPlanItems(content, existingItems)
-        }
-
-        /**
-         * Checks if content contains any plan-related elements.
-         *
-         * @param content The content to check
-         * @return True if the content contains plan-related elements
-         */
-        fun containsPlanElements(content: String): Boolean {
-            return PlanItemParser.containsPlanElements(content)
-        }
     }
 }

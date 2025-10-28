@@ -93,7 +93,7 @@ export namespace UI {
      * Set text in input field
      * @param text - Text to input
      */
-    function setText(text: string): Promise<UIActionResultData>;
+    function setText(text: string, resourceId?: string): Promise<UIActionResultData>;
 
     /**
      * Press a key
@@ -108,7 +108,7 @@ export namespace UI {
      * @param endX - End X coordinate
      * @param endY - End Y coordinate
      */
-    function swipe(startX: number, startY: number, endX: number, endY: number): Promise<UIActionResultData>;
+    function swipe(startX: number, startY: number, endX: number, endY: number, duration?: number): Promise<UIActionResultData>;
 }
 
 /**

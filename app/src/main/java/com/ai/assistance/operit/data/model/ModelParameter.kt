@@ -23,7 +23,8 @@ enum class ParameterValueType {
     INT,
     FLOAT,
     STRING,
-    BOOLEAN
+    BOOLEAN,
+    OBJECT
 }
 
 /** 参数分类枚举 */

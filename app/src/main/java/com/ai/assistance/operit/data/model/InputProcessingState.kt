@@ -26,6 +26,9 @@ sealed class InputProcessingState {
     /** 新增：正在总结记忆 */
     data class Summarizing(val message: String) : InputProcessingState()
 
+    /** 新增：正在执行计划 */
+    data class ExecutingPlan(val message: String) : InputProcessingState()
+
     /** 处理完成 */
     object Completed : InputProcessingState()
 

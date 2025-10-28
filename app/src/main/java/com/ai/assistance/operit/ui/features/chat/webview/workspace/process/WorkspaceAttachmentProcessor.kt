@@ -55,12 +55,16 @@ object WorkspaceAttachmentProcessor {
             
             // 获取用户改动记录
             val userChanges = getUserChanges(toolHandler, workspacePath)
+
+            // 获取工作区建议
+            val workspaceSuggestions = getWorkspaceSuggestions(workspaceDir)
             
             // 生成完整的XML
             buildWorkspaceXml(
                 directoryStructure = directoryStructure,
                 workspaceErrors = workspaceErrors,
-                userChanges = userChanges
+                userChanges = userChanges,
+                workspaceSuggestions = workspaceSuggestions
             )
             
         } catch (e: Exception) {
@@ -69,6 +73,36 @@ object WorkspaceAttachmentProcessor {
         }
     }
     
+    /**
+     * 获取工作区建议
+     */
+    private fun getWorkspaceSuggestions(workspaceDir: File): String {
+        val suggestions = mutableListOf<String>()
+        try {
+            // 提醒AI分离文件
+            suggestions.add("请将HTML, CSS, 和 JavaScript 代码分别存放到独立的文件中。")
+
+            // 当文件数量较多时，建议创建子目录（排除gitignore中的文件）
+            val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+            val files = workspaceDir.listFiles()?.filter { file ->
+                !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+            } ?: emptyList()
+            
+            if (files.size > 10) {
+                suggestions.add("项目文件较多，建议创建 'css', 'js' 等子目录来组织文件，保持结构清晰。")
+            }
+
+            return if (suggestions.isNotEmpty()) {
+                suggestions.joinToString("\n")
+            } else {
+                "暂无建议"
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取工作区建议失败", e)
+            return "获取建议时发生异常: ${e.message}"
+        }
+    }
+
     /**
      * 获取工作区目录结构，并与缓存进行比较以生成差异报告
      */
@@ -133,9 +167,21 @@ object WorkspaceAttachmentProcessor {
         if (!workspaceDir.exists() || !workspaceDir.isDirectory) {
             return emptyList()
         }
+        
+        // 加载 gitignore 规则
+        val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+        
         // 遍历所有文件和目录，并转换为FileMetadata列表
         return workspaceDir.walkTopDown()
+            .onEnter { dir -> 
+                // 使用 gitignore 规则判断是否进入目录
+                !GitIgnoreFilter.shouldIgnore(dir, workspaceDir, ignoreRules)
+            }
             .filter { it != workspaceDir } // 排除根目录本身
+            .filter { file ->
+                // 过滤应该被忽略的文件
+                !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+            }
             .map { file ->
                 FileMetadata(
                     path = file.relativeTo(workspaceDir).path,
@@ -309,8 +355,19 @@ object WorkspaceAttachmentProcessor {
             val currentTime = System.currentTimeMillis()
             val oneDayAgo = currentTime - 24 * 60 * 60 * 1000 // 24小时前
             
+            // 加载 gitignore 规则
+            val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
+            
             workspaceDir.walkTopDown()
+                .onEnter { dir -> 
+                    // 使用 gitignore 规则判断是否进入目录
+                    !GitIgnoreFilter.shouldIgnore(dir, workspaceDir, ignoreRules)
+                }
                 .filter { it.isFile }
+                .filter { file ->
+                    // 过滤应该被忽略的文件
+                    !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
+                }
                 .filter { it.lastModified() > oneDayAgo }
                 .sortedByDescending { it.lastModified() }
                 .take(10) // 最多显示10个文件
@@ -323,33 +380,6 @@ object WorkspaceAttachmentProcessor {
             Log.e(TAG, "获取最近修改文件失败", e)
         }
     }
-    /**
-     * 检查项目结构建议
-     */
-    private fun checkProjectStructureSuggestions(
-        workspaceDir: File,
-        suggestions: MutableList<String>
-    ) {
-        val files = workspaceDir.listFiles() ?: return
-        
-        // 检查是否有CSS文件但没有在HTML中引用
-        val hasHtml = files.any { it.name.endsWith(".html") }
-        val hasCss = files.any { it.name.endsWith(".css") }
-        val hasJs = files.any { it.name.endsWith(".js") }
-        
-        if (hasHtml && hasCss) {
-            suggestions.add("确保CSS文件已在HTML中正确引用")
-        }
-        
-        if (hasHtml && hasJs) {
-            suggestions.add("确保JavaScript文件已在HTML中正确引用")
-        }
-        
-        // 检查文件组织
-        if (files.size > 10) {
-            suggestions.add("考虑创建子文件夹来组织文件")
-        }
-    }
     
     /**
      * 构建完整的工作区XML
@@ -357,7 +387,8 @@ object WorkspaceAttachmentProcessor {
     private fun buildWorkspaceXml(
         directoryStructure: String,
         workspaceErrors: String,
-        userChanges: String
+        userChanges: String,
+        workspaceSuggestions: String
     ): String {
         return """
 <workspace_context>
@@ -373,6 +404,9 @@ object WorkspaceAttachmentProcessor {
     $userChanges
 </user_changes>
 
+<workspace_suggestions>
+    $workspaceSuggestions
+</workspace_suggestions>
 </workspace_context>""".trimIndent()
     }
     

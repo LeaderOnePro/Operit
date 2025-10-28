@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Api
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
@@ -30,9 +31,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.api.chat.EndpointCompleter
+import com.ai.assistance.operit.api.chat.llmprovider.EndpointCompleter
 import com.ai.assistance.operit.api.chat.EnhancedAIService
-import com.ai.assistance.operit.api.chat.ModelListFetcher
+import com.ai.assistance.operit.api.chat.llmprovider.ModelListFetcher
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelOption
@@ -48,7 +49,8 @@ val TAG = "ModelApiSettings"
 fun ModelApiSettingsSection(
         config: ModelConfigData,
         configManager: ModelConfigManager,
-        showNotification: (String) -> Unit
+        showNotification: (String) -> Unit,
+        navigateToMnnModelDownload: (() -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -72,7 +74,10 @@ fun ModelApiSettingsSection(
             ApiProviderType.SILICONFLOW -> "yi-1.5-34b"
             ApiProviderType.OPENROUTER -> "google/gemini-pro"
             ApiProviderType.INFINIAI -> "infini-mini"
+            ApiProviderType.ALIPAY_BAILING -> "Ling-1T"
             ApiProviderType.LMSTUDIO -> "meta-llama-3.1-8b-instruct"
+            ApiProviderType.MNN -> ""
+            ApiProviderType.PPINFRA -> "gpt-4o-mini"
             ApiProviderType.OTHER -> ""
         }
     }
@@ -87,6 +92,13 @@ fun ModelApiSettingsSection(
     var apiKeyInput by remember(config.id) { mutableStateOf(config.apiKey) }
     var modelNameInput by remember(config.id) { mutableStateOf(config.modelName) }
     var selectedApiProvider by remember(config.id) { mutableStateOf(config.apiProviderType) }
+    
+    // MNN特定配置状态
+    var mnnForwardTypeInput by remember(config.id) { mutableStateOf(config.mnnForwardType) }
+    var mnnThreadCountInput by remember(config.id) { mutableStateOf(config.mnnThreadCount.toString()) }
+    
+    // 图片处理配置状态
+    var enableDirectImageProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectImageProcessing) }
 
     // 根据API提供商获取默认的API端点URL
     fun getDefaultApiEndpoint(providerType: ApiProviderType): String {
@@ -107,7 +119,10 @@ fun ModelApiSettingsSection(
             ApiProviderType.SILICONFLOW -> "https://api.siliconflow.cn/v1/chat/completions"
             ApiProviderType.OPENROUTER -> "https://openrouter.ai/api/v1/chat/completions"
             ApiProviderType.INFINIAI -> "https://cloud.infini-ai.com/maas/v1/chat/completions"
+            ApiProviderType.ALIPAY_BAILING -> "https://api.tbox.cn/api/llm/v1/chat/completions"
             ApiProviderType.LMSTUDIO -> "http://localhost:1234/v1/chat/completions"
+            ApiProviderType.MNN -> "" // MNN本地推理不需要endpoint
+            ApiProviderType.PPINFRA -> "https://api.ppinfra.com/openai/v1/chat/completions"
             ApiProviderType.OTHER -> ""
         }
     }
@@ -211,7 +226,161 @@ fun ModelApiSettingsSection(
                 )
             }
 
-            // API端点输入
+            // MNN特定配置（仅在选择MNN提供商时显示）
+            if (selectedApiProvider == ApiProviderType.MNN) {
+                // MNN使用提示
+                Card(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                                text = stringResource(R.string.mnn_local_model_tip),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                lineHeight = 18.sp
+                        )
+                    }
+                }
+                
+                // 下载模型按钮
+                navigateToMnnModelDownload?.let { navigate ->
+                    Button(
+                            onClick = navigate,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                    ) {
+                        Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.mnn_model_download))
+                    }
+                }
+                
+                // MNN前向计算类型选择
+                var showForwardTypeDialog by remember { mutableStateOf(false) }
+                
+                Text(
+                        stringResource(R.string.mnn_forward_type),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                )
+                
+                Surface(
+                        modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showForwardTypeDialog = true }
+                                .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                                text = when (mnnForwardTypeInput) {
+                                    0 -> "CPU"
+                                    3 -> "OpenCL"
+                                    4 -> "Auto"
+                                    6 -> "OpenGL"
+                                    7 -> "Vulkan"
+                                    else -> "CPU"
+                                },
+                                style = MaterialTheme.typography.bodyLarge
+                        )
+                        Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.select),
+                                tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                
+                if (showForwardTypeDialog) {
+                    Dialog(onDismissRequest = { showForwardTypeDialog = false }) {
+                        Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                        stringResource(R.string.mnn_forward_type),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                                
+                                listOf(
+                                    0 to "CPU",
+                                    3 to "OpenCL",
+                                    4 to "Auto",
+                                    6 to "OpenGL",
+                                    7 to "Vulkan"
+                                ).forEach { (type, name) ->
+                                    Surface(
+                                            modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        mnnForwardTypeInput = type
+                                                        showForwardTypeDialog = false
+                                                    },
+                                            color = if (mnnForwardTypeInput == type) 
+                                                    MaterialTheme.colorScheme.primaryContainer 
+                                                else MaterialTheme.colorScheme.surface
+                                    ) {
+                                        Text(
+                                                text = name,
+                                                modifier = Modifier.padding(16.dp),
+                                                style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // MNN线程数输入
+                OutlinedTextField(
+                        value = mnnThreadCountInput,
+                        onValueChange = { 
+                            // 只允许输入数字
+                            if (it.isEmpty() || it.toIntOrNull() != null) {
+                                mnnThreadCountInput = it
+                            }
+                        },
+                        label = { Text(stringResource(R.string.mnn_thread_count)) },
+                        placeholder = { Text("4") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        singleLine = true
+                )
+            }
+
+            // API端点输入（MNN提供商不显示）
+            if (selectedApiProvider != ApiProviderType.MNN) {
             OutlinedTextField(
                     value = apiEndpointInput,
                     onValueChange = { apiEndpointInput = it },
@@ -220,6 +389,7 @@ fun ModelApiSettingsSection(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     singleLine = true
             )
+            }
 
             // 显示自动补全后的URL
             val completedEndpoint = EndpointCompleter.completeEndpoint(apiEndpointInput)
@@ -239,7 +409,8 @@ fun ModelApiSettingsSection(
                 )
             }
  
-             // API密钥输入
+             // API密钥输入（MNN提供商不显示）
+             if (selectedApiProvider != ApiProviderType.MNN) {
              OutlinedTextField(
                      value = if (isUsingDefaultApiKey) "" else apiKeyInput,
                      onValueChange = {
@@ -261,8 +432,10 @@ fun ModelApiSettingsSection(
                      modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                      singleLine = true
              )
+             }
 
-            // 模型名称输入和模型列表按钮
+            // 模型名称输入和模型列表按钮（MNN提供商不显示，因为MNN只需要选择模型，不需要手动输入）
+            if (selectedApiProvider != ApiProviderType.MNN) {
             Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
@@ -400,6 +573,84 @@ fun ModelApiSettingsSection(
                     }
                 }
             }
+            } else {
+                // MNN提供商：显示获取本地模型列表按钮
+                Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    OutlinedTextField(
+                            value = modelNameInput,
+                            onValueChange = { /* MNN模型名称从列表选择，不允许手动编辑 */ },
+                            label = { Text(stringResource(R.string.model_name)) },
+                            placeholder = { Text(stringResource(R.string.mnn_select_downloaded_model)) },
+                            modifier = Modifier.weight(1f),
+                            enabled = false,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                    disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // 获取MNN本地模型列表按钮
+                    IconButton(
+                            onClick = {
+                                Log.d(TAG, "获取MNN本地模型列表")
+                                val gettingModelsText = context.getString(R.string.getting_models_list)
+                                val modelsListSuccessText = context.getString(R.string.models_list_success)
+                                showNotification(gettingModelsText)
+
+                                scope.launch {
+                                    isLoadingModels = true
+                                    modelLoadError = null
+
+                                    try {
+                                        val result = ModelListFetcher.getMnnLocalModels(context)
+                                        if (result.isSuccess) {
+                                            val models = result.getOrThrow()
+                                            Log.d(TAG, "MNN模型列表获取成功，共 ${models.size} 个模型")
+                                            modelsList = models
+                                            showModelsDialog = true
+                                            showNotification(modelsListSuccessText.format(models.size))
+                                        } else {
+                                            val errorMsg = result.exceptionOrNull()?.message ?: context.getString(R.string.unknown_error)
+                                            Log.e(TAG, "MNN模型列表获取失败: $errorMsg")
+                                            modelLoadError = context.getString(R.string.get_models_list_failed, errorMsg)
+                                            showNotification(modelLoadError!!)
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "获取MNN模型列表发生异常", e)
+                                        modelLoadError = context.getString(R.string.get_models_list_failed, e.message ?: "")
+                                        showNotification(modelLoadError!!)
+                                    } finally {
+                                        isLoadingModels = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(48.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary
+                            )
+                    ) {
+                        if (isLoadingModels) {
+                            CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                    imageVector = Icons.Default.FormatListBulleted,
+                                    contentDescription = stringResource(R.string.get_models_list),
+                                    tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
 
             // 添加API提供商选择
             var showApiProviderDialog by remember { mutableStateOf(false) }
@@ -460,6 +711,33 @@ fun ModelApiSettingsSection(
                 )
             }
 
+            // 图片直接处理开关（仅在非MNN提供商时显示）
+            if (selectedApiProvider != ApiProviderType.MNN) {
+                Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = stringResource(R.string.enable_direct_image_processing),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                                text = stringResource(R.string.enable_direct_image_processing_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                        )
+                    }
+                    Switch(
+                            checked = enableDirectImageProcessingInput,
+                            onCheckedChange = { enableDirectImageProcessingInput = it }
+                    )
+                }
+            }
+
             // 显示模型限制信息
             if (showModelRestrictionInfo) {
                 Text(
@@ -494,7 +772,15 @@ fun ModelApiSettingsSection(
                                         apiKey = apiKeyInput,
                                         apiEndpoint = apiEndpointInput,
                                         modelName = modelToSave,
-                                        apiProviderType = selectedApiProvider
+                                        apiProviderType = selectedApiProvider,
+                                        mnnForwardType = mnnForwardTypeInput,
+                                        mnnThreadCount = mnnThreadCountInput.toIntOrNull() ?: 4
+                                )
+
+                                // 更新图片直接处理配置
+                                configManager.updateDirectImageProcessing(
+                                        configId = config.id,
+                                        enableDirectImageProcessing = enableDirectImageProcessingInput
                                 )
 
                                 // 刷新所有AI服务实例，确保使用最新配置
@@ -678,6 +964,10 @@ fun ModelApiSettingsSection(
                                                 Modifier.fillMaxWidth()
                                                         .clickable {
                                                             modelNameInput = model.id
+                                                            // MNN提供商：model.id 就是文件夹名称，直接使用即可
+                                                            if (selectedApiProvider == ApiProviderType.MNN) {
+                                                                Log.d(TAG, "选择MNN模型: ${model.id}")
+                                                            }
                                                             showModelsDialog = false
                                                         }
                                                         .padding(
@@ -687,7 +977,7 @@ fun ModelApiSettingsSection(
                                         verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                            text = model.id,
+                                            text = model.name,
                                             style = MaterialTheme.typography.bodyMedium,
                                             modifier = Modifier.weight(1f)
                                     )
@@ -751,7 +1041,10 @@ private fun getProviderDisplayName(provider: ApiProviderType, context: android.c
         ApiProviderType.SILICONFLOW -> context.getString(R.string.provider_siliconflow)
         ApiProviderType.OPENROUTER -> context.getString(R.string.provider_openrouter)
         ApiProviderType.INFINIAI -> context.getString(R.string.provider_infiniai)
+        ApiProviderType.ALIPAY_BAILING -> context.getString(R.string.provider_alipay_bailing)
         ApiProviderType.LMSTUDIO -> context.getString(R.string.provider_lmstudio)
+        ApiProviderType.MNN -> context.getString(R.string.provider_mnn)
+        ApiProviderType.PPINFRA -> context.getString(R.string.provider_ppinfra)
         ApiProviderType.OTHER -> context.getString(R.string.provider_other)
     }
 }
@@ -901,7 +1194,10 @@ private fun getProviderColor(provider: ApiProviderType): androidx.compose.ui.gra
         ApiProviderType.SILICONFLOW -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
         ApiProviderType.OPENROUTER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
         ApiProviderType.INFINIAI -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-        ApiProviderType.LMSTUDIO -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
-        ApiProviderType.OTHER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        ApiProviderType.ALIPAY_BAILING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+        ApiProviderType.LMSTUDIO -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+        ApiProviderType.MNN -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+        ApiProviderType.PPINFRA -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f)
+        ApiProviderType.OTHER -> MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
     }
 }

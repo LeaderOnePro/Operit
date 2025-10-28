@@ -63,9 +63,7 @@ fun PermissionLevelCard(
         isShizukuInstalled: Boolean,
         isShizukuRunning: Boolean,
         hasShizukuPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
+        isOperitTerminalInstalled: Boolean,
         isDeviceRooted: Boolean,
         hasRootAccess: Boolean,
         isAccessibilityProviderInstalled: Boolean, // 新增：提供者App是否已安装
@@ -76,7 +74,7 @@ fun PermissionLevelCard(
         onInstallAccessibilityProviderClick: () -> Unit, // 新增：安装提供者App的回调
         onLocationPermissionClick: () -> Unit,
         onShizukuClick: () -> Unit,
-        onTermuxClick: () -> Unit,
+        onOperitTerminalClick: () -> Unit,
         onRootClick: () -> Unit,
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit,
@@ -309,14 +307,12 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
-                                            isTermuxInstalled = isTermuxInstalled,
-                                            isTermuxAuthorized = isTermuxAuthorized,
-                                            isTermuxFullyConfigured = isTermuxFullyConfigured,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
-                                            onTermuxClick = onTermuxClick
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -334,19 +330,17 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
-                                            isTermuxInstalled = isTermuxInstalled,
-                                            isTermuxAuthorized = isTermuxAuthorized,
-                                            isTermuxFullyConfigured = isTermuxFullyConfigured,
                                             isAccessibilityProviderInstalled = isAccessibilityProviderInstalled,
                                             hasAccessibilityServiceEnabled =
                                                     hasAccessibilityServiceEnabled,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
-                                            onTermuxClick = onTermuxClick,
                                             onAccessibilityClick = onAccessibilityClick,
-                                            onInstallAccessibilityProviderClick = onInstallAccessibilityProviderClick
+                                            onInstallAccessibilityProviderClick = onInstallAccessibilityProviderClick,
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -364,14 +358,12 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
-                                            isTermuxInstalled = isTermuxInstalled,
-                                            isTermuxAuthorized = isTermuxAuthorized,
-                                            isTermuxFullyConfigured = isTermuxFullyConfigured,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
-                                            onTermuxClick = onTermuxClick
+                                            onOperitTerminalClick = onOperitTerminalClick
                                     )
                                 }
                         )
@@ -389,9 +381,7 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
-                                            isTermuxInstalled = isTermuxInstalled,
-                                            isTermuxAuthorized = isTermuxAuthorized,
-                                            isTermuxFullyConfigured = isTermuxFullyConfigured,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             isShizukuInstalled = isShizukuInstalled,
                                             isShizukuRunning = isShizukuRunning,
                                             hasShizukuPermission = hasShizukuPermission,
@@ -401,7 +391,7 @@ fun PermissionLevelCard(
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
-                                            onTermuxClick = onTermuxClick,
+                                            onOperitTerminalClick = onOperitTerminalClick,
                                             onShizukuClick = onShizukuClick,
                                             onAccessibilityClick = onAccessibilityClick,
                                             onInstallAccessibilityProviderClick = onInstallAccessibilityProviderClick
@@ -422,16 +412,14 @@ fun PermissionLevelCard(
                                             hasBatteryOptimizationExemption =
                                                     hasBatteryOptimizationExemption,
                                             hasLocationPermission = hasLocationPermission,
-                                            isTermuxInstalled = isTermuxInstalled,
-                                            isTermuxAuthorized = isTermuxAuthorized,
-                                            isTermuxFullyConfigured = isTermuxFullyConfigured,
+                                            isOperitTerminalInstalled = isOperitTerminalInstalled,
                                             isDeviceRooted = isDeviceRooted,
                                             hasRootAccess = hasRootAccess,
                                             onStoragePermissionClick = onStoragePermissionClick,
                                             onOverlayPermissionClick = onOverlayPermissionClick,
                                             onBatteryOptimizationClick = onBatteryOptimizationClick,
                                             onLocationPermissionClick = onLocationPermissionClick,
-                                            onTermuxClick = onTermuxClick,
+                                            onOperitTerminalClick = onOperitTerminalClick,
                                             onRootClick = onRootClick
                                     )
                                 }
@@ -583,14 +571,12 @@ private fun StandardPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
-        onTermuxClick: () -> Unit
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -646,6 +632,17 @@ private fun StandardPermissionSection(
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
                 )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
+                )
             }
         }
     }
@@ -657,18 +654,16 @@ private fun AccessibilityPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
         isAccessibilityProviderInstalled: Boolean, // 新增
         hasAccessibilityServiceEnabled: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
-        onTermuxClick: () -> Unit,
         onAccessibilityClick: () -> Unit,
-        onInstallAccessibilityProviderClick: () -> Unit // 新增
+        onInstallAccessibilityProviderClick: () -> Unit, // 新增
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -722,6 +717,17 @@ private fun AccessibilityPermissionSection(
                         title = stringResource(R.string.location_permission),
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
+                )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
                 )
             }
         }
@@ -805,14 +811,12 @@ private fun AdminPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
+        isOperitTerminalInstalled: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
-        onTermuxClick: () -> Unit
+        onOperitTerminalClick: () -> Unit
 ) {
     Column {
         Text(
@@ -899,6 +903,17 @@ private fun AdminPermissionSection(
                         isGranted = hasLocationPermission,
                         onClick = onLocationPermissionClick
                 )
+
+                Divider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                )
+
+                PermissionStatusItem(
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
+                )
             }
         }
 
@@ -918,9 +933,7 @@ private fun DebuggerPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
+        isOperitTerminalInstalled: Boolean,
         isShizukuInstalled: Boolean,
         isShizukuRunning: Boolean,
         hasShizukuPermission: Boolean,
@@ -930,7 +943,7 @@ private fun DebuggerPermissionSection(
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
-        onTermuxClick: () -> Unit,
+        onOperitTerminalClick: () -> Unit,
         onShizukuClick: () -> Unit,
         onAccessibilityClick: () -> Unit,
         onInstallAccessibilityProviderClick: () -> Unit
@@ -1009,9 +1022,9 @@ private fun DebuggerPermissionSection(
                 )
 
                 PermissionStatusItem(
-                        title = stringResource(R.string.termux_terminal),
-                        isGranted = isTermuxFullyConfigured,
-                        onClick = onTermuxClick
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
                 )
             }
         }
@@ -1193,16 +1206,14 @@ private fun RootPermissionSection(
         hasOverlayPermission: Boolean,
         hasBatteryOptimizationExemption: Boolean,
         hasLocationPermission: Boolean,
-        isTermuxInstalled: Boolean,
-        isTermuxAuthorized: Boolean,
-        isTermuxFullyConfigured: Boolean,
+        isOperitTerminalInstalled: Boolean,
         isDeviceRooted: Boolean,
         hasRootAccess: Boolean,
         onStoragePermissionClick: () -> Unit,
         onOverlayPermissionClick: () -> Unit,
         onBatteryOptimizationClick: () -> Unit,
         onLocationPermissionClick: () -> Unit,
-        onTermuxClick: () -> Unit,
+        onOperitTerminalClick: () -> Unit,
         onRootClick: () -> Unit
 ) {
     Column {
@@ -1265,9 +1276,9 @@ private fun RootPermissionSection(
                 )
 
                 PermissionStatusItem(
-                        title = stringResource(R.string.termux_terminal),
-                        isGranted = isTermuxFullyConfigured,
-                        onClick = onTermuxClick
+                        title = stringResource(R.string.operit_terminal),
+                        isGranted = isOperitTerminalInstalled,
+                        onClick = onOperitTerminalClick
                 )
             }
         }
@@ -1413,7 +1424,7 @@ private fun FeatureGrid(level: AndroidPermissionLevel) {
                         "data/data" to isFeatureSupported(level, false, false, false, false, true),
                         context.getString(R.string.feature_screen_auto_click) to isFeatureSupported(level, false, true, true, true, true),
                         context.getString(R.string.feature_system_permission_modification) to isFeatureSupported(level, false, false, false, true, true),
-                        context.getString(R.string.feature_termux_support) to isFeatureSupported(level, false, false, true, true, true),
+                        context.getString(R.string.feature_termux_support) to isFeatureSupported(level, true, true, true, true, true),
                         context.getString(R.string.feature_run_js) to isFeatureSupported(level, true, true, true, true, true),
                         context.getString(R.string.feature_plugin_market_mcp) to isFeatureSupported(level, false, false, false, true, true)
                 )

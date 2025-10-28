@@ -1,5 +1,16 @@
 package com.ai.assistance.operit.ui.floating
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -9,11 +20,9 @@ import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.services.floating.FloatingWindowState
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingChatBallMode
-import com.ai.assistance.operit.ui.floating.ui.ball.FloatingDragonBonesBallMode
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingVoiceBallMode
 import com.ai.assistance.operit.ui.floating.ui.fullscreen.FloatingFullscreenMode
-import com.ai.assistance.operit.ui.floating.ui.pet.FloatingDragonBonesMode
-import com.ai.assistance.operit.ui.floating.ui.window.FloatingChatWindowMode
+import com.ai.assistance.operit.ui.floating.ui.window.screen.FloatingChatWindowMode
 
 /**
  * 悬浮聊天窗口的主要UI组件 - 重构版
@@ -123,19 +132,60 @@ fun FloatingChatWindow(
         }
     }
 
-    // 根据currentMode参数渲染对应界面
-    when (floatContext.currentMode) {
-        FloatingMode.WINDOW -> FloatingChatWindowMode(floatContext = floatContext)
-        FloatingMode.BALL -> {
-            // 根据前一个模式决定显示哪种球
-            when (floatContext.previousMode) {
-                FloatingMode.DragonBones -> FloatingDragonBonesBallMode(floatContext = floatContext)
-                FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
-                else -> FloatingChatBallMode(floatContext = floatContext)
+    // 根据currentMode参数渲染对应界面，使用AnimatedContent添加炫酷过渡动画
+    AnimatedContent(
+        targetState = currentMode, // 只监听 currentMode，避免消息更新时触发动画
+        transitionSpec = {
+            val targetMode = targetState
+            val initialMode = initialState
+            
+            // 判断是否从球模式切换到其他模式，或从其他模式切换到球模式
+            val isToBall = targetMode == FloatingMode.BALL || targetMode == FloatingMode.VOICE_BALL
+            val isFromBall = initialMode == FloatingMode.BALL || initialMode == FloatingMode.VOICE_BALL
+            
+            // 判断是否是窗口和全屏之间的切换
+            val isWindowFullscreenTransition = 
+                (initialMode == FloatingMode.WINDOW && targetMode == FloatingMode.FULLSCREEN) ||
+                (initialMode == FloatingMode.FULLSCREEN && targetMode == FloatingMode.WINDOW)
+            
+            if (isWindowFullscreenTransition) {
+                // 窗口 ↔ 全屏：彻底禁用动画，避免任何延迟
+                EnterTransition.None togetherWith ExitTransition.None
+            } else if (isToBall && !isFromBall) {
+                // 其他模式 -> 球模式：窗口快速缩小消失，球从极小爆炸式出现
+                (fadeIn(animationSpec = tween(350, delayMillis = 150, easing = FastOutSlowInEasing)) + 
+                 scaleIn(initialScale = 0.0f, animationSpec = tween(350, delayMillis = 150, easing = FastOutSlowInEasing)))
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(150)) + 
+                        scaleOut(targetScale = 0.0f, animationSpec = tween(150))
+                    )
+            } else if (isFromBall && !isToBall) {
+                // 球模式 -> 其他模式：球瞬间消失，窗口从中心炸开展现
+                (fadeIn(animationSpec = tween(400, delayMillis = 100, easing = FastOutSlowInEasing)) + 
+                 scaleIn(initialScale = 0.0f, animationSpec = tween(400, delayMillis = 100, easing = FastOutSlowInEasing)))
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(100)) + 
+                        scaleOut(targetScale = 0.0f, animationSpec = tween(100))
+                    )
+            } else {
+                // 球模式之间切换：快速交叉淡入淡出
+                fadeIn(animationSpec = tween(250, delayMillis = 100))
+                    .togetherWith(fadeOut(animationSpec = tween(100)))
             }
+        },
+        label = "mode_transition"
+    ) { mode -> // 只接收 currentMode，不是整个 context
+        when (mode) {
+            FloatingMode.WINDOW -> FloatingChatWindowMode(floatContext = floatContext)
+            FloatingMode.BALL -> {
+                // 根据前一个模式决定显示哪种球
+                when (previousMode) {
+                    FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+                    else -> FloatingChatBallMode(floatContext = floatContext)
+                }
+            }
+            FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+            FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
         }
-        FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
-        FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
-        FloatingMode.DragonBones -> FloatingDragonBonesMode(floatContext = floatContext)
     }
 }

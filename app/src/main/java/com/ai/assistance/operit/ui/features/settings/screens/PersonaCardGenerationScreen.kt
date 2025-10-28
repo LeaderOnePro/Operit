@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,17 +15,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.ai.assistance.operit.data.model.FunctionType
+import com.ai.assistance.operit.R
+import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.CharacterCard
+import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptTag
+import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.PromptTagManager
+import com.ai.assistance.operit.util.stream.Stream
+import com.ai.assistance.operit.data.preferences.PersonaCardChatHistoryManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import android.util.Log
 
 // --- 本地最小工具执行器：仅处理 save_character_info ---
 private object LocalCharacterToolExecutor {
@@ -53,17 +61,17 @@ private object LocalCharacterToolExecutor {
         characterCardId: String,
         field: String,
         content: String
-    ): com.ai.assistance.operit.data.model.ToolResult {
+    ): ToolResult {
         return try {
             val manager = CharacterCardManager.getInstance(context)
             
             // 获取当前角色卡
             val currentCard = manager.getCharacterCard(characterCardId)
             if (currentCard == null) {
-                return com.ai.assistance.operit.data.model.ToolResult(
+                return ToolResult(
                     toolName = TOOL_NAME,
                     success = false,
-                    result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                    result = StringResultData(""),
                     error = "角色卡不存在"
                 )
             }
@@ -73,33 +81,35 @@ private object LocalCharacterToolExecutor {
                 "name" -> currentCard.copy(name = content)
                 "description" -> currentCard.copy(description = content)
                 "characterSetting" -> currentCard.copy(characterSetting = content)
+                "openingStatement" -> currentCard.copy(openingStatement = content)
                 "otherContent" -> currentCard.copy(otherContent = content)
                 "advancedCustomPrompt" -> currentCard.copy(advancedCustomPrompt = content)
+                "marks" -> currentCard.copy(marks = content)
                 else -> {
-                    return com.ai.assistance.operit.data.model.ToolResult(
+                    return ToolResult(
                         toolName = TOOL_NAME,
                         success = false,
-                        result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                        result = StringResultData(""),
                         error = "不支持的字段: $field"
                     )
                 }
             }
             
-            withContext(kotlinx.coroutines.Dispatchers.IO) { 
+            withContext(Dispatchers.IO) { 
                 manager.updateCharacterCard(updatedCard)
             }
             
-            com.ai.assistance.operit.data.model.ToolResult(
+            ToolResult(
                 toolName = TOOL_NAME,
                 success = true,
-                result = com.ai.assistance.operit.core.tools.StringResultData("ok"),
+                result = StringResultData("ok"),
                 error = null
             )
         } catch (e: Exception) {
-            com.ai.assistance.operit.data.model.ToolResult(
+            ToolResult(
                 toolName = TOOL_NAME,
                 success = false,
-                result = com.ai.assistance.operit.core.tools.StringResultData(""),
+                result = StringResultData(""),
                 error = e.message
             )
         }
@@ -148,6 +158,7 @@ fun PersonaCardGenerationScreen(
     // 角色卡数据
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val tagManager = remember { PromptTagManager.getInstance(context) }
+    val chatHistoryManager = remember { PersonaCardChatHistoryManager.getInstance(context) }
     var allCharacterCards by remember { mutableStateOf(listOf<CharacterCard>()) }
     var allTags by remember { mutableStateOf(listOf<PromptTag>()) }
     var activeCardId by remember { mutableStateOf("") }
@@ -155,46 +166,94 @@ fun PersonaCardGenerationScreen(
     var expanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showClearHistoryConfirm by remember { mutableStateOf(false) }
+    var showMessageLimitWarning by remember { mutableStateOf(false) }
     var newCardName by remember { mutableStateOf("") }
+    
+    // 对话数量限制
+    val MESSAGE_LIMIT = 40
 
     // 编辑器值
     var editName by remember { mutableStateOf("") }
     var editDescription by remember { mutableStateOf("") }
     var editCharacterSetting by remember { mutableStateOf("") }
+    var editOpeningStatement by remember { mutableStateOf("") }
     var editOtherContent by remember { mutableStateOf("") }
     var editAdvancedCustomPrompt by remember { mutableStateOf("") }
+    var editMarks by remember { mutableStateOf("") }
 
-    // 初始化数据
+    // 1. 一次性初始化：加载所有卡片和标签，并确定初始活跃卡片ID
     LaunchedEffect(Unit) {
-        if (chatMessages.isEmpty()) {
-            chatMessages.add(
-                CharacterChatMessage("assistant", characterAssistantIntro)
-        )
-        }
-        
         withContext(Dispatchers.IO) {
             characterCardManager.initializeIfNeeded()
-            allCharacterCards = characterCardManager.getAllCharacterCards()
+            val cards = characterCardManager.getAllCharacterCards()
+            allCharacterCards = cards
             allTags = tagManager.getAllTags()
 
-            activeCardId = characterCardManager.activeCharacterCardIdFlow.first()
-            activeCard = characterCardManager.getCharacterCard(activeCardId)
+            var currentId = characterCardManager.activeCharacterCardIdFlow.first()
 
-            // 如果没有活跃卡，并且列表不为空，则设置第一个为活跃
-            if (activeCard == null && allCharacterCards.isNotEmpty()) {
-                val firstCardId = allCharacterCards.first().id
+            // 如果记录的活跃ID无效（例如卡被删除），则默认使用第一张卡
+            if (characterCardManager.getCharacterCard(currentId) == null && cards.isNotEmpty()) {
+                val firstCardId = cards.first().id
                 characterCardManager.setActiveCharacterCard(firstCardId)
-                activeCardId = firstCardId
-                activeCard = characterCardManager.getCharacterCard(firstCardId)
+                currentId = firstCardId
+            }
+
+            // 在主线程更新 activeCardId 以触发后续的 Effect
+            withContext(Dispatchers.Main) {
+                activeCardId = currentId
             }
         }
-        
-        activeCard?.let { card ->
-            editName = card.name
-            editDescription = card.description
-            editCharacterSetting = card.characterSetting
-            editOtherContent = card.otherContent
-            editAdvancedCustomPrompt = card.advancedCustomPrompt
+    }
+
+    // 2. 响应式效果：当 activeCardId 变化时（初始化或切换），加载卡片详情并重置对话
+    LaunchedEffect(activeCardId) {
+        if (activeCardId.isBlank()) {
+            // 没有活跃卡片的情况
+            activeCard = null
+            editName = ""; editDescription = ""; editCharacterSetting = ""; editOpeningStatement = ""
+            editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
+            chatMessages.clear()
+            chatMessages.add(CharacterChatMessage("assistant", context.getString(R.string.please_select_or_create_card)))
+            return@LaunchedEffect
+        }
+
+        withContext(Dispatchers.IO) {
+            val card = characterCardManager.getCharacterCard(activeCardId)
+            withContext(Dispatchers.Main) {
+                activeCard = card
+
+                // 更新编辑器内容
+                card?.let {
+                    editName = it.name
+                    editDescription = it.description
+                    editCharacterSetting = it.characterSetting
+                    editOpeningStatement = it.openingStatement
+                    editOtherContent = it.otherContent
+                    editAdvancedCustomPrompt = it.advancedCustomPrompt
+                    editMarks = it.marks
+                } ?: run {
+                    // 如果卡片加载失败，则清空编辑器
+                    editName = ""; editDescription = ""; editCharacterSetting = ""; editOpeningStatement = ""
+                    editOtherContent = ""; editAdvancedCustomPrompt = ""; editMarks = ""
+                }
+
+                // 加载该角色卡的聊天历史
+                chatMessages.clear()
+                val savedHistory = chatHistoryManager.loadChatHistory(activeCardId)
+                if (savedHistory.isNotEmpty()) {
+                    // 转换为界面使用的消息格式
+                    savedHistory.forEach { msg ->
+                        chatMessages.add(CharacterChatMessage(msg.role, msg.content, msg.timestamp))
+                    }
+                } else {
+                    // 如果没有历史记录，添加欢迎消息
+                    chatMessages.add(CharacterChatMessage("assistant",
+                        context.getString(R.string.persona_generation_welcome, 
+                        card?.name ?: context.getString(R.string.new_character))
+                    ))
+                }
+            }
         }
     }
 
@@ -209,31 +268,87 @@ fun PersonaCardGenerationScreen(
                     editName = card.name
                     editDescription = card.description
                     editCharacterSetting = card.characterSetting
+                    editOpeningStatement = card.openingStatement
                     editOtherContent = card.otherContent
                     editAdvancedCustomPrompt = card.advancedCustomPrompt
+                    editMarks = card.marks
                 }
             }
         }
     }
 
+    // 构建稳定的系统提示词
+    fun buildSystemPrompt(): String {
+        return """
+            你是"角色卡生成助手"。请严格按照以下流程进行角色卡生成：
+            
+            [生成流程]
+            1) 角色名称：询问并确认角色名称
+            2) 角色描述：简短的角色描述
+            3) 角色设定：详细的角色设定，包括身份、外貌、性格等
+            4) 开场白：角色的第一句话或开场白，用于开始对话时的问候语
+            5) 其他内容：背景故事、特殊能力等补充信息
+            6) 高级自定义：特殊的提示词或交互方式
+            7) 备注：不会被拼接到提示词的备注信息，用于记录创作想法或注意事项
+            
+            [重要规则]
+            - 全程语气要活泼可爱喵~
+            - 严格按照 1→2→3→4→5→6→7 的顺序进行，不要跳跃
+            - 每轮对话只能处理一个步骤，完成后进入下一步
+            - 如果用户输入了角色设定，对其进行适当优化与丰富
+            - 如果用户说"随便/你看着写"，就帮用户体贴地生成设定内容
+            - 生成或补充完后，用一小段话总结当前进度
+            - 对于下一个步骤提几个最关键、最具体的小问题
+            - 不要重复问已经确认过的内容
+            
+            [完成条件]
+            - 当所有7个步骤都完成时，输出："🎉 角色卡生成完成！所有信息都已保存。"
+            - 完成后不再询问任何问题，等待用户的新指令
+            
+            [工具调用]
+            - 每轮对话如果得到了新的角色信息，必须调用工具保存
+            - field 取值："name" | "description" | "characterSetting" | "openingStatement" | "otherContent" | "advancedCustomPrompt" | "marks"
+            - 工具调用格式为: <tool name="save_character_info"><param name="field">字段名</param><param name="content">内容</param></tool>
+            - 例如，如果角色名称确认是“奶糖”，则必须在回答的末尾调用: <tool name="save_character_info"><param name="field">name</param><param name="content">奶糖</param></tool>
+        """.trimIndent()
+    }
+    
+    // 检查是否所有字段都已完成
+    fun isCharacterCardComplete(): Boolean {
+        return activeCard?.let { card ->
+            listOf(
+                card.name,
+                card.description, 
+                card.characterSetting,
+                card.openingStatement,
+                card.otherContent,
+                card.advancedCustomPrompt,
+                card.marks
+            ).all { it.isNotBlank() }
+        } ?: false
+    }
+
     // 通过默认底层 AIService 发送消息
     suspend fun requestFromDefaultService(
-        fullPrompt: String,
-        historyPairs: List<Pair<String, String>>
-    ): com.ai.assistance.operit.util.stream.Stream<String> = withContext(Dispatchers.IO) {
-        val aiService = com.ai.assistance.operit.api.chat.EnhancedAIService
+        prompt: String,
+        historyPairs: List<Pair<String, String>>,
+        systemPrompt: String? = null
+    ): Stream<String> = withContext(Dispatchers.IO) {
+        val aiService = EnhancedAIService
             .getInstance(context)
             .getAIServiceForFunction(FunctionType.CHAT)
-        val functionalConfigManager = com.ai.assistance.operit.data.preferences.FunctionalConfigManager(context)
+        val functionalConfigManager = FunctionalConfigManager(context)
         functionalConfigManager.initializeIfNeeded()
-        val configId = functionalConfigManager.getConfigIdForFunction(FunctionType.CHAT)
-        val modelParameters = com.ai.assistance.operit.data.preferences.ModelConfigManager(context)
-            .getModelParametersForConfig(configId)
+
+        val fullHistory = mutableListOf<Pair<String, String>>()
+        if (systemPrompt != null) {
+            fullHistory.add("system" to systemPrompt)
+        }
+        fullHistory.addAll(historyPairs)
+
         aiService.sendMessage(
-            message = fullPrompt,
-            chatHistory = historyPairs,
-            modelParameters = modelParameters,
-            enableThinking = false
+            message = prompt,
+            chatHistory = fullHistory
         )
     }
 
@@ -277,69 +392,55 @@ fun PersonaCardGenerationScreen(
         }
     }
 
+    // 保存聊天历史
+    fun saveChatHistory() {
+        scope.launch(Dispatchers.IO) {
+            val messages = chatMessages.map { msg ->
+                PersonaCardChatHistoryManager.ChatMessage(msg.role, msg.content, msg.timestamp)
+            }
+            chatHistoryManager.saveChatHistory(activeCardId, messages)
+        }
+    }
+
     fun sendMessage() {
         if (userInput.isBlank() || isGenerating) return
+        
+        // 检查对话数量限制
+        if (chatMessages.size >= MESSAGE_LIMIT) {
+            showMessageLimitWarning = true
+            return
+        }
+        
         val input = userInput
         userInput = ""
 
         scope.launch(Dispatchers.Main) {
             chatMessages.add(CharacterChatMessage("user", input))
+            saveChatHistory() // 保存用户消息
             isGenerating = true
 
-            val guidancePrefix = """
-                你是"角色卡生成助手"。请在每次回复中自行判断当前进度并进入还没完成的步骤，遵循以下多步流程：
-                [步骤]
-                1) 角色名称：询问并确认角色名称
-                2) 角色描述：简短的角色描述
-                3) 角色设定：详细的角色设定，包括身份、外貌、性格等
-                4) 其他内容：背景故事、特殊能力等补充信息
-                5) 高级自定义：特殊的提示词或交互方式
-                [规则]
-                - 全程语气要活泼可爱喵~
-                - 每轮对话如果用户输入了角色设定就对其进行适当优化与丰富，然后用一小段话总结当前的进度
-                - 如果用户说"随便/你看着写"，就帮用户体贴地生成设定内容，合理细节并输出生成的内容
-                - 生成或者补充完之后判断现在到哪一步或者还有什么需要补充的，然后对于下一个步骤提几个最关键、最具体的小问题
-                - 不要重复问已经确认过的内容，也不要一下子把所有问题都问完，慢慢来更贴心
-                [工具调用]
-                - 每轮对话必须进行判断，如果本轮对话得到了新的角色信息，你必须调用一次工具保存信息
-                - field 取值限定为："name" | "description" | "characterSetting" | "otherContent" | "advancedCustomPrompt"
-                - content 该部分对应的优化丰富后的设定文本，不要带有其他多余内容
-                - 请勿在对话可见内容中展示任何工具调用，仅在内部使用
-                - 工具调用XML示例：
-                  <tool name="save_character_info"><param name="field">name</param><param name="content">角色名称</param></tool>
-            """.trimIndent()
+            // 检查是否已完成，如果已完成则直接结束
+            if (isCharacterCardComplete()) {
+                chatMessages.add(CharacterChatMessage("assistant", context.getString(R.string.character_card_complete)))
+                saveChatHistory() // 保存完成消息
+                isGenerating = false
+                scope.launch { listState.animateScrollToItem(chatMessages.lastIndex) }
+                return@launch
+            }
 
+            // 构建稳定的上下文
+            val systemPrompt = buildSystemPrompt()
+            // val characterStatus = buildCharacterStatus() // REMOVED: 不再每次都发送状态
+            
             val historyPairs = withContext(Dispatchers.Default) {
                 chatMessages.map { it.role to it.content }
             }
 
-            val characterJson = withContext(Dispatchers.IO) {
-                activeCard?.let { card ->
-                    JSONObject().apply {
-                        put("name", card.name)
-                        put("description", card.description)
-                        put("characterSetting", card.characterSetting)
-                        put("otherContent", card.otherContent)
-                        put("advancedCustomPrompt", card.advancedCustomPrompt)
-                    }.toString()
-                } ?: "{}"
-            }
-
-            val stream = run {
-                val fullPrompt = buildString {
-                    append(guidancePrefix)
-                    append('\n')
-                    append("[当前角色卡信息] ")
-                    append(characterJson)
-                    append('\n')
-                    append("[用户输入] ")
-                    append(input)
-                }
-                requestFromDefaultService(fullPrompt, historyPairs)
-            }
+            val stream = requestFromDefaultService(input, historyPairs, systemPrompt)
 
             // 提前插入占位的"生成中…"助手消息
-            chatMessages.add(CharacterChatMessage("assistant", "生成中…"))
+            val generatingText = context.getString(R.string.generating)
+            chatMessages.add(CharacterChatMessage("assistant", generatingText))
             val assistantIndex = chatMessages.lastIndex
 
             val toolTagRegex = Regex("(?s)\\s*<tool\\b[\\s\\S]*?</tool>\\s*")
@@ -359,7 +460,7 @@ fun PersonaCardGenerationScreen(
                                 firstChunkReceived = true
                                 isGenerating = false
                             }
-                            val sanitized = (chatMessages[assistantIndex].content.replace("生成中…", "") + chunk)
+                            val sanitized = (chatMessages[assistantIndex].content.replace(generatingText, "") + chunk)
                                 .replace(toolTagRegex, "")
                                 .replace(toolResultRegex, "")
                                 .replace(statusRegex, "")
@@ -374,13 +475,17 @@ fun PersonaCardGenerationScreen(
                 withContext(Dispatchers.IO) {
                     processToolInvocations(rawBuffer.toString(), assistantIndex)
                 }
+                
+                // 保存助手回复
+                saveChatHistory()
             } catch (e: Exception) {
                 chatMessages.add(
                     CharacterChatMessage(
                         role = "assistant",
-                        content = "发送失败：${e.message ?: "未知错误"}"
+                        content = context.getString(R.string.send_failed, e.message ?: "Unknown error")
                     )
                 )
+                saveChatHistory() // 保存错误消息
             } finally {
                 isGenerating = false
             }
@@ -390,23 +495,40 @@ fun PersonaCardGenerationScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(windowInsets = WindowInsets(0, 0, 0, 0)) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    Text("角色卡配置", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    // 关闭按钮
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        IconButton(
+                            onClick = { scope.launch { drawerState.close() } }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = context.getString(R.string.close)
+                            )
+                        }
+                    }
+
+                    Text(context.getString(R.string.character_card_config), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
 
                     // 选择不同角色卡
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                         OutlinedTextField(
-                            value = activeCard?.name ?: "无角色卡",
+                            value = activeCard?.name ?: context.getString(R.string.no_character_card),
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("当前角色卡") },
+                            label = { Text(context.getString(R.string.current_character_card)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -423,13 +545,13 @@ fun PersonaCardGenerationScreen(
                                         expanded = false
                                         scope.launch {
                                             characterCardManager.setActiveCharacterCard(card.id)
-                                            refreshData()
+                                            activeCardId = card.id // 更新ID以触发Effect
                                         }
                                     }
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("+ 新建角色卡") },
+                                text = { Text(context.getString(R.string.create_new_character_card)) },
                                 onClick = {
                                     expanded = false
                                     showCreateDialog = true
@@ -445,7 +567,7 @@ fun PersonaCardGenerationScreen(
                             TextButton(onClick = { showDeleteConfirm = true }) {
                                 Icon(Icons.Filled.Delete, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
-                                Text("删除当前角色卡")
+                                Text(context.getString(R.string.delete_current_character_card))
                             }
                         }
                     }
@@ -454,21 +576,21 @@ fun PersonaCardGenerationScreen(
                     if (showCreateDialog) {
                         AlertDialog(
                             onDismissRequest = { showCreateDialog = false },
-                            title = { Text("新建角色卡") },
+                            title = { Text(context.getString(R.string.new_character_card)) },
                             text = {
                                 Column {
                                     OutlinedTextField(
                                         value = newCardName,
                                         onValueChange = { newCardName = it },
                                         singleLine = true,
-                                        label = { Text("角色卡名称") },
-                                        placeholder = { Text("例如：小昔-校园版") }
+                                        label = { Text(context.getString(R.string.character_card_name)) },
+                                        placeholder = { Text(context.getString(R.string.character_card_name_example)) }
                                     )
                                 }
                             },
                             confirmButton = {
                                 TextButton(onClick = {
-                                    val name = newCardName.trim().ifBlank { "新角色" }
+                                    val name = newCardName.trim().ifBlank { context.getString(R.string.new_character) }
                                     showCreateDialog = false
                                     newCardName = ""
                                     scope.launch {
@@ -488,10 +610,10 @@ fun PersonaCardGenerationScreen(
                                         }
                                         refreshData()
                                     }
-                                }) { Text("创建") }
+                                }) { Text(context.getString(R.string.create)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
+                                TextButton(onClick = { showCreateDialog = false }) { Text(context.getString(R.string.cancel)) }
                             }
                         )
                     }
@@ -499,8 +621,8 @@ fun PersonaCardGenerationScreen(
                     if (showDeleteConfirm) {
                         AlertDialog(
                             onDismissRequest = { showDeleteConfirm = false },
-                            title = { Text("删除角色卡") },
-                            text = { Text("确定删除当前角色卡吗？此操作不可撤销。") },
+                            title = { Text(context.getString(R.string.delete_character_card)) },
+                            text = { Text(context.getString(R.string.confirm_delete_character_card)) },
                             confirmButton = {
                                 TextButton(onClick = {
                                     showDeleteConfirm = false
@@ -514,16 +636,16 @@ fun PersonaCardGenerationScreen(
                                             refreshData()
                                         }
                                     }
-                                }) { Text("删除") }
+                                }) { Text(context.getString(R.string.delete)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                                TextButton(onClick = { showDeleteConfirm = false }) { Text(context.getString(R.string.cancel)) }
                             }
                         )
                     }
 
                     Spacer(Modifier.height(16.dp))
-                    Text("当前角色卡内容", style = MaterialTheme.typography.titleSmall)
+                    Text(context.getString(R.string.current_character_card_content), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
                     
                     // 角色名称
@@ -539,7 +661,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色名称") },
+                        label = { Text(context.getString(R.string.character_name)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 1
                     )
@@ -559,7 +681,7 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色描述") },
+                        label = { Text(context.getString(R.string.character_description)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -579,17 +701,37 @@ fun PersonaCardGenerationScreen(
                                 }
                             }
                         },
-                        label = { Text("角色设定") },
+                        label = { Text(context.getString(R.string.character_setting)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
                     )
                     
                     Spacer(Modifier.height(8.dp))
                     
+                    // 开场白
+                    OutlinedTextField(
+                        value = editOpeningStatement,
+                        onValueChange = { newValue ->
+                            editOpeningStatement = newValue
+                            scope.launch {
+                                activeCard?.let { card ->
+                                    withContext(Dispatchers.IO) {
+                                        characterCardManager.updateCharacterCard(card.copy(openingStatement = newValue))
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text(context.getString(R.string.opening_statement)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
                     // 其他内容
-                            OutlinedTextField(
+                    OutlinedTextField(
                         value = editOtherContent,
-                                onValueChange = { newValue ->
+                        onValueChange = { newValue ->
                             editOtherContent = newValue
                             scope.launch {
                                 activeCard?.let { card ->
@@ -598,9 +740,9 @@ fun PersonaCardGenerationScreen(
                                     }
                                 }
                             }
-                                },
-                        label = { Text("其他内容") },
-                                modifier = Modifier.fillMaxWidth(),
+                        },
+                        label = { Text(context.getString(R.string.other_content)) },
+                        modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
                     )
                     
@@ -615,13 +757,33 @@ fun PersonaCardGenerationScreen(
                                 activeCard?.let { card ->
                                     withContext(Dispatchers.IO) {
                                         characterCardManager.updateCharacterCard(card.copy(advancedCustomPrompt = newValue))
-                        }
-                    }
+                                    }
+                                }
                             }
                         },
-                        label = { Text("高级自定义提示词") },
+                        label = { Text(context.getString(R.string.advanced_custom_prompt)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 6
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // 备注信息
+                    OutlinedTextField(
+                        value = editMarks,
+                        onValueChange = { newValue ->
+                            editMarks = newValue
+                            scope.launch {
+                                activeCard?.let { card ->
+                                    withContext(Dispatchers.IO) {
+                                        characterCardManager.updateCharacterCard(card.copy(marks = newValue))
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text(context.getString(R.string.character_marks)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4
                     )
                 }
             }
@@ -634,13 +796,19 @@ fun PersonaCardGenerationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "角色卡生成助手", 
+                    text = context.getString(R.string.persona_card_generation_title), 
                     style = MaterialTheme.typography.titleMedium, 
                     fontWeight = FontWeight.Bold
                 )
+                IconButton(onClick = { showClearHistoryConfirm = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteSweep,
+                        contentDescription = context.getString(R.string.clear_chat_history)
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { scope.launch { drawerState.open() } }) {
-                    Text(activeCard?.name ?: "无角色卡")
+                    Text(activeCard?.name ?: context.getString(R.string.no_character_card))
                 }
             }
 
@@ -715,28 +883,92 @@ fun PersonaCardGenerationScreen(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = userInput,
-                        onValueChange = { userInput = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp),
-                        placeholder = { Text(if (isGenerating) "正在生成…" else "描述你想要的角色…") },
-                        enabled = !isGenerating,
-                        maxLines = 4
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = userInput,
+                            onValueChange = { userInput = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp),
+                            placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
+                            enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT,
+                            maxLines = 4
+                        )
+                        // 对话计数器 - 右上角小标签
+                        Text(
+                            text = "${chatMessages.size}/$MESSAGE_LIMIT",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (chatMessages.size >= MESSAGE_LIMIT) 
+                                MaterialTheme.colorScheme.error 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 4.dp, end = 12.dp)
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     FilledIconButton(
                         onClick = { if (!isGenerating) sendMessage() },
-                        enabled = !isGenerating
+                        enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT
                     ) {
                         Icon(
                             imageVector = if (isGenerating) Icons.Filled.HourglassBottom else Icons.Filled.Send,
-                            contentDescription = if (isGenerating) "生成中" else "发送"
+                            contentDescription = if (isGenerating) context.getString(R.string.generating) else context.getString(R.string.send)
                         )
                     }
                 }
             }
         }
+    }
+    
+    // 对话数量限制警告对话框
+    if (showMessageLimitWarning) {
+        AlertDialog(
+            onDismissRequest = { showMessageLimitWarning = false },
+            title = { Text(context.getString(R.string.message_limit_reached_title)) },
+            text = { 
+                Text(context.getString(R.string.message_limit_reached_message, MESSAGE_LIMIT))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMessageLimitWarning = false
+                    showClearHistoryConfirm = true
+                }) { Text(context.getString(R.string.go_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMessageLimitWarning = false }) { Text(context.getString(R.string.cancel)) }
+            }
+        )
+    }
+    
+    // 清空对话记录确认对话框
+    if (showClearHistoryConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryConfirm = false },
+            title = { Text(context.getString(R.string.clear_chat_history)) },
+            text = { Text(context.getString(R.string.confirm_clear_chat_history)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearHistoryConfirm = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            chatHistoryManager.clearChatHistory(activeCardId)
+                        }
+                        // 清空界面显示的消息
+                        chatMessages.clear()
+                        // 添加欢迎消息
+                        chatMessages.add(CharacterChatMessage("assistant",
+                            context.getString(R.string.persona_generation_welcome, 
+                            activeCard?.name ?: context.getString(R.string.new_character))
+                        ))
+                        saveChatHistory()
+                    }
+                }) { Text(context.getString(R.string.clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryConfirm = false }) { Text(context.getString(R.string.cancel)) }
+            }
+        )
     }
 } 

@@ -13,6 +13,7 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.WorkspaceAttachmentProcessor
+import com.ai.assistance.operit.util.ImagePoolManager
 import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import kotlinx.coroutines.CoroutineScope
@@ -36,11 +37,14 @@ import kotlinx.coroutines.withContext
  */
 object AIMessageManager {
     private const val TAG = "AIMessageManager"
-    // 聊天总结的消息数量阈值
-    private const val SUMMARY_CHUNK_SIZE = 4
+    // 聊天总结的消息数量阈值 - 移除硬编码，改用动态设置
+    // private const val SUMMARY_CHUNK_SIZE = 4
 
     // 使用独立的协程作用域，确保AI操作的生命周期独立于任何特定的ViewModel
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private var activeEnhancedAiService: EnhancedAIService? = null
+    private var activePlanModeManager: PlanModeManager? = null
 
     private lateinit var toolHandler: AIToolHandler
     private lateinit var context: Context
@@ -57,37 +61,35 @@ object AIMessageManager {
      *
      * @param messageText 用户输入的原始文本。
      * @param attachments 附件列表。
-     * @param enableMemoryAttachment 是否启用记忆附着功能。
+     * @param enableMemoryQuery 是否允许AI查询记忆。
      * @param enableWorkspaceAttachment 是否启用工作区附着功能。
      * @param workspacePath 工作区路径。
+     * @param enableDirectImageProcessing 是否将图片附件转换为link标签（用于直接图片处理）。
      * @return 格式化后的完整消息字符串。
      */
     suspend fun buildUserMessageContent(
         messageText: String,
         attachments: List<AttachmentInfo>,
-        enableMemoryAttachment: Boolean,
+        enableMemoryQuery: Boolean,
         enableWorkspaceAttachment: Boolean = false,
-        workspacePath: String? = null
+        workspacePath: String? = null,
+        replyToMessage: ChatMessage? = null, // 新增回复消息参数
+        enableDirectImageProcessing: Boolean = false // 是否启用直接图片处理
     ): String {
-        // 1. 根据开关决定是否查询知识库
-        val memoryTag = if (enableMemoryAttachment && messageText.isNotBlank() && !messageText.contains("<memory>", ignoreCase = true)) {
-            val queryTool = AITool(
-                name = "query_knowledge_library",
-                parameters = listOf(ToolParameter("query", messageText))
-            )
-            val result = toolHandler.executeTool(queryTool)
-            if (result.success && result.result is MemoryQueryResultData) {
-                val memoryData = result.result as MemoryQueryResultData
-                if (memoryData.memories.isNotEmpty()) {
-                    val instruction = "你不用刻意去针对memory进行回复，仅针对用户说的话回答即可"
-                    val memoryContent = memoryData.toString()
-                    "<memory>${instruction}\n---\n${memoryContent}</memory>"
-                } else ""
-            } else ""
-        } else ""
+        // 1. 构建回复标签（如果有回复消息）
+        val replyTag = replyToMessage?.let { message ->
+            val cleanContent = message.content
+                .replace(Regex("<[^>]*>"), "") // 移除XML标签
+                .trim()
+                .let { if (it.length > 100) it.take(100) + "..." else it }
+            
+            val roleName = message.roleName ?: if (message.sender == "ai") "AI" else "用户"
+            val instruction = "用户正在回复你之前的这条消息："
+            "<reply_to sender=\"${roleName}\" timestamp=\"${message.timestamp}\">${instruction}\"${cleanContent}\"</reply_to>"
+        } ?: ""
 
-        // 2. 根据开关决定是否生成工作区附着
-        val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank()) {
+        // 3. 根据开关决定是否生成工作区附着
+        val workspaceTag = if (enableWorkspaceAttachment && !workspacePath.isNullOrBlank() && !messageText.contains("<workspace_attachment>", ignoreCase = true)) {
             try {
                 val workspaceContent = WorkspaceAttachmentProcessor.generateWorkspaceAttachment(
                     context = context,
@@ -100,21 +102,44 @@ object AIMessageManager {
             }
         } else ""
 
-        // 3. 构建附件标签
+        // 4. 构建附件标签
         val attachmentTags = if (attachments.isNotEmpty()) {
             attachments.joinToString(" ") { attachment ->
-                "<attachment " +
-                        "id=\"${attachment.filePath}\" " +
-                        "filename=\"${attachment.fileName}\" " +
-                        "type=\"${attachment.mimeType}\" " +
-                        (if (attachment.fileSize > 0) "size=\"${attachment.fileSize}\" " else "") +
-                        (if (attachment.content.isNotEmpty()) "content=\"${attachment.content}\" " else "") +
-                        "/>"
+                // 如果启用直接图片处理且附件是图片，转换为link标签
+                if (enableDirectImageProcessing && attachment.mimeType.startsWith("image/", ignoreCase = true)) {
+                    try {
+                        val imageId = ImagePoolManager.addImage(attachment.filePath)
+                        "<link type=\"image\" id=\"$imageId\"></link>"
+                    } catch (e: Exception) {
+                        Log.e(TAG, "添加图片到池失败: ${attachment.filePath}", e)
+                        // 失败时回退到普通附件格式
+                        val attributes = buildString {
+                            append("id=\"${attachment.filePath}\" ")
+                            append("filename=\"${attachment.fileName}\" ")
+                            append("type=\"${attachment.mimeType}\"")
+                            if (attachment.fileSize > 0) {
+                                append(" size=\"${attachment.fileSize}\"")
+                            }
+                        }
+                        "<attachment $attributes>${attachment.content}</attachment>"
+                    }
+                } else {
+                    // 非图片或未启用直接图片处理，使用普通附件格式
+                    val attributes = buildString {
+                        append("id=\"${attachment.filePath}\" ")
+                        append("filename=\"${attachment.fileName}\" ")
+                        append("type=\"${attachment.mimeType}\"")
+                        if (attachment.fileSize > 0) {
+                            append(" size=\"${attachment.fileSize}\"")
+                        }
+                    }
+                    "<attachment $attributes>${attachment.content}</attachment>"
+                }
             }
         } else ""
 
-        // 4. 组合最终消息
-        return listOf(messageText, attachmentTags, memoryTag, workspaceTag)
+        // 5. 组合最终消息
+        return listOf(messageText, attachmentTags, workspaceTag, replyTag)
             .filter { it.isNotBlank() }
             .joinToString(" ")
     }
@@ -129,7 +154,9 @@ object AIMessageManager {
      * @param promptFunctionType 提示功能类型。
      * @param enableThinking 是否启用思考过程。
      * @param thinkingGuidance 是否启用思考引导。
-     * @param enableMemoryAttachment 是否启用记忆附着功能。
+     * @param enableMemoryQuery 是否允许AI查询记忆。
+     * @param characterName 角色名称，用于通知。
+     * @param avatarUri 角色头像URI，用于通知。
      * @return 包含AI响应流的ChatMessage对象。
      */
     suspend fun sendMessage(
@@ -140,11 +167,14 @@ object AIMessageManager {
         promptFunctionType: PromptFunctionType,
         enableThinking: Boolean,
         thinkingGuidance: Boolean,
-        enableMemoryAttachment: Boolean, // Add this parameter
+        enableMemoryQuery: Boolean,
         maxTokens: Int,
         tokenUsageThreshold: Double,
-        onNonFatalError: suspend (error: String) -> Unit
+        onNonFatalError: suspend (error: String) -> Unit,
+        characterName: String? = null,
+        avatarUri: String? = null
     ): SharedStream<String> {
+        activeEnhancedAiService = enhancedAiService // Keep a reference to the service for cancellation
         val memory = getMemoryFromMessages(chatHistory)
         
         // 检查是否启用了深度搜索模式（计划模式）
@@ -159,7 +189,13 @@ object AIMessageManager {
                 val shouldUseDeepSearch = planModeManager.shouldUseDeepSearchMode(messageContent)
                 
                 if (shouldUseDeepSearch) {
+                    activePlanModeManager = planModeManager // Store active manager
                     Log.d(TAG, "启用深度搜索模式处理消息")
+                    
+                    // 设置执行计划的特定UI状态
+                    enhancedAiService.setInputProcessingState(
+                        com.ai.assistance.operit.data.model.InputProcessingState.ExecutingPlan("正在执行深度搜索...")
+                    )
                     
                     // 使用深度搜索模式
                     return@withContext planModeManager.executeDeepSearchMode(
@@ -171,8 +207,11 @@ object AIMessageManager {
                         onNonFatalError = onNonFatalError
                     ).share(scope)
                 } else {
+                    activePlanModeManager = null // Clear manager if not used
                     Log.d(TAG, "消息不适合深度搜索模式，使用普通模式")
                 }
+            } else {
+                activePlanModeManager = null // Clear manager if disabled
             }
             
             // 使用普通模式
@@ -183,12 +222,37 @@ object AIMessageManager {
                 promptFunctionType = promptFunctionType,
                 enableThinking = enableThinking,
                 thinkingGuidance = thinkingGuidance,
-                enableMemoryAttachment = enableMemoryAttachment, // Pass it here
+                enableMemoryQuery = enableMemoryQuery,
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
-                onNonFatalError = onNonFatalError
+                onNonFatalError = onNonFatalError,
+                characterName = characterName,
+                avatarUri = avatarUri
             ).share(scope) // 使用.share()将其转换为共享流
         }
+    }
+
+    /**
+     * 取消当前正在进行的AI操作。
+     * 这会同时尝试取消计划执行（如果正在进行）和底层的AI流。
+     */
+    fun cancelCurrentOperation() {
+        Log.d(TAG, "请求取消当前AI操作...")
+
+        // 1. 取消计划模式（如果正在运行）
+        activePlanModeManager?.let {
+            Log.d(TAG, "正在取消计划模式执行...")
+            it.cancel()
+            activePlanModeManager = null // 取消后清除引用
+        }
+
+        // 2. 取消底层的 EnhancedAIService（处理普通流和工具调用）
+        activeEnhancedAiService?.let {
+            Log.d(TAG, "正在取消 EnhancedAIService 对话...")
+            it.cancelConversation()
+        }
+
+        Log.d(TAG, "AI操作取消请求已发送。")
     }
 
     /**
@@ -238,7 +302,8 @@ object AIMessageManager {
                 ChatMessage(
                     sender = "summary",
                     content = summary.trim(),
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    roleName = "system" // 总结消息的角色名
                 )
             }
         } catch (e: Exception) {
@@ -259,8 +324,17 @@ object AIMessageManager {
         messages: List<ChatMessage>,
         currentTokens: Int,
         maxTokens: Int,
-        tokenUsageThreshold: Double
+        tokenUsageThreshold: Double,
+        enableSummary: Boolean,
+        enableSummaryByMessageCount: Boolean,
+        summaryMessageCountThreshold: Int
     ): Boolean {
+        // 首先检查总结功能是否启用
+        if (!enableSummary) {
+            return false
+        }
+
+        // 检查Token阈值
         if (maxTokens > 0) {
             val usageRatio = currentTokens.toDouble() / maxTokens.toDouble()
             if (usageRatio >= tokenUsageThreshold) {
@@ -269,20 +343,23 @@ object AIMessageManager {
             }
         }
 
-        val lastSummaryIndex = messages.indexOfLast { it.sender == "summary" }
-        val relevantMessages = if (lastSummaryIndex != -1) {
-            messages.subList(lastSummaryIndex + 1, messages.size)
-        } else {
-            messages
-        }
-        val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user"}
+        // 检查消息条数阈值（如果启用）
+        if (enableSummaryByMessageCount) {
+            val lastSummaryIndex = messages.indexOfLast { it.sender == "summary" }
+            val relevantMessages = if (lastSummaryIndex != -1) {
+                messages.subList(lastSummaryIndex + 1, messages.size)
+            } else {
+                messages
+            }
+            val userAiMessagesSinceLastSummary = relevantMessages.count { it.sender == "user"}
 
-        if (userAiMessagesSinceLastSummary >= SUMMARY_CHUNK_SIZE) {
-            Log.d(TAG, "自上次总结后新消息数量达到阈值 ($userAiMessagesSinceLastSummary)，生成总结.")
-            return true
+            if (userAiMessagesSinceLastSummary >= summaryMessageCountThreshold) {
+                Log.d(TAG, "自上次总结后新消息数量达到阈值 ($userAiMessagesSinceLastSummary)，生成总结.")
+                return true
+            }
         }
 
-        Log.d(TAG, "未达到生成总结的条件. 新消息数: $userAiMessagesSinceLastSummary, Token使用率: ${if (maxTokens > 0) currentTokens.toDouble() / maxTokens else 0.0}")
+        Log.d(TAG, "未达到生成总结的条件. Token使用率: ${if (maxTokens > 0) currentTokens.toDouble() / maxTokens else 0.0}")
         return false
     }
 

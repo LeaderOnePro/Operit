@@ -20,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.SerializableColorScheme
@@ -31,16 +30,12 @@ import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.floating.FloatingWindowCallback
 import com.ai.assistance.operit.services.floating.FloatingWindowManager
 import com.ai.assistance.operit.services.floating.FloatingWindowState
-import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentManager
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collect
 
 class FloatingChatService : Service(), FloatingWindowCallback {
     private val TAG = "FloatingChatService"
@@ -57,7 +52,9 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     private lateinit var lifecycleOwner: ServiceLifecycleOwner
     private val chatMessages = mutableStateOf<List<ChatMessage>>(emptyList())
     private val attachments = mutableStateOf<List<AttachmentInfo>>(emptyList())
-    private lateinit var attachmentManager: AttachmentManager
+
+    // 聊天服务核心 - 整合所有业务逻辑
+    private lateinit var chatCore: ChatServiceCore
 
     private var lastCrashTime = 0L
     private var crashCount = 0
@@ -70,25 +67,11 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     private val colorScheme = mutableStateOf<ColorScheme?>(null)
     private val typography = mutableStateOf<Typography?>(null)
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val _attachmentRequest = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val attachmentRequest: SharedFlow<String>
-        get() = _attachmentRequest
-
-    private val _attachmentRemoveRequest = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val attachmentRemoveRequest: SharedFlow<String> = _attachmentRemoveRequest
-
-    private val _messageToSend =
-            MutableSharedFlow<Pair<String, PromptFunctionType>>(extraBufferCapacity = 1)
-    val messageToSend: SharedFlow<Pair<String, PromptFunctionType>>
-        get() = _messageToSend
-
-    private val _cancelMessageRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val cancelMessageRequest: SharedFlow<Unit>
-        get() = _cancelMessageRequest
 
     inner class LocalBinder : Binder() {
         private var closeCallback: (() -> Unit)? = null
         fun getService(): FloatingChatService = this@FloatingChatService
+        fun getChatCore(): ChatServiceCore = chatCore
         fun setCloseCallback(callback: () -> Unit) {
             this.closeCallback = callback
         }
@@ -143,9 +126,43 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         try {
             acquireWakeLock()
             
+            // 初始化 ChatServiceCore
+            chatCore = ChatServiceCore(context = this, coroutineScope = serviceScope)
+            Log.d(TAG, "ChatServiceCore 已初始化")
+            
+            // 订阅聊天历史更新
+            serviceScope.launch {
+                chatCore.chatHistory.collect { messages ->
+                    chatMessages.value = messages
+                    Log.d(TAG, "聊天历史已更新: ${messages.size} 条消息")
+                }
+            }
+            
+            // 订阅附件列表更新
+            serviceScope.launch {
+                chatCore.attachments.collect { newAttachments ->
+                    attachments.value = newAttachments
+                    Log.d(TAG, "附件列表已更新: ${newAttachments.size} 个附件")
+                }
+            }
+            
+            // 设置 EnhancedAIService 就绪回调，以便监听输入处理状态
+            chatCore.setOnEnhancedAiServiceReady { aiService ->
+                Log.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
+                serviceScope.launch {
+                    try {
+                        aiService.inputProcessingState.collect { state ->
+                            chatCore.handleInputProcessingState(state)
+                            Log.d(TAG, "输入处理状态已更新: $state")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "监听输入处理状态失败", e)
+                    }
+                }
+            }
+            
             lifecycleOwner = ServiceLifecycleOwner()
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-            attachmentManager = AttachmentManager(this, AIToolHandler.getInstance(this))
             windowState = FloatingWindowState(this)
             windowManager =
                     FloatingWindowManager(
@@ -323,7 +340,9 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         Log.d(TAG, "Attachment request received: $request")
         serviceScope.launch {
             try {
-                _attachmentRequest.emit(request)
+                // 直接使用 chatCore 的 AttachmentDelegate 处理附件
+                chatCore.handleAttachment(request)
+                Log.d(TAG, "附件已添加: $request")
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling attachment request", e)
             }
@@ -331,19 +350,9 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     fun removeAttachment(filePath: String) {
-        serviceScope.launch {
-            try {
-                attachments.value = attachments.value.filterNot { it.filePath == filePath }
-                _attachmentRemoveRequest.emit(filePath)
-                Log.d(TAG, "Attachment removed: $filePath, remaining: ${attachments.value.size}")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error removing attachment", e)
-            }
-        }
-    }
-
-    fun updateAttachments(newAttachments: List<AttachmentInfo>) {
-        serviceScope.launch { attachments.value = newAttachments }
+        Log.d(TAG, "移除附件: $filePath")
+        // 直接使用 chatCore 的 AttachmentDelegate 移除附件
+        chatCore.removeAttachment(filePath)
     }
 
     fun updateChatMessages(messages: List<ChatMessage>) {
@@ -382,11 +391,76 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     override fun onSendMessage(message: String, promptType: PromptFunctionType) {
-        serviceScope.launch { _messageToSend.tryEmit(Pair(message, promptType)) }
+        Log.d(TAG, "onSendMessage: $message, promptType: $promptType")
+        
+        // 直接使用 chatCore 发送消息，不再通过 SharedFlow
+        serviceScope.launch {
+            try {
+                // 获取当前聊天ID，如果没有则创建新聊天
+                var chatId = chatCore.currentChatId.value
+                if (chatId == null) {
+                    Log.d(TAG, "当前没有活跃对话，自动创建新对话")
+                    chatCore.createNewChat()
+                    
+                    // 等待对话ID更新
+                    var waitCount = 0
+                    while (chatCore.currentChatId.value == null && waitCount < 10) {
+                        kotlinx.coroutines.delay(100)
+                        waitCount++
+                    }
+                    
+                    chatId = chatCore.currentChatId.value
+                    if (chatId == null) {
+                        Log.e(TAG, "创建新对话超时，无法发送消息")
+                        return@launch
+                    }
+                    Log.d(TAG, "新对话创建完成，ID: $chatId")
+                }
+                
+                // 获取当前附件列表
+                val currentAttachments = chatCore.attachments.value
+                
+                // 获取工作区路径
+                val currentChat = chatCore.chatHistories.value.find { it.id == chatId }
+                val workspacePath = currentChat?.workspace
+                
+                // 获取配置
+                val maxTokens = (chatCore.contextLength.value * 1024).toInt()
+                val tokenUsageThreshold = chatCore.summaryTokenThreshold.value.toDouble()
+                
+                // 发送消息
+                chatCore.sendUserMessage(
+                    message = message,
+                    attachments = currentAttachments,
+                    chatId = chatId,
+                    workspacePath = workspacePath,
+                    promptFunctionType = promptType,
+                    enableThinking = chatCore.enableThinkingMode.value,
+                    thinkingGuidance = chatCore.enableThinkingGuidance.value,
+                    enableMemoryQuery = chatCore.enableMemoryQuery.value,
+                    enableWorkspaceAttachment = !workspacePath.isNullOrBlank(),
+                    maxTokens = maxTokens,
+                    tokenUsageThreshold = tokenUsageThreshold,
+                    replyToMessage = null
+                )
+                
+                // 发送后清空附件列表
+                if (currentAttachments.isNotEmpty()) {
+                    chatCore.clearAttachments()
+                }
+                
+                Log.d(TAG, "消息已通过 chatCore 发送")
+            } catch (e: Exception) {
+                Log.e(TAG, "发送消息时出错", e)
+            }
+        }
     }
 
     override fun onCancelMessage() {
-        serviceScope.launch { _cancelMessageRequest.tryEmit(Unit) }
+        Log.d(TAG, "onCancelMessage")
+        
+        // 直接使用 chatCore 取消消息，不再通过 SharedFlow
+        chatCore.cancelCurrentMessage()
     }
 
     override fun onAttachmentRequest(request: String) {

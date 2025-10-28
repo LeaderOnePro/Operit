@@ -57,7 +57,7 @@ fun ToolTesterScreen(navController: NavController) {
 
     suspend fun runTest(toolTest: ToolTest) {
         // UI preparation phase on Main thread
-        if (toolTest.id == "set_input_text" || toolTest.id == "click_element") {
+        if (toolTest.id == "set_input_text") {
             // If the dialog is showing for a single test run, dismiss it first.
             if (showDialog) {
                 showDialog = false
@@ -301,7 +301,7 @@ private fun getFinalToolTestGroups(context: android.content.Context): List<ToolG
             ToolTest("manage_cookies", context.getString(R.string.manage_cookies_test), context.getString(R.string.manage_cookies_test_desc), listOf(ToolParameter("action", "get"), ToolParameter("domain", "google.com"))),
             ToolTest("visit_web", context.getString(R.string.visit_web_test), context.getString(R.string.visit_web_test_desc), listOf(ToolParameter("url", "https://www.baidu.com"))),
             ToolTest("use_package", context.getString(R.string.use_package_test), context.getString(R.string.use_package_test_desc), listOf(ToolParameter("package_name", "non_existent_package"))),
-            ToolTest("query_knowledge_library", context.getString(R.string.query_knowledge_test), context.getString(R.string.query_knowledge_test_desc), listOf(ToolParameter("query", "test")))
+            ToolTest("query_memory", context.getString(R.string.query_knowledge_test), context.getString(R.string.query_knowledge_test_desc), listOf(ToolParameter("query", "test")))
         )),
         ToolGroup(context.getString(R.string.file_readonly_group), false, false, listOf(
             ToolTest("list_files", context.getString(R.string.list_files_test), context.getString(R.string.list_files_test_desc), listOf(ToolParameter("path", testBaseDir))),
@@ -316,7 +316,6 @@ private fun getFinalToolTestGroups(context: android.content.Context): List<ToolG
             ToolTest("move_file", context.getString(R.string.move_file_test), context.getString(R.string.move_file_test_desc), listOf(ToolParameter("source", testFileCopy), ToolParameter("destination", "$testBaseDir/moved_file.txt"))),
             ToolTest("zip_files", context.getString(R.string.zip_files_test), context.getString(R.string.zip_files_test_desc), listOf(ToolParameter("source", testBaseDir), ToolParameter("destination", testZip))),
             ToolTest("unzip_files", context.getString(R.string.unzip_files_test), context.getString(R.string.unzip_files_test_desc), listOf(ToolParameter("source", testZip), ToolParameter("destination", testUnzipDir))),
-            ToolTest("convert_file", context.getString(R.string.convert_file_test), context.getString(R.string.convert_file_test_desc), listOf(ToolParameter("source_path", testImage), ToolParameter("target_path", "$testBaseDir/converted.jpg")))
         )),
         ToolGroup(context.getString(R.string.system_group), false, false, listOf(
             ToolTest("list_installed_apps", context.getString(R.string.list_apps_test), context.getString(R.string.list_apps_test_desc), listOf(ToolParameter("include_system_apps", "false"))),
@@ -329,7 +328,6 @@ private fun getFinalToolTestGroups(context: android.content.Context): List<ToolG
             ToolTest("get_page_info", context.getString(R.string.page_info_test), context.getString(R.string.page_info_test_desc), emptyList()),
             ToolTest("press_key", context.getString(R.string.simulate_key_test), context.getString(R.string.simulate_key_test_desc), listOf(ToolParameter("key_code", "KEYCODE_VOLUME_UP"))),
             ToolTest("set_input_text", context.getString(R.string.text_input_test), context.getString(R.string.text_input_test_desc), listOf(ToolParameter("text", "Hello from Operit!"))),
-            ToolTest("click_element", context.getString(R.string.click_input_test), context.getString(R.string.click_input_test_desc), listOf(ToolParameter("resourceId", "tool_tester_input"))),
             ToolTest("tap", context.getString(R.string.simulate_tap_test), context.getString(R.string.simulate_tap_test_desc), listOf(ToolParameter("x", "1"), ToolParameter("y", "1"))),
             ToolTest("swipe", context.getString(R.string.simulate_swipe_test), context.getString(R.string.simulate_swipe_test_desc), listOf(ToolParameter("start_x", "500"), ToolParameter("start_y", "1000"), ToolParameter("end_x", "500"), ToolParameter("end_y", "1200")))
         )),
