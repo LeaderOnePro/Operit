@@ -37,6 +37,8 @@ To use a tool, use this format in your response:
 <param name="parameter_name">parameter_value</param>
 </tool>
 
+When outputting XML (e.g., <tool>, <status>), insert a newline before it and ensure the opening tag starts at the beginning of a line.
+
 Based on user needs, proactively select the most appropriate tool or combination of tools. For complex tasks, you can break down the problem and use different tools step by step to solve it. After using each tool, clearly explain the execution results and suggest the next steps."""
     private const val TOOL_USAGE_GUIDELINES_CN = """
 调用工具时，用户会看到你的响应，然后会自动将工具结果发送回给你。
@@ -46,6 +48,8 @@ Based on user needs, proactively select the most appropriate tool or combination
 <tool name="tool_name">
 <param name="parameter_name">parameter_value</param>
 </tool>
+
+输出XML（如 <tool>、<status>）时，必须在XML前换行，并确保起始标签位于行首。
 
 根据用户需求，主动选择最合适的工具或工具组合。对于复杂任务，你可以分解问题并使用不同的工具逐步解决。使用每个工具后，清楚地解释执行结果并建议下一步。"""
 
@@ -496,6 +500,7 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
                 .replace(workspaceGuidelines, "")
         }
     }
+
 
     // Clean up multiple consecutive blank lines (replace 3+ newlines with 2)
     prompt = prompt.replace(Regex("\n{3,}"), "\n\n")
