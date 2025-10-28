@@ -1329,6 +1329,8 @@
     <string name="tool_permission_manager_desc">管理手机各个应用的权限，保护隐私安全</string>
     <string name="tool_user_agreement">用户协议</string>
     <string name="tool_user_agreement_desc">查看应用的用户协议与隐私政策</string>
+    <string name="tool_default_assistant_guide">默认助手设置</string>
+    <string name="tool_default_assistant_guide_desc">设置Operit语音悬浮为系统默认助手</string>
     <string name="tool_terminal">命令终端</string>
     <string name="tool_terminal_desc">功能强大的命令行终端，执行系统指令</string>
     <string name="tool_terminal_auto_config">终端自动配置</string>
@@ -2597,6 +2599,7 @@
     <string name="screen_title_tool_tester">工具测试中心</string>
     <string name="screen_title_text_to_speech">文本转语音</string>
     <string name="screen_title_speech_to_text">语音识别</string>
+    <string name="screen_title_default_assistant_guide">默认助手设置</string>
     <string name="screen_title_mcp_market">MCP 市场</string>
     <string name="screen_title_mcp_publish">发布 MCP 插件</string>
     <string name="screen_title_mcp_manage">管理我的插件</string>
@@ -3008,5 +3011,43 @@
     <string name="workflow_node_running">执行中</string>
     <string name="workflow_node_success">成功</string>
     <string name="workflow_node_failed">失败</string>
+
+    <!-- 默认助手设置引导 -->
+    <string name="default_assistant_guide_title">设置默认语音助手</string>
+    <string name="default_assistant_guide_subtitle">让Operit成为您的智能助手</string>
+    <string name="default_assistant_guide_intro">将Operit设置为系统默认助手后，您可以通过长按Home键或使用语音唤醒快速启动Operit语音助手，获得更便捷的AI交互体验。</string>
+    <string name="default_assistant_guide_steps_title">设置步骤</string>
+    
+    <!-- 步骤1: 设置为默认助理 -->
+    <string name="default_assistant_guide_step1_title">设置为默认助理</string>
+    <string name="default_assistant_guide_step1_desc">将 Operit 设置为系统的默认数字助理应用</string>
+    <string name="default_assistant_guide_step1_detail1">• 打开系统设置 → 应用 → 默认应用 → 数字助理应用</string>
+    <string name="default_assistant_guide_step1_detail2">• 在助手应用列表中找到并选择"Operit AI"</string>
+    <string name="default_assistant_guide_step1_detail_android12">Android 12+: 设置 → 应用 → 默认应用 → 数字助理应用 → 默认数字助理应用</string>
+    <string name="default_assistant_guide_open_settings">打开助理设置</string>
+    
+    <!-- 步骤2: 配置启动手势 -->
+    <string name="default_assistant_guide_open_gesture_settings">打开手势设置</string>
+    <string name="default_assistant_guide_step2_title">配置启动手势</string>
+    <string name="default_assistant_guide_step2_desc">设置如何快速唤起 Operit 助手</string>
+    <string name="default_assistant_guide_step2_detail1">• 长按Home键：最常用的方式，在大部分设备上都可用</string>
+    <string name="default_assistant_guide_step2_detail2">• 从屏幕底部向上滑动：部分支持全面屏手势的设备</string>
+    <string name="default_assistant_guide_step2_detail3">• 语音唤醒："Hey Google"或设备指定的唤醒词（需设备支持）</string>
+    <string name="default_assistant_guide_step2_note">注意：不同品牌手机的手势设置可能有所不同，请在系统设置中查看可用选项</string>
+    
+    <!-- 步骤3: 测试助手功能 -->
+    <string name="default_assistant_guide_step3_title">测试助手功能</string>
+    <string name="default_assistant_guide_step3_desc">完成设置后，测试 Operit 是否能正常唤起</string>
+    <string name="default_assistant_guide_step3_detail1">• 使用您设置的手势（如长按Home键）唤起助手</string>
+    <string name="default_assistant_guide_step3_detail2">• 如果成功，应该会看到 Operit 的语音助手界面</string>
+    <string name="default_assistant_guide_step3_detail3">• 可以尝试说话或输入文字与助手交互</string>
+    
+    <!-- 疑难解答 -->
+    <string name="default_assistant_guide_troubleshooting_title">遇到问题？</string>
+    <string name="default_assistant_guide_troubleshooting_content">如果在列表中找不到Operit，请确保：\n\n• 应用已正确安装且未被禁用\n• 已授予必要的权限（麦克风、悬浮窗等）\n• 尝试重启设备后再次设置\n\n部分定制系统可能限制第三方应用作为默认助手，如遇此情况，您仍可通过应用内的悬浮窗功能使用Operit。</string>
+    
+    <!-- Voice Interaction Service -->
+    <string name="voice_interaction_service_name">Operit AI 助手</string>
+    <string name="voice_interaction_service_summary">智能语音助手服务</string>
 
 </resources>

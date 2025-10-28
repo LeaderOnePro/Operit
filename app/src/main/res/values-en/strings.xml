@@ -1284,6 +1284,8 @@
     <string name="tool_permission_manager_desc">Manage permissions for all device applications to protect privacy</string>
     <string name="tool_user_agreement">User Agreement</string>
     <string name="tool_user_agreement_desc">View the application\'s user agreement and privacy policy</string>
+    <string name="tool_default_assistant_guide">Default Assistant Setup</string>
+    <string name="tool_default_assistant_guide_desc">Set Operit voice floating as system default assistant</string>
     <string name="tool_terminal">Command Terminal</string>
     <string name="tool_terminal_desc">Powerful command-line terminal for executing system commands</string>
     <string name="tool_terminal_auto_config">Terminal Auto Configuration</string>
@@ -2595,6 +2597,7 @@
     <string name="screen_title_tool_tester">Tool Testing Center</string>
     <string name="screen_title_text_to_speech">Text to Speech</string>
     <string name="screen_title_speech_to_text">Speech Recognition</string>
+    <string name="screen_title_default_assistant_guide">Default Assistant Setup</string>
     <string name="screen_title_mcp_market">MCP Market</string>
     <string name="screen_title_mcp_publish">Publish MCP Plugin</string>
     <string name="screen_title_mcp_manage">Manage My Plugins</string>
@@ -3009,5 +3012,39 @@
     <string name="mnn_model_path_placeholder">Enter the full path to MNN model file</string>
     <string name="mnn_forward_type">Forward Type</string>
     <string name="mnn_thread_count">Thread Count</string>
+
+    <!-- Default Assistant Setup Guide -->
+    <string name="default_assistant_guide_title">Set Default Voice Assistant</string>
+    <string name="default_assistant_guide_subtitle">Make Operit Your Smart Assistant</string>
+    <string name="default_assistant_guide_intro">After setting Operit as the default system assistant, you can quickly launch the Operit voice assistant by long-pressing the Home button or using voice wake-up, providing a more convenient AI interaction experience.</string>
+    <string name="default_assistant_guide_steps_title">Setup Steps</string>
+    
+    <!-- Step 1 -->
+    <string name="default_assistant_guide_step1_title">Open System Settings</string>
+    <string name="default_assistant_guide_step1_desc">First, you need to enter the Android system settings interface</string>
+    <string name="default_assistant_guide_open_settings">Open Settings</string>
+    
+    <!-- Step 2 -->
+    <string name="default_assistant_guide_step2_title">Find Assistant Settings</string>
+    <string name="default_assistant_guide_step2_desc">In system settings, find voice assistant or digital assistant related options</string>
+    <string name="default_assistant_guide_step2_detail1">• The settings location may vary slightly between different phone manufacturers</string>
+    <string name="default_assistant_guide_step2_detail2">• Usually located at: Settings → Apps → Default apps → Digital assistant app</string>
+    <string name="default_assistant_guide_step2_detail_android12">Android 12+: Settings → Apps → Default apps → Digital assistant app → Default digital assistant app</string>
+    
+    <!-- Step 3 -->
+    <string name="default_assistant_guide_step3_title">Select Operit</string>
+    <string name="default_assistant_guide_step3_desc">Choose Operit AI from the assistant app list</string>
+    <string name="default_assistant_guide_step3_detail1">• Find \"Operit AI\" in the available assistant apps list</string>
+    <string name="default_assistant_guide_step3_detail2">• Tap to select, and the system will set Operit as the default assistant</string>
+    
+    <!-- Step 4 -->
+    <string name="default_assistant_guide_step4_title">Test Voice Assistant</string>
+    <string name="default_assistant_guide_step4_desc">After setup, test if it can be launched normally</string>
+    <string name="default_assistant_guide_step4_detail1">• Long-press the Home button (home screen button) should invoke Operit voice assistant</string>
+    <string name="default_assistant_guide_step4_detail2">• If voice wake-up is supported, saying \"Hey Google\" or your device\'s designated wake word may also trigger Operit</string>
+    
+    <!-- Troubleshooting -->
+    <string name="default_assistant_guide_troubleshooting_title">Having Problems?</string>
+    <string name="default_assistant_guide_troubleshooting_content">If you can\'t find Operit in the list, please ensure:\n\n• The app is properly installed and not disabled\n• Necessary permissions have been granted (microphone, overlay, etc.)\n• Try restarting the device and setting it up again\n\nSome custom systems may restrict third-party apps from being set as default assistants. If you encounter this situation, you can still use Operit through the in-app floating window feature.</string>
 
 </resources>

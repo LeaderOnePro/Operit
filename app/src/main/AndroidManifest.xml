@@ -52,6 +52,9 @@
     <!-- 在<uses-permission>部分添加语音识别所需权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
+    <!-- Voice Interaction Service permissions -->
+    <uses-permission android:name="android.permission.BIND_VOICE_INTERACTION" />
+    
     <!-- Workflow scheduling permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -257,6 +260,26 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        
+        <!-- Voice Interaction Service for system default assistant -->
+        <service
+            android:name=".services.assistant.OperitVoiceInteractionService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        
+        <!-- Voice Interaction Session Service -->
+        <service
+            android:name=".services.assistant.OperitVoiceInteractionSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true" />
         
     </application>
 

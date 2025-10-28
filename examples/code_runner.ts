@@ -1,7 +1,7 @@
 /* METADATA
 {
   name: code_runner
-  description: 提供多语言代码执行能力，支持JavaScript、Python、Ruby、Go和Rust脚本的运行。可直接执行代码字符串或运行外部文件，适用于快速测试、自动化脚本和教学演示。
+  description: 提供多语言代码执行能力，支持JavaScript、Python、Ruby、Go、Rust、C和C++脚本的运行。可直接执行代码字符串或运行外部文件，适用于快速测试、自动化脚本和教学演示。
   enabledByDefault: true
   
   // Multiple tools in this package
@@ -33,7 +33,7 @@
     },
     {
       name: run_python
-      description: 运行自定义 Python 脚本。脚本的输出应使用 'print' 函数，以便能够被捕获。
+      description: 运行自定义 Python 脚本。会捕获 print 函数的输出。
       parameters: [
         {
           name: script
@@ -45,7 +45,7 @@
     },
     {
       name: run_python_file
-      description: 运行 Python 文件。脚本的输出应使用 'print' 函数，以便能够被捕获。
+      description: 运行 Python 文件。会捕获 print 函数的输出。
       parameters: [
         {
           name: file_path
@@ -526,7 +526,7 @@ int main() {
       const tempCExec = "/tmp/test_c";
       await executeTerminalCommand(`cat <<'EOF' > ${tempCFile}\n${script}\nEOF`);
 
-      const compileResult = await executeTerminalCommand(`gcc ${tempCFile} -o ${tempCExec}`, 30000);
+      const compileResult = await executeTerminalCommand(`gcc -O3 ${tempCFile} -o ${tempCExec}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         await executeTerminalCommand(`rm -f ${tempCFile} ${tempCExec}`);
         return { success: false, message: `C 编译失败: ${compileResult.output}` };
@@ -565,7 +565,7 @@ int main() {
       const tempCppExec = "/tmp/test_cpp";
       await executeTerminalCommand(`cat <<'EOF' > ${tempCppFile}\n${script}\nEOF`);
 
-      const compileResult = await executeTerminalCommand(`g++ ${tempCppFile} -o ${tempCppExec}`, 30000);
+      const compileResult = await executeTerminalCommand(`g++ -O3 ${tempCppFile} -o ${tempCppExec}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         await executeTerminalCommand(`rm -f ${tempCppFile} ${tempCppExec}`);
         return { success: false, message: `C++ 编译失败: ${compileResult.output}` };
@@ -854,7 +854,7 @@ edition = "2021"
     try {
       await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
 
-      const compileResult = await executeTerminalCommand(`gcc ${tempFilePath} -o ${tempExecPath}`, 30000);
+      const compileResult = await executeTerminalCommand(`gcc -O3 ${tempFilePath} -o ${tempExecPath}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         throw new Error(`C 代码编译失败:\n${compileResult.output}`);
       }
@@ -883,7 +883,7 @@ edition = "2021"
 
     const tempExecPath = "/tmp/temp_c_exec";
     try {
-      const compileResult = await executeTerminalCommand(`gcc ${filePath} -o ${tempExecPath}`, 30000);
+      const compileResult = await executeTerminalCommand(`gcc -O3 ${filePath} -o ${tempExecPath}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         throw new Error(`C 文件编译失败:\n${compileResult.output}`);
       }
@@ -910,7 +910,7 @@ edition = "2021"
     try {
       await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
 
-      const compileResult = await executeTerminalCommand(`g++ ${tempFilePath} -o ${tempExecPath}`, 30000);
+      const compileResult = await executeTerminalCommand(`g++ -O3 ${tempFilePath} -o ${tempExecPath}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         throw new Error(`C++ 代码编译失败:\n${compileResult.output}`);
       }
@@ -939,7 +939,7 @@ edition = "2021"
 
     const tempExecPath = "/tmp/temp_cpp_exec";
     try {
-      const compileResult = await executeTerminalCommand(`g++ ${filePath} -o ${tempExecPath}`, 30000);
+      const compileResult = await executeTerminalCommand(`g++ -O3 ${filePath} -o ${tempExecPath}`, 30000);
       if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
         throw new Error(`C++ 文件编译失败:\n${compileResult.output}`);
       }

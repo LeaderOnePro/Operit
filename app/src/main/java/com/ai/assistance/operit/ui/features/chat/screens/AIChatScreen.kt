@@ -86,6 +86,7 @@ fun AIChatScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val colorScheme = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
 
     // Initialize ViewModel without using viewModel() function
     val factory = ChatViewModelFactory(context)
@@ -249,7 +250,6 @@ fun AIChatScreen(
     // UI state
     val scrollState = rememberScrollState()
     val historyListState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     
@@ -485,9 +485,15 @@ fun AIChatScreen(
                                 userMessage = userMessage,
                                 onUserMessageChange = { actualViewModel.updateUserMessage(it) },
                                 onSendMessage = {
+                                    // 清除焦点，收起软键盘
+                                    focusManager.clearFocus()
+                                    
                                     actualViewModel.sendUserMessage()
                                     // 在发送消息后重置附件面板状态
                                     actualViewModel.resetAttachmentPanelState()
+                                    // 发送新问题时，恢复自动滚动到底部
+                                    autoScrollToBottom = true
+                                    showScrollButton = false
                                 },
                                 onCancelMessage = { actualViewModel.cancelCurrentMessage() },
                                 isLoading = isLoading,

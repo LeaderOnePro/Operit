@@ -90,7 +90,8 @@ fun ToolboxScreen(
         onTextToSpeechSelected: () -> Unit,
         onSpeechToTextSelected: () -> Unit,
         onToolTesterSelected: () -> Unit,
-        onAgreementSelected: () -> Unit
+        onAgreementSelected: () -> Unit,
+        onDefaultAssistantGuideSelected: () -> Unit
 ) {
         // 屏幕配置信息，用于响应式布局
         val configuration = LocalConfiguration.current
@@ -150,6 +151,13 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_user_agreement_desc),
                                 category = ToolCategory.SYSTEM,
                                 onClick = onAgreementSelected
+                        ),
+                        Tool(
+                                name = stringResource(R.string.tool_default_assistant_guide),
+                                icon = Icons.Default.Assistant,
+                                description = stringResource(R.string.tool_default_assistant_guide_desc),
+                                category = ToolCategory.SYSTEM,
+                                onClick = onDefaultAssistantGuideSelected
                         ),
                         Tool(
                                 name = stringResource(R.string.tool_terminal),
@@ -532,4 +540,12 @@ fun ToolTesterToolScreen(navController: NavController) {
                                 .ToolTesterScreen(navController = navController)
                 }
         }
+}
+
+/** 显示默认助手设置引导屏幕 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DefaultAssistantGuideToolScreen(navController: NavController) {
+        com.ai.assistance.operit.ui.features.toolbox.screens.defaultassistant
+                .DefaultAssistantGuideScreen(navController = navController)
 }
