@@ -24,6 +24,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.common.rememberLocal
 import com.ai.assistance.operit.ui.common.markdown.DefaultXmlRenderer
 import com.ai.assistance.operit.ui.common.markdown.XmlContentRenderer
 
@@ -164,11 +165,31 @@ class CustomXmlRenderer(
                     content.substring(startIndex).trim()
                 }
 
+        var expandThinkingProcess by rememberLocal(key = "expand_thinking_process_default", defaultValue = false)
+        val isThinkingInProgress = !isXmlFullyClosed(content)
+
         var expanded by remember { mutableStateOf(false) }
+
+        // 使用LaunchedEffect来初始化和同步状态，避免在快速重组时状态被意外重置
+        LaunchedEffect(isThinkingInProgress, expandThinkingProcess) {
+            expanded = if (isThinkingInProgress) {
+                // 思考过程中，状态由用户偏好决定
+                expandThinkingProcess
+            } else {
+                // 思考结束后，总是折叠
+                false
+            }
+        }
 
         Column(modifier = modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp)) {
             Row(
-                    modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val newExpandedValue = !expanded
+                        expanded = newExpandedValue
+                        if (isThinkingInProgress) {
+                            expandThinkingProcess = newExpandedValue
+                        }
+                    },
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
             ) {
@@ -204,7 +225,6 @@ class CustomXmlRenderer(
                     Box(
                             modifier =
                                     Modifier.fillMaxWidth()
-                                            .clickable { expanded = false }
                                             .padding(top = 4.dp, bottom = 8.dp, start = 24.dp)
                     ) {
                         Text(

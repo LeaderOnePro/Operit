@@ -126,6 +126,54 @@
           required: true
         }
       ]
+    },
+    {
+      name: run_c
+      description: 运行自定义 C 代码
+      parameters: [
+        {
+          name: script
+          description: 要执行的 C 代码内容
+          type: string
+          required: true
+        }
+      ]
+    },
+    {
+      name: run_c_file
+      description: 运行 C 文件
+      parameters: [
+        {
+          name: file_path
+          description: C 文件路径
+          type: string
+          required: true
+        }
+      ]
+    },
+    {
+      name: run_cpp
+      description: 运行自定义 C++ 代码
+      parameters: [
+        {
+          name: script
+          description: 要执行的 C++ 代码内容
+          type: string
+          required: true
+        }
+      ]
+    },
+    {
+      name: run_cpp_file
+      description: 运行 C++ 文件
+      parameters: [
+        {
+          name: file_path
+          description: C++ 文件路径
+          type: string
+          required: true
+        }
+      ]
     }
   ]
   
@@ -262,7 +310,9 @@ const codeRunner = (function () {
       python: await testPython(),
       ruby: await testRuby(),
       go: await testGo(),
-      rust: await testRust()
+      rust: await testRust(),
+      c: await testC(),
+      cpp: await testCpp()
     };
 
     // Format results for display
@@ -453,6 +503,84 @@ edition = "2021"
       return { success: true, message: "Rust执行器测试成功" };
     } catch (error) {
       return { success: false, message: `Rust执行器测试失败: ${error.message}` };
+    }
+  }
+
+  // 测试C执行功能
+  async function testC() {
+    try {
+      // 检查gcc是否可用
+      const gccCheckResult = await executeTerminalCommand("gcc --version", 10000);
+      if (gccCheckResult.exitCode !== 0 || hasError(gccCheckResult.output)) {
+        return { success: false, message: "GCC不可用，请确保已安装gcc" };
+      }
+
+      // 测试简单的C代码
+      const script = `
+#include <stdio.h>
+int main() {
+  printf("C运行正常\\n");
+  return 0;
+}`;
+      const tempCFile = "/tmp/test_c.c";
+      const tempCExec = "/tmp/test_c";
+      await executeTerminalCommand(`cat <<'EOF' > ${tempCFile}\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`gcc ${tempCFile} -o ${tempCExec}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        await executeTerminalCommand(`rm -f ${tempCFile} ${tempCExec}`);
+        return { success: false, message: `C 编译失败: ${compileResult.output}` };
+      }
+
+      const runResult = await executeTerminalCommand(tempCExec, 10000);
+      await executeTerminalCommand(`rm -f ${tempCFile} ${tempCExec}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("C运行正常")) {
+        return { success: false, message: `C 执行失败: ${runResult.output}` };
+      }
+
+      return { success: true, message: "C执行器测试成功" };
+    } catch (error) {
+      return { success: false, message: `C执行器测试失败: ${error.message}` };
+    }
+  }
+
+  // 测试C++执行功能
+  async function testCpp() {
+    try {
+      // 检查g++是否可用
+      const gppCheckResult = await executeTerminalCommand("g++ --version", 10000);
+      if (gppCheckResult.exitCode !== 0 || hasError(gppCheckResult.output)) {
+        return { success: false, message: "G++不可用，请确保已安装g++" };
+      }
+
+      // 测试简单的C++代码
+      const script = `
+#include <iostream>
+int main() {
+  std::cout << "C++运行正常" << std::endl;
+  return 0;
+}`;
+      const tempCppFile = "/tmp/test_cpp.cpp";
+      const tempCppExec = "/tmp/test_cpp";
+      await executeTerminalCommand(`cat <<'EOF' > ${tempCppFile}\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`g++ ${tempCppFile} -o ${tempCppExec}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        await executeTerminalCommand(`rm -f ${tempCppFile} ${tempCppExec}`);
+        return { success: false, message: `C++ 编译失败: ${compileResult.output}` };
+      }
+
+      const runResult = await executeTerminalCommand(tempCppExec, 10000);
+      await executeTerminalCommand(`rm -f ${tempCppFile} ${tempCppExec}`);
+
+      if (runResult.exitCode !== 0 || hasError(runResult.output) || !runResult.output.includes("C++运行正常")) {
+        return { success: false, message: `C++ 执行失败: ${runResult.output}` };
+      }
+
+      return { success: true, message: "C++执行器测试成功" };
+    } catch (error) {
+      return { success: false, message: `C++执行器测试失败: ${error.message}` };
     }
   }
 
@@ -715,6 +843,118 @@ edition = "2021"
     }
   }
 
+  async function run_c(params: { script: string }) {
+    const script = params.script;
+    if (!script || script.trim() === "") {
+      throw new Error("请提供要执行的 C 代码内容");
+    }
+
+    const tempFilePath = "/tmp/temp_script.c";
+    const tempExecPath = "/tmp/temp_script_c_exec";
+    try {
+      await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`gcc ${tempFilePath} -o ${tempExecPath}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`C 代码编译失败:\n${compileResult.output}`);
+      }
+
+      const result = await executeTerminalCommand(tempExecPath, 30000);
+      if (result.exitCode === 0 && !hasError(result.output)) {
+        return result.output.trim();
+      } else {
+        throw new Error(`C 代码执行失败:\n${result.output}`);
+      }
+    } finally {
+      await executeTerminalCommand(`rm -f ${tempFilePath} ${tempExecPath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+    }
+  }
+
+  async function run_c_file(params: { file_path: string }) {
+    const filePath = params.file_path;
+    if (!filePath || filePath.trim() === "") {
+      throw new Error("请提供要执行的 C 文件路径");
+    }
+
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`C 文件不存在或路径错误: ${filePath}`);
+    }
+
+    const tempExecPath = "/tmp/temp_c_exec";
+    try {
+      const compileResult = await executeTerminalCommand(`gcc ${filePath} -o ${tempExecPath}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`C 文件编译失败:\n${compileResult.output}`);
+      }
+
+      const result = await executeTerminalCommand(tempExecPath, 30000);
+      if (result.exitCode === 0 && !hasError(result.output)) {
+        return result.output.trim();
+      } else {
+        throw new Error(`C 文件执行失败:\n${result.output}`);
+      }
+    } finally {
+      await executeTerminalCommand(`rm -f ${tempExecPath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+    }
+  }
+
+  async function run_cpp(params: { script: string }) {
+    const script = params.script;
+    if (!script || script.trim() === "") {
+      throw new Error("请提供要执行的 C++ 代码内容");
+    }
+
+    const tempFilePath = "/tmp/temp_script.cpp";
+    const tempExecPath = "/tmp/temp_script_cpp_exec";
+    try {
+      await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
+
+      const compileResult = await executeTerminalCommand(`g++ ${tempFilePath} -o ${tempExecPath}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`C++ 代码编译失败:\n${compileResult.output}`);
+      }
+
+      const result = await executeTerminalCommand(tempExecPath, 30000);
+      if (result.exitCode === 0 && !hasError(result.output)) {
+        return result.output.trim();
+      } else {
+        throw new Error(`C++ 代码执行失败:\n${result.output}`);
+      }
+    } finally {
+      await executeTerminalCommand(`rm -f ${tempFilePath} ${tempExecPath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+    }
+  }
+
+  async function run_cpp_file(params: { file_path: string }) {
+    const filePath = params.file_path;
+    if (!filePath || filePath.trim() === "") {
+      throw new Error("请提供要执行的 C++ 文件路径");
+    }
+
+    const fileExistsResult = await executeTerminalCommand(`test -f ${filePath}`);
+    if (fileExistsResult.exitCode !== 0 || hasError(fileExistsResult.output)) {
+      throw new Error(`C++ 文件不存在或路径错误: ${filePath}`);
+    }
+
+    const tempExecPath = "/tmp/temp_cpp_exec";
+    try {
+      const compileResult = await executeTerminalCommand(`g++ ${filePath} -o ${tempExecPath}`, 30000);
+      if (compileResult.exitCode !== 0 || hasError(compileResult.output)) {
+        throw new Error(`C++ 文件编译失败:\n${compileResult.output}`);
+      }
+
+      const result = await executeTerminalCommand(tempExecPath, 30000);
+      if (result.exitCode === 0 && !hasError(result.output)) {
+        return result.output.trim();
+      } else {
+        throw new Error(`C++ 文件执行失败:\n${result.output}`);
+      }
+    } finally {
+      await executeTerminalCommand(`rm -f ${tempExecPath}`).catch(err => console.error(`删除临时文件失败: ${err.message}`));
+    }
+  }
+
   function wrap(func: (params: any) => Promise<any>) {
     return async (params: any) => {
       try {
@@ -745,6 +985,10 @@ edition = "2021"
     run_go_file,
     run_rust,
     run_rust_file,
+    run_c,
+    run_c_file,
+    run_cpp,
+    run_cpp_file,
     wrap
   };
 })();
@@ -761,3 +1005,7 @@ exports.run_go = codeRunner.wrap(codeRunner.run_go);
 exports.run_go_file = codeRunner.wrap(codeRunner.run_go_file);
 exports.run_rust = codeRunner.wrap(codeRunner.run_rust);
 exports.run_rust_file = codeRunner.wrap(codeRunner.run_rust_file);
+exports.run_c = codeRunner.wrap(codeRunner.run_c);
+exports.run_c_file = codeRunner.wrap(codeRunner.run_c_file);
+exports.run_cpp = codeRunner.wrap(codeRunner.run_cpp);
+exports.run_cpp_file = codeRunner.wrap(codeRunner.run_cpp_file);

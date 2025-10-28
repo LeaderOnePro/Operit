@@ -805,7 +805,7 @@ data class MemoryQueryResultData(
         return memories.joinToString("\n---\n") { memory ->
             """
             Title: ${memory.title}
-            Content: ${memory.content.take(200)}...
+            Content: ${memory.content}
             Source: ${memory.source}
             Tags: ${memory.tags.joinToString(", ")}
             Created: ${memory.createdAt}

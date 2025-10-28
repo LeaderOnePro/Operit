@@ -255,7 +255,7 @@ fun PhoneLayout(
                         modifier =
                                 Modifier.width(drawerWidth)
                                         .fillMaxHeight()
-                                        .offset(x = drawerOffset)
+                                        .graphicsLayer { translationX = drawerOffset.toPx() }
                                         .zIndex(2f),
                         shape =
                                 MaterialTheme.shapes.medium.copy(
