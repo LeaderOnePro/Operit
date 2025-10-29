@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -186,11 +187,14 @@ fun AppContent(
 
     CompositionLocalProvider(LocalAppBarContentColor provides appBarContentColor) {
         // 使用Scaffold来正确处理顶部栏和内容的布局
+        // contentWindowInsets = WindowInsets(0) 让内容可以延伸到系统栏下方，使背景能够完全填充
         Scaffold(
-            
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 // 单一工具栏 - 使用小型化的设计
+                // 使用 windowInsets 参数让 TopAppBar 自己处理状态栏的 insets
                 SmallTopAppBar(
+                    windowInsets = WindowInsets.statusBars,
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // 使用Screen的标题或导航项的标题
@@ -281,9 +285,11 @@ fun AppContent(
             containerColor = Color.Transparent
         ) { innerPadding ->
             // 主内容区域
+            // 添加底部导航栏的 padding，确保内容不会被导航栏遮挡
             Surface(
                 modifier = Modifier
                     .padding(innerPadding)
+                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
                     .fillMaxSize(),
                 color =
                 if (hasBackgroundImage) Color.Transparent
