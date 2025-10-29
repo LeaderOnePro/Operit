@@ -115,7 +115,8 @@ fun ChatArea(
     isMultiSelectMode: Boolean = false, // 是否处于多选模式
     selectedMessageIndices: Set<Int> = emptySet(), // 已选中的消息索引集合
     onToggleMultiSelectMode: ((Int?) -> Unit)? = null, // 切换多选模式的回调，可传入要初始选中的消息索引
-    onToggleMessageSelection: ((Int) -> Unit)? = null // 切换消息选中状态的回调
+    onToggleMessageSelection: ((Int) -> Unit)? = null, // 切换消息选中状态的回调
+    horizontalPadding: Dp = 16.dp // 水平内边距，可自定义
 ) {
     // 记住当前深度状态，但当chatHistory发生变化时重置为1
     var currentDepth = remember(chatHistory) { mutableStateOf(1) }
@@ -130,7 +131,7 @@ fun ChatArea(
             modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = horizontalPadding)
                 .verticalScroll(scrollState) // 使用从外部传入的scrollState
                 .background(Color.Transparent)
                 .padding(top = topPadding),

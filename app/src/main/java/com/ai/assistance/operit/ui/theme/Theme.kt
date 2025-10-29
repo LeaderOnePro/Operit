@@ -133,15 +133,17 @@ fun OperitTheme(content: @Composable () -> Unit) {
     val fontType by preferencesManager.fontType.collectAsState(initial = UserPreferencesManager.FONT_TYPE_SYSTEM)
     val systemFontName by preferencesManager.systemFontName.collectAsState(initial = UserPreferencesManager.SYSTEM_FONT_DEFAULT)
     val customFontPath by preferencesManager.customFontPath.collectAsState(initial = null)
+    val fontScale by preferencesManager.fontScale.collectAsState(initial = 1.0f)
 
     // 创建自定义 Typography
-    val customTypography = remember(useCustomFont, fontType, systemFontName, customFontPath) {
+    val customTypography = remember(useCustomFont, fontType, systemFontName, customFontPath, fontScale) {
         createCustomTypography(
             context = context,
             useCustomFont = useCustomFont,
             fontType = fontType,
             systemFontName = systemFontName,
-            customFontPath = customFontPath
+            customFontPath = customFontPath,
+            fontScale = fontScale
         )
     }
 

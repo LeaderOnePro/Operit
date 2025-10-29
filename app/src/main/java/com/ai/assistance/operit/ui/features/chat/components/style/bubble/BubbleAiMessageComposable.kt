@@ -125,7 +125,7 @@ fun BubbleAiMessageComposable(
 
     Row(
         modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 0.dp, vertical = 4.dp)
             .alpha(alpha)
             .offset(y = offsetY.dp),
         horizontalArrangement = Arrangement.Start,
@@ -158,7 +158,7 @@ fun BubbleAiMessageComposable(
                 model = Uri.parse(imageUrl),
                 contentDescription = "Image from AI",
                 modifier = Modifier
-                    .padding(end = 64.dp)
+                    .padding(end = 32.dp)
                     .heightIn(max = 80.dp)
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Fit
@@ -167,7 +167,7 @@ fun BubbleAiMessageComposable(
             // Message bubble
             Surface(
                 modifier = Modifier
-                    .padding(end = 64.dp)
+                    .padding(end = 32.dp)
                     .defaultMinSize(minHeight = 44.dp),
                 shape = RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp),
                 color = backgroundColor,

@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.theme
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
@@ -8,6 +9,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toFile
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import java.io.File
 
@@ -54,7 +56,13 @@ fun getSystemFontFamily(systemFontName: String): FontFamily {
  */
 fun loadCustomFontFamily(context: Context, fontPath: String): FontFamily? {
     return try {
-        val file = File(fontPath)
+        // - 修复了 file:// URI 路径无法被 File 正确解析的问题
+        val file = if (fontPath.startsWith("file://")) {
+            Uri.parse(fontPath).toFile()
+        } else {
+            File(fontPath)
+        }
+        
         if (!file.exists()) {
             Log.e("TypeKt", "Font file does not exist: $fontPath")
             return null
@@ -77,44 +85,56 @@ fun createCustomTypography(
     useCustomFont: Boolean,
     fontType: String,
     systemFontName: String,
-    customFontPath: String?
+    customFontPath: String?,
+    fontScale: Float
 ): Typography {
-    // 如果不使用自定义字体，返回默认 Typography
-    if (!useCustomFont) {
+    // 如果不使用自定义字体且字体大小为默认值，则直接返回默认Typography
+    if (!useCustomFont && fontScale == 1.0f) {
         return Typography
     }
-    
+
     // 确定要使用的 FontFamily
-    val fontFamily: FontFamily = when (fontType) {
-        UserPreferencesManager.FONT_TYPE_SYSTEM -> {
-            getSystemFontFamily(systemFontName)
-        }
-        UserPreferencesManager.FONT_TYPE_FILE -> {
-            if (!customFontPath.isNullOrEmpty()) {
-                loadCustomFontFamily(context, customFontPath) ?: FontFamily.Default
-            } else {
-                FontFamily.Default
+    val fontFamily: FontFamily = if (useCustomFont) {
+        when (fontType) {
+            UserPreferencesManager.FONT_TYPE_SYSTEM -> {
+                getSystemFontFamily(systemFontName)
             }
+            UserPreferencesManager.FONT_TYPE_FILE -> {
+                if (!customFontPath.isNullOrEmpty()) {
+                    loadCustomFontFamily(context, customFontPath) ?: FontFamily.Default
+                } else {
+                    FontFamily.Default
+                }
+            }
+            else -> FontFamily.Default
         }
-        else -> FontFamily.Default
+    } else {
+        FontFamily.Default
     }
-    
+
+    // Helper to apply scale. It will be applied to every style.
+    fun TextStyle.withScale(): TextStyle = if (fontScale != 1.0f) {
+        copy(fontSize = fontSize * fontScale, lineHeight = lineHeight * fontScale)
+    } else {
+        this
+    }
+
     // 创建带有自定义字体的 Typography
     return Typography(
-        displayLarge = Typography.displayLarge.copy(fontFamily = fontFamily),
-        displayMedium = Typography.displayMedium.copy(fontFamily = fontFamily),
-        displaySmall = Typography.displaySmall.copy(fontFamily = fontFamily),
-        headlineLarge = Typography.headlineLarge.copy(fontFamily = fontFamily),
-        headlineMedium = Typography.headlineMedium.copy(fontFamily = fontFamily),
-        headlineSmall = Typography.headlineSmall.copy(fontFamily = fontFamily),
-        titleLarge = Typography.titleLarge.copy(fontFamily = fontFamily),
-        titleMedium = Typography.titleMedium.copy(fontFamily = fontFamily),
-        titleSmall = Typography.titleSmall.copy(fontFamily = fontFamily),
-        bodyLarge = Typography.bodyLarge.copy(fontFamily = fontFamily),
-        bodyMedium = Typography.bodyMedium.copy(fontFamily = fontFamily),
-        bodySmall = Typography.bodySmall.copy(fontFamily = fontFamily),
-        labelLarge = Typography.labelLarge.copy(fontFamily = fontFamily),
-        labelMedium = Typography.labelMedium.copy(fontFamily = fontFamily),
-        labelSmall = Typography.labelSmall.copy(fontFamily = fontFamily)
+        displayLarge = Typography.displayLarge.copy(fontFamily = fontFamily).withScale(),
+        displayMedium = Typography.displayMedium.copy(fontFamily = fontFamily).withScale(),
+        displaySmall = Typography.displaySmall.copy(fontFamily = fontFamily).withScale(),
+        headlineLarge = Typography.headlineLarge.copy(fontFamily = fontFamily).withScale(),
+        headlineMedium = Typography.headlineMedium.copy(fontFamily = fontFamily).withScale(),
+        headlineSmall = Typography.headlineSmall.copy(fontFamily = fontFamily).withScale(),
+        titleLarge = Typography.titleLarge.copy(fontFamily = fontFamily).withScale(),
+        titleMedium = Typography.titleMedium.copy(fontFamily = fontFamily).withScale(),
+        titleSmall = Typography.titleSmall.copy(fontFamily = fontFamily).withScale(),
+        bodyLarge = Typography.bodyLarge.copy(fontFamily = fontFamily).withScale(),
+        bodyMedium = Typography.bodyMedium.copy(fontFamily = fontFamily).withScale(),
+        bodySmall = Typography.bodySmall.copy(fontFamily = fontFamily).withScale(),
+        labelLarge = Typography.labelLarge.copy(fontFamily = fontFamily).withScale(),
+        labelMedium = Typography.labelMedium.copy(fontFamily = fontFamily).withScale(),
+        labelSmall = Typography.labelSmall.copy(fontFamily = fontFamily).withScale()
     )
 }

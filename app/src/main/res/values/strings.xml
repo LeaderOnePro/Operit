@@ -2174,6 +2174,8 @@
     <string name="chat_settings_bar_right_margin_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
     <string name="chat_settings_button_end_padding">聊天设置按钮右边距</string>
     <string name="chat_settings_button_end_padding_desc">调整聊天设置按钮距离屏幕右边缘的距离，单位为dp</string>
+    <string name="chat_area_horizontal_padding">聊天区域水平内边距</string>
+    <string name="chat_area_horizontal_padding_desc">调整聊天消息区域距离屏幕左右边缘的距离，单位为dp</string>
     <string name="current_value">当前值</string>
     <string name="closer_to_edge">靠近边缘</string>
     <string name="farther_from_edge">远离边缘</string>

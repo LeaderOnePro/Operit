@@ -308,11 +308,13 @@ fun ThemeSettingsScreen() {
     val fontType = preferencesManager.fontType.collectAsState(initial = UserPreferencesManager.FONT_TYPE_SYSTEM).value
     val systemFontName = preferencesManager.systemFontName.collectAsState(initial = UserPreferencesManager.SYSTEM_FONT_DEFAULT).value
     val customFontPath = preferencesManager.customFontPath.collectAsState(initial = null).value
+    val fontScale = preferencesManager.fontScale.collectAsState(initial = 1.0f).value
 
     var useCustomFontInput by remember { mutableStateOf(useCustomFont) }
     var fontTypeInput by remember { mutableStateOf(fontType) }
     var systemFontNameInput by remember { mutableStateOf(systemFontName) }
     var customFontPathInput by remember { mutableStateOf(customFontPath) }
+    var fontScaleInput by remember { mutableStateOf(fontScale) }
 
     var showColorPicker by remember { mutableStateOf(false) }
     var currentColorPickerMode by remember { mutableStateOf("primary") }
@@ -665,7 +667,8 @@ fun ThemeSettingsScreen() {
             useCustomFont,
             fontType,
             systemFontName,
-            customFontPath
+            customFontPath,
+            fontScale
     ) {
         themeModeInput = themeMode
         useSystemThemeInput = useSystemTheme
@@ -711,6 +714,7 @@ fun ThemeSettingsScreen() {
         fontTypeInput = fontType
         systemFontNameInput = systemFontName
         customFontPathInput = customFontPath
+        fontScaleInput = fontScale
     }
 
     // 字体文件选择器 launcher
@@ -1941,6 +1945,25 @@ fun ThemeSettingsScreen() {
                             }
                         }
                     }
+
+                    // 添加字体大小调整滑块
+                    Divider(modifier = Modifier.padding(vertical = 16.dp))
+                    Text(
+                        text = "字体大小缩放 (${String.format("%.1f", fontScaleInput)}x)",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Slider(
+                        value = fontScaleInput,
+                        onValueChange = { fontScaleInput = it },
+                        onValueChangeFinished = {
+                            saveThemeSettingsWithCharacterCard {
+                                preferencesManager.saveThemeSettings(fontScale = fontScaleInput)
+                            }
+                        },
+                        valueRange = 0.8f..1.5f,
+                        steps = 6
+                    )
                 }
             }
         }
@@ -2722,6 +2745,11 @@ fun ThemeSettingsScreen() {
                         showSaveSuccessMessage = true
                         globalUserAvatarUriInput = null
                         globalUserNameInput = null
+                        useCustomFontInput = false
+                        fontTypeInput = UserPreferencesManager.FONT_TYPE_SYSTEM
+                        systemFontNameInput = UserPreferencesManager.SYSTEM_FONT_DEFAULT
+                        customFontPathInput = null
+                        fontScaleInput = 1.0f
                     }
                 },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)

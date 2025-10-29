@@ -116,7 +116,8 @@ fun ChatScreenContent(
         chatHeaderOverlayMode: Boolean,
         chatStyle: ChatStyle, // Add chatStyle parameter
         historyListState: LazyListState,
-        onSwitchCharacter: (String) -> Unit
+        onSwitchCharacter: (String) -> Unit,
+        chatAreaHorizontalPadding: Float = 16f // 聊天区域水平内边距
 ) {
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
@@ -201,7 +202,8 @@ fun ChatScreenContent(
                             } else {
                                 selectedMessageIndices + index
                             }
-                        }
+                        },
+                        horizontalPadding = chatAreaHorizontalPadding.dp
                 )
                 ChatScreenHeader(
                         modifier =
@@ -254,6 +256,7 @@ fun ChatScreenContent(
                         chatStyle = chatStyle, // Pass chat style
                         isMultiSelectMode = isMultiSelectMode,
                         selectedMessageIndices = selectedMessageIndices,
+                        horizontalPadding = chatAreaHorizontalPadding.dp,
                         onToggleMultiSelectMode = { initialIndex ->
                             isMultiSelectMode = !isMultiSelectMode
                             if (!isMultiSelectMode) {

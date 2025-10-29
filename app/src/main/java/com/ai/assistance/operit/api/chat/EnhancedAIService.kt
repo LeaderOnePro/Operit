@@ -967,11 +967,36 @@ class EnhancedAIService private constructor(private val context: Context) {
             toolName.contains(':') -> {
                 val parts = toolName.split(':', limit = 2)
                 val packName = parts[0]
+                val toolNamePart = parts.getOrNull(1) ?: ""
                 val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
-                if (isAvailable) "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 命令来激活它。"
-                else "工具包 '$packName' 不存在。"
+                
+                if (!isAvailable) {
+                    "工具包 '$packName' 不存在。"
+                } else {
+                    // 包存在，检查是否已激活（通过检查该包的任何工具是否已注册）
+                    val packageTools = packageManager.getPackageTools(packName)?.tools ?: emptyList()
+                    val isPackageActivated = packageTools.any { 
+                        toolHandler.getToolExecutor("$packName:${it.name}") != null 
+                    }
+                    
+                    if (isPackageActivated) {
+                        // 包已激活但工具不存在
+                        "工具 '$toolNamePart' 在工具包 '$packName' 中不存在。请使用 'use_package' 工具并指定包名 '$packName' 来查看该包的所有可用工具。"
+                    } else {
+                        // 包未激活
+                        "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 工具并指定包名 '$packName' 来激活它。"
+                    }
+                }
             }
-            else -> "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+            else -> {
+                // 检查是否直接把包名当作工具名调用了
+                val isPackageName = packageManager.getAvailablePackages().containsKey(toolName)
+                if (isPackageName) {
+                    "错误: '$toolName' 是一个工具包，不是工具。请先使用 'use_package' 工具并指定包名 '$toolName' 来激活这个工具包，然后才能使用其中的工具。"
+                } else {
+                    "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
+                }
+            }
         }
     }
 

@@ -63,7 +63,7 @@ class McpBridge {
         this.pendingSpawnRequests = new Map(); // 跟踪等待启动的 spawn 请求
         // 请求超时(毫秒)
         this.REQUEST_TIMEOUT = 180000; // 180秒超时 (3分钟)
-        this.SPAWN_TIMEOUT = 60000; // spawn命令60秒超时
+        this.SPAWN_TIMEOUT = 180000; // spawn命令180秒超时
         // 服务错误记录
         this.mcpErrors = new Map();
         this.serviceExitSignals = new Map();

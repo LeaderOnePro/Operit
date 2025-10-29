@@ -98,7 +98,7 @@ fun BubbleUserMessageComposable(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 0.dp, vertical = 4.dp)
     ) {
         // Display reply info above attachments if present
         replyInfo?.let { reply ->
@@ -109,7 +109,7 @@ fun BubbleUserMessageComposable(
                 horizontalArrangement = Arrangement.End
             ) {
                 Surface(
-                    modifier = Modifier.padding(start = 64.dp),
+                    modifier = Modifier.padding(start = 32.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp, 8.dp, 2.dp, 8.dp)
                 ) {
@@ -144,7 +144,7 @@ fun BubbleUserMessageComposable(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp, start = 64.dp),
+                    .padding(bottom = 4.dp, start = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.End
             ) {
@@ -236,7 +236,7 @@ fun BubbleUserMessageComposable(
             Surface(
                 modifier = Modifier
                     .weight(1f, fill = false)
-                    .padding(start = 64.dp)
+                    .padding(start = 32.dp)
                     .defaultMinSize(minHeight = 44.dp),
                 shape = RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp),
                 color = backgroundColor,

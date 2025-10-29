@@ -151,6 +151,9 @@ fun AIChatScreen(
         }
     }
 
+    // Collect chat area horizontal padding from preferences
+    val chatAreaHorizontalPadding by preferencesManager.chatAreaHorizontalPadding.collectAsState(initial = 16f)
+
     // 添加编辑按钮和编辑状态
     val editingMessageIndex = remember { mutableStateOf<Int?>(null) }
     val editingMessageContent = remember { mutableStateOf("") }
@@ -639,7 +642,8 @@ fun AIChatScreen(
                                     coroutineScope.launch {
                                         characterCardManager.setActiveCharacterCard(characterId)
                                     }
-                                }
+                                },
+                                chatAreaHorizontalPadding = chatAreaHorizontalPadding
                         )
 
                         // The settings bar is aligned to the bottom-end of the parent Box,

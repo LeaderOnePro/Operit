@@ -106,6 +106,7 @@ class UserPreferencesManager(private val context: Context) {
         private val FONT_TYPE = stringPreferencesKey("font_type")  // "system" or "file"
         private val SYSTEM_FONT_NAME = stringPreferencesKey("system_font_name")
         private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+        private val FONT_SCALE = floatPreferencesKey("font_scale")
 
         // Chat style preference
         private val CHAT_STYLE = stringPreferencesKey("chat_style")
@@ -151,6 +152,7 @@ class UserPreferencesManager(private val context: Context) {
 
         // 布局调整设置
         private val CHAT_SETTINGS_BUTTON_END_PADDING = floatPreferencesKey("chat_settings_button_end_padding")
+        private val CHAT_AREA_HORIZONTAL_PADDING = floatPreferencesKey("chat_area_horizontal_padding")
 
         // 最近使用颜色
         private val RECENT_COLORS = stringPreferencesKey("recent_colors")
@@ -447,10 +449,20 @@ class UserPreferencesManager(private val context: Context) {
             preferences[CUSTOM_FONT_PATH]
         }
 
+    val fontScale: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[FONT_SCALE] ?: 1.0f
+        }
+
     // 布局调整设置
     val chatSettingsButtonEndPadding: Flow<Float> =
         context.userPreferencesDataStore.data.map { preferences ->
             preferences[CHAT_SETTINGS_BUTTON_END_PADDING] ?: 2f // 默认2dp
+        }
+
+    val chatAreaHorizontalPadding: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[CHAT_AREA_HORIZONTAL_PADDING] ?: 16f // 默认16dp
         }
 
     // 获取最近使用颜色
@@ -494,10 +506,18 @@ class UserPreferencesManager(private val context: Context) {
         }
     }
 
+    // 保存聊天区域水平内边距
+    suspend fun saveChatAreaHorizontalPadding(padding: Float) {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences[CHAT_AREA_HORIZONTAL_PADDING] = padding
+        }
+    }
+
     // 重置布局设置
     suspend fun resetLayoutSettings() {
         context.userPreferencesDataStore.edit { preferences ->
             preferences.remove(CHAT_SETTINGS_BUTTON_END_PADDING)
+            preferences.remove(CHAT_AREA_HORIZONTAL_PADDING)
         }
     }
 
@@ -585,7 +605,8 @@ class UserPreferencesManager(private val context: Context) {
             useCustomFont: Boolean? = null,
             fontType: String? = null,
             systemFontName: String? = null,
-            customFontPath: String? = null
+            customFontPath: String? = null,
+            fontScale: Float? = null
     ) {
         context.userPreferencesDataStore.edit { preferences ->
             themeMode?.let { preferences[THEME_MODE] = it }
@@ -638,6 +659,7 @@ class UserPreferencesManager(private val context: Context) {
             fontType?.let { preferences[FONT_TYPE] = it }
             systemFontName?.let { preferences[SYSTEM_FONT_NAME] = it }
             customFontPath?.let { preferences[CUSTOM_FONT_PATH] = it }
+            fontScale?.let { preferences[FONT_SCALE] = it }
         }
     }
 
@@ -688,6 +710,7 @@ class UserPreferencesManager(private val context: Context) {
             preferences.remove(FONT_TYPE)
             preferences.remove(SYSTEM_FONT_NAME)
             preferences.remove(CUSTOM_FONT_PATH)
+            preferences.remove(FONT_SCALE)
         }
     }
 
@@ -958,7 +981,7 @@ class UserPreferencesManager(private val context: Context) {
 
     private fun getAllFloatThemeKeys(): List<Preferences.Key<Float>> {
         return listOf(
-            BACKGROUND_IMAGE_OPACITY, BACKGROUND_BLUR_RADIUS, KEY_AVATAR_CORNER_RADIUS
+            BACKGROUND_IMAGE_OPACITY, BACKGROUND_BLUR_RADIUS, KEY_AVATAR_CORNER_RADIUS, FONT_SCALE
         )
     }
 

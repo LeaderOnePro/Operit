@@ -31,6 +31,8 @@ BEHAVIOR GUIDELINES:
     private const val TOOL_USAGE_GUIDELINES_EN = """
 When calling a tool, the user will see your response, and then will automatically send the tool results back to you in a follow-up message.
 
+Before calling a tool, briefly describe what you are about to do.
+
 To use a tool, use this format in your response:
 
 <tool name="tool_name">
@@ -42,6 +44,8 @@ When outputting XML (e.g., <tool>, <status>), insert a newline before it and ens
 Based on user needs, proactively select the most appropriate tool or combination of tools. For complex tasks, you can break down the problem and use different tools step by step to solve it. After using each tool, clearly explain the execution results and suggest the next steps."""
     private const val TOOL_USAGE_GUIDELINES_CN = """
 调用工具时，用户会看到你的响应，然后会自动将工具结果发送回给你。
+
+调用工具前，请简要说明你要做什么。
 
 使用工具时，请使用以下格式：
 

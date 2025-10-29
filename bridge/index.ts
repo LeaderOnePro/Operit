@@ -107,7 +107,7 @@ class McpBridge {
 
     // 请求超时(毫秒)
     private readonly REQUEST_TIMEOUT = 180000; // 180秒超时 (3分钟)
-    private readonly SPAWN_TIMEOUT = 60000; // spawn命令60秒超时
+    private readonly SPAWN_TIMEOUT = 180000; // spawn命令180秒超时
 
     // 服务错误记录
     private mcpErrors: Map<string, string> = new Map();
