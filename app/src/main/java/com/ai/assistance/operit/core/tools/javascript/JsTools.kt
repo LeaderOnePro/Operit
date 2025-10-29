@@ -174,9 +174,8 @@ fun getJsToolsDefinition(): String {
                 // 执行终端命令 - 一次性收集输出
                 terminal: {
                     create: (sessionName) => toolCall("create_terminal_session", { session_name: sessionName }),
-                    exec: (sessionId, command, timeoutMs) => {
+                    exec: (sessionId, command) => {
                         const params = { session_id: sessionId, command };
-                        if (timeoutMs) params.timeout_ms = timeoutMs;
                         return toolCall("execute_in_terminal_session", params);
                     },
                     close: (sessionId) => toolCall("close_terminal_session", { session_id: sessionId })

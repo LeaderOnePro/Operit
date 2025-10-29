@@ -33,7 +33,7 @@ const fileConverter = (function () {
 
     async function executeTerminalCommand(command: string, timeoutMs?: number) {
         const sessionId = await getTerminalSessionId();
-        return await Tools.System.terminal.exec(sessionId, command, timeoutMs);
+        return await Tools.System.terminal.exec(sessionId, command);
     }
 
     interface ToolResponse {
@@ -70,14 +70,14 @@ const fileConverter = (function () {
         // Assuming an apt-based system (like Debian/Ubuntu).
         const updateCmd = 'apt-get update';
         console.log(`Running: ${updateCmd}`);
-        const updateResult = await executeTerminalCommand(updateCmd, 120000);
+        const updateResult = await executeTerminalCommand(updateCmd);
         if (updateResult.exitCode !== 0) {
             console.warn(`'apt-get update' failed. This might be okay if caches are fresh, but installation may fail.\nOutput: ${updateResult.output}`);
         }
 
         const installCmd = `apt-get install -y ${packageName}`;
         console.log(`Running: ${installCmd}`);
-        const installResult = await executeTerminalCommand(installCmd, 300000);
+        const installResult = await executeTerminalCommand(installCmd);
 
         if (installResult.exitCode !== 0) {
             console.error(`Failed to install ${packageName}: ${installResult.output}`);
@@ -149,7 +149,7 @@ const fileConverter = (function () {
         await checkAndInstall(converter.tool, converter.pkg);
 
         console.log(`Executing conversion command: ${converter.command}`);
-        const result = await executeTerminalCommand(converter.command, 300000);
+        const result = await executeTerminalCommand(converter.command);
 
         if (result.exitCode !== 0) {
             throw new Error(`Conversion failed. Exit code: ${result.exitCode}\nOutput:\n${result.output}`);

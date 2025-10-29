@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.setValue
+import com.ai.assistance.operit.ui.components.CustomScaffold
 
 // 定义一个 CompositionLocal，用于向下传递当前屏幕是否可见的状态
 val LocalIsCurrentScreen = compositionLocalOf { true }
@@ -186,6 +187,7 @@ fun AppContent(
     CompositionLocalProvider(LocalAppBarContentColor provides appBarContentColor) {
         // 使用Scaffold来正确处理顶部栏和内容的布局
         Scaffold(
+            
             topBar = {
                 // 单一工具栏 - 使用小型化的设计
                 SmallTopAppBar(
@@ -397,3 +399,4 @@ fun AppContent(
         }
     }
 }
+

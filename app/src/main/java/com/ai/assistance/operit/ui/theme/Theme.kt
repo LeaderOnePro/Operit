@@ -204,6 +204,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 // 状态栏颜色和图标颜色控制
                 val statusBarColor = when {
                     statusBarTransparent -> Color.Transparent.toArgb()
+                    useBackgroundImage && backgroundImageUri != null -> Color.Transparent.toArgb()  // 有背景时透明
                     useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
                     else -> colorScheme.primary.toArgb()
                 }
@@ -216,13 +217,27 @@ fun OperitTheme(content: @Composable () -> Unit) {
             }
             
             // 设置导航栏颜色（底部小白条所在的区域）
-            // 使用软件背景色作为导航栏背景色
-            window.navigationBarColor = colorScheme.background.toArgb()
-            
-            // 根据导航栏背景色动态设置导航栏图标颜色
-            // isAppearanceLightNavigationBars = true 表示图标为深色（适用于浅色背景）
-            // isAppearanceLightNavigationBars = false 表示图标为浅色（适用于深色背景）
-            insetsController?.isAppearanceLightNavigationBars = !isColorLight(colorScheme.background)
+            // 在有背景图片时，让导航栏透明
+            if (useBackgroundImage && backgroundImageUri != null) {
+                // 关键：禁用导航栏对比度强制模式（Android 10+）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isNavigationBarContrastEnforced = false
+                }
+                // 设置为完全透明
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                // 根据主题设置导航栏图标颜色
+                insetsController?.isAppearanceLightNavigationBars = !darkTheme
+            } else {
+                // 没有背景时使用软件背景色作为导航栏背景色
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.isNavigationBarContrastEnforced = true
+                }
+                window.navigationBarColor = colorScheme.background.toArgb()
+                // 根据导航栏背景色动态设置导航栏图标颜色
+                // isAppearanceLightNavigationBars = true 表示图标为深色（适用于浅色背景）
+                // isAppearanceLightNavigationBars = false 表示图标为浅色（适用于深色背景）
+                insetsController?.isAppearanceLightNavigationBars = !isColorLight(colorScheme.background)
+            }
         }
     }
 

@@ -98,7 +98,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                                 .find { param -> param.name == "timeout_ms" }
                                 ?.value
                                 ?.toLongOrNull()
-                                ?: 30000L
+                                ?: 1800000L // 30 分钟
 
                 val terminal = Terminal.getInstance(context)
 

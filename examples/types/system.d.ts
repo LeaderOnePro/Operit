@@ -127,10 +127,9 @@ export namespace System {
          * Execute a command in a terminal session.
          * @param sessionId The ID of the session.
          * @param command The command to execute.
-         * @param timeoutMs Optional timeout in milliseconds.
          * @returns Promise resolving to the command execution result.
          */
-        function exec(sessionId: string, command: string, timeoutMs?: number): Promise<TerminalCommandResultData>;
+        function exec(sessionId: string, command: string): Promise<TerminalCommandResultData>;
 
         /**
          * Close a terminal session.

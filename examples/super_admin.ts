@@ -76,7 +76,7 @@ const superAdmin = (function () {
             }
 
             // 调用系统工具执行终端命令
-            const result = await Tools.System.terminal.exec(sessionId!, command, timeout);
+            const result = await Tools.System.terminal.exec(sessionId!, command);
 
             return {
                 command: command,

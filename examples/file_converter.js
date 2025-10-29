@@ -29,7 +29,7 @@ const fileConverter = (function () {
     }
     async function executeTerminalCommand(command, timeoutMs) {
         const sessionId = await getTerminalSessionId();
-        return await Tools.System.terminal.exec(sessionId, command, timeoutMs);
+        return await Tools.System.terminal.exec(sessionId, command);
     }
     /**
      * Checks if a command-line tool is installed, and attempts to install it if not found.
@@ -50,13 +50,13 @@ const fileConverter = (function () {
         // Assuming an apt-based system (like Debian/Ubuntu).
         const updateCmd = 'apt-get update';
         console.log(`Running: ${updateCmd}`);
-        const updateResult = await executeTerminalCommand(updateCmd, 120000);
+        const updateResult = await executeTerminalCommand(updateCmd);
         if (updateResult.exitCode !== 0) {
             console.warn(`'apt-get update' failed. This might be okay if caches are fresh, but installation may fail.\nOutput: ${updateResult.output}`);
         }
         const installCmd = `apt-get install -y ${packageName}`;
         console.log(`Running: ${installCmd}`);
-        const installResult = await executeTerminalCommand(installCmd, 300000);
+        const installResult = await executeTerminalCommand(installCmd);
         if (installResult.exitCode !== 0) {
             console.error(`Failed to install ${packageName}: ${installResult.output}`);
             throw new Error(`Failed to install required tool: ${toolName} (package: ${packageName}). Please try installing it manually.`);
@@ -115,7 +115,7 @@ const fileConverter = (function () {
         const converter = getConverterInfo(input_path, output_path, options);
         await checkAndInstall(converter.tool, converter.pkg);
         console.log(`Executing conversion command: ${converter.command}`);
-        const result = await executeTerminalCommand(converter.command, 300000);
+        const result = await executeTerminalCommand(converter.command);
         if (result.exitCode !== 0) {
             throw new Error(`Conversion failed. Exit code: ${result.exitCode}\nOutput:\n${result.output}`);
         }
