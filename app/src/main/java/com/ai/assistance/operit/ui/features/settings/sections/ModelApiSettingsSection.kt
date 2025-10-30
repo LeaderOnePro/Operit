@@ -50,6 +50,7 @@ fun ModelApiSettingsSection(
         config: ModelConfigData,
         configManager: ModelConfigManager,
         showNotification: (String) -> Unit,
+        onSaveRequested: (() -> Unit) -> Unit = {},
         navigateToMnnModelDownload: (() -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
@@ -99,6 +100,54 @@ fun ModelApiSettingsSection(
     
     // 图片处理配置状态
     var enableDirectImageProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectImageProcessing) }
+
+    // 保存设置的通用函数
+    val saveSettings = {
+        scope.launch {
+            // 强制在使用默认API密钥时使用默认模型
+            val modelToSave =
+                    if (apiKeyInput == ApiPreferences.DEFAULT_API_KEY) {
+                        ApiPreferences.DEFAULT_MODEL_NAME
+                    } else {
+                        modelNameInput
+                    }
+
+            Log.d(
+                    TAG,
+                    "保存API设置: apiKey=${apiKeyInput.take(5)}..., endpoint=$apiEndpointInput, model=$modelToSave, providerType=${selectedApiProvider.name}"
+            )
+
+            // 更新配置
+            configManager.updateModelConfig(
+                    configId = config.id,
+                    apiKey = apiKeyInput,
+                    apiEndpoint = apiEndpointInput,
+                    modelName = modelToSave,
+                    apiProviderType = selectedApiProvider,
+                    mnnForwardType = mnnForwardTypeInput,
+                    mnnThreadCount = mnnThreadCountInput.toIntOrNull() ?: 4
+            )
+
+            // 更新图片直接处理配置
+            configManager.updateDirectImageProcessing(
+                    configId = config.id,
+                    enableDirectImageProcessing = enableDirectImageProcessingInput
+            )
+
+            // 刷新所有AI服务实例，确保使用最新配置
+            EnhancedAIService.refreshAllServices(
+                    configManager.appContext
+            )
+
+            Log.d(TAG, "API设置保存完成并刷新服务")
+            showNotification(context.getString(R.string.api_settings_saved))
+        }
+    }
+
+    // 将保存函数暴露给父组件
+    LaunchedEffect(Unit) {
+        onSaveRequested(saveSettings)
+    }
 
     // 根据API提供商获取默认的API端点URL
     fun getDefaultApiEndpoint(providerType: ApiProviderType): String {
@@ -752,45 +801,7 @@ fun ModelApiSettingsSection(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(
                         onClick = {
-                            scope.launch {
-                                // 强制在使用默认API密钥时使用默认模型
-                                val modelToSave =
-                                        if (apiKeyInput == ApiPreferences.DEFAULT_API_KEY) {
-                                            ApiPreferences.DEFAULT_MODEL_NAME
-                                        } else {
-                                            modelNameInput
-                                        }
-
-                                Log.d(
-                                        TAG,
-                                        "保存API设置: apiKey=${apiKeyInput.take(5)}..., endpoint=$apiEndpointInput, model=$modelToSave, providerType=${selectedApiProvider.name}"
-                                )
-
-                                // 更新配置
-                                configManager.updateModelConfig(
-                                        configId = config.id,
-                                        apiKey = apiKeyInput,
-                                        apiEndpoint = apiEndpointInput,
-                                        modelName = modelToSave,
-                                        apiProviderType = selectedApiProvider,
-                                        mnnForwardType = mnnForwardTypeInput,
-                                        mnnThreadCount = mnnThreadCountInput.toIntOrNull() ?: 4
-                                )
-
-                                // 更新图片直接处理配置
-                                configManager.updateDirectImageProcessing(
-                                        configId = config.id,
-                                        enableDirectImageProcessing = enableDirectImageProcessingInput
-                                )
-
-                                // 刷新所有AI服务实例，确保使用最新配置
-                                EnhancedAIService.refreshAllServices(
-                                        configManager.appContext
-                                )
-
-                                Log.d(TAG, "API设置保存完成并刷新服务")
-                                showNotification(context.getString(R.string.api_settings_saved))
-                            }
+                            saveSettings()
                         }
                 ) { Text(stringResource(R.string.save_api_settings)) }
             }

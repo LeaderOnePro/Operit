@@ -312,7 +312,7 @@ fun PersonaCardGenerationScreen(
             - field 取值："name" | "description" | "characterSetting" | "openingStatement" | "otherContent" | "advancedCustomPrompt" | "marks"
             - 工具调用格式为: <tool name="save_character_info"><param name="field">字段名</param><param name="content">内容</param></tool>
             - 例如，如果角色名称确认是“奶糖”，则必须在回答的末尾调用: <tool name="save_character_info"><param name="field">name</param><param name="content">奶糖</param></tool>
-        """.trimIndent()
+            """.trimIndent()
     }
     
     // 检查是否所有字段都已完成

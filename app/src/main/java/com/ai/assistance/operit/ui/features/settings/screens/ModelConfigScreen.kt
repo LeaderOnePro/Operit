@@ -62,6 +62,9 @@ fun ModelConfigScreen(
     // 连接测试状态
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Result<String>?>(null) }
+    
+    // 保存API设置的函数引用
+    var saveApiSettings: (() -> Unit)? by remember { mutableStateOf(null) }
 
     // 初始化配置管理器
     LaunchedEffect(Unit) { configManager.initializeIfNeeded() }
@@ -236,6 +239,11 @@ fun ModelConfigScreen(
                         TextButton(
                                 onClick = {
                                     scope.launch {
+                                        // 先保存API设置
+                                        saveApiSettings?.invoke()
+                                        // 延迟以确保保存操作完成
+                                        kotlinx.coroutines.delay(300)
+                                        
                                         isTestingConnection = true
                                         testResult = null
                                         try {
@@ -415,10 +423,11 @@ fun ModelConfigScreen(
             // API设置区域
             selectedConfig.value?.let { config ->
                 ModelApiSettingsSection(
-                        config = config,
-                        configManager = configManager,
-                        showNotification = { message -> showNotification(message) },
-                        navigateToMnnModelDownload = navigateToMnnModelDownload
+                    config = config,
+                    configManager = configManager,
+                    showNotification = { message -> showNotification(message) },
+                    onSaveRequested = { saveFunction -> saveApiSettings = saveFunction },
+                    navigateToMnnModelDownload = navigateToMnnModelDownload
                 )
             }
 
