@@ -181,6 +181,9 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
             aiService.cachedInputTokenCount
         )
         
+        // Update request count
+        apiPreferences?.incrementRequestCountForProviderModel(aiService.providerModel)
+        
         // 解析 AI 返回的 JSON 并更新记忆
         parseAndApplyCategorization(result.toString(), memories, repository)
     }
@@ -597,6 +600,9 @@ ${memories.joinToString("\n") { "- 标题: ${it.title}, 内容: ${it.content.tak
                     aiService.outputTokenCount,
                     aiService.cachedInputTokenCount
             )
+            
+            // Update request count
+            apiPreferences?.incrementRequestCountForProviderModel(aiService.providerModel)
 
             return parseAnalysisResult(ChatUtils.removeThinkingContent(result.toString()))
         } catch (e: Exception) {

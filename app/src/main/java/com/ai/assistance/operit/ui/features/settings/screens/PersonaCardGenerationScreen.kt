@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.model.FunctionType
@@ -25,6 +26,7 @@ import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.PromptTagManager
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.data.preferences.PersonaCardChatHistoryManager
 import kotlinx.coroutines.*
@@ -333,7 +335,7 @@ fun PersonaCardGenerationScreen(
         prompt: String,
         historyPairs: List<Pair<String, String>>,
         systemPrompt: String? = null
-    ): Stream<String> = withContext(Dispatchers.IO) {
+    ): Pair<Stream<String>, AIService> = withContext(Dispatchers.IO) {
         val aiService = EnhancedAIService
             .getInstance(context)
             .getAIServiceForFunction(FunctionType.CHAT)
@@ -346,10 +348,11 @@ fun PersonaCardGenerationScreen(
         }
         fullHistory.addAll(historyPairs)
 
-        aiService.sendMessage(
+        val stream = aiService.sendMessage(
             message = prompt,
             chatHistory = fullHistory
         )
+        Pair(stream, aiService)
     }
 
     // 解析并执行工具调用
@@ -436,7 +439,7 @@ fun PersonaCardGenerationScreen(
                 chatMessages.map { it.role to it.content }
             }
 
-            val stream = requestFromDefaultService(input, historyPairs, systemPrompt)
+            val (stream, aiService) = requestFromDefaultService(input, historyPairs, systemPrompt)
 
             // 提前插入占位的"生成中…"助手消息
             val generatingText = context.getString(R.string.generating)
@@ -469,6 +472,18 @@ fun PersonaCardGenerationScreen(
                             scope.launch { listState.animateScrollToItem(chatMessages.lastIndex) }
                         }
                     }
+                }
+
+                // Update token and request count statistics
+                withContext(Dispatchers.IO) {
+                    val apiPreferences = ApiPreferences.getInstance(context)
+                    apiPreferences.updateTokensForProviderModel(
+                        aiService.providerModel,
+                        aiService.inputTokenCount,
+                        aiService.outputTokenCount,
+                        aiService.cachedInputTokenCount
+                    )
+                    apiPreferences.incrementRequestCountForProviderModel(aiService.providerModel)
                 }
 
                 // 流结束后解析并执行工具

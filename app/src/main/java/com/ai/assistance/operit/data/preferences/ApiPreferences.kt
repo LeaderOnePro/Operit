@@ -59,6 +59,18 @@ class ApiPreferences private constructor(private val context: Context) {
         fun getModelOutputPriceKey(providerModel: String) =
                 floatPreferencesKey("model_output_price_${providerModel.replace(":", "_")}")
 
+        // 请求次数统计键
+        fun getRequestCountKey(providerModel: String) =
+                intPreferencesKey("request_count_${providerModel.replace(":", "_")}")
+
+        // 计费方式键
+        fun getBillingModeKey(providerModel: String) =
+                stringPreferencesKey("billing_mode_${providerModel.replace(":", "_")}")
+
+        // 按次计费价格键
+        fun getPricePerRequestKey(providerModel: String) =
+                floatPreferencesKey("price_per_request_${providerModel.replace(":", "_")}")
+
         val SHOW_FPS_COUNTER = booleanPreferencesKey("show_fps_counter")
         val ENABLE_AI_PLANNING = booleanPreferencesKey("enable_ai_planning")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -633,7 +645,7 @@ class ApiPreferences private constructor(private val context: Context) {
             val keysToRemove = mutableListOf<Preferences.Key<*>>()
             preferences.asMap().forEach { (key, _) ->
                 val keyName = key.name
-                if (keyName.startsWith("token_input_") || keyName.startsWith("token_output_") || keyName.startsWith("token_cached_input_")) {
+                if (keyName.startsWith("token_input_") || keyName.startsWith("token_output_") || keyName.startsWith("token_cached_input_") || keyName.startsWith("request_count_")) {
                     keysToRemove.add(key)
                 }
             }
@@ -649,6 +661,7 @@ class ApiPreferences private constructor(private val context: Context) {
             preferences[getTokenInputKey(providerModel)] = 0
             preferences[getTokenCachedInputKey(providerModel)] = 0
             preferences[getTokenOutputKey(providerModel)] = 0
+            preferences[getRequestCountKey(providerModel)] = 0
         }
     }
 
@@ -688,6 +701,110 @@ class ApiPreferences private constructor(private val context: Context) {
     suspend fun setModelOutputPrice(providerModel: String, price: Double) {
         context.apiDataStore.edit { preferences ->
             preferences[getModelOutputPriceKey(providerModel)] = price.toFloat()
+        }
+    }
+
+    // ===== Request Count Statistics 请求次数统计相关方法 =====
+
+    /**
+     * 增加指定供应商:模型的请求次数
+     * @param providerModel 供应商:模型标识符，格式如"DEEPSEEK:deepseek-chat"
+     */
+    suspend fun incrementRequestCountForProviderModel(providerModel: String) {
+        context.apiDataStore.edit { preferences ->
+            val countKey = getRequestCountKey(providerModel)
+            val currentCount = preferences[countKey] ?: 0
+            preferences[countKey] = currentCount + 1
+        }
+    }
+
+    /**
+     * 获取指定供应商:模型的请求次数
+     * @param providerModel 供应商:模型标识符
+     * @return 请求次数
+     */
+    suspend fun getRequestCountForProviderModel(providerModel: String): Int {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getRequestCountKey(providerModel)] ?: 0
+    }
+
+    /**
+     * 获取所有供应商:模型的请求次数统计
+     * @return Map<供应商:模型, 请求次数>
+     */
+    suspend fun getAllProviderModelRequestCounts(): Map<String, Int> {
+        val preferences = context.apiDataStore.data.first()
+        val result = mutableMapOf<String, Int>()
+        
+        // 遍历所有preferences，查找请求次数相关的key
+        preferences.asMap().forEach { (key, value) ->
+            val keyName = key.name
+            if (keyName.startsWith("request_count_")) {
+                val providerModel = keyName.removePrefix("request_count_").replace("_", ":")
+                val count = value as? Int ?: 0
+                if (count > 0) {
+                    result[providerModel] = count
+                }
+            }
+        }
+        
+        return result
+    }
+
+    /**
+     * 重置指定供应商:模型的请求次数
+     * @param providerModel 供应商:模型标识符
+     */
+    suspend fun resetProviderModelRequestCount(providerModel: String) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getRequestCountKey(providerModel)] = 0
+        }
+    }
+
+    // ===== Billing Mode 计费方式相关方法 =====
+
+    /**
+     * 获取指定供应商:模型的计费方式
+     * @param providerModel 供应商:模型标识符
+     * @return 计费方式，默认为TOKEN
+     */
+    suspend fun getBillingModeForProviderModel(providerModel: String): com.ai.assistance.operit.data.model.BillingMode {
+        val preferences = context.apiDataStore.data.first()
+        val modeString = preferences[getBillingModeKey(providerModel)]
+        return com.ai.assistance.operit.data.model.BillingMode.fromString(modeString)
+    }
+
+    /**
+     * 设置指定供应商:模型的计费方式
+     * @param providerModel 供应商:模型标识符
+     * @param mode 计费方式
+     */
+    suspend fun setBillingModeForProviderModel(providerModel: String, mode: com.ai.assistance.operit.data.model.BillingMode) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getBillingModeKey(providerModel)] = mode.name
+        }
+    }
+
+    // ===== Price Per Request 按次计费价格相关方法 =====
+
+    /**
+     * 获取指定供应商:模型的按次计费价格（人民币）
+     * @param providerModel 供应商:模型标识符
+     * @return 每次请求的价格，默认为0.01元
+     */
+    suspend fun getPricePerRequestForProviderModel(providerModel: String): Double {
+        val preferences = context.apiDataStore.data.first()
+        return preferences[getPricePerRequestKey(providerModel)]?.toDouble() ?: 0.01
+    }
+
+    /**
+     * 设置指定供应商:模型的按次计费价格（人民币）
+     * @param providerModel 供应商:模型标识符
+     * @param price 每次请求的价格
+     */
+    suspend fun setPricePerRequestForProviderModel(providerModel: String, price: Double) {
+        context.apiDataStore.edit { preferences ->
+            preferences[getPricePerRequestKey(providerModel)] = price.toFloat()
         }
     }
 

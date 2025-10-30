@@ -18,12 +18,13 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.model.BillingMode
 import com.ai.assistance.operit.ui.components.CustomScaffold
-import com.ai.assistance.operit.util.TokenCacheManager
 
 private const val DEFAULT_INPUT_PRICE = 2.0
 private const val DEFAULT_OUTPUT_PRICE = 3.0
 private const val DEFAULT_CACHED_INPUT_PRICE = 0.2
+private const val DEFAULT_PRICE_PER_REQUEST = 0.01
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,8 +37,14 @@ fun TokenUsageStatisticsScreen(
     
     // State to hold token data for all provider models
     val providerModelTokenUsage = remember { mutableStateMapOf<String, Triple<Int, Int, Int>>() }
+    // State to hold request counts for all provider models
+    val providerModelRequestCounts = remember { mutableStateMapOf<String, Int>() }
     // State to hold custom pricing for each model (input, output, cached input)
     val modelPricing = remember { mutableStateMapOf<String, Triple<Double, Double, Double>>() }
+    // State to hold billing mode for each model
+    val modelBillingMode = remember { mutableStateMapOf<String, BillingMode>() }
+    // State to hold price per request for each model
+    val modelPricePerRequest = remember { mutableStateMapOf<String, Double>() }
     var showPricingDialog by remember { mutableStateOf(false) }
     var selectedModel by remember { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -49,45 +56,82 @@ fun TokenUsageStatisticsScreen(
                 providerModelTokenUsage.clear()
                 providerModelTokenUsage.putAll(tokensMap)
                 
-                // Initialize pricing for new models with default values
+                // Initialize pricing and billing mode for new models with default values
                 tokensMap.keys.forEach { model ->
                     if (!modelPricing.containsKey(model)) {
-                        // Default pricing in RMB
-                        modelPricing[model] = Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE) // ¥2/1M input, ¥3/1M output, ¥0.2/1M cached input
+                        modelPricing[model] = Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
+                    }
+                    if (!modelBillingMode.containsKey(model)) {
+                        modelBillingMode[model] = BillingMode.TOKEN
+                    }
+                    if (!modelPricePerRequest.containsKey(model)) {
+                        modelPricePerRequest[model] = DEFAULT_PRICE_PER_REQUEST
                     }
                 }
             }
         }
     }
     
-    // Load custom pricing from preferences
+    // Load request counts
+    LaunchedEffect(Unit) {
+        scope.launch {
+            val requestCounts = apiPreferences.getAllProviderModelRequestCounts()
+            providerModelRequestCounts.clear()
+            providerModelRequestCounts.putAll(requestCounts)
+        }
+    }
+    
+    // Load custom pricing, billing mode, and price per request from preferences
     LaunchedEffect(Unit) {
         scope.launch {
             providerModelTokenUsage.keys.forEach { model ->
+                // Load token pricing
                 val inputPrice = apiPreferences.getModelInputPrice(model)
                 val outputPrice = apiPreferences.getModelOutputPrice(model)
                 val cachedInputPrice = apiPreferences.getModelCachedInputPrice(model)
                 if (inputPrice > 0.0 || outputPrice > 0.0 || cachedInputPrice > 0.0) {
                     modelPricing[model] = Triple(inputPrice, outputPrice, cachedInputPrice)
                 }
+                
+                // Load billing mode
+                val billingMode = apiPreferences.getBillingModeForProviderModel(model)
+                modelBillingMode[model] = billingMode
+                
+                // Load price per request
+                val pricePerRequest = apiPreferences.getPricePerRequestForProviderModel(model)
+                modelPricePerRequest[model] = pricePerRequest
             }
         }
     }
 
-    // Calculate costs for each provider model using custom pricing
+    // Calculate costs for each provider model based on billing mode
     val providerModelCosts = providerModelTokenUsage.mapValues { (model, tokens) ->
-        val pricing = modelPricing[model] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
-        // tokens.first = total input, tokens.second = output, tokens.third = cached input
-        val nonCachedInput = tokens.first - tokens.third
-        (nonCachedInput / 1_000_000.0 * pricing.first) + (tokens.second / 1_000_000.0 * pricing.second) + (tokens.third / 1_000_000.0 * pricing.third)
+        val billingMode = modelBillingMode[model] ?: BillingMode.TOKEN
+        
+        when (billingMode) {
+            BillingMode.TOKEN -> {
+                val pricing = modelPricing[model] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
+                // tokens.first = total input, tokens.second = output, tokens.third = cached input
+                val nonCachedInput = tokens.first - tokens.third
+                (nonCachedInput / 1_000_000.0 * pricing.first) + 
+                (tokens.second / 1_000_000.0 * pricing.second) + 
+                (tokens.third / 1_000_000.0 * pricing.third)
+            }
+            BillingMode.COUNT -> {
+                val pricePerRequest = modelPricePerRequest[model] ?: DEFAULT_PRICE_PER_REQUEST
+                val requestCount = providerModelRequestCounts[model] ?: 0
+                requestCount * pricePerRequest
+            }
+        }
     }
 
     val totalInputTokens = providerModelTokenUsage.values.sumOf { it.first }
     val totalOutputTokens = providerModelTokenUsage.values.sumOf { it.second }
     val totalCachedInputTokens = providerModelTokenUsage.values.sumOf { it.third }
     val totalTokens = totalInputTokens + totalOutputTokens
+    val totalRequests = providerModelRequestCounts.values.sum()
 
-    // Calculate total cost across all models
+    // Calculate total cost across all models (mixed billing modes)
     val totalCost = providerModelCosts.values.sum()
 
     CustomScaffold(
@@ -141,6 +185,19 @@ fun TokenUsageStatisticsScreen(
                                 )
                                 Text(
                                     text = "$totalTokens",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = stringResource(id = R.string.settings_total_requests),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "$totalRequests",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -276,15 +333,21 @@ fun TokenUsageStatisticsScreen(
                     val (input, output, cached) = tokens
                     val cost = providerModelCosts[providerModel] ?: 0.0
                     val pricing = modelPricing[providerModel] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
+                    val billingMode = modelBillingMode[providerModel] ?: BillingMode.TOKEN
+                    val requestCount = providerModelRequestCounts[providerModel] ?: 0
+                    val pricePerRequest = modelPricePerRequest[providerModel] ?: DEFAULT_PRICE_PER_REQUEST
                     
                     TokenUsageModelCard(
                         modelName = providerModel,
                         inputTokens = input,
                         cachedInputTokens = cached,
                         outputTokens = output,
+                        requestCount = requestCount,
                         cost = cost,
                         inputPrice = pricing.first,
                         outputPrice = pricing.second,
+                        billingMode = billingMode,
+                        pricePerRequest = pricePerRequest,
                         onClick = {
                             selectedModel = providerModel
                             showPricingDialog = true
@@ -295,12 +358,17 @@ fun TokenUsageStatisticsScreen(
         }
     }
 
-    // Pricing Dialog
+    // Pricing and Billing Mode Dialog
     if (showPricingDialog && selectedModel.isNotEmpty()) {
         val currentPricing = modelPricing[selectedModel] ?: Triple(DEFAULT_INPUT_PRICE, DEFAULT_OUTPUT_PRICE, DEFAULT_CACHED_INPUT_PRICE)
+        val currentBillingMode = modelBillingMode[selectedModel] ?: BillingMode.TOKEN
+        val currentPricePerRequest = modelPricePerRequest[selectedModel] ?: DEFAULT_PRICE_PER_REQUEST
+        
+        var billingMode by remember { mutableStateOf(currentBillingMode) }
         var inputPrice by remember { mutableStateOf(currentPricing.first.toString()) }
         var outputPrice by remember { mutableStateOf(currentPricing.second.toString()) }
         var cachedInputPrice by remember { mutableStateOf(currentPricing.third.toString()) }
+        var pricePerRequest by remember { mutableStateOf(currentPricePerRequest.toString()) }
         
         AlertDialog(
             onDismissRequest = { showPricingDialog = false },
@@ -309,50 +377,105 @@ fun TokenUsageStatisticsScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Billing Mode Selection
                     Text(
-                        text = stringResource(id = R.string.settings_pricing_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = stringResource(id = R.string.settings_billing_mode),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
                     )
                     
-                    OutlinedTextField(
-                        value = inputPrice,
-                        onValueChange = { inputPrice = it },
-                        label = { Text(stringResource(id = R.string.settings_input_price_per_million)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = billingMode == BillingMode.TOKEN,
+                            onClick = { billingMode = BillingMode.TOKEN },
+                            label = { Text(stringResource(id = R.string.settings_billing_mode_token)) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = billingMode == BillingMode.COUNT,
+                            onClick = { billingMode = BillingMode.COUNT },
+                            label = { Text(stringResource(id = R.string.settings_billing_mode_count)) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     
-                    OutlinedTextField(
-                        value = cachedInputPrice,
-                        onValueChange = { cachedInputPrice = it },
-                        label = { Text(stringResource(id = R.string.settings_cached_input_price_per_million)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Divider()
                     
-                    OutlinedTextField(
-                        value = outputPrice,
-                        onValueChange = { outputPrice = it },
-                        label = { Text(stringResource(id = R.string.settings_output_price_per_million)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    // Conditional pricing inputs based on billing mode
+                    if (billingMode == BillingMode.TOKEN) {
+                        Text(
+                            text = stringResource(id = R.string.settings_pricing_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        OutlinedTextField(
+                            value = inputPrice,
+                            onValueChange = { inputPrice = it },
+                            label = { Text(stringResource(id = R.string.settings_input_price_per_million)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        OutlinedTextField(
+                            value = cachedInputPrice,
+                            onValueChange = { cachedInputPrice = it },
+                            label = { Text(stringResource(id = R.string.settings_cached_input_price_per_million)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        OutlinedTextField(
+                            value = outputPrice,
+                            onValueChange = { outputPrice = it },
+                            label = { Text(stringResource(id = R.string.settings_output_price_per_million)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        Text(
+                            text = "设置每次API请求的人民币价格",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        OutlinedTextField(
+                            value = pricePerRequest,
+                            onValueChange = { pricePerRequest = it },
+                            label = { Text(stringResource(id = R.string.settings_price_per_request)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val inputPriceDouble = inputPrice.toDoubleOrNull() ?: DEFAULT_INPUT_PRICE
-                        val outputPriceDouble = outputPrice.toDoubleOrNull() ?: DEFAULT_OUTPUT_PRICE
-                        val cachedInputPriceDouble = cachedInputPrice.toDoubleOrNull() ?: DEFAULT_CACHED_INPUT_PRICE
-                        
-                        modelPricing[selectedModel] = Triple(inputPriceDouble, outputPriceDouble, cachedInputPriceDouble)
-                        
                         scope.launch {
-                            apiPreferences.setModelInputPrice(selectedModel, inputPriceDouble)
-                            apiPreferences.setModelOutputPrice(selectedModel, outputPriceDouble)
-                            apiPreferences.setModelCachedInputPrice(selectedModel, cachedInputPriceDouble)
+                            // Save billing mode
+                            modelBillingMode[selectedModel] = billingMode
+                            apiPreferences.setBillingModeForProviderModel(selectedModel, billingMode)
+                            
+                            if (billingMode == BillingMode.TOKEN) {
+                                // Save token pricing
+                                val inputPriceDouble = inputPrice.toDoubleOrNull() ?: DEFAULT_INPUT_PRICE
+                                val outputPriceDouble = outputPrice.toDoubleOrNull() ?: DEFAULT_OUTPUT_PRICE
+                                val cachedInputPriceDouble = cachedInputPrice.toDoubleOrNull() ?: DEFAULT_CACHED_INPUT_PRICE
+                                
+                                modelPricing[selectedModel] = Triple(inputPriceDouble, outputPriceDouble, cachedInputPriceDouble)
+                                apiPreferences.setModelInputPrice(selectedModel, inputPriceDouble)
+                                apiPreferences.setModelOutputPrice(selectedModel, outputPriceDouble)
+                                apiPreferences.setModelCachedInputPrice(selectedModel, cachedInputPriceDouble)
+                            } else {
+                                // Save per-request pricing
+                                val pricePerRequestDouble = pricePerRequest.toDoubleOrNull() ?: DEFAULT_PRICE_PER_REQUEST
+                                modelPricePerRequest[selectedModel] = pricePerRequestDouble
+                                apiPreferences.setPricePerRequestForProviderModel(selectedModel, pricePerRequestDouble)
+                            }
                         }
                         
                         showPricingDialog = false
@@ -386,6 +509,7 @@ fun TokenUsageStatisticsScreen(
                     onClick = {
                         scope.launch {
                             apiPreferences.resetAllProviderModelTokenCounts()
+                            providerModelRequestCounts.clear()
                         }
                         showResetDialog = false
                     },
@@ -413,9 +537,12 @@ private fun TokenUsageModelCard(
     inputTokens: Int,
     cachedInputTokens: Int,
     outputTokens: Int,
+    requestCount: Int,
     cost: Double,
     inputPrice: Double,
     outputPrice: Double,
+    billingMode: BillingMode,
+    pricePerRequest: Double,
     onClick: () -> Unit
 ) {
     Card(
@@ -429,19 +556,62 @@ private fun TokenUsageModelCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = modelName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                Column(
                     modifier = Modifier.weight(1f)
-                )
+                ) {
+                    Text(
+                        text = modelName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Billing mode indicator as a small tag
+                    AssistChip(
+                        onClick = { },
+                        label = {
+                            Text(
+                                text = when (billingMode) {
+                                    BillingMode.TOKEN -> stringResource(id = R.string.settings_billing_mode_token)
+                                    BillingMode.COUNT -> stringResource(id = R.string.settings_billing_mode_count)
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = when (billingMode) {
+                                BillingMode.TOKEN -> MaterialTheme.colorScheme.secondaryContainer
+                                BillingMode.COUNT -> MaterialTheme.colorScheme.tertiaryContainer
+                            }
+                        ),
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = stringResource(id = R.string.settings_edit_pricing),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Request count display
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(id = R.string.settings_request_count),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "$requestCount",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
             }
             
@@ -469,11 +639,13 @@ private fun TokenUsageModelCard(
                             color = MaterialTheme.colorScheme.tertiary
                         )
                     }
-                    Text(
-                        text = stringResource(id = R.string.settings_price_format, inputPrice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (billingMode == BillingMode.TOKEN) {
+                        Text(
+                            text = stringResource(id = R.string.settings_price_format, inputPrice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -487,11 +659,13 @@ private fun TokenUsageModelCard(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
-                    Text(
-                        text = stringResource(id = R.string.settings_price_format, outputPrice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (billingMode == BillingMode.TOKEN) {
+                        Text(
+                            text = stringResource(id = R.string.settings_price_format, outputPrice),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
@@ -506,6 +680,13 @@ private fun TokenUsageModelCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (billingMode == BillingMode.COUNT) {
+                        Text(
+                            text = stringResource(id = R.string.settings_per_request_cost, pricePerRequest),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

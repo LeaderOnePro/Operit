@@ -132,6 +132,10 @@ class ConversationService(
             try {
                 Log.d(TAG, "总结生成使用了输入token: $inputTokens, 缓存token: $cachedInputTokens, 输出token: $outputTokens")
                 apiPreferences.updateTokensForProviderModel(summaryService.providerModel, inputTokens, outputTokens, cachedInputTokens)
+                
+                // Update request count for summary generation
+                apiPreferences.incrementRequestCountForProviderModel(summaryService.providerModel)
+                
                 Log.d(TAG, "已将总结token统计添加到用户偏好分析token计数中")
             } catch (e: Exception) {
                 Log.e(TAG, "更新token统计失败", e)

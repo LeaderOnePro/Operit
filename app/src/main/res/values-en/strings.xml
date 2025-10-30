@@ -2206,6 +2206,15 @@
     <string name="settings_usage_summary">Usage Summary</string>
     <string name="settings_total_tokens">Total Tokens</string>
     <string name="settings_total_cost">Total Cost</string>
+    <string name="settings_total_requests">Total Requests</string>
+    <string name="settings_request_count">Request Count</string>
+    <string name="settings_request_count_label">Requests: %1$d</string>
+    <string name="settings_billing_mode">Billing Mode</string>
+    <string name="settings_billing_mode_token">Token-based Billing</string>
+    <string name="settings_billing_mode_count">Per-request Billing</string>
+    <string name="settings_price_per_request">Price Per Request (CNY)</string>
+    <string name="settings_per_request_cost">¥%1$.4f per request</string>
+    <string name="settings_switch_billing_mode">Switch Billing Mode</string>
     <string name="settings_model_details">Model Details</string>
     <string name="settings_click_to_edit_pricing">Click to edit pricing</string>
     <string name="settings_edit_model_pricing">Edit Model Pricing - %1$s</string>
