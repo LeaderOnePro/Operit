@@ -43,6 +43,8 @@ import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
 import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.terminal.TerminalManager
+import com.ai.assistance.operit.terminal.filesystem.FileSystemProvider
 
 /**
  * Collection of file system operation tools for the AI assistant These tools use Java File APIs for
@@ -56,6 +58,21 @@ open class StandardFileSystemTools(protected val context: Context) {
         // ApiPreferences 实例，用于动态获取配置
         protected val apiPreferences: ApiPreferences by lazy {
                 ApiPreferences.getInstance(context)
+        }
+
+        // Linux文件系统提供者，从TerminalManager获取
+        protected val linuxFileSystem: FileSystemProvider by lazy {
+                TerminalManager.getInstance(context).getFileSystemProvider()
+        }
+
+        // Linux文件系统工具实例
+        private val linuxTools: LinuxFileSystemTools by lazy {
+                LinuxFileSystemTools(context)
+        }
+
+        /** 检查是否是Linux环境 */
+        protected fun isLinuxEnvironment(environment: String?): Boolean {
+                return environment?.lowercase() == "linux"
         }
 
         /** Adds line numbers to a string of content. */
@@ -83,6 +100,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.listFiles(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -92,10 +114,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 return try {
-                        val directory = File(actualPath)
+                        val directory = File(path)
 
                         if (!directory.exists()) {
                                 return ToolResult(
@@ -418,6 +438,11 @@ open class StandardFileSystemTools(protected val context: Context) {
         open suspend fun readFileFull(tool: AITool): ToolResult {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
+
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.readFileFull(tool)
+                }
                 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -428,10 +453,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 try {
-                        val file = File(actualPath)
+                        val file = File(path)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -495,6 +518,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.readFile(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -504,13 +532,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 try {
                         // 从配置中获取最大文件大小
                         val maxFileSizeBytes = apiPreferences.getMaxFileSizeBytes()
                         
-                        val file = File(actualPath)
+                        val file = File(path)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -616,6 +642,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val partIndex =
                         tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.readFilePart(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -625,13 +656,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 return try {
                         // 从配置中获取分段大小
                         val partSize = apiPreferences.getPartSize()
                         
-                        val file = File(actualPath)
+                        val file = File(path)
                         if (!file.exists() || !file.isFile) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -713,6 +742,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val append =
                         tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.writeFile(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -728,10 +762,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -839,6 +871,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val base64Content = tool.parameters.find { it.name == "base64Content" }?.value ?: ""
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.writeFileBinary(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -869,10 +906,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
 
                         // Create parent directories if needed
                         val parentDir = file.parentFile
@@ -963,7 +998,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.deleteFile(tool)
+                }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -999,7 +1037,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -1099,6 +1137,11 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.fileExists(tool)
+                }
+
                 if (path.isBlank()) {
                         return ToolResult(
                                 toolName = tool.name,
@@ -1108,10 +1151,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
-
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
                         val exists = file.exists()
 
                         if (!exists) {
@@ -1161,8 +1202,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
-                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
-                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.moveFile(tool)
+                }
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1198,8 +1241,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(actualSourcePath)
-                        val destFile = File(actualDestPath)
+                        val sourceFile = File(sourcePath)
+                        val destFile = File(destPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1354,8 +1397,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
 
-                val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
-                val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.copyFile(tool)
+                }
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1374,8 +1419,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val sourceFile = File(actualSourcePath)
-                        val destFile = File(actualDestPath)
+                        val sourceFile = File(sourcePath)
+                        val destFile = File(destPath)
 
                         if (!sourceFile.exists()) {
                                 return ToolResult(
@@ -1514,7 +1559,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                         tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean()
                                 ?: false
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.makeDirectory(tool)
+                }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1532,7 +1580,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val directory = File(actualPath)
+                        val directory = File(path)
 
                         // Check if directory already exists
                         if (directory.exists()) {
@@ -1628,7 +1676,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.findFiles(tool)
+                }
 
                 if (path.isBlank() || pattern.isBlank()) {
                         return ToolResult(
@@ -1645,7 +1696,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val rootDir = File(actualPath)
+                        val rootDir = File(path)
 
                         if (!rootDir.exists() || !rootDir.isDirectory) {
                                 return ToolResult(
@@ -1798,7 +1849,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.fileInfo(tool)
+                }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1821,7 +1875,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
 
                         if (!file.exists()) {
                                 return ToolResult(
@@ -2158,8 +2212,6 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val aiGeneratedCode = tool.parameters.find { it.name == "content" }?.value ?: ""
-
-                val actualPath = PathMapper.resolvePath(context, path, environment)
 
                 if (path.isBlank()) {
                         emit(
@@ -2562,7 +2614,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.openFile(tool)
+                }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2580,7 +2635,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,
@@ -2667,7 +2722,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val contextLines = tool.parameters.find { it.name == "context_lines" }?.value?.toIntOrNull() ?: 3
                 val maxResults = tool.parameters.find { it.name == "max_results" }?.value?.toIntOrNull() ?: 100
                 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.grepCode(tool)
+                }
                 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2693,7 +2751,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 AITool(
                                         name = "find_files",
                                         parameters = listOf(
-                                                ToolParameter("path", actualPath),
+                                                ToolParameter("path", path),
                                                 ToolParameter("pattern", filePattern),
                                                 ToolParameter("use_path_pattern", "false"),
                                                 ToolParameter("case_insensitive", "false"),
@@ -2852,7 +2910,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val title = tool.parameters.find { it.name == "title" }?.value ?: "Share File"
 
-                val actualPath = PathMapper.resolvePath(context, path, environment)
+                // 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(environment)) {
+                        return linuxTools.shareFile(tool)
+                }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2870,7 +2931,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
 
                 return try {
-                        val file = File(actualPath)
+                        val file = File(path)
                         if (!file.exists()) {
                                 return ToolResult(
                                         toolName = tool.name,
