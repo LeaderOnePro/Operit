@@ -4,12 +4,21 @@
 
 ## 脚本与插件开发者
 
-- **第三方脚本开发者**: 请参考 [脚本开发指南 (SCRIPT_DEV_GUIDE.md)](./SCRIPT_DEV_GUIDE.md) 快速上手。
-- **MCP 插件开发者**: 你可以开发自己的 MCP 插件来扩展 AI 的能力，如网页浏览、图像处理等。在 Operit AI 中导入你的插件仓库或 zip 文件即可开始。
+### 📜 脚本开发
+
+Operit 支持通过 TypeScript/JavaScript 脚本来扩展 AI 的能力。完整指南请参考 [脚本开发指南 (SCRIPT_DEV_GUIDE.md)](./SCRIPT_DEV_GUIDE.md)。
+
+### 🔌 MCP 插件开发
+
+你可以开发自己的 MCP 插件来扩展 AI 的能力，如网页浏览、图像处理等。在 Operit AI 中导入你的插件仓库或 zip 文件即可开始。
 
 ## Operit 本体开发者
 
 参与 Operit AI 本体开发，请遵循以下精简指南。
+
+### 🛠️ 环境搭建
+
+在开始开发之前，请参考 [完整编译指南 (BUILDING.md)](./BUILDING.md) 搭建 Android 开发环境。
 
 ### 🚀 开发前必读
 
