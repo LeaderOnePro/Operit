@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +89,9 @@ private fun BottomInputBar(
     val focusRequester = remember { FocusRequester() }
     val hasContent = floatContext.userMessage.isNotBlank()
     var isInputFocused by remember { mutableStateOf(false) }
+    
+    // 检测 AI 是否正在处理消息 - 使用 chatService 的 isLoading 状态
+    val isProcessing = floatContext.chatService?.getChatCore()?.isLoading?.collectAsState()?.value ?: false
     
     // 监听焦点状态变化，通知服务更新窗口焦点
     LaunchedEffect(isInputFocused) {
@@ -188,35 +193,46 @@ private fun BottomInputBar(
             
             Spacer(modifier = Modifier.width(8.dp))
             
-            // 发送按钮
+            // 发送/取消按钮
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(
-                        if (hasContent || floatContext.attachments.isNotEmpty())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant
+                        when {
+                            isProcessing -> MaterialTheme.colorScheme.error
+                            hasContent || floatContext.attachments.isNotEmpty() -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
                     )
                     .clickable(
-                        enabled = hasContent || floatContext.attachments.isNotEmpty()
+                        enabled = isProcessing || hasContent || floatContext.attachments.isNotEmpty()
                     ) {
-                        floatContext.onSendMessage?.invoke(floatContext.userMessage, PromptFunctionType.CHAT)
-                        floatContext.userMessage = ""
-                        floatContext.showAttachmentPanel = false
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
+                        when {
+                            isProcessing -> {
+                                // 取消当前消息处理
+                                floatContext.onCancelMessage?.invoke()
+                            }
+                            else -> {
+                                // 发送消息
+                                floatContext.onSendMessage?.invoke(floatContext.userMessage, PromptFunctionType.CHAT)
+                                floatContext.userMessage = ""
+                                floatContext.showAttachmentPanel = false
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "发送",
-                    tint = if (hasContent || floatContext.attachments.isNotEmpty())
-                        MaterialTheme.colorScheme.onPrimary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    imageVector = if (isProcessing) Icons.Default.Close else Icons.Default.Send,
+                    contentDescription = if (isProcessing) "取消" else "发送",
+                    tint = when {
+                        isProcessing -> MaterialTheme.colorScheme.onError
+                        hasContent || floatContext.attachments.isNotEmpty() -> MaterialTheme.colorScheme.onPrimary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier.size(16.dp)
                 )
             }

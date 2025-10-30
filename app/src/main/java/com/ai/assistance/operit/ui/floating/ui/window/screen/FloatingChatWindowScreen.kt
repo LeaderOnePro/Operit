@@ -554,6 +554,9 @@ private fun ColumnScope.InputTextField(
 ) {
                                     val focusRequester = remember { FocusRequester() }
 
+                                    // 检测 AI 是否正在处理消息 - 使用 chatService 的 isLoading 状态
+                                    val isProcessing = floatContext.chatService?.getChatCore()?.isLoading?.collectAsState()?.value ?: false
+
                                     DisposableEffect(floatContext.showInputDialog) {
                                         if (floatContext.showInputDialog) {
                                             floatContext.coroutineScope.launch {
@@ -606,28 +609,42 @@ private fun ColumnScope.InputTextField(
                                             shape = RoundedCornerShape(12.dp)
                                         )
 
+                                        // 发送/取消按钮
                                         FloatingActionButton(
                                             onClick = {
-                if (floatContext.userMessage.isNotBlank() || floatContext.attachments.isNotEmpty()) {
-                                                    floatContext.onSendMessage?.invoke(
-                                                        floatContext.userMessage,
-                                                        PromptFunctionType.CHAT
-                                                    )
-                                                    floatContext.userMessage = ""
-                                                    floatContext.showInputDialog = false
-                                                    floatContext.showAttachmentPanel = false
+                                                when {
+                                                    isProcessing -> {
+                                                        // 取消当前消息处理
+                                                        floatContext.onCancelMessage?.invoke()
+                                                    }
+                                                    floatContext.userMessage.isNotBlank() || floatContext.attachments.isNotEmpty() -> {
+                                                        // 发送消息
+                                                        floatContext.onSendMessage?.invoke(
+                                                            floatContext.userMessage,
+                                                            PromptFunctionType.CHAT
+                                                        )
+                                                        floatContext.userMessage = ""
+                                                        floatContext.showInputDialog = false
+                                                        floatContext.showAttachmentPanel = false
+                                                    }
                                                 }
                                             },
             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
                                                 .padding(8.dp)
                                                 .size(46.dp),
-                                            containerColor = MaterialTheme.colorScheme.primary
+                                            containerColor = if (isProcessing) 
+                                                MaterialTheme.colorScheme.error 
+                                            else 
+                                                MaterialTheme.colorScheme.primary
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Send,
-                                                contentDescription = "发送",
-                                                tint = MaterialTheme.colorScheme.onPrimary
+                                                imageVector = if (isProcessing) Icons.Default.Close else Icons.Default.Send,
+                                                contentDescription = if (isProcessing) "取消" else "发送",
+                                                tint = if (isProcessing)
+                                                    MaterialTheme.colorScheme.onError
+                                                else
+                                                    MaterialTheme.colorScheme.onPrimary
                                             )
                                         }
                                     }

@@ -253,16 +253,6 @@ const BilibiliAssistant = (function () {
         return false;
     }
 
-    async function scrollToTop(maxSwipes: number = 5): Promise<void> {
-        console.log("Scrolling to top...");
-        for (let i = 0; i < maxSwipes; i++) {
-            // Swipe down to scroll the list up to the top. A longer swipe.
-            await Tools.UI.swipe(540, 1000, 540, 1800);
-            await Tools.System.sleep(500); // Increased wait time for animation
-        }
-        await Tools.System.sleep(1000); // Extra wait to ensure UI is fully settled
-        console.log("Finished scrolling to top.");
-    }
 
     // --- Bilibili Automation Logic ---
     let lastSearchResults: any[] = [];
@@ -357,9 +347,7 @@ const BilibiliAssistant = (function () {
             return results;
         }
 
-        // Scroll to the top before starting
-        await scrollToTop();
-
+        // 不再滚动到顶部，直接从当前位置开始处理，避免触发下拉刷新
         let lastResultCount = -1;
         const maxScrolls = 10; // Safety break to prevent infinite loops
         let scrollCount = 0;
@@ -458,10 +446,9 @@ const BilibiliAssistant = (function () {
             return createResponse(false, "似乎不在搜索结果页面，无法播放视频。");
         }
 
-        // Scroll to the top before starting
-        await scrollToTop();
-
+        // 不再滚动到顶部，直接从当前位置开始查找，避免触发下拉刷新
         let lastSeenCount = -1;
+        let scrollCount = 0; // 记录向下滚动的次数
 
         for (let i = 0; i < maxScrolls; i++) {
             page = await UINode.getCurrentPage();
@@ -542,6 +529,16 @@ const BilibiliAssistant = (function () {
             // Scroll down to load more
             await Tools.UI.swipe(540, 1500, 540, 800);
             await Tools.System.sleep(1500);
+            scrollCount++; // 记录滚动次数
+        }
+
+        // 如果没找到视频，滚动回去
+        if (!videoFoundAndClicked && scrollCount > 0) {
+            console.log(`未找到视频，滚动回去 ${scrollCount} 次`);
+            for (let i = 0; i < scrollCount; i++) {
+                await Tools.UI.swipe(540, 800, 540, 1550);
+                await Tools.System.sleep(1000);
+            }
         }
 
         if (videoFoundAndClicked) {

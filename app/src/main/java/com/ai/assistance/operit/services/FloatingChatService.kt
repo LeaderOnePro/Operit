@@ -493,4 +493,10 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             Log.w(TAG, "WindowManager not initialized, cannot set interaction.")
         }
     }
+
+    /**
+     * 获取 ChatServiceCore 实例
+     * @return ChatServiceCore 聊天服务核心实例
+     */
+    fun getChatCore(): ChatServiceCore = chatCore
 }
