@@ -209,7 +209,7 @@ AI自动分类管理记忆，智能搜索历史对话，记住您的偏好和习
 <td>
 • 语音对话系统<br>
 • 知识库功能<br>
-• DragonBones/Live2D动画
+• DragonBones动画支持
 </td>
 </tr>
 

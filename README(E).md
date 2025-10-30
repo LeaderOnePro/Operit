@@ -20,7 +20,7 @@
 <div align="center">
   <img src="app/src/main/res/playstore-icon.png" width="120" height="120" alt="Operit Logo">
   <h1>Operit AI - Your Intelligent Assistant</h1>
-  <p>📱 <b>The first fully functional, standalone AI assistant for mobile devices with powerful tool-calling capabilities.</b> 📱</p>
+  <p>📱 <b>The first fully functional, standalone AI assistant for mobile devices with powerful tool-calling capabilities</b> 📱</p>
 </div>
 
 <div align="center">
@@ -30,111 +30,224 @@
     <img src="docs/assets/9036f349c25888d357de5ce34580176d.jpg" width="22%" alt="Operit Preview 3" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
     <img src="docs/assets/d12038f26df3f814b4e3ce967537f039.jpg" width="22%" alt="Operit Preview 4" style="display: inline-block; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 3px; max-width: 220px;">
   </div>
-  <p><b>🚀 We need your help to promote this application and gain more visibility! 🚀</b></p>
 </div>
+
+---
 
 ## 🌟 Project Introduction
 
-**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, a **Memory Vault**, and supports highly customizable features like **User Personality** and **Character Cards**. It is more than just a chat interface; it is an **all-in-one assistant** deeply integrated with Android permissions and various tools. Now with a built-in **Ubuntu 24 Environment**, it provides unprecedented functionality.
+**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, an **intelligent Memory Vault**, and supports highly customizable features like **User Personality** and **Character Cards**. It's more than just a chat interface—it's an **all-in-one assistant** deeply integrated with Android permissions and various tools, now featuring a built-in **Ubuntu 24 Environment** for unprecedented functionality.
 
-## 🛠️ Rich Built-in Tools
+---
 
-Operit comes with over 40 powerful built-in tools, enabling the AI assistant to interact deeply with your device:
+## ⚡ Core Highlights
 
-- **Built-in Ubuntu 24 Environment**: Stably run various Linux commands and MCPs to achieve complex automation tasks.
-- **File System Tools**: Read/write files, search files, compress/decompress, convert formats, etc.
-- **HTTP Tools**: Make web requests, access web pages, upload/download files, etc.
-- **System Operation Tools**: Manage system settings, install apps, control app execution, etc.
-- **Media Processing Tools**: Video conversion, encoding/decoding, frame extraction, etc.
+<table>
+<tr>
+<td width="50%">
 
-These built-in tools, combined with a rich plugin system, allow Operit to handle a wide range of tasks from simple to complex, truly delivering an all-powerful mobile AI assistant experience.
+### 🖥️ Ubuntu 24 Environment
+Complete Ubuntu 24 system with support for vim, MCP, Python, and more—run complex Linux commands and automation tasks on your phone
 
-## 🚀 Core Feature Showcase
+### 🧠 Intelligent Memory System
+AI automatically categorizes and manages memories, intelligently searches conversation history, remembers your preferences and habits for personalized service
 
-### 🗣️ All-New Voice Interaction Experience
+### 🗣️ Voice Interaction
+Natural continuous conversations with local/cloud TTS support, custom voice tones, and floating voice orb for instant access
 
-Operit AI introduces a revolutionary voice interaction feature. It's no longer just about simple voice commands; it's an intelligent partner capable of **natural, continuous conversations**. By combining powerful local and cloud-based voice technologies, you can communicate fluently with the AI, achieving comprehensive voice control for everything from casual chats and queries to executing complex tasks.
+</td>
+<td width="50%">
 
-### 🖥️ Built-in Ubuntu 24 Environment
+### 🤖 Local AI Models
+Support for MNN local models—run AI completely offline to protect your privacy
 
-Operit AI includes a complete Ubuntu 24 environment, meaning you can have a powerful, desktop-class Linux system on your phone. This provides unprecedented support for the **stable operation of MCPs (Method, Coder, and Plan)**, allowing you to execute complex code tasks and automation workflows securely and efficiently without worrying about compatibility or environmental issues.
+### 🎭 Personality & Character Cards
+Customize AI personality and speaking style, import/export character cards, with independent conversation history for each character
 
-### 🎨 Powerful Theming and Personalization
+### 🔌 Rich Tool Ecosystem
+40+ built-in tools + MCP marketplace plugins for file operations, network requests, system control, media processing, and more
 
-Create an AI assistant that's uniquely yours! Operit AI offers powerful theme customization features, allowing you to tweak almost every corner of the interface—from colors and fonts to layouts—to create a one-of-a-kind visual style. What's more, you can shape the AI's personality and speaking style through **User Personality** and **Character Card** features, making it your most personal companion.
+</td>
+</tr>
+</table>
 
-### 🧠 Deep Search and Memory Vault
+---
 
-Forget the hassle of information overload. Operit AI features a powerful **Deep Search** function that can quickly find the information you need on your device and in your conversation history. The unique **Memory Vault** feature allows the AI to remember your preferences, important information, and common habits, providing more personalized and context-aware intelligent services.
+## 🛠️ Feature Overview
 
-### 🌐 Web Development Functionality
+<details>
+<summary><b>📦 Built-in Tool System (Click to expand)</b></summary>
 
-Design web pages on your phone and export them as standalone apps, useful for personal portfolios or creating utility tools.
+| Tool Category | Features |
+|--------------|----------|
+| 🐧 **Linux Environment** | Complete Ubuntu 24 with apt package management, Python/Node.js runtime, custom repositories |
+| 📁 **File System** | Read/write files, search, compress/decompress, format conversion, Git integration, syntax checking |
+| 🌐 **Network Tools** | HTTP requests, web access, file upload/download, web development and export |
+| ⚙️ **System Operations** | App installation, permission management, accessibility services, Shizuku/Root support |
+| 🎬 **Media Processing** | Video conversion, frame extraction, OCR recognition, camera capture |
+| 🔍 **Search Engines** | Deep search, DuckDuckGo, Tavily, Baidu Maps integration |
 
-<div align="center">
-  <div style="margin: 20px 0;">
-    <!-- Desktop Screenshot -->
-    <figure style="margin-bottom: 15px;">
-      <img src="docs/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" style="max-width: 90%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Desktop">
-      <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">I used AI to create a music game with a built-in fast-paced background music</figcaption>
-    </figure>
-    <!-- Mobile Screenshots -->
-    <div>
-      <figure style="display: inline-block; margin: 0 5px; vertical-align: top;">
-        <img src="docs/assets/webdev/6b0f3650dd4c5709069d2e4201d3cb9.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 1">
-        <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Building the site via chat.</figcaption>
-      </figure>
-      <figure style="display: inline-block; margin: 0 5px; vertical-align: top;">
-        <img src="docs/assets/webdev/9e43331c5f055b1bd82cd0f7d74704d.jpg" style="height: 300px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15);" alt="Web Dev Mobile 2">
-        <figcaption style="font-size:0.8em; text-align:center; color:#555; margin-top: 5px;">Previewing the site on mobile.</figcaption>
-      </figure>
-    </div>
-  </div>
-  <p>👆 Web application development, supporting export as standalone apps and various interactive experiences.</p>
-</div>
+</details>
 
-### 📱 Floating Window & Attachment Functionality
+<details>
+<summary><b>🎨 Interface Customization (Click to expand)</b></summary>
 
-Operit AI supports a floating window mode and convenient attachment uploads, allowing you to call AI functions and share files anytime.
+- ✨ **Theme System**: Customize colors, fonts, spacing, padding
+- 🎭 **Desktop Pet**: WebP animation support, custom expressions, floating window display
+- 📱 **Layout Optimization**: Hide status bar, custom toolbar, tablet adaptation
+- 🎨 **Markdown Rendering**: LaTeX formulas, code highlighting, tables, Mermaid diagrams
 
-<div align="center">
-  <div style="margin: 20px 0;">
-    <img src="docs/assets/floating_and_attach.jpg" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px;">
-  </div>
-  <p>👆 Access via floating window anytime, with convenient attachment sharing.</p>
-</div>
+</details>
 
-### 🔌 Powerful Plugin System
+<details>
+<summary><b>🔗 Integration Capabilities (Click to expand)</b></summary>
 
-Operit AI offers a rich plugin ecosystem. Combined with built-in tools, it can handle a variety of functions, from daily utilities to code execution, map queries, and system management. Accomplish complex tasks that used to require multiple steps with a single natural language sentence.
+- 🤖 **Tasker Integration**: Trigger custom AI agent events for deep automation
+- 🌐 **MCP Marketplace**: One-click plugin installation, remote MCP, auto-description, uvx/npx support
+- 🔌 **Multi-Model Support**: OpenAI, Claude, Gemini, Bailing, OpenRouter, LMStudio
+- 📊 **Parallel Tools**: Read-only tools execute in parallel for faster response
 
-<div align="center">
-  <div style="margin: 20px 0;">
-    <img src="docs/assets/84ea63a7437eae374f53c5b64f52c24d.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
-    <img src="docs/assets/73a602a713cff3f840efaba543465b03.png" style="height: 350px; width: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); margin: 0 10px; display: inline-block;">
-  </div>
-  <p>👆 A rich plugin ecosystem and built-in tools for a wide range of functions at your fingertips.</p>
-</div>
+</details>
+
+---
+
+## 📸 Feature Showcase
+
+<table>
+<tr>
+<td align="center" width="33%">
+<img src="docs/assets/webdev/c851e530a258bbbbf41f87dcb907b14.png" width="100%"><br>
+<b>Web Development</b><br>
+Design web pages on your phone and export as standalone apps
+</td>
+<td align="center" width="33%">
+<img src="docs/assets/floating_and_attach.jpg" height="200px"><br>
+<b>Floating Window & Attachments</b><br>
+Access anytime, share conveniently
+</td>
+<td align="center" width="33%">
+<img src="docs/assets/84ea63a7437eae374f53c5b64f52c24d.png" height="200px"><br>
+<b>Plugin Marketplace</b><br>
+Rich MCP ecosystem
+</td>
+</tr>
+</table>
+
+---
 
 ## 🚀 Quick Start
 
-> **For a detailed installation guide and rich usage examples, please check out our 👉 [User Guide](https://aaswordman.github.io/OperitWeb)**
+| Item | Description |
+|------|-------------|
+| 📋 **System Requirements** | Android 8.0+ (API 26+), 4GB+ RAM recommended, 200MB+ storage |
+| 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases) |
+| 📖 **User Guide** | [Complete Documentation](https://aaswordman.github.io/OperitWeb) with detailed tutorials and examples |
 
-- **System Requirements**: Android 8.0+ (API 26+), 4GB+ RAM recommended, 200MB+ storage space.
-- **Installation Steps**:
-  1. Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases).
-  2. Install and launch the app, then follow the in-app guide to complete the setup.
-  3. Start enjoying the convenience of an AI assistant!
+**Installation Steps:** Download APK → Install & Launch → Follow Setup Guide → Start Using ✨
+
+---
+
+## 📅 Version History
+
+<table>
+<tr><th>Version</th><th>Release Date</th><th>Core Updates</th></tr>
+
+<tr>
+<td><b>v1.6.0</b><br><sub>Latest</sub></td>
+<td>2025-10-21</td>
+<td>
+• <b>MNN Local Model</b> support<br>
+• <b>Memory System Overhaul</b>: AI auto-categorization, smart search, import/export<br>
+• <b>Terminal Enhancements</b>: vim support, progress bars, custom repositories<br>
+• Tasker integration, desktop pets, storyline tags
+</td>
+</tr>
+
+<tr>
+<td><b>v1.5.2</b></td>
+<td>2025-10-05</td>
+<td>
+• MCP enhancements: uvx/npx support, faster startup<br>
+• Workspace Git ignore, syntax checking<br>
+• Camera capture, HTML rendering, regex filtering
+</td>
+</tr>
+
+<tr>
+<td><b>v1.5.0</b></td>
+<td>2025-09</td>
+<td>
+• <b>Ubuntu 24 Terminal</b> full integration<br>
+• MCP Marketplace launch<br>
+• Desktop pets, deep search mode
+</td>
+</tr>
+
+<tr>
+<td><b>v1.4.0</b></td>
+<td>2025-08</td>
+<td>
+• Parallel tool execution<br>
+• Character card system, character selector<br>
+• PNG character card import
+</td>
+</tr>
+
+<tr>
+<td><b>v1.3.0</b></td>
+<td>2025-08</td>
+<td>
+• Web development features<br>
+• Theme selector, custom UI<br>
+• Anthropic Claude support
+</td>
+</tr>
+
+<tr>
+<td><b>v1.2.x</b></td>
+<td>2025-07</td>
+<td>
+• Voice conversation system<br>
+• Knowledge base functionality<br>
+• DragonBones animation support
+</td>
+</tr>
+
+<tr>
+<td><b>v1.1.x</b></td>
+<td>2025-06</td>
+<td>
+• MCP protocol support<br>
+• OCR recognition, floating window<br>
+• Full Gemini support
+</td>
+</tr>
+
+<tr>
+<td><b>v1.0.0</b></td>
+<td>2025-05</td>
+<td>
+• First official release<br>
+• Basic AI chat, tool calling<br>
+• Shizuku/Root integration
+</td>
+</tr>
+</table>
+
+> 📝 **Full Changelog**: Visit the [Releases Page](https://github.com/AAswordman/Operit/releases) for detailed updates on each version
+
+---
 
 ## 👨‍💻 Open Source & Collaboration
 
-Join the Operit open-source ecosystem! We welcome all types of contributors, whether you're developing third-party scripts, MCP plugins, or participating in the core development.
+Join the Operit open-source ecosystem! We welcome all types of contributions: third-party scripts, MCP plugins, and core feature development.
 
-For this repository, you must download some dependency libraries from `https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7?usp=sharing` and place them in folders with .keep files
+**Developer Notes:**
+- 📚 [Contribution Guide](docs/CONTRIBUTING.md) | [Script Development Guide (Chinese)](docs/SCRIPT_DEV_GUIDE.md)
+- 📦 Building requires downloading dependencies from [Google Drive](https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7?usp=sharing)
+- 💬 Join community discussions: [QQ Group](https://qm.qq.com/q/Sa4fKEH7sO) | [Discord](https://discord.gg/YnV9MWurRF)
 
-**Check out our [Contribution Guide](docs/CONTRIBUTING.md) and [Script Development Guide (Chinese)](docs/SCRIPT_DEV_GUIDE.md) to learn how to get involved.**
-
-## 💖 Contributors
+### 💖 Contributors
 
 Thanks to all who have contributed to Operit AI!
 
@@ -142,42 +255,38 @@ Thanks to all who have contributed to Operit AI!
   <img src="https://contrib.rocks/image?repo=AAswordman/Operit" />
 </a>
 
-## 📝 Feedback (Issues)
-
-If you encounter any problems or have suggestions for new features, we welcome you to submit an Issue!
-
-**Issue Submission Guidelines:**
-
-- Clearly describe the problem/suggestion, providing detailed steps to reproduce if possible.
-- Include relevant information such as your device model and system version.
-- If possible, provide screenshots or screen recordings to help us understand the issue.
-
-We do our best to address every reasonable issue, but please understand that open-source maintainers have limited time and energy. Also, we do not tolerate personal attacks or disrespectful comments; such issues will be closed immediately.
+---
 
 ## 📄 License
 
-This project is licensed under a **modified GPLv3 License**:
+This project is licensed under a **Modified GPLv3 License**:
 
-1. This project is open-sourced based on the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
-2. **Additional Requirements**:
-   - All derivative works using or modifying this project's code **must** be open-sourced on one of the following platforms: GitHub, GitLab, or Gitee.
-   - The README file of the derivative work **must** clearly state the original project's address: `https://github.com/AAswordman/Operit`
-   - These additional requirements are intended to ensure that the community can track and review all derivative works, prevent malicious modifications, and provide users with greater security.
+✅ Based on [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) open source  
+✅ Derivative works must be open-sourced on GitHub/GitLab/Gitee  
+✅ Must credit original project in README: `https://github.com/AAswordman/Operit`
 
-For full license details, please see the [LICENSE](LICENSE) file. If you plan to use this project's code, please ensure you understand and comply with the above requirements.
+> 💡 These requirements ensure the community can track and review all derivative works, prevent malicious modifications, and provide security for users.
 
-## 📝 TODO List
+For full license details, please see the [LICENSE](LICENSE) file.
 
-Here are the features we are planning:
+---
 
-- Enhance the voice conversation system with support for continuous dialogue and a richer variety of TTS voices.
-- Implement a more user-friendly interactive interface.
-- Address the excellent suggestions in the issues.
-- Promotion! Promotion! Promotion!
-- Support for multiple languages.
+## 📝 Feedback
 
-## 🐛 Known Bugs
+Encountered a problem or have a suggestion? Welcome to [submit an Issue](https://github.com/AAswordman/Operit/issues)!
 
-Please visit the [Issue Tracker](https://github.com/AAswordman/Operit/issues) to see the latest list of known issues.
+**Submission Guidelines:**
+- 📝 Clearly describe the problem/suggestion with reproduction steps
+- 📱 Include device model, system version, and other information
+- 📸 If possible, provide screenshots or screen recordings
 
-If you find any other bugs, please let us know by submitting an issue! We'll do our best to fix them.
+---
+
+<div align="center">
+  <h3>⭐ If you like this project, please give us a Star ⭐</h3>
+  <p><b>🚀 Help us promote and let more people discover Operit AI 🚀</b></p>
+  
+  <br>
+  
+  <sub>Made with ❤️ by the Operit Team</sub>
+</div>
