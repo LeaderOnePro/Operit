@@ -143,6 +143,8 @@ Rich MCP ecosystem
 | 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases) |
 | 📖 **User Guide** | [Complete Documentation](https://aaswordman.github.io/OperitWeb) with detailed tutorials and examples |
 
+> **Security Warning:** To ensure your data security, please download this application exclusively from the official [Release Page](https://github.com/AAswordman/Operit/releases) or the [Official Website](https://aaswordman.github.io/OperitWeb/). Installation packages from unofficial sources may be maliciously modified, potentially leading to privacy leaks or device monitoring.
+
 **Installation Steps:** Download APK → Install & Launch → Follow Setup Guide → Start Using ✨
 
 ---
@@ -259,15 +261,12 @@ Thanks to all who have contributed to Operit AI!
 
 ## 📄 License
 
-This project is licensed under a **Modified GPLv3 License**:
+This project is licensed under the [GNU LGPLv3](https://www.gnu.org/licenses/lgpl-3.0.html) license.
 
-✅ Based on [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) open source  
-✅ Derivative works must be open-sourced on GitHub/GitLab/Gitee  
-✅ Must credit original project in README: `https://github.com/AAswordman/Operit`
-
-> 💡 These requirements ensure the community can track and review all derivative works, prevent malicious modifications, and provide security for users.
-
-For full license details, please see the [LICENSE](LICENSE) file.
+In simple terms, this means:
+- You are free to use, modify, and distribute the code of this project.
+- If you modify the code and distribute it, you must also open-source your modified parts under the LGPLv3 license.
+- For more details, please see the [LICENSE](LICENSE) file.
 
 ---
 

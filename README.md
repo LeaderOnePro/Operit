@@ -143,6 +143,8 @@ AI自动分类管理记忆，智能搜索历史对话，记住您的偏好和习
 | 📥 **下载安装** | [Release页面](https://github.com/AAswordman/Operit/releases) 下载最新APK |
 | 📖 **使用指南** | [完整文档](https://aaswordman.github.io/OperitWeb) 包含详细教程和示例 |
 
+> **安全提示：** 为确保您的数据安全，请务必从官方 [Release页面](https://github.com/AAswordman/Operit/releases) 或 [官方网站](https://aaswordman.github.io/OperitWeb/) 下载本应用。通过未知渠道下载的安装包可能被恶意修改，从而导致隐私泄露或设备被监听。
+
 **安装步骤：** 下载APK → 安装启动 → 按引导配置 → 开始使用 ✨
 
 ---
@@ -259,15 +261,12 @@ AI自动分类管理记忆，智能搜索历史对话，记住您的偏好和习
 
 ## 📄 许可证
 
-本项目采用 **修改版 GPLv3 许可证**：
+本项目采用 [GNU LGPLv3](https://www.gnu.org/licenses/lgpl-3.0.html) 许可证。
 
-✅ 基于 [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.html) 开源  
-✅ 衍生作品必须在 GitHub/GitLab/Gitee 之一开源  
-✅ 必须在 README 中标注原始项目地址：`https://github.com/AAswordman/Operit`
-
-> 💡 这些要求旨在确保社区能追踪和审查所有衍生作品，防止恶意修改，为用户提供安全保障。
-
-完整许可证详情请查看 [LICENSE](LICENSE) 文件。
+简单来说，这意味着：
+- 您可以自由地使用、修改和分发本项目的代码。
+- 如果您修改了代码并进行分发，您也必须以 LGPLv3 许可证开源您修改过的部分。
+- 详细信息请参阅 [LICENSE](LICENSE) 文件。
 
 ---
 

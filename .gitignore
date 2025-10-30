@@ -17,6 +17,7 @@ node_modules
 package-lock.json
 pnpm-lock.yaml
 temp.json
+temp
 /app/src/main/jniLibs
 /app/src/main/assets/models
 /app/src/main/assets/subpack
