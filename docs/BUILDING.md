@@ -129,7 +129,33 @@ org.gradle.parallel=true
 # org.gradle.workers.max=8
 ``` 
 
-## **5. 第五步：克隆并编译项目**
+## **5. 第五步：配置 GitHub OAuth 应用**
+
+为了使应用的 GitHub 相关功能（如登录、MCP 包管理）能正常工作，你需要注册自己的 GitHub OAuth Application 并配置 Client ID。
+
+1. **创建 GitHub OAuth App:**  
+   - 访问你的 GitHub 开发者设置页面：[**GitHub Developer Settings**](https://github.com/settings/developers)
+   - 点击 **"New OAuth App"**。
+   - 填写以下信息：
+     - **Application name**: `Operit Dev` (或任何你喜欢的名字)
+     - **Homepage URL**: `https://github.com/<你的 GitHub 用户名>/Operit` (使用你 Fork 后的仓库地址)
+     - **Authorization callback URL**: `operit://callback` (**必须完全匹配！**)
+
+2. **获取 Client ID:**  
+   创建成功后，页面会显示生成的 **Client ID**。复制这个 ID。
+
+3. **配置项目:**  
+   - 在项目根目录，找到 `local.properties.example` 文件。
+   - 复制该文件并重命名为 `local.properties`。
+   - 打开 `local.properties` 文件，将 `"YOUR_OWN_GITHUB_CLIENT_ID_HERE"` 替换为你刚刚复制的 Client ID。
+
+   ```properties
+   # 示例:
+   GITHUB_CLIENT_ID="iv1.1234567890abcdef"
+   ```
+   **注意：** `local.properties` 文件已被 Git 忽略，因此你的个人 ID 不会被提交到仓库中，确保了安全。
+
+## **6. 第六步：克隆并编译项目**
 
 环境准备就绪，现在开始编译项目。
 
@@ -186,7 +212,7 @@ chmod +x ./gradlew
 编译成功后，生成的 APK 文件位于项目目录下的以下路径：  
 app/build/outputs/apk/debug/app-debug.apk
 
-## **6. 常见问题排查**
+## **7. 常见问题排查**
 
 | 错误信息 | 解决方案 |
 | :---- | :---- |

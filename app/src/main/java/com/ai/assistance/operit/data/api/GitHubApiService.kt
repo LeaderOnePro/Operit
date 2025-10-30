@@ -177,19 +177,18 @@ class GitHubApiService(private val context: Context) {
     /**
      * 通过授权码获取访问令牌
      */
-    suspend fun getAccessToken(code: String): Result<GitHubAccessTokenResponse> = withContext(Dispatchers.IO) {
+    suspend fun getAccessToken(code: String, codeVerifier: String): Result<GitHubAccessTokenResponse> = withContext(Dispatchers.IO) {
         try {
-            val requestBody = """
-                {
-                    "client_id": "${GitHubAuthPreferences.GITHUB_CLIENT_ID}",
-                    "client_secret": "${GitHubAuthPreferences.GITHUB_CLIENT_SECRET}",
-                    "code": "$code"
-                }
-            """.trimIndent()
-            
+            val formBody = FormBody.Builder()
+                .add("client_id", GitHubAuthPreferences.GITHUB_CLIENT_ID)
+                .add("code", code)
+                .add("code_verifier", codeVerifier)
+                .add("grant_type", "authorization_code")
+                .build()
+
             val request = Request.Builder()
                 .url("$GITHUB_OAUTH_BASE/access_token")
-                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .post(formBody)
                 .addHeader("Accept", "application/json")
                 .build()
             

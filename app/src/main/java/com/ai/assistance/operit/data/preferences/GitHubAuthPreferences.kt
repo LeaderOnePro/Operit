@@ -16,6 +16,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
+import java.security.SecureRandom
+import android.util.Base64
 
 private val Context.githubAuthDataStore: DataStore<Preferences> by
     preferencesDataStore(name = "github_auth_preferences")
@@ -42,7 +45,6 @@ class GitHubAuthPreferences(private val context: Context) {
     companion object {
         // GitHub OAuth相关配置
         val GITHUB_CLIENT_ID = BuildConfig.GITHUB_CLIENT_ID
-        val GITHUB_CLIENT_SECRET = BuildConfig.GITHUB_CLIENT_SECRET
         const val GITHUB_SCOPE = "public_repo,user:email,read:user"
         const val GITHUB_REDIRECT_URI = "operit://github-oauth-callback"
         
@@ -54,6 +56,7 @@ class GitHubAuthPreferences(private val context: Context) {
         private val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val USER_INFO = stringPreferencesKey("user_info")
         private val LAST_LOGIN_TIME = longPreferencesKey("last_login_time")
+        private val PKCE_CODE_VERIFIER = stringPreferencesKey("pkce_code_verifier")
         
         @Volatile
         private var INSTANCE: GitHubAuthPreferences? = null
@@ -205,15 +208,59 @@ class GitHubAuthPreferences(private val context: Context) {
     }
 
     /**
+     * 保存Code Verifier
+     */
+    suspend fun saveCodeVerifier(codeVerifier: String) {
+        context.githubAuthDataStore.edit { preferences ->
+            preferences[PKCE_CODE_VERIFIER] = codeVerifier
+        }
+    }
+
+    /**
+     * 获取并清除Code Verifier
+     */
+    suspend fun getAndClearCodeVerifier(): String? {
+        val preferences = context.githubAuthDataStore.data.first()
+        val codeVerifier = preferences[PKCE_CODE_VERIFIER]
+        if (codeVerifier != null) {
+            context.githubAuthDataStore.edit {
+                it.remove(PKCE_CODE_VERIFIER)
+            }
+        }
+        return codeVerifier
+    }
+
+    /**
      * 生成GitHub OAuth授权URL
      */
-    fun getAuthorizationUrl(): String {
+    suspend fun getAuthorizationUrl(): String {
         val state = generateRandomState()
+        val (codeVerifier, codeChallenge) = generatePkceChallenge()
+        saveCodeVerifier(codeVerifier)
+
         return "https://github.com/login/oauth/authorize?" +
                 "client_id=$GITHUB_CLIENT_ID&" +
                 "redirect_uri=$GITHUB_REDIRECT_URI&" +
                 "scope=$GITHUB_SCOPE&" +
-                "state=$state"
+                "state=$state&" +
+                "code_challenge=$codeChallenge&" +
+                "code_challenge_method=S256"
+    }
+
+    /**
+     * 生成PKCE质询
+     */
+    private fun generatePkceChallenge(): Pair<String, String> {
+        val sr = SecureRandom()
+        val code = ByteArray(32)
+        sr.nextBytes(code)
+        val codeVerifier = Base64.encodeToString(code, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(codeVerifier.toByteArray())
+        val codeChallenge = Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+
+        return Pair(codeVerifier, codeChallenge)
     }
 
     /**
