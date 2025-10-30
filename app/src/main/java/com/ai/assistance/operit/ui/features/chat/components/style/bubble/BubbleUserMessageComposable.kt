@@ -88,6 +88,10 @@ fun BubbleUserMessageComposable(
     val selectedAttachmentContent = remember { mutableStateOf("") }
     val selectedAttachmentName = remember { mutableStateOf("") }
 
+    // 添加状态控制图片预览
+    val showImagePreview = remember { mutableStateOf(false) }
+    val selectedImageBitmap = remember { mutableStateOf<Bitmap?>(null) }
+
     // Parse message content to separate text and attachments
     val parseResult = remember(message.content) { parseMessageContent(message.content) }
     val textContent = parseResult.processedText
@@ -153,7 +157,11 @@ fun BubbleUserMessageComposable(
                         // 图片还在池子里，显示图片
                         Card(
                             modifier = Modifier
-                                .size(120.dp),
+                                .size(120.dp)
+                                .clickable {
+                                    selectedImageBitmap.value = bitmap
+                                    showImagePreview.value = true
+                                },
                             shape = RoundedCornerShape(8.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
@@ -361,6 +369,72 @@ fun BubbleUserMessageComposable(
             }
         }
     }
+
+    // 图片预览对话框
+    if (showImagePreview.value && selectedImageBitmap.value != null) {
+        Dialog(onDismissRequest = { showImagePreview.value = false }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // 头部
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = stringResource(R.string.image_preview),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(onClick = { showImagePreview.value = false }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // 图片显示区域
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 500.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        selectedImageBitmap.value?.let { bitmap ->
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxWidth(),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** Result of parsing message content, containing processed text and trailing attachments */
@@ -473,9 +547,9 @@ private fun parseMessageContent(content: String): MessageParseResult {
         // 2. Old format (self-closing): <attachment ... content="..." />
         // 注意：优先匹配新格式（配对标签），回退到旧格式（自闭合标签）
         val pairedTagPattern =
-                "<attachment\\s+id=\"([^\"]+\")\\s+filename=\"([^\"]+\")\\s+type=\"([^\"]+\")\"(?:\\s+size=\"([^\"]+\"))?\\s*>([\\s\\S]*?)</attachment>".toRegex()
+                "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?\\s*>([\\s\\S]*?)</attachment>".toRegex()
         val selfClosingPattern =
-                "<attachment\\s+id=\"([^\"]+\")\\s+filename=\"([^\"]+\")\\s+type=\"([^\"]+\")\"(?:\\s+size=\"([^\"]+\"))?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
+                "<attachment\\s+id=\"([^\"]+)\"\\s+filename=\"([^\"]+)\"\\s+type=\"([^\"]+)\"(?:\\s+size=\"([^\"]+)\")?(?:\\s+content=\"(.*?)\")?\\s*/>".toRegex(
                         RegexOption.DOT_MATCHES_ALL
                 )
 
@@ -626,7 +700,7 @@ private fun AttachmentTag(
             Modifier.height(24.dp)
                 .padding(vertical = 2.dp)
                 .clickable(
-                    enabled = attachment.content.isNotEmpty() || attachment.id.startsWith("/storage/"),
+                    enabled = attachment.content.isNotEmpty() || attachment.id.startsWith("/storage/") || attachment.type.startsWith("image/"),
                     onClick = { onClick(attachment) }
                 ),
         shape = RoundedCornerShape(12.dp),

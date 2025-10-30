@@ -2184,6 +2184,8 @@
     <string name="chat_settings_bar_right_margin_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
     <string name="chat_settings_button_end_padding">Chat Settings Button End Padding</string>
     <string name="chat_settings_button_end_padding_desc">Adjust the distance between chat settings button and the right edge of the screen, in dp</string>
+    <string name="chat_area_horizontal_padding">Chat Area Horizontal Padding</string>
+    <string name="chat_area_horizontal_padding_desc">Adjust the distance between chat message area and the left/right edges of the screen, in dp</string>
     <string name="current_value">Current Value</string>
     <string name="closer_to_edge">Closer to Edge</string>
     <string name="farther_from_edge">Farther from Edge</string>
@@ -2509,6 +2511,7 @@
     <string name="value">Value</string>
     <string name="range_format">Range: %1$s - %2$s</string>
     <string name="must_be_float">Must be a float</string>
+    <string name="must_be_valid_json">Must be valid JSON</string>
     <string name="default_value_format">Default value: %s</string>
     <string name="temperature_recommendation">Temperature Recommendation</string>
     <string name="parameter_value">Parameter Value</string>
@@ -2548,6 +2551,7 @@
     <string name="value_type_float">Float</string>
     <string name="value_type_string">String</string>
     <string name="value_type_boolean">Boolean</string>
+    <string name="value_type_object">Object(JSON)</string>
     <string name="other_parameters">Other Parameters</string>
 
     <string name="settings_title">Settings</string>
@@ -3022,13 +3026,19 @@
     <!-- Step 1 -->
     <string name="default_assistant_guide_step1_title">Open System Settings</string>
     <string name="default_assistant_guide_step1_desc">First, you need to enter the Android system settings interface</string>
+    <string name="default_assistant_guide_step1_detail1">• Open System Settings → Apps → Default apps → Digital assistant app</string>
+    <string name="default_assistant_guide_step1_detail2">• Find and select "Operit AI" in the assistant app list</string>
+    <string name="default_assistant_guide_step1_detail_android12">Android 12+: Settings → Apps → Default apps → Digital assistant app → Default digital assistant app</string>
     <string name="default_assistant_guide_open_settings">Open Settings</string>
     
     <!-- Step 2 -->
+    <string name="default_assistant_guide_open_gesture_settings">Open Gesture Settings</string>
     <string name="default_assistant_guide_step2_title">Find Assistant Settings</string>
     <string name="default_assistant_guide_step2_desc">In system settings, find voice assistant or digital assistant related options</string>
     <string name="default_assistant_guide_step2_detail1">• The settings location may vary slightly between different phone manufacturers</string>
     <string name="default_assistant_guide_step2_detail2">• Usually located at: Settings → Apps → Default apps → Digital assistant app</string>
+    <string name="default_assistant_guide_step2_detail3">• Voice wake-up: \"Hey Google\" or your device\'s designated wake word (device support required)</string>
+    <string name="default_assistant_guide_step2_note">Note: Gesture settings may vary between phone brands. Please check available options in system settings</string>
     <string name="default_assistant_guide_step2_detail_android12">Android 12+: Settings → Apps → Default apps → Digital assistant app → Default digital assistant app</string>
     
     <!-- Step 3 -->
@@ -3036,6 +3046,7 @@
     <string name="default_assistant_guide_step3_desc">Choose Operit AI from the assistant app list</string>
     <string name="default_assistant_guide_step3_detail1">• Find \"Operit AI\" in the available assistant apps list</string>
     <string name="default_assistant_guide_step3_detail2">• Tap to select, and the system will set Operit as the default assistant</string>
+    <string name="default_assistant_guide_step3_detail3">• You can try speaking or typing to interact with the assistant</string>
     
     <!-- Step 4 -->
     <string name="default_assistant_guide_step4_title">Test Voice Assistant</string>
@@ -3046,5 +3057,9 @@
     <!-- Troubleshooting -->
     <string name="default_assistant_guide_troubleshooting_title">Having Problems?</string>
     <string name="default_assistant_guide_troubleshooting_content">If you can\'t find Operit in the list, please ensure:\n\n• The app is properly installed and not disabled\n• Necessary permissions have been granted (microphone, overlay, etc.)\n• Try restarting the device and setting it up again\n\nSome custom systems may restrict third-party apps from being set as default assistants. If you encounter this situation, you can still use Operit through the in-app floating window feature.</string>
+
+    <!-- Voice Interaction Service -->
+    <string name="voice_interaction_service_name">Operit AI Assistant</string>
+    <string name="voice_interaction_service_summary">Intelligent voice assistant service</string>
 
 </resources>

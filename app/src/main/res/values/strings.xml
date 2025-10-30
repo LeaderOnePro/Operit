@@ -3034,8 +3034,15 @@
     <string name="default_assistant_guide_step2_desc">设置如何快速唤起 Operit 助手</string>
     <string name="default_assistant_guide_step2_detail1">• 长按Home键：最常用的方式，在大部分设备上都可用</string>
     <string name="default_assistant_guide_step2_detail2">• 从屏幕底部向上滑动：部分支持全面屏手势的设备</string>
+    <string name="default_assistant_guide_step2_detail_android12">Android 12+: 设置 → 应用 → 默认应用 → 数字助理应用 → 默认数字助理应用</string>
     <string name="default_assistant_guide_step2_detail3">• 语音唤醒："Hey Google"或设备指定的唤醒词（需设备支持）</string>
     <string name="default_assistant_guide_step2_note">注意：不同品牌手机的手势设置可能有所不同，请在系统设置中查看可用选项</string>
+    
+    <!-- 步骤4: 测试语音助手 -->
+    <string name="default_assistant_guide_step4_title">测试语音助手</string>
+    <string name="default_assistant_guide_step4_desc">设置完成后，测试是否能正常启动</string>
+    <string name="default_assistant_guide_step4_detail1">• 长按Home键（主屏幕按钮）应该会调起 Operit 语音助手</string>
+    <string name="default_assistant_guide_step4_detail2">• 如果设备支持语音唤醒，说"Hey Google"或设备指定的唤醒词也可能触发 Operit</string>
     
     <!-- 步骤3: 测试助手功能 -->
     <string name="default_assistant_guide_step3_title">测试助手功能</string>
