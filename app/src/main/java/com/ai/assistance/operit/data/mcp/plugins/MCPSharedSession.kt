@@ -45,7 +45,7 @@ object MCPSharedSession {
             }
             
             // 创建共享会话
-            val sessionId = terminal.createSessionAndWait(SESSION_NAME)
+            val sessionId = terminal.createSession(SESSION_NAME)
             if (sessionId == null) {
                 Log.e(TAG, "Failed to create shared session or session initialization timeout")
             } else {

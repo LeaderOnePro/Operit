@@ -154,9 +154,8 @@ class Terminal private constructor(private val context: Context) {
      * 返回命令执行过程中的所有事件，直到命令完成
      */
     fun executeCommandFlow(sessionId: String, command: String): Flow<CommandExecutionEvent> {
-        terminalManager.switchToSession(sessionId)
         return channelFlow {
-            val commandId = terminalManager.sendCommand(command)
+            val commandId = terminalManager.sendCommandToSession(sessionId, command)
             commandEvents
                 .filter { it.sessionId == sessionId && it.commandId == commandId }
                 .transformWhile { event ->

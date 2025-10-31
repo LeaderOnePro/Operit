@@ -113,7 +113,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                     // 使用传入的sessionId或创建新的会话
                     val actualSessionId = sessionId ?: run {
-                        val newSessionId = terminal.createSessionAndWait("mcp-bridge-deploy")
+                        val newSessionId = terminal.createSession("mcp-bridge-deploy")
                         if (newSessionId == null) {
                             Log.e(TAG, "无法创建终端会话或会话初始化超时")
                             return@withContext false
@@ -188,7 +188,7 @@ class MCPBridge private constructor(private val context: Context) {
 
                         // 使用传入的sessionId或创建新的会话
                         val actualSessionId = sessionId ?: run {
-                            val newSessionId = terminal.createSessionAndWait("mcp-bridge-daemon")
+                            val newSessionId = terminal.createSession("mcp-bridge-daemon")
                             if (newSessionId == null) {
                                 Log.e(TAG, "无法创建终端会话或会话初始化超时")
                                 return@withContext false
