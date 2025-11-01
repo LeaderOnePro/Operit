@@ -760,8 +760,19 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val sourceEnv = tool.parameters.find { it.name == "source_environment" }?.value
+                val destEnv = tool.parameters.find { it.name == "dest_environment" }?.value
                 val environment = tool.parameters.find { it.name == "environment" }?.value
-                val envInfo = if (!environment.isNullOrBlank() && environment != "android") " (环境: $environment)" else ""
+                
+                // 确定源和目标环境
+                val srcEnv = sourceEnv ?: environment ?: "android"
+                val dstEnv = destEnv ?: environment ?: "android"
+                
+                val envInfo = if (srcEnv != "android" || dstEnv != "android") {
+                    " ($srcEnv → $dstEnv)"
+                } else {
+                    ""
+                }
                 "复制文件: $source -> $destination$envInfo"
             },
             executor = { tool -> kotlinx.coroutines.runBlocking { fileSystemTools.copyFile(tool) } }

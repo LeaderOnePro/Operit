@@ -1389,18 +1389,279 @@ open class StandardFileSystemTools(protected val context: Context) {
                 }
         }
 
+        /**
+         * 跨环境复制文件或目录
+         * 支持 Android <-> Linux 之间的文件复制
+         */
+        private suspend fun copyFileCrossEnvironment(
+                toolName: String,
+                sourcePath: String,
+                destPath: String,
+                sourceEnvironment: String,
+                destEnvironment: String,
+                recursive: Boolean
+        ): ToolResult {
+                // 目标路径保持原样，让 Linux 文件系统提供者处理 ~ 的展开
+                val finalDestPath = destPath
+
+                return try {
+                        Log.d(TAG, "Cross-environment copy: $sourceEnvironment:$sourcePath -> $destEnvironment:$finalDestPath")
+
+                        // 1. 检查源文件是否存在
+                        val sourceExists = if (isLinuxEnvironment(sourceEnvironment)) {
+                                linuxFileSystem.exists(sourcePath)
+                        } else {
+                                File(sourcePath).exists()
+                        }
+
+                        if (!sourceExists) {
+                                return ToolResult(
+                                        toolName = toolName,
+                                        success = false,
+                                        result = FileOperationData(operation = "copy", path = sourcePath, successful = false, details = "Failed to read source file"),
+                                        error = "Failed to read source file"
+                                )
+                        }
+
+                        // 2. 检查是否是目录
+                        val isDirectory = if (isLinuxEnvironment(sourceEnvironment)) {
+                                linuxFileSystem.isDirectory(sourcePath)
+                        } else {
+                                File(sourcePath).isDirectory
+                        }
+
+                        if (isDirectory) {
+                                if (!recursive) {
+                                        return ToolResult(
+                                                toolName = toolName,
+                                                success = false,
+                                                result = FileOperationData(operation = "copy", path = sourcePath, successful = false, details = "Cannot copy directory without recursive flag"),
+                                                error = "Cannot copy directory without recursive flag"
+                                        )
+                                }
+                                
+                                // 目录复制：递归复制所有文件
+                                return copyDirectoryCrossEnvironment(
+                                        toolName,
+                                        sourcePath,
+                                        finalDestPath,
+                                        sourceEnvironment,
+                                        destEnvironment
+                                )
+                        }
+
+                        // 3. 获取文件大小
+                        val fileSize = if (isLinuxEnvironment(sourceEnvironment)) {
+                                linuxFileSystem.getFileSize(sourcePath)
+                        } else {
+                                File(sourcePath).length()
+                        }
+
+                        // 4. 统一分块传输（10MB 缓冲）
+                        val BUFFER_SIZE = 10 * 1024 * 1024
+                        var totalBytes = 0L
+                        
+                        if (isLinuxEnvironment(sourceEnvironment)) {
+                                // 从 Linux 读取并写入
+                                val content = linuxFileSystem.readFile(sourcePath) ?: return ToolResult(
+                                        toolName = toolName,
+                                        success = false,
+                                        result = FileOperationData(operation = "copy", path = sourcePath, successful = false, details = "Failed to read source file"),
+                                        error = "Failed to read source file"
+                                )
+                                val bytes = content.toByteArray(Charsets.UTF_8)
+                                
+                                if (isLinuxEnvironment(destEnvironment)) {
+                                        val result = linuxFileSystem.writeFileBytes(finalDestPath, bytes)
+                                        if (!result.success) {
+                                                return ToolResult(toolName = toolName, success = false, result = FileOperationData(operation = "copy", path = sourcePath, successful = false, details = result.message), error = result.message)
+                                        }
+                                } else {
+                                        File(finalDestPath).apply { parentFile?.mkdirs() }.writeBytes(bytes)
+                                }
+                                totalBytes = bytes.size.toLong()
+                        } else {
+                                // 从 Android 读取并写入
+                                val sourceFile = File(sourcePath)
+                                sourceFile.inputStream().use { input ->
+                                        val buffer = ByteArray(BUFFER_SIZE)
+                                        val outputStream = if (isLinuxEnvironment(destEnvironment)) {
+                                                java.io.ByteArrayOutputStream()
+                                        } else {
+                                                File(finalDestPath).apply { parentFile?.mkdirs() }.outputStream()
+                                        }
+                                        
+                                        outputStream.use { output ->
+                                                var bytesRead: Int
+                                                while (input.read(buffer).also { bytesRead = it } != -1) {
+                                                        output.write(buffer, 0, bytesRead)
+                                                        totalBytes += bytesRead
+                                                }
+                                        }
+                                        
+                                        if (isLinuxEnvironment(destEnvironment)) {
+                                                val bytes = (outputStream as java.io.ByteArrayOutputStream).toByteArray()
+                                                val result = linuxFileSystem.writeFileBytes(finalDestPath, bytes)
+                                                if (!result.success) {
+                                                        return ToolResult(toolName = toolName, success = false, result = FileOperationData(operation = "copy", path = sourcePath, successful = false, details = result.message), error = result.message)
+                                                }
+                                        }
+                                }
+                        }
+
+                        // 5. 验证成功
+                        Log.d(TAG, "Successfully copied file cross-environment: $totalBytes bytes")
+                        return ToolResult(
+                                toolName = toolName,
+                                success = true,
+                                result = FileOperationData(
+                                        operation = "copy",
+                                        path = sourcePath,
+                                        successful = true,
+                                        details = "Successfully copied file from $sourceEnvironment:$sourcePath to $destEnvironment:$finalDestPath ($totalBytes bytes)"
+                                ),
+                                error = ""
+                        )
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error copying file cross-environment", e)
+                        return ToolResult(
+                                toolName = toolName,
+                                success = false,
+                                result = FileOperationData(
+                                        operation = "copy",
+                                        path = sourcePath,
+                                        successful = false,
+                                        details = "Error copying file cross-environment: ${e.message}"
+                                ),
+                                error = "Error copying file cross-environment: ${e.message}"
+                        )
+                }
+        }
+
+        /**
+         * 跨环境递归复制目录
+         */
+        private suspend fun copyDirectoryCrossEnvironment(
+                toolName: String,
+                sourcePath: String,
+                destPath: String,
+                sourceEnvironment: String,
+                destEnvironment: String
+        ): ToolResult {
+                // 目标路径保持原样，让 Linux 文件系统提供者处理 ~ 的展开
+                val finalDestPath = destPath
+
+                return try {
+                        Log.d(TAG, "Cross-environment directory copy: $sourceEnvironment:$sourcePath -> $destEnvironment:$finalDestPath")
+
+                        // 1. 创建目标目录
+                        if (isLinuxEnvironment(destEnvironment)) {
+                                val result = linuxFileSystem.createDirectory(finalDestPath, createParents = true)
+                                if (!result.success) {
+                                        return ToolResult(
+                                                toolName = toolName,
+                                                success = false,
+                                                result = FileOperationData(
+                                                        operation = "copy",
+                                                        path = sourcePath,
+                                                        successful = false,
+                                                        details = "Failed to create destination directory: ${result.message}"
+                                                ),
+                                                error = "Failed to create destination directory: ${result.message}"
+                                        )
+                                }
+                        } else {
+                                val destDir = File(finalDestPath)
+                                if (!destDir.exists()) {
+                                        destDir.mkdirs()
+                                }
+                        }
+
+                        // 2. 列出源目录内容
+                        val entries = if (isLinuxEnvironment(sourceEnvironment)) {
+                                linuxFileSystem.listDirectory(sourcePath)?.map { fileInfo ->
+                                        Pair(fileInfo.name, fileInfo.isDirectory)
+                                } ?: emptyList()
+                        } else {
+                                File(sourcePath).listFiles()?.map { file ->
+                                        Pair(file.name, file.isDirectory)
+                                } ?: emptyList()
+                        }
+
+                        // 3. 递归复制每个条目
+                        var copiedFiles = 0
+                        var copiedDirs = 0
+                        for ((name, isDir) in entries) {
+                                val srcFullPath = if (sourcePath.endsWith("/")) "$sourcePath$name" else "$sourcePath/$name"
+                                val dstFullPath = if (finalDestPath.endsWith("/")) "$finalDestPath$name" else "$finalDestPath/$name"
+
+                                if (isDir) {
+                                        val result = copyDirectoryCrossEnvironment(
+                                                toolName,
+                                                srcFullPath,
+                                                dstFullPath,
+                                                sourceEnvironment,
+                                                destEnvironment
+                                        )
+                                        if (result.success) {
+                                                copiedDirs++
+                                        } else {
+                                                Log.w(TAG, "Failed to copy directory: $srcFullPath")
+                                        }
+                                } else {
+                                        val result = copyFileCrossEnvironment(
+                                                toolName,
+                                                srcFullPath,
+                                                dstFullPath,
+                                                sourceEnvironment,
+                                                destEnvironment,
+                                                recursive = false
+                                        )
+                                        if (result.success) {
+                                                copiedFiles++
+                                        } else {
+                                                Log.w(TAG, "Failed to copy file: $srcFullPath")
+                                        }
+                                }
+                        }
+
+                        Log.d(TAG, "Successfully copied directory: $copiedFiles files, $copiedDirs subdirectories")
+                        return ToolResult(
+                                toolName = toolName,
+                                success = true,
+                                result = FileOperationData(
+                                        operation = "copy",
+                                        path = sourcePath,
+                                        successful = true,
+                                        details = "Successfully copied directory from $sourceEnvironment:$sourcePath to $destEnvironment:$finalDestPath ($copiedFiles files, $copiedDirs subdirectories)"
+                                ),
+                                error = ""
+                        )
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error copying directory cross-environment", e)
+                        return ToolResult(
+                                toolName = toolName,
+                                success = false,
+                                result = FileOperationData(
+                                        operation = "copy",
+                                        path = sourcePath,
+                                        successful = false,
+                                        details = "Error copying directory cross-environment: ${e.message}"
+                                ),
+                                error = "Error copying directory cross-environment: ${e.message}"
+                        )
+                }
+        }
+
         /** Copy a file or directory */
         open suspend fun copyFile(tool: AITool): ToolResult {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+                val sourceEnvironment = tool.parameters.find { it.name == "source_environment" }?.value
+                val destEnvironment = tool.parameters.find { it.name == "dest_environment" }?.value
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val recursive =
                         tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
-
-                // 如果是Linux环境，委托给LinuxFileSystemTools
-                if (isLinuxEnvironment(environment)) {
-                        return linuxTools.copyFile(tool)
-                }
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1418,6 +1679,40 @@ open class StandardFileSystemTools(protected val context: Context) {
                         )
                 }
 
+                // 确定源和目标环境
+                val srcEnv = sourceEnvironment ?: environment ?: "android"
+                val dstEnv = destEnvironment ?: environment ?: "android"
+
+                // 检查是否是跨环境复制
+                val isCrossEnvironment = srcEnv.lowercase() != dstEnv.lowercase()
+
+                // 如果是跨环境复制，使用特殊处理
+                if (isCrossEnvironment) {
+                        return copyFileCrossEnvironment(
+                                toolName = tool.name,
+                                sourcePath = sourcePath,
+                                destPath = destPath,
+                                sourceEnvironment = srcEnv,
+                                destEnvironment = dstEnv,
+                                recursive = recursive
+                        )
+                }
+
+                // 同环境复制 - 如果是Linux环境，委托给LinuxFileSystemTools
+                if (isLinuxEnvironment(srcEnv)) {
+                        return linuxTools.copyFile(
+                                AITool(
+                                        name = tool.name,
+                                        parameters = listOf(
+                                                ToolParameter("source", sourcePath),
+                                                ToolParameter("destination", destPath),
+                                                ToolParameter("recursive", recursive.toString())
+                                        )
+                                )
+                        )
+                }
+
+                // Android环境内复制
                 return try {
                         val sourceFile = File(sourcePath)
                         val destFile = File(destPath)

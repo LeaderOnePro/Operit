@@ -44,10 +44,11 @@ fun getJsToolsDefinition(): String {
                     if (environment) params.environment = environment;
                     return toolCall("move_file", params);
                 },
-                copy: (source, destination, recursive, environment) => {
+                copy: (source, destination, recursive, sourceEnvironment, destEnvironment) => {
                     const params = { source, destination };
                     if (recursive !== undefined) params.recursive = recursive ? "true" : "false";
-                    if (environment) params.environment = environment;
+                    if (sourceEnvironment) params.source_environment = sourceEnvironment;
+                    if (destEnvironment) params.dest_environment = destEnvironment;
                     return toolCall("copy_file", params);
                 },
                 mkdir: (path, create_parents, environment) => {

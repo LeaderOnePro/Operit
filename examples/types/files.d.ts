@@ -73,13 +73,14 @@ export namespace Files {
     function move(source: string, destination: string, environment?: FileEnvironment): Promise<FileOperationData>;
 
     /**
-     * Copy file from source to destination
+     * Copy file from source to destination. Supports cross-environment copying between Android and Linux.
      * @param source - Source path
      * @param destination - Destination path
      * @param recursive - Copy recursively
-     * @param environment - Execution environment ("android" or "linux"), default "android"
+     * @param sourceEnvironment - Source execution environment ("android" or "linux"), default "android"
+     * @param destEnvironment - Destination execution environment ("android" or "linux"), default "android"
      */
-    function copy(source: string, destination: string, recursive?: boolean, environment?: FileEnvironment): Promise<FileOperationData>;
+    function copy(source: string, destination: string, recursive?: boolean, sourceEnvironment?: FileEnvironment, destEnvironment?: FileEnvironment): Promise<FileOperationData>;
 
     /**
      * Create a directory

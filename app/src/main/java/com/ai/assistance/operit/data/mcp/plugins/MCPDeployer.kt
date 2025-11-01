@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import com.ai.assistance.operit.core.tools.system.Terminal
+import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ToolParameter
 import com.google.gson.JsonParser
 import java.io.File
 
@@ -270,11 +273,25 @@ class MCPDeployer(private val context: Context) {
                 pluginPath
             }
 
-            val copyExecuted = terminal.executeCommand(sessionId, "cp -r $terminalPluginPath/* $pluginDir/")
-            if (copyExecuted == null) {
-                statusCallback(DeploymentStatus.Error("复制文件到目标目录失败"))
+            // 使用 AIToolHandler 复制目录（跨环境复制：Android -> Linux）
+            val toolHandler = AIToolHandler.getInstance(context)
+            val copyTool = AITool(
+                name = "copy_file",
+                parameters = listOf(
+                    ToolParameter("source", terminalPluginPath),
+                    ToolParameter("destination", pluginDir),
+                    ToolParameter("source_environment", "android"),
+                    ToolParameter("dest_environment", "linux"),
+                    ToolParameter("recursive", "true")
+                )
+            )
+            
+            val copyResult = toolHandler.executeTool(copyTool)
+            if (!copyResult.success) {
+                statusCallback(DeploymentStatus.Error("复制文件到目标目录失败: ${copyResult.error}"))
                 return@withContext false
             }
+            Log.d(TAG, "成功复制插件目录: $terminalPluginPath -> $pluginDir")
 
             // 切换到插件目录
             statusCallback(DeploymentStatus.InProgress("切换到插件目录"))

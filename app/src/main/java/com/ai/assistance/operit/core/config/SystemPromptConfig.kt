@@ -140,7 +140,7 @@ $readFileDescription
 - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
 - file_exists: Check if a file or directory exists. Parameters: path (target path)
 - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
-- copy_file: Copy a file or directory. Parameters: source (source path), destination (destination path), recursive (boolean, default false)
+- copy_file: Copy a file or directory. Supports cross-environment copying between Android and Linux. Parameters: source (source path), destination (destination path), recursive (boolean, default false), source_environment (optional, "android" or "linux", default "android"), dest_environment (optional, "android" or "linux", default "android"). For cross-environment copy (e.g., Android → Linux or Linux → Android), specify both source_environment and dest_environment.
 - make_directory: Create a directory. Parameters: path (directory path), create_parents (boolean, default false)
 - find_files: Search for files matching a pattern. Parameters: path (search path, for Android use /sdcard/..., for Linux use /home/... or /etc/...), pattern (search pattern, e.g. "*.jpg"), max_depth (optional, controls depth of subdirectory search, -1=unlimited), use_path_pattern (boolean, default false), case_insensitive (boolean, default false)
 - grep_code: Search code content matching a regex pattern in files. Returns matches with surrounding context lines. Parameters: path (search path), pattern (regex pattern), file_pattern (file filter, default "*"), case_insensitive (boolean, default false), context_lines (lines of context before/after match, default 3), max_results (max matches, default 100)
@@ -236,7 +236,7 @@ $readFileDescription
 - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
 - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
 - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）
-- copy_file: 复制文件或目录。参数：source（源路径），destination（目标路径），recursive（布尔值，默认false）
+- copy_file: 复制文件或目录。支持Android和Linux之间的跨环境复制。参数：source（源路径），destination（目标路径），recursive（布尔值，默认false），source_environment（可选，"android"或"linux"，默认"android"），dest_environment（可选，"android"或"linux"，默认"android"）。跨环境复制（如Android → Linux或Linux → Android）时，需指定source_environment和dest_environment。
 - make_directory: 创建目录。参数：path（目录路径），create_parents（布尔值，默认false）
 - find_files: 搜索匹配模式的文件。参数：path（搜索路径，Android用/sdcard/...，Linux用/home/...或/etc/...），pattern（搜索模式，例如"*.jpg"），max_depth（可选，控制子目录搜索深度，-1=无限），use_path_pattern（布尔值，默认false），case_insensitive（布尔值，默认false）
 - grep_code: 在文件中搜索匹配正则表达式的代码内容，返回带上下文的匹配结果。参数：path（搜索路径），pattern（正则表达式模式），file_pattern（文件过滤，默认"*"），case_insensitive（布尔值，默认false），context_lines（匹配行前后的上下文行数，默认3），max_results（最大匹配数，默认100）

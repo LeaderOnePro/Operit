@@ -1121,10 +1121,20 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Copy a file or directory */
     override suspend fun copyFile(tool: AITool): ToolResult {
+        val sourceEnvironment = tool.parameters.find { it.name == "source_environment" }?.value
+        val destEnvironment = tool.parameters.find { it.name == "dest_environment" }?.value
         val environment = tool.parameters.find { it.name == "environment" }?.value
-        if (environment == "linux") {
+        
+        // 确定源和目标环境
+        val srcEnv = sourceEnvironment ?: environment ?: "android"
+        val dstEnv = destEnvironment ?: environment ?: "android"
+        
+        // 只要有一个环境是Linux，就使用父类的跨环境复制功能
+        if (srcEnv.lowercase() == "linux" || dstEnv.lowercase() == "linux") {
             return super.copyFile(tool)
         }
+        
+        // 如果都是Android环境，使用本地实现
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
         val recursive =
