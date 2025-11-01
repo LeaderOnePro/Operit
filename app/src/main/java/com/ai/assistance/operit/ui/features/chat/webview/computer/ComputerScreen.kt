@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.ai.assistance.operit.terminal.TerminalManager
 import com.ai.assistance.operit.terminal.rememberTerminalEnv
-import com.ai.assistance.operit.terminal.view.TerminalScreen
+import com.ai.assistance.operit.terminal.main.TerminalScreen
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable

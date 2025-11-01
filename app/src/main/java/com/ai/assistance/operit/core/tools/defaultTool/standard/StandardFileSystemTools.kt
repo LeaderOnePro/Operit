@@ -44,7 +44,7 @@ import android.webkit.MimeTypeMap
 import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.terminal.TerminalManager
-import com.ai.assistance.operit.terminal.filesystem.FileSystemProvider
+import com.ai.assistance.operit.terminal.provider.filesystem.FileSystemProvider
 
 /**
  * Collection of file system operation tools for the AI assistant These tools use Java File APIs for
