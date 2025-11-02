@@ -38,7 +38,7 @@ class MessageProcessingDelegate(
         private val coroutineScope: CoroutineScope,
         private val getEnhancedAiService: () -> EnhancedAIService?,
         private val getChatHistory: () -> List<ChatMessage>,
-        private val addMessageToChat: (String, ChatMessage) -> Unit,
+        private val addMessageToChat: suspend (String, ChatMessage) -> Unit,
         private val saveCurrentChat: () -> Unit,
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
@@ -192,6 +192,7 @@ class MessageProcessingDelegate(
             }
 
             if (chatId != null) {
+                // 等待消息添加到聊天历史完成，确保getChatHistory()包含新消息
                 addMessageToChat(chatId, userMessage)
             }
 
@@ -227,11 +228,14 @@ class MessageProcessingDelegate(
                     Pair(null, null)
                 }
 
+                val chatHistory = getChatHistory()
+
                 // 2. 使用 AIMessageManager 发送消息
                 val responseStream = AIMessageManager.sendMessage(
                     enhancedAiService = service,
                     messageContent = finalMessageContent,
-                    chatHistory = getChatHistory(),
+                    //现在chatHistory 100%包含最新的用户输入，所以可以截掉
+                    chatHistory = chatHistory.subList(0, chatHistory.size-1),
                     workspacePath = workspacePath,
                     promptFunctionType = promptFunctionType,
                     enableThinking = enableThinking,

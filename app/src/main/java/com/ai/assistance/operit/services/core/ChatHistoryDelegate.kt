@@ -326,47 +326,56 @@ class ChatHistoryDelegate(
             context.getString(R.string.new_conversation)
         }
     }
-
+    
     /**
-     * 添加或更新消息到聊天。
-     * - 始终写入/更新到指定的会话（通过 chatIdOverride 固定目标会话）。
-     * - 若目标会话不是当前选中会话，则仅更新数据库，避免在切换会话时把流式增量插入为多条消息。
-     * - 若目标会话是当前会话：
+     * 向聊天历史添加或更新消息。
+     *
+     * @param message 待添加或更新的消息
+     * @param chatIdOverride 可选：指定聊天会话ID（不使用`currentChatId`）
+     *
+     * 行为逻辑：
      *   - 已存在同时间戳消息：更新内存与数据库（保持UI与持久层一致）。
      *   - 不存在：追加到内存，并持久化。
      */
-    fun addMessageToChat(message: ChatMessage, chatIdOverride: String? = null) {
-        coroutineScope.launch {
-            historyUpdateMutex.withLock {
-                val targetChatId = chatIdOverride ?: _currentChatId.value ?: return@withLock
+    suspend fun addMessageToChat(message: ChatMessage, chatIdOverride: String? = null) {
+        historyUpdateMutex.withLock {
+            val targetChatId = chatIdOverride ?: _currentChatId.value ?: return@withLock
 
-                val isCurrentChat = (targetChatId == _currentChatId.value)
+            val isCurrentChat = (targetChatId == _currentChatId.value)
 
-                if (!isCurrentChat) {
+            if (!isCurrentChat) {
                     // 非当前会话：使用“更新或插入”语义，避免每个chunk都插入新消息
-                    chatHistoryManager.updateMessage(targetChatId, message)
-                    return@withLock
-                }
-
-                // 当前会话：尝试在内存中定位并更新
-                val currentMessages = _chatHistory.value
-                val existingIndex = currentMessages.indexOfFirst { it.timestamp == message.timestamp }
-
-                if (existingIndex >= 0) {
-                    //只更新消息，不能重新加载聊天记录
-                    val updated = currentMessages.toMutableList().also { it[existingIndex] = message }
-                    chatHistoryManager.updateMessage(targetChatId, message)
-                } else {
-                    Log.d(
-                        TAG,
-                        "添加新消息到聊天 $targetChatId, isCurrent=$isCurrentChat, stream is null: ${message.contentStream == null}, ts: ${message.timestamp}"
-                    )
-                    val updated = currentMessages + message
-                    _chatHistory.value = updated
-                    onChatHistoryLoaded(updated)
-                    chatHistoryManager.addMessage(targetChatId, message)
-                }
+                chatHistoryManager.updateMessage(targetChatId, message)
+                return@withLock
             }
+
+            // 当前会话：尝试在内存中定位并更新
+            val currentMessages = _chatHistory.value
+            val existingIndex = currentMessages.indexOfFirst { it.timestamp == message.timestamp }
+
+            if (existingIndex >= 0) {
+                //只更新消息，不能重新加载聊天记录
+                val updated = currentMessages.toMutableList().also { it[existingIndex] = message }
+                chatHistoryManager.updateMessage(targetChatId, message)
+            } else {
+                Log.d(
+                    TAG,
+                    "添加新消息到聊天 $targetChatId, isCurrent=$isCurrentChat, stream is null: ${message.contentStream == null}, ts: ${message.timestamp}"
+                )
+                val updated = currentMessages + message
+                _chatHistory.value = updated
+                onChatHistoryLoaded(updated)
+                chatHistoryManager.addMessage(targetChatId, message)
+            }
+        }
+    }
+
+    /**
+     * 异步向聊天历史添加或更新消息（供不需要等待完成的场景使用）
+     */
+    fun addMessageToChatAsync(message: ChatMessage, chatIdOverride: String? = null) {
+        coroutineScope.launch {
+            addMessageToChat(message, chatIdOverride)
         }
     }
 
