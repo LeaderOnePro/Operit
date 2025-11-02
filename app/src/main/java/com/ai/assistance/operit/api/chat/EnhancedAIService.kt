@@ -362,9 +362,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     // Process the input message for any conversation markup (e.g., for AI planning)
                     val startTime = System.currentTimeMillis()
                     val processedInput = InputProcessor.processUserInput(message)
-
-                    // 将当前用户输入添加到内部历史记录中，以便进行后续处理
-                    context.conversationHistory.add(Pair("user", processedInput))
+                
 
                     // Update state to show we're processing
                     if (!isSubTask) {
