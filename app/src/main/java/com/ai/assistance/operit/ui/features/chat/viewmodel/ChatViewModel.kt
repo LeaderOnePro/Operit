@@ -315,6 +315,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         getChatHistory = { chatHistoryDelegate.chatHistory.value },
                         addMessageToChat = { targetChatId, message ->
                             // 将消息固定写入指定聊天，避免在切换会话后串流到新会话
+                            // 这是suspend函数，在suspend上下文中会等待完成
                             chatHistoryDelegate.addMessageToChat(message, targetChatId)
                         },
                         saveCurrentChat = {
