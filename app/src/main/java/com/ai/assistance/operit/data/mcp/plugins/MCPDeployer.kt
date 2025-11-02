@@ -91,8 +91,7 @@ class MCPDeployer(private val context: Context) {
                                 return@withContext false
                             }
 
-                            mcpLocalServer.updateServerStatus(pluginId, deploySuccess = true)
-                            Log.d(TAG, "已标记 $pluginId 为部署成功")
+                            Log.d(TAG, "虚拟路径插件 $pluginId 最小化部署完成")
                             statusCallback(DeploymentStatus.Success("$command 类型插件最小化部署完成，已可直接使用"))
                             return@withContext true
                         } finally {
@@ -367,15 +366,7 @@ class MCPDeployer(private val context: Context) {
             val currentTime = System.currentTimeMillis()
             successMessage.append("部署时间: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(currentTime))}")
 
-            // 保存部署成功状态到配置中
-            try {
-                val mcpLocalServer = MCPLocalServer.getInstance(context)
-                mcpLocalServer.updateServerStatus(pluginId, deploySuccess = true)
-                Log.d(TAG, "已保存部署成功状态: $pluginId")
-            } catch (e: Exception) {
-                Log.e(TAG, "保存部署成功状态失败: ${e.message}")
-            }
-
+            Log.d(TAG, "插件 $pluginId 部署完成")
             statusCallback(DeploymentStatus.Success(successMessage.toString()))
             deploySuccess = true
             return@withContext true

@@ -861,8 +861,7 @@ class MCPRepository(private val context: Context) {
 
             mcpLocalServer.updateServerStatus(
                 server.id,
-                active = false, // The bridge will report the active status
-                deploySuccess = true
+                active = false // The bridge will report the active status
             )
 
             // 重新加载插件状态

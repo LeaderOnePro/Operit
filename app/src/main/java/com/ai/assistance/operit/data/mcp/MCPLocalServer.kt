@@ -4,7 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Environment
 import android.util.Log
+import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.tools.DirectoryListingData
+import com.ai.assistance.operit.core.tools.FileExistsData
 import com.ai.assistance.operit.data.mcp.plugins.MCPStarter
+import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ToolParameter
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
@@ -199,10 +204,6 @@ class MCPLocalServer private constructor(private val context: Context) {
         val lastStartTime: Long = 0L,
         @SerializedName("lastStopTime")
         val lastStopTime: Long = 0L,
-        @SerializedName("deploySuccess")
-        val deploySuccess: Boolean = false,
-        @SerializedName("lastDeployTime")
-        val lastDeployTime: Long = 0L,
         @SerializedName("errorMessage")
         val errorMessage: String? = null,
         @SerializedName("cachedTools")
@@ -338,8 +339,6 @@ class MCPLocalServer private constructor(private val context: Context) {
                     active = false,
                     lastStartTime = 0L,
                     lastStopTime = 0L,
-                    deploySuccess = false,
-                    lastDeployTime = 0L,
                     errorMessage = null
                 )
                 hasNewStatus = true
@@ -559,7 +558,6 @@ class MCPLocalServer private constructor(private val context: Context) {
     suspend fun updateServerStatus(
         serverId: String,
         active: Boolean? = null,
-        deploySuccess: Boolean? = null,
         errorMessage: String? = null,
         cachedTools: List<CachedToolInfo>? = null
     ) {
@@ -568,13 +566,11 @@ class MCPLocalServer private constructor(private val context: Context) {
         
         val updatedStatus = existingStatus.copy(
             active = active ?: existingStatus.active,
-            deploySuccess = deploySuccess ?: existingStatus.deploySuccess,
             errorMessage = errorMessage ?: existingStatus.errorMessage,
             cachedTools = cachedTools ?: existingStatus.cachedTools,
             toolsCachedTime = if (cachedTools != null) System.currentTimeMillis() else existingStatus.toolsCachedTime,
             lastStartTime = if (active == true) System.currentTimeMillis() else existingStatus.lastStartTime,
-            lastStopTime = if (active == false) System.currentTimeMillis() else existingStatus.lastStopTime,
-            lastDeployTime = if (deploySuccess == true) System.currentTimeMillis() else existingStatus.lastDeployTime
+            lastStopTime = if (active == false) System.currentTimeMillis() else existingStatus.lastStopTime
         )
         
         currentStatus[serverId] = updatedStatus
@@ -665,6 +661,73 @@ class MCPLocalServer private constructor(private val context: Context) {
             autoApprove = serverConfig.autoApprove ?: emptyList()
         )
         Log.d(TAG, "服务器启用状态已更新: $serverId, enabled=$enabled")
+    }
+
+    /**
+     * 检查插件是否已部署
+     * 对于虚拟路径插件（npx/uvx/uv）：直接返回true
+     * 对于实体路径插件：检查Linux文件系统中目录是否存在且包含至少1个文件
+     */
+    suspend fun isPluginDeployed(pluginId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // 获取插件元数据
+            val metadata = getPluginMetadata(pluginId)
+            val installedPath = metadata?.installedPath
+            
+            // 如果是虚拟路径，直接返回true
+            if (installedPath?.startsWith("virtual://") == true) {
+                Log.d(TAG, "插件 $pluginId 是虚拟路径，判定为已部署")
+                return@withContext true
+            }
+            
+            // 检查Linux文件系统中是否存在插件目录
+            val pluginHomeDir = "~/mcp_plugins"
+            val pluginDir = "$pluginHomeDir/${pluginId.split("/").last()}"
+            
+            // 使用AIToolHandler检查目录是否存在
+            val toolHandler = AIToolHandler.getInstance(context)
+            
+            // 先检查目录是否存在
+            val checkExistsTool = AITool(
+                name = "file_exists",
+                parameters = listOf(
+                    ToolParameter("path", pluginDir),
+                    ToolParameter("environment", "linux")
+                )
+            )
+            
+            val existsResult = toolHandler.executeTool(checkExistsTool)
+            val dirExists = existsResult.success && existsResult.result is FileExistsData && 
+                            (existsResult.result as FileExistsData).exists
+            
+            if (!dirExists) {
+                Log.d(TAG, "插件 $pluginId 目录不存在: $pluginDir")
+                return@withContext false
+            }
+            
+            // 目录存在，检查是否有至少1个文件
+            val listFilesTool = AITool(
+                name = "list_files",
+                parameters = listOf(
+                    ToolParameter("path", pluginDir),
+                    ToolParameter("environment", "linux")
+                )
+            )
+            
+            val listResult = toolHandler.executeTool(listFilesTool)
+            val hasFiles = if (listResult.success && listResult.result is DirectoryListingData) {
+                val listing = listResult.result as DirectoryListingData
+                listing.entries.isNotEmpty()
+            } else {
+                false
+            }
+            
+            Log.d(TAG, "插件 $pluginId 部署检查: $hasFiles (路径: $pluginDir, 包含${if (hasFiles) "有" else "无"}文件)")
+            return@withContext hasFiles
+        } catch (e: Exception) {
+            Log.e(TAG, "检查插件部署状态时出错: $pluginId", e)
+            return@withContext false
+        }
     }
 
     // ==================== 兼容性方法 ====================

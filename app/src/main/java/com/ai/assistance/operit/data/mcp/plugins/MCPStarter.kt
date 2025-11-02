@@ -178,8 +178,7 @@ class MCPStarter(private val context: Context) {
 
             // For local plugins, check if they are deployed
             if (serviceType == "local") {
-                val serverStatus = mcpLocalServer.getServerStatus(pluginId)
-                val isDeployed = serverStatus?.deploySuccess == true
+                val isDeployed = mcpLocalServer.isPluginDeployed(pluginId)
                 if (!isDeployed) {
                     // 自动部署未部署的插件
                     statusCallback(StartStatus.InProgress("插件未部署，开始自动部署: $pluginId"))
@@ -611,7 +610,7 @@ class MCPStarter(private val context: Context) {
             // Auto-deploy if it's a local plugin and not deployed yet
             if (pluginInfo.type == "local") {
                 val mcpLocalServer = MCPLocalServer.getInstance(context)
-                if (mcpLocalServer.getServerStatus(pluginId)?.deploySuccess != true) {
+                if (!mcpLocalServer.isPluginDeployed(pluginId)) {
                     val deployer = MCPDeployer(context)
                     val pluginPath = mcpRepository.getInstalledPluginPath(pluginId) ?: return null
                     val deployCommands =
@@ -888,11 +887,9 @@ class MCPStarter(private val context: Context) {
 
             // Get deployed plugins
             val pluginList = mcpRepository.installedPluginIds.first()
-            val deployedPlugins =
-                pluginList.filter {
-                    val serverStatus = mcpLocalServer.getServerStatus(it)
-                    serverStatus?.deploySuccess == true
-                }
+            val deployedPlugins = pluginList.filter { pluginId ->
+                mcpLocalServer.isPluginDeployed(pluginId)
+            }
 
             // Get registered services
             val bridge = MCPBridge.getInstance(context)

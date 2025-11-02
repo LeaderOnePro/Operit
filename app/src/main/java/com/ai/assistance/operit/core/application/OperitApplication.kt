@@ -9,8 +9,11 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import coil.ImageLoader
+import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.request.CachePolicy
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.core.config.SystemPromptConfig
@@ -45,7 +48,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 /** Application class for Operit */
-class OperitApplication : Application() {
+class OperitApplication : Application(), ImageLoaderFactory {
 
     companion object {
         /** Global JSON instance with custom serializers */
@@ -169,8 +172,17 @@ class OperitApplication : Application() {
         }
 
         // 初始化全局图片加载器，设置强大的缓存策略
+        // 创建自定义 OkHttp 客户端，增加超时时间以支持慢速图片服务器
+        val imageOkHttpClient = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS) // 连接超时：30秒（默认10秒）
+                .readTimeout(60, TimeUnit.SECONDS)    // 读取超时：60秒（默认10秒）
+                .writeTimeout(30, TimeUnit.SECONDS)   // 写入超时：30秒（默认10秒）
+                .retryOnConnectionFailure(true)       // 连接失败时自动重试
+                .build()
+        
         globalImageLoader =
                 ImageLoader.Builder(this)
+                        .okHttpClient(imageOkHttpClient) // 使用自定义 OkHttp 客户端
                         .crossfade(true)
                         .respectCacheHeaders(true)
                         .memoryCachePolicy(CachePolicy.ENABLED)
@@ -186,7 +198,7 @@ class OperitApplication : Application() {
                             coil.memory.MemoryCache.Builder(this).maxSizePercent(0.15).build()
                         }
                         .build()
-        Log.d(TAG, "【启动计时】全局图片加载器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+        Log.d(TAG, "【启动计时】全局图片加载器初始化完成（超时配置：连接30s/读取60s） - ${System.currentTimeMillis() - startTime}ms")
         
         // 初始化图片池管理器，支持本地持久化缓存
         ImagePoolManager.initialize(filesDir)
@@ -206,6 +218,14 @@ class OperitApplication : Application() {
         
         val totalTime = System.currentTimeMillis() - startTime
         Log.d(TAG, "【启动计时】应用启动全部完成 - 总耗时: ${totalTime}ms")
+    }
+
+    /**
+     * 实现 ImageLoaderFactory 接口
+     * 让 Coil 使用我们配置的全局 ImageLoader（带有自定义超时设置）
+     */
+    override fun newImageLoader(): ImageLoader {
+        return globalImageLoader
     }
 
     /** 初始化应用语言设置 */

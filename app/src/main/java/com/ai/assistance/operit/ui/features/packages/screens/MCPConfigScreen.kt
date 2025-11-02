@@ -1022,9 +1022,9 @@ fun MCPConfigScreen(
                         // 获取插件服务器状态
                         val serverStatus = mcpLocalServer.getServerStatus(pluginId)
 
-                        // 获取插件部署成功状态
+                        // 获取插件部署状态（通过检查Linux文件系统）
                         val deploySuccessState = remember(pluginId) {
-                            mutableStateOf(serverStatus?.deploySuccess == true)
+                            mutableStateOf(false)
                         }
 
                         // 获取插件启用状态 - 从配置读取
@@ -1036,19 +1036,19 @@ fun MCPConfigScreen(
                         val pluginRunningState = remember(pluginId) {
                             mutableStateOf(serverStatus?.active == true)
                         }
-
-                        // 获取插件最后部署时间
-                        val lastDeployTimeState = remember(pluginId) {
-                            mutableStateOf(serverStatus?.lastDeployTime ?: 0L)
+                        
+                        // 检查部署状态
+                        LaunchedEffect(pluginId) {
+                            deploySuccessState.value = mcpLocalServer.isPluginDeployed(pluginId)
                         }
                         
                         // 监听服务器状态变化
                         LaunchedEffect(pluginId) {
                             mcpLocalServer.serverStatus.collect { statusMap ->
                                 val status = statusMap[pluginId]
-                                deploySuccessState.value = status?.deploySuccess == true
                                 pluginRunningState.value = status?.active == true
-                                lastDeployTimeState.value = status?.lastDeployTime ?: 0L
+                                // 重新检查部署状态
+                                deploySuccessState.value = mcpLocalServer.isPluginDeployed(pluginId)
                             }
                         }
                         
@@ -1089,8 +1089,7 @@ fun MCPConfigScreen(
                                     }
                                 },
                                 isRunning = pluginRunningState.value,
-                                isDeployed = deploySuccessState.value,
-                                lastDeployTime = lastDeployTimeState.value
+                                isDeployed = deploySuccessState.value
                         )
                         Divider(modifier = Modifier.padding(horizontal = 4.dp))
                     }
@@ -1205,8 +1204,7 @@ private fun PluginListItem(
     isEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     isRunning: Boolean = false,
-    isDeployed: Boolean = false,
-    lastDeployTime: Long = 0L
+    isDeployed: Boolean = false
 ) {
     Card(
         modifier = Modifier
@@ -1323,20 +1321,6 @@ private fun PluginListItem(
                                 )
                             }
                         }
-                    }
-                    
-                    // 部署时间（如果有）
-                    if (lastDeployTime > 0 && !isRemote) {
-                        val dateStr = java.text.SimpleDateFormat(
-                            "MM-dd HH:mm",
-                            java.util.Locale.getDefault()
-                        ).format(java.util.Date(lastDeployTime))
-                        Text(
-                            text = stringResource(R.string.deploy_date, dateStr),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontSize = 10.sp
-                        )
                     }
                 }
 
