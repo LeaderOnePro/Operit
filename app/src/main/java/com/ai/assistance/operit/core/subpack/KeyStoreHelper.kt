@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.subpack
 
 import android.content.Context
 import android.util.Log
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.File
 import java.io.FileInputStream
 import java.security.KeyStore
@@ -27,7 +28,7 @@ class KeyStoreHelper {
                 Security.removeProvider("BC")
 
                 // 创建新的BouncyCastle提供者实例
-                val provider = org.bouncycastle.jce.provider.BouncyCastleProvider()
+                val provider = BouncyCastleProvider()
 
                 // 添加到安全提供者列表首位确保优先级
                 val position = Security.insertProviderAt(provider, 1)

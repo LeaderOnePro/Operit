@@ -43,8 +43,8 @@ class AnrMonitor(
 ) {
     companion object {
         // 默认阈值设置
-        private const val ANR_THRESHOLD_MS = 5000L     // 5秒，标准ANR阈值
-        private const val WARNING_THRESHOLD_MS = 1000L // 1秒，警告阈值
+        private const val ANR_THRESHOLD_MS = 1000L     // 5秒，标准ANR阈值
+        private const val WARNING_THRESHOLD_MS = 500L // 1秒，警告阈值
         private const val SAMPLING_INTERVAL_MS = 100L  // 100毫秒采样间隔
         private const val MAX_STACK_TRACES = 10        // 最大堆栈跟踪数
         

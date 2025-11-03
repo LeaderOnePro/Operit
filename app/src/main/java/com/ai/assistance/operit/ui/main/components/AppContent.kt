@@ -344,46 +344,61 @@ fun AppContent(
                             }
                         }
 
-                        // 渲染所有缓存的屏幕，并通过z-index和alpha控制它们的可见性
+                        // 优化渲染：只渲染当前屏幕和正在过渡的屏幕
+                        // 记录上一个屏幕用于过渡动画
+                        var previousScreenKey by remember { mutableStateOf<String?>(null) }
+                        var isTransitioning by remember { mutableStateOf(false) }
+                        
+                        LaunchedEffect(currentScreenKey) {
+                            if (previousScreenKey != null && previousScreenKey != currentScreenKey) {
+                                isTransitioning = true
+                                // 等待动画完成后停止过渡状态
+                                kotlinx.coroutines.delay(400) // 与动画时长一致
+                                isTransitioning = false
+                            }
+                            previousScreenKey = currentScreenKey
+                        }
+
                         screenCache.forEach { (screenKey, screenContent) ->
-                            key(screenKey) {
-                                val isCurrentScreen = screenKey == currentScreenKey
+                            val isCurrentScreen = screenKey == currentScreenKey
+                            val isPreviousScreen = screenKey == previousScreenKey && isTransitioning
+                            
+                            // 只渲染当前屏幕或正在过渡的上一个屏幕
+                            if (isCurrentScreen || isPreviousScreen) {
+                                key(screenKey) {
+                                    // 为每个屏幕维护一个独立的可见性状态
+                                    var visibility by remember { mutableStateOf(ScreenVisibility.HIDDEN) }
 
-                                // 为每个屏幕维护一个独立的可见性状态
-                                // 当屏幕首次组合时，其状态为 HIDDEN
-                                var visibility by remember { mutableStateOf(ScreenVisibility.HIDDEN) }
+                                    // 使用 LaunchedEffect 在 isCurrentScreen 状态变化后更新可见性
+                                    LaunchedEffect(isCurrentScreen) {
+                                        visibility = if (isCurrentScreen) ScreenVisibility.VISIBLE else ScreenVisibility.HIDDEN
+                                    }
 
-                                // 使用 LaunchedEffect 在 isCurrentScreen 状态变化后更新可见性
-                                // 这确保了即使是新屏幕，也会从 HIDDEN 过渡到 VISIBLE，从而触发进入动画
-                                LaunchedEffect(isCurrentScreen) {
-                                    visibility = if (isCurrentScreen) ScreenVisibility.VISIBLE else ScreenVisibility.HIDDEN
-                                }
+                                    // 使用 updateTransition 来处理动画状态
+                                    val transition = updateTransition(
+                                        targetState = visibility,
+                                        label = "ScreenVisibilityTransition"
+                                    )
 
-                                // 使用 updateTransition 来处理更复杂的动画状态，确保进入和退出都有动画
-                                val transition = updateTransition(
-                                    targetState = visibility,
-                                    label = "ScreenVisibilityTransition"
-                                )
+                                    val alpha by transition.animateFloat(
+                                        transitionSpec = {
+                                            tween(durationMillis = 400)
+                                        },
+                                        label = "ScreenAlphaAnimation"
+                                    ) { visibility ->
+                                        if (visibility == ScreenVisibility.VISIBLE) 1f else 0f
+                                    }
 
-                                val alpha by transition.animateFloat(
-                                    transitionSpec = {
-                                        // 将动画时间设置为 400 毫秒
-                                        tween(durationMillis = 400)
-                                    },
-                                    label = "ScreenAlphaAnimation"
-                                ) { visibility ->
-                                    if (visibility == ScreenVisibility.VISIBLE) 1f else 0f
-                                }
-
-                                Box(
-                                    modifier =
-                                        Modifier.fillMaxSize()
-                                            .zIndex(if (isCurrentScreen) 1f else 0f)
-                                            .graphicsLayer { this.alpha = alpha }
-                                ) {
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        CompositionLocalProvider(LocalIsCurrentScreen provides isCurrentScreen) {
-                                            screenContent()
+                                    Box(
+                                        modifier =
+                                            Modifier.fillMaxSize()
+                                                .zIndex(if (isCurrentScreen) 1f else 0f)
+                                                .graphicsLayer { this.alpha = alpha }
+                                    ) {
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            CompositionLocalProvider(LocalIsCurrentScreen provides isCurrentScreen) {
+                                                screenContent()
+                                            }
                                         }
                                     }
                                 }

@@ -432,7 +432,10 @@ fun ModelApiSettingsSection(
             if (selectedApiProvider != ApiProviderType.MNN) {
             OutlinedTextField(
                     value = apiEndpointInput,
-                    onValueChange = { apiEndpointInput = it },
+                    onValueChange = { 
+                        // 过滤换行和空格
+                        apiEndpointInput = it.replace("\n", "").replace("\r", "").replace(" ", "")
+                    },
                     label = { Text(stringResource(R.string.api_endpoint)) },
                     placeholder = { Text(stringResource(R.string.api_endpoint_placeholder)) },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -463,10 +466,12 @@ fun ModelApiSettingsSection(
              OutlinedTextField(
                      value = if (isUsingDefaultApiKey) "" else apiKeyInput,
                      onValueChange = {
-                         apiKeyInput = it
+                         // 过滤换行和空格
+                         val filteredInput = it.replace("\n", "").replace("\r", "").replace(" ", "")
+                         apiKeyInput = filteredInput
 
                          // 当API密钥改变时检查是否需要限制模型
-                         if (it == ApiPreferences.DEFAULT_API_KEY) {
+                         if (filteredInput == ApiPreferences.DEFAULT_API_KEY) {
                              modelNameInput = ApiPreferences.DEFAULT_MODEL_NAME
                              showModelRestrictionInfo = true
                          } else {
@@ -475,9 +480,7 @@ fun ModelApiSettingsSection(
                      },
                      label = { Text(stringResource(R.string.api_key)) },
                      placeholder = { Text(if (isUsingDefaultApiKey) stringResource(R.string.api_key_placeholder_default) else stringResource(R.string.api_key_placeholder_custom)) },
-                     visualTransformation =
-                             if (isUsingDefaultApiKey) VisualTransformation.None
-                             else PasswordVisualTransformation(),
+                     visualTransformation = VisualTransformation.None,
                      modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                      singleLine = true
              )
@@ -494,7 +497,8 @@ fun ModelApiSettingsSection(
                         onValueChange = {
                             // 只有在不使用默认API密钥时才允许更改
                             if (!isUsingDefaultApiKey) {
-                                modelNameInput = it
+                                // 过滤换行和空格
+                                modelNameInput = it.replace("\n", "").replace("\r", "").replace(" ", "")
                             }
                         },
                         label = { Text(stringResource(R.string.model_name)) },

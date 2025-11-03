@@ -365,11 +365,21 @@ dependencies {
             force("io.ktor:ktor-client-core:2.3.5") 
             force("io.ktor:ktor-client-cio:2.3.5")
             force("io.ktor:ktor-serialization-kotlinx-json:2.3.5")
+            // Force BouncyCastle to use jdk18on version to avoid duplicate classes
+            force("org.bouncycastle:bcprov-jdk18on:1.78")
         }
+    }
+    
+    // Exclude bcprov-jdk15to18 from all configurations to avoid duplicate classes
+    configurations.all {
+        exclude(group = "org.bouncycastle", module = "bcprov-jdk15to18")
     }
 
     // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    
+    // BouncyCastle - explicitly include jdk18on version to avoid conflicts
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78")
 
     // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

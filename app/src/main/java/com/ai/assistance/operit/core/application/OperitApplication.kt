@@ -8,12 +8,15 @@ import android.os.LocaleList
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.work.Configuration as WorkConfiguration
+import androidx.work.WorkManager
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.request.CachePolicy
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.core.config.SystemPromptConfig
@@ -48,7 +51,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 /** Application class for Operit */
-class OperitApplication : Application(), ImageLoaderFactory {
+class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.Provider {
 
     companion object {
         /** Global JSON instance with custom serializers */
@@ -227,6 +230,15 @@ class OperitApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         return globalImageLoader
     }
+
+    /**
+     * 实现 WorkConfiguration.Provider 接口
+     * 提供 WorkManager 的配置，确保 WorkManager 被正确初始化
+     */
+    override val workManagerConfiguration: WorkConfiguration
+        get() = WorkConfiguration.Builder()
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.INFO)
+            .build()
 
     /** 初始化应用语言设置 */
     private fun initializeAppLanguage() {

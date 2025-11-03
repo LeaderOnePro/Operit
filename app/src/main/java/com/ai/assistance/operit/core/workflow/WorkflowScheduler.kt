@@ -41,7 +41,9 @@ class WorkflowScheduler(private val context: Context) {
         const val KEY_TRIGGER_NODE_ID = "trigger_node_id"
     }
 
-    private val workManager = WorkManager.getInstance(context)
+    private val workManager: WorkManager by lazy { 
+        WorkManager.getInstance(context.applicationContext)
+    }
 
     /**
      * Schedule a workflow based on its trigger configuration
