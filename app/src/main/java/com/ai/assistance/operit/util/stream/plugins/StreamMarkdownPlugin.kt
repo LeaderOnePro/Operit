@@ -649,11 +649,25 @@ class StreamMarkdownBlockQuotePlugin(private val includeMarker: Boolean = true) 
                     )
 
     override fun processChar(c: Char, atStartOfLine: Boolean): Boolean {
-        if (state == PluginState.PROCESSING) {
-            if (c == '\n') {
+        if (c == '\n') {
+            if (state == PluginState.PROCESSING) {
+                state = PluginState.WAITFOR
+            } else {
                 reset()
             }
             return true
+        }
+
+        if (state == PluginState.WAITFOR) {
+            if (atStartOfLine) {
+                if (c == '>') {
+                    state = PluginState.PROCESSING
+                    return true
+                } else {
+                    reset()
+                    return true
+                }
+            }
         }
 
         if (atStartOfLine) {

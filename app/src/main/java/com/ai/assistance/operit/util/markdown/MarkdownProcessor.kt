@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.util.markdown
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -47,7 +48,10 @@ enum class MarkdownProcessorType {
     PLAIN_TEXT
 }
 
-/** Markdown数据模型 */
+/** 
+ * Markdown数据模型 
+ * 
+ */
 class MarkdownNode(val type: MarkdownProcessorType, initialContent: String = "") {
     val content: SmartString = SmartString(initialContent)
     val children: SnapshotStateList<MarkdownNode> = mutableStateListOf()

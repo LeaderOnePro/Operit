@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Constraints
 
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -723,15 +724,16 @@ fun AIChatScreen(
             if (measurables.isEmpty()) {
                 layout(0, 0) {}
             } else {
-                val placeable = measurables.first().measure(constraints)
-                layout(placeable.width, placeable.height) {
-                    if (showWebView) {
-                        // When visible, place it on-screen.
+                if (showWebView) {
+                    val placeable = measurables.first().measure(constraints)
+                    layout(placeable.width, placeable.height) {
                         placeable.placeRelative(0, 0)
-                    } else {
-                        // When not visible, place it off-screen to keep it alive but invisible.
-                        placeable.placeRelative(-placeable.width, -placeable.height)
                     }
+                } else {
+                    // 当不可见时，我们让布局大小为0，并且完全不测量或放置子项。
+                    // 这可以跳过子项昂贵的测量/布局过程，从而解决性能问题，
+                    // 同时由于它仍在组合中，因此可以保持其状态。
+                    layout(0, 0) {}
                 }
             }
         }
@@ -750,15 +752,14 @@ fun AIChatScreen(
             if (measurables.isEmpty()) {
                 layout(0, 0) {}
             } else {
-                val placeable = measurables.first().measure(constraints)
-                layout(placeable.width, placeable.height) {
-                    if (showAiComputer) {
-                        // When visible, place it on-screen.
+                if (showAiComputer) {
+                    val placeable = measurables.first().measure(constraints)
+                    layout(placeable.width, placeable.height) {
                         placeable.placeRelative(0, 0)
-                    } else {
-                        // When not visible, place it off-screen to keep it alive but invisible.
-                        placeable.placeRelative(-placeable.width, -placeable.height)
                     }
+                } else {
+                    // 当不可见时，我们让布局大小为0，并且完全不测量或放置子项。
+                    layout(0, 0) {}
                 }
             }
         }
