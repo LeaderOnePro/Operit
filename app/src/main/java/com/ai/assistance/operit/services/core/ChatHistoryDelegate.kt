@@ -90,6 +90,14 @@ class ChatHistoryDelegate(
                 }
             }
         }
+
+        // 监听角色卡切换：如果当前会话尚无用户消息，则更新/插入开场白
+        coroutineScope.launch {
+            characterCardManager.activeCharacterCardFlow.collect { _ ->
+                val chatId = _currentChatId.value ?: return@collect
+                syncOpeningStatementIfNoUserMessage(chatId)
+            }
+        }
     }
 
     private suspend fun loadChatMessages(chatId: String) {
@@ -109,8 +117,55 @@ class ChatHistoryDelegate(
 
 
             }
+
+            // 打开历史对话时也执行开场白同步：仅当当前会话还没有用户消息时
+            syncOpeningStatementIfNoUserMessage(chatId)
         } catch (e: Exception) {
             Log.e(TAG, "加载聊天消息失败", e)
+        }
+    }
+
+    private suspend fun syncOpeningStatementIfNoUserMessage(chatId: String) {
+        val hasUserMessage = _chatHistory.value.any { it.sender == "user" }
+        if (hasUserMessage) return
+
+        val activeCard = characterCardManager.activeCharacterCardFlow.first()
+        val opening = activeCard.openingStatement
+        val roleName = activeCard.name
+
+        historyUpdateMutex.withLock {
+            val currentMessages = _chatHistory.value.toMutableList()
+            val existingIndex = currentMessages.indexOfFirst { it.sender == "ai" }
+
+            if (existingIndex >= 0) {
+                if (opening.isNotBlank()) {
+                    val existing = currentMessages[existingIndex]
+                    if (existing.content != opening || existing.roleName != roleName) {
+                        val updated = existing.copy(content = opening, roleName = roleName)
+                        currentMessages[existingIndex] = updated
+                        _chatHistory.value = currentMessages
+                        onChatHistoryLoaded(currentMessages)
+                        chatHistoryManager.updateMessage(chatId, updated)
+                    }
+                } else {
+                    val existing = currentMessages[existingIndex]
+                    currentMessages.removeAt(existingIndex)
+                    _chatHistory.value = currentMessages
+                    onChatHistoryLoaded(currentMessages)
+                    chatHistoryManager.deleteMessage(chatId, existing.timestamp)
+                }
+            } else if (opening.isNotBlank()) {
+                val openingMessage = ChatMessage(
+                    sender = "ai",
+                    content = opening,
+                    timestamp = System.currentTimeMillis(),
+                    roleName = roleName
+                )
+                currentMessages.add(openingMessage)
+                _chatHistory.value = currentMessages
+                onChatHistoryLoaded(currentMessages)
+                chatHistoryManager.addMessage(chatId, openingMessage)
+            }
         }
     }
 
