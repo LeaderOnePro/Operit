@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.util.markdown
 
+import androidx.compose.runtime.Stable
+
 /**
  * 智能字符串类 - 高性能的字符串构建器，带缓存优化
  * 
