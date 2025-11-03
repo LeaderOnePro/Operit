@@ -784,7 +784,7 @@ private fun synchronizeRenderNodes(
 }
 
 /** 从链接Markdown中提取链接文本 例如：从 [链接文本](https://example.com) 中提取 "链接文本" */
-private fun extractLinkText(linkContent: String): String {
+internal fun extractLinkText(linkContent: String): String {
     val startBracket = linkContent.indexOf('[')
     val endBracket = linkContent.indexOf(']')
     val result =
@@ -797,7 +797,7 @@ private fun extractLinkText(linkContent: String): String {
 }
 
 /** 从链接Markdown中提取链接URL 例如：从 [链接文本](https://example.com) 中提取 "https://example.com" */
-private fun extractLinkUrl(linkContent: String): String {
+internal fun extractLinkUrl(linkContent: String): String {
     val startParenthesis = linkContent.indexOf('(')
     val endParenthesis = linkContent.indexOf(')')
     val result =

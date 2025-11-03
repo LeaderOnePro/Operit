@@ -1,12 +1,19 @@
 package com.ai.assistance.operit.ui.common.markdown
 
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.text.style.URLSpan
+import android.text.style.UnderlineSpan
 import android.util.Log
 import android.util.LruCache
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Divider
@@ -15,13 +22,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
@@ -30,8 +43,51 @@ import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.util.markdown.MarkdownNode
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import java.util.concurrent.ConcurrentHashMap
+import android.graphics.Typeface
 
 private const val TAG = "CanvasMarkdownRenderer"
+
+/**
+ * 通用性能优化 Modifier：仅在组件进入屏幕可见区域时才进行绘制。
+ * 
+ * 实现原理：
+ * 1.  使用 `onGloballyPositioned` 监听组件的布局位置和大小。
+ * 2.  获取 `LocalView.current.getGlobalVisibleRect()` 来确定当前窗口的可见区域。
+ * 3.  通过 `layoutCoordinates.boundsInWindow()` 获取组件在窗口中的边界。
+ * 4.  比较组件边界和窗口可见边界，判断组件是否应该被渲染。
+ * 5.  使用 `drawWithContent`，如果组件不可见，则跳过其内容的绘制阶段，但其空间占用不变。
+ *
+ * @return 返回一个配置好的 Modifier。
+ */
+@Composable
+private fun Modifier.drawOnlyWhenVisible(): Modifier {
+    var isVisible by remember { mutableStateOf(false) }
+    val view = LocalView.current
+
+    return this
+            .onGloballyPositioned { layoutCoordinates ->
+                val windowRect = android.graphics.Rect()
+                // getGlobalVisibleRect 提供了视图在全局坐标系中的可见部分。
+                // 对于根视图，这给了我们应用窗口的可见部分。
+                view.getGlobalVisibleRect(windowRect)
+
+                val componentBounds = layoutCoordinates.boundsInWindow()
+
+                // 检查组件的垂直边界是否与窗口的可见垂直边界重叠。
+                // 这是检查可滚动列表中可见性的一个简单而有效的方法。
+                val newVisibility = componentBounds.top < windowRect.bottom && componentBounds.bottom > windowRect.top
+
+                if (newVisibility != isVisible) {
+                    isVisible = newVisibility
+                }
+            }
+            .drawWithContent {
+                // 仅当可组合项可见时才绘制内容。
+                if (isVisible) {
+                    drawContent()
+                }
+            }
+}
 
 /** 扩展函数：去除字符串首尾的所有空白字符 */
 private fun String.trimAll(): String {
@@ -45,40 +101,32 @@ private object PaintCache {
     private data class PaintKey(
         val colorArgb: Int,
         val textSize: Float,
-        val isBold: Boolean
+        val typeface: Typeface
     )
     
     private val paintCache = ConcurrentHashMap<PaintKey, android.graphics.Paint>()
     private val textPaintCache = ConcurrentHashMap<PaintKey, TextPaint>()
     
-    fun getPaint(color: Color, textSize: Float, fontWeight: FontWeight): android.graphics.Paint {
-        val key = PaintKey(color.toArgb(), textSize, fontWeight == FontWeight.Bold)
+    fun getPaint(color: Color, textSize: Float, typeface: Typeface): android.graphics.Paint {
+        val key = PaintKey(color.toArgb(), textSize, typeface)
         return paintCache.getOrPut(key) {
             android.graphics.Paint().apply {
                 this.color = key.colorArgb
                 this.textSize = textSize
                 this.isAntiAlias = true
-                this.typeface = if (key.isBold) {
-                    android.graphics.Typeface.DEFAULT_BOLD
-                } else {
-                    android.graphics.Typeface.DEFAULT
-                }
+                this.typeface = key.typeface
             }
         }
     }
     
-    fun getTextPaint(color: Color, textSize: Float, fontWeight: FontWeight): TextPaint {
-        val key = PaintKey(color.toArgb(), textSize, fontWeight == FontWeight.Bold)
+    fun getTextPaint(color: Color, textSize: Float, typeface: Typeface): TextPaint {
+        val key = PaintKey(color.toArgb(), textSize, typeface)
         return textPaintCache.getOrPut(key) {
             TextPaint().apply {
                 this.color = key.colorArgb
                 this.textSize = textSize
                 this.isAntiAlias = true
-                this.typeface = if (key.isBold) {
-                    android.graphics.Typeface.DEFAULT_BOLD
-                } else {
-                    android.graphics.Typeface.DEFAULT
-                }
+                this.typeface = key.typeface
             }
         }
     }
@@ -98,8 +146,8 @@ private object LayoutCache {
         val text: String,
         val colorArgb: Int,
         val textSize: Float,
-        val isBold: Boolean,
-        val width: Int
+        val width: Int,
+        val typeface: Typeface
     )
     
     private val cache = LruCache<LayoutKey, StaticLayout>(100)
@@ -109,14 +157,14 @@ private object LayoutCache {
         paint: TextPaint,
         width: Int,
         color: Color,
-        fontWeight: FontWeight
+        typeface: Typeface
     ): StaticLayout {
         val key = LayoutKey(
             text = text,
             colorArgb = color.toArgb(),
             textSize = paint.textSize,
-            isBold = fontWeight == FontWeight.Bold,
-            width = width
+            width = width,
+            typeface = paint.typeface
         )
         
         return cache.get(key) ?: createStaticLayout(text, paint, width).also {
@@ -172,7 +220,8 @@ private sealed class DrawInstruction {
     data class TextLayout(
         val layout: StaticLayout,
         val x: Float,
-        val y: Float
+        val y: Float,
+        val text: CharSequence? = null // 添加字段以存储Spannable
     ) : DrawInstruction()
 }
 
@@ -289,7 +338,8 @@ private fun renderNodeContent(
                 titleMediumSize = fontSizes.titleMedium,
                 titleSmallSize = fontSizes.titleSmall,
                 density = density,
-                modifier = modifier
+                modifier = modifier,
+                onLinkClick = onLinkClick
             )
         }
         
@@ -449,8 +499,23 @@ private fun UnifiedCanvasRenderer(
     titleMediumSize: TextUnit,
     titleSmallSize: TextUnit,
     density: Density,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLinkClick: ((String) -> Unit)?
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    val fontFamily = MaterialTheme.typography.bodyMedium.fontFamily
+    val resolver = LocalFontFamilyResolver.current
+
+    val normalTypeface = remember(resolver, fontFamily) {
+        (resolver.resolve(fontFamily = fontFamily, fontWeight = FontWeight.Normal).value as? android.graphics.Typeface)
+            ?: android.graphics.Typeface.DEFAULT
+    }
+    val boldTypeface = remember(resolver, fontFamily) {
+        (resolver.resolve(fontFamily = fontFamily, fontWeight = FontWeight.Bold).value as? android.graphics.Typeface)
+            ?: android.graphics.Typeface.DEFAULT_BOLD
+    }
+
     BoxWithConstraints(modifier = modifier) {
         val availableWidthPx = with(density) { maxWidth.toPx() }.toInt()
         
@@ -459,10 +524,11 @@ private fun UnifiedCanvasRenderer(
         val contentLength = node.content.length
         
         // 计算布局和绘制指令
-        val (totalHeight, drawInstructions) = remember(contentLength, textColor, availableWidthPx, node.type) {
+        val (totalHeight, drawInstructions) = remember(contentLength, textColor, availableWidthPx, node.type, normalTypeface, boldTypeface) {
             calculateLayout(
                 node = node,
                 textColor = textColor,
+                primaryColor = primaryColor,
                 bodyMediumSize = bodyMediumSize,
                 headlineLargeSize = headlineLargeSize,
                 headlineMediumSize = headlineMediumSize,
@@ -470,6 +536,8 @@ private fun UnifiedCanvasRenderer(
                 titleLargeSize = titleLargeSize,
                 titleMediumSize = titleMediumSize,
                 titleSmallSize = titleSmallSize,
+                normalTypeface = normalTypeface,
+                boldTypeface = boldTypeface,
                 density = density,
                 availableWidthPx = availableWidthPx
             )
@@ -480,6 +548,35 @@ private fun UnifiedCanvasRenderer(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(with(density) { totalHeight.toDp() })
+                .pointerInput(drawInstructions, onLinkClick) {
+                    detectTapGestures { offset ->
+                        drawInstructions.forEach { instruction ->
+                            if (instruction is DrawInstruction.TextLayout) {
+                                val layout = instruction.layout
+                                val text = instruction.text
+                                if (text is Spanned) {
+                                    val bounds = android.graphics.RectF(
+                                        instruction.x,
+                                        instruction.y,
+                                        instruction.x + layout.width,
+                                        instruction.y + layout.height
+                                    )
+                                    if (bounds.contains(offset.x, offset.y)) {
+                                        val relativeX = offset.x - instruction.x
+                                        val relativeY = offset.y - instruction.y
+                                        val line = layout.getLineForVertical(relativeY.toInt())
+                                        val lineOffset = layout.getOffsetForHorizontal(line, relativeX)
+
+                                        val spans = text.getSpans(lineOffset, lineOffset, URLSpan::class.java)
+                                        spans.firstOrNull()?.let { span ->
+                                            onLinkClick?.invoke(span.url)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
         ) {
             drawIntoCanvas { canvas ->
                 // 获取可见区域（屏幕内区域）
@@ -543,6 +640,7 @@ private fun UnifiedCanvasRenderer(
 private fun calculateLayout(
     node: MarkdownNode,
     textColor: Color,
+    primaryColor: Color,
     bodyMediumSize: TextUnit,
     headlineLargeSize: TextUnit,
     headlineMediumSize: TextUnit,
@@ -550,6 +648,8 @@ private fun calculateLayout(
     titleLargeSize: TextUnit,
     titleMediumSize: TextUnit,
     titleSmallSize: TextUnit,
+    normalTypeface: Typeface,
+    boldTypeface: Typeface,
     density: Density,
     availableWidthPx: Int
 ): Pair<Float, List<DrawInstruction>> {
@@ -562,32 +662,43 @@ private fun calculateLayout(
             val level = determineHeaderLevel(content)
             val headerText = content.trimStart('#', ' ').trimAll()
             
+            // 减小标题字号：使用更小一级的字体
             val fontSize = when (level) {
-                1 -> headlineLargeSize
-                2 -> headlineMediumSize
-                3 -> headlineSmallSize
-                4 -> titleLargeSize
-                5 -> titleMediumSize
-                else -> titleSmallSize
+                1 -> headlineMediumSize  // 原：headlineLargeSize
+                2 -> headlineSmallSize   // 原：headlineMediumSize
+                3 -> titleLargeSize      // 原：headlineSmallSize
+                4 -> titleMediumSize     // 原：titleLargeSize
+                5 -> titleSmallSize      // 原：titleMediumSize
+                else -> bodyMediumSize   // 原：titleSmallSize
             }
             
+            // 增大上下间距，提高可读性
             val topPadding = when (level) {
-                1 -> 8f
-                2 -> 6f
-                3 -> 4f
-                else -> 3f
+                1 -> 12f  // 原：8f
+                2 -> 10f  // 原：6f
+                3 -> 8f   // 原：4f
+                else -> 6f // 原：3f
             } * density.density
             
-            val bottomPadding = if (level <= 2) 2f else 1f
+            val bottomPadding = when (level) {
+                1, 2 -> 4f  // 原：2f
+                else -> 2f  // 原：1f
+            }
             val bottomPaddingPx = bottomPadding * density.density
             
             currentY += topPadding
             
             val textSizePx = with(density) { fontSize.toPx() }
-            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, FontWeight.Bold)
-            val layout = LayoutCache.getLayout(headerText, textPaint, availableWidthPx, textColor, FontWeight.Bold)
+            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, boldTypeface)
+
+            val layout = if (node.children.isNotEmpty()) {
+                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                createStaticLayout(spannable, textPaint, availableWidthPx)
+            } else {
+                LayoutCache.getLayout(headerText, textPaint, availableWidthPx, textColor, boldTypeface)
+            }
             
-            instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY))
+            instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY, layout.text))
             currentY += layout.height
             
             currentY += bottomPaddingPx
@@ -603,8 +714,8 @@ private fun calculateLayout(
             val markerEndPadding = 4f * density.density
             
             val textSizePx = with(density) { bodyMediumSize.toPx() }
-            val boldPaint = PaintCache.getPaint(textColor, textSizePx, FontWeight.Bold)
-            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, FontWeight.Normal)
+            val boldPaint = PaintCache.getPaint(textColor, textSizePx, boldTypeface)
+            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, normalTypeface)
             
             // 测量标记宽度
             val markerWidth = boldPaint.measureText("$numberStr.")
@@ -616,9 +727,19 @@ private fun calculateLayout(
             
             // 使用 StaticLayout 绘制内容（支持自动换行）
             val contentWidth = availableWidthPx - contentX.toInt()
-            val layout = LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, FontWeight.Normal)
-            instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY))
+            
+            val layout = if (node.children.isNotEmpty()) {
+                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                createStaticLayout(spannable, textPaint, contentWidth)
+            } else {
+                LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
+            }
+
+            instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY, layout.text))
             currentY += layout.height
+            
+            // 列表项底部间距
+            currentY += 2f * density.density
         }
         
         MarkdownProcessorType.UNORDERED_LIST -> {
@@ -630,8 +751,8 @@ private fun calculateLayout(
             val markerEndPadding = 4f * density.density
             
             val textSizePx = with(density) { bodyMediumSize.toPx() }
-            val boldPaint = PaintCache.getPaint(textColor, textSizePx, FontWeight.Bold)
-            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, FontWeight.Normal)
+            val boldPaint = PaintCache.getPaint(textColor, textSizePx, boldTypeface)
+            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, normalTypeface)
             
             // 测量标记宽度
             val markerWidth = boldPaint.measureText("•")
@@ -643,20 +764,38 @@ private fun calculateLayout(
             
             // 使用 StaticLayout 绘制内容（支持自动换行）
             val contentWidth = availableWidthPx - contentX.toInt()
-            val layout = LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, FontWeight.Normal)
-            instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY))
+            
+            val layout = if (node.children.isNotEmpty()) {
+                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                createStaticLayout(spannable, textPaint, contentWidth)
+            } else {
+                LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
+            }
+            instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY, layout.text))
             currentY += layout.height
+            
+            // 列表项底部间距
+            currentY += 2f * density.density
         }
         
         MarkdownProcessorType.PLAIN_TEXT -> {
             if (content.trimAll().isEmpty()) return Pair(0f, emptyList())
             
             val textSizePx = with(density) { bodyMediumSize.toPx() }
-            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, FontWeight.Normal)
-            val layout = LayoutCache.getLayout(content.trimAll(), textPaint, availableWidthPx, textColor, FontWeight.Normal)
+            val textPaint = PaintCache.getTextPaint(textColor, textSizePx, normalTypeface)
             
-            instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY))
+            val layout = if (node.children.isNotEmpty()) {
+                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                createStaticLayout(spannable, textPaint, availableWidthPx)
+            } else {
+                LayoutCache.getLayout(content.trimAll(), textPaint, availableWidthPx, textColor, normalTypeface)
+            }
+
+            instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY, layout.text))
             currentY += layout.height
+            
+            // 段落底部间距
+            currentY += 6f * density.density
         }
         
         else -> {
@@ -665,6 +804,49 @@ private fun calculateLayout(
     }
     
     return Pair(currentY, instructions)
+}
+
+
+/**
+ * 从 MarkdownNode 的子节点构建 SpannableStringBuilder
+ */
+private fun buildSpannableFromChildren(
+    children: List<MarkdownNode>,
+    textColor: Color,
+    primaryColor: Color
+): SpannableStringBuilder {
+    val builder = SpannableStringBuilder()
+    children.forEach { child ->
+        val content = child.content.toString()
+        when (child.type) {
+            MarkdownProcessorType.LINK -> {
+                val linkText = extractLinkText(content)
+                val linkUrl = extractLinkUrl(content)
+                val start = builder.length
+                builder.append(linkText)
+                val end = builder.length
+                builder.setSpan(URLSpan(linkUrl), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(UnderlineSpan(), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(ForegroundColorSpan(primaryColor.toArgb()), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            MarkdownProcessorType.BOLD -> {
+                val start = builder.length
+                builder.append(content)
+                val end = builder.length
+                builder.setSpan(StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            MarkdownProcessorType.ITALIC -> {
+                val start = builder.length
+                builder.append(content)
+                val end = builder.length
+                builder.setSpan(StyleSpan(Typeface.ITALIC), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            else -> { // PLAIN_TEXT, INLINE_CODE etc.
+                builder.append(content)
+            }
+        }
+    }
+    return builder
 }
 
 
@@ -681,17 +863,24 @@ private fun SingleTextCanvas(
     modifier: Modifier = Modifier
 ) {
     if (text.isEmpty()) return
-    
+
+    val fontFamily = MaterialTheme.typography.bodyMedium.fontFamily
+    val resolver = LocalFontFamilyResolver.current
+    val typeface = remember(resolver, fontFamily, fontWeight) {
+        (resolver.resolve(fontFamily = fontFamily, fontWeight = fontWeight).value as? android.graphics.Typeface)
+            ?: if (fontWeight == FontWeight.Bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+    }
+
     BoxWithConstraints(modifier = modifier) {
         val availableWidthPx = with(density) { maxWidth.toPx() }.toInt()
         val textSizePx = with(density) { fontSize.toPx() }
         
-        val textPaint = remember(textColor, textSizePx, fontWeight) {
-            PaintCache.getTextPaint(textColor, textSizePx, fontWeight)
+        val textPaint = remember(textColor, textSizePx, typeface) {
+            PaintCache.getTextPaint(textColor, textSizePx, typeface)
         }
         
-        val layout = remember(text, textPaint, availableWidthPx, textColor, fontWeight) {
-            LayoutCache.getLayout(text, textPaint, availableWidthPx, textColor, fontWeight)
+        val layout = remember(text, textPaint, availableWidthPx, textColor, typeface) {
+            LayoutCache.getLayout(text, textPaint, availableWidthPx, textColor, typeface)
         }
         
         val totalHeight = layout.height.toFloat()
@@ -719,4 +908,28 @@ private fun SingleTextCanvas(
 private fun determineHeaderLevel(content: String): Int {
     val headerPrefix = content.takeWhile { it == '#' }
     return headerPrefix.length.coerceIn(1, 6)
+}
+
+/**
+ * 直接创建 StaticLayout (用于Spannable, 不走缓存)
+ */
+private fun createStaticLayout(text: CharSequence, paint: TextPaint, width: Int): StaticLayout {
+    return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
+            .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(0f, 1.3f)
+            .setIncludePad(false)
+            .build()
+    } else {
+        @Suppress("DEPRECATION")
+        StaticLayout(
+            text,
+            paint,
+            width,
+            android.text.Layout.Alignment.ALIGN_NORMAL,
+            1.3f,
+            0f,
+            false
+        )
+    }
 }
