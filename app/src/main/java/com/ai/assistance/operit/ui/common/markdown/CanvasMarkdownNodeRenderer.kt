@@ -692,7 +692,7 @@ private fun calculateLayout(
             val textPaint = PaintCache.getTextPaint(textColor, textSizePx, boldTypeface)
 
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor, skipHeaderMarkers = true)
                 createStaticLayout(spannable, textPaint, availableWidthPx)
             } else {
                 LayoutCache.getLayout(headerText, textPaint, availableWidthPx, textColor, boldTypeface)
@@ -813,11 +813,18 @@ private fun calculateLayout(
 private fun buildSpannableFromChildren(
     children: List<MarkdownNode>,
     textColor: Color,
-    primaryColor: Color
+    primaryColor: Color,
+    skipHeaderMarkers: Boolean = false
 ): SpannableStringBuilder {
     val builder = SpannableStringBuilder()
-    children.forEach { child ->
-        val content = child.content.toString()
+    children.forEachIndexed { index, child ->
+        var content = child.content.toString()
+        
+        // 如果是标题的第一个子节点，去除开头的 # 和空格
+        if (skipHeaderMarkers && index == 0) {
+            content = content.trimStart('#', ' ')
+        }
+        
         when (child.type) {
             MarkdownProcessorType.LINK -> {
                 val linkText = extractLinkText(content)

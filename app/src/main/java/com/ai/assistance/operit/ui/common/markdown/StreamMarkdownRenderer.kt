@@ -660,16 +660,7 @@ private fun UnifiedMarkdownCanvas(
         }
     }
     
-    // 监听 Column 的 recompose
-    SideEffect {
-        Log.d(TAG, "【Column Recompose】准备渲染 ${nodes.size} 个节点")
-    }
-    
     Column(modifier = modifier) {
-        // 监听 Column 内部的 recompose
-        SideEffect {
-            Log.d(TAG, "【Column Body Recompose】开始遍历 ${nodes.size} 个节点")
-        }
         
         nodes.forEachIndexed { index, node ->
             val nodeKey = if (rendererId.startsWith("static-")) {
