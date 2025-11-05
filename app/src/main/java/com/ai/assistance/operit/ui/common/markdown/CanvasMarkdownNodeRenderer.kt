@@ -5,6 +5,7 @@ import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.style.ForegroundColorSpan
+import android.text.style.ImageSpan
 import android.text.style.StyleSpan
 import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
@@ -14,6 +15,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Divider
@@ -40,10 +44,14 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.ai.assistance.operit.ui.common.displays.LatexCache
 import com.ai.assistance.operit.util.markdown.MarkdownNode
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import java.util.concurrent.ConcurrentHashMap
 import android.graphics.Typeface
+import android.widget.TextView
+import ru.noties.jlatexmath.JLatexMathDrawable
 
 private const val TAG = "CanvasMarkdownRenderer"
 
@@ -467,6 +475,60 @@ private fun renderNodeContent(
             }
         }
         
+        // ========== 块级 LaTeX：保留原组件 ==========
+        MarkdownProcessorType.BLOCK_LATEX -> {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                color = Color.Transparent,
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 0.dp, horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // 提取LaTeX内容，移除$$分隔符
+                    val latexContent = content.trimAll().removeSurrounding("$$", "$$")
+                    
+                    // 使用AndroidView和JLatexMath渲染LaTeX公式
+                    AndroidView(
+                        factory = { context ->
+                            TextView(context).apply {
+                                // 设置初始空白状态
+                                text = ""
+                            }
+                        },
+                        update = { textView ->
+                            // 在update回调中渲染LaTeX公式
+                            try {
+                                val drawable = LatexCache.getDrawable(
+                                    latexContent.trim(),
+                                    JLatexMathDrawable.builder(latexContent)
+                                        .textSize(14f * textView.resources.displayMetrics.density)
+                                        .padding(2)
+                                        .background(0x00000000)
+                                        .align(JLatexMathDrawable.ALIGN_CENTER)
+                                        .color(textColor.toArgb())
+                                )
+                                
+                                // 设置边界并添加到TextView
+                                drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
+                                textView.setCompoundDrawables(null, drawable, null, null)
+                            } catch (e: Exception) {
+                                // 渲染失败时回退到纯文本显示
+                                textView.text = e.message ?: "渲染失败"
+                                textView.setTextColor(textColor.toArgb())
+                                textView.textSize = 16f
+                                textView.typeface = android.graphics.Typeface.MONOSPACE
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+        
         // ========== 其他：Canvas 绘制 ==========
         else -> {
             if (content.trimAll().isEmpty()) return
@@ -549,32 +611,57 @@ private fun UnifiedCanvasRenderer(
                 .fillMaxWidth()
                 .height(with(density) { totalHeight.toDp() })
                 .pointerInput(drawInstructions, onLinkClick) {
-                    detectTapGestures { offset ->
-                        drawInstructions.forEach { instruction ->
-                            if (instruction is DrawInstruction.TextLayout) {
-                                val layout = instruction.layout
-                                val text = instruction.text
-                                if (text is Spanned) {
-                                    val bounds = android.graphics.RectF(
-                                        instruction.x,
-                                        instruction.y,
-                                        instruction.x + layout.width,
-                                        instruction.y + layout.height
-                                    )
-                                    if (bounds.contains(offset.x, offset.y)) {
-                                        val relativeX = offset.x - instruction.x
-                                        val relativeY = offset.y - instruction.y
-                                        val line = layout.getLineForVertical(relativeY.toInt())
-                                        val lineOffset = layout.getOffsetForHorizontal(line, relativeX)
+                    // 使用 awaitEachGesture 来精确控制事件消费
+                    awaitEachGesture {
+                        val down = awaitPointerEvent(PointerEventPass.Initial).changes.first()
+                        val downTime = System.currentTimeMillis()
+                        val downPosition = down.position
+                        
+                        // 等待手指抬起
+                        val up = awaitPointerEvent(PointerEventPass.Initial).changes.first()
+                        val upTime = System.currentTimeMillis()
+                        val upPosition = up.position
+                        
+                        // 检查是否是点击（而非长按或拖动）
+                        val isTap = (upTime - downTime) < 500 && // 时间小于500ms
+                                    (upPosition - downPosition).getDistance() < 10f // 移动距离小于10px
+                        
+                        if (isTap) {
+                            // 检查是否点击到了链接
+                            var clickedLink = false
+                            drawInstructions.forEach { instruction ->
+                                if (instruction is DrawInstruction.TextLayout) {
+                                    val layout = instruction.layout
+                                    val text = instruction.text
+                                    if (text is Spanned) {
+                                        val bounds = android.graphics.RectF(
+                                            instruction.x,
+                                            instruction.y,
+                                            instruction.x + layout.width,
+                                            instruction.y + layout.height
+                                        )
+                                        if (bounds.contains(upPosition.x, upPosition.y)) {
+                                            val relativeX = upPosition.x - instruction.x
+                                            val relativeY = upPosition.y - instruction.y
+                                            val line = layout.getLineForVertical(relativeY.toInt())
+                                            val lineOffset = layout.getOffsetForHorizontal(line, relativeX)
 
-                                        val spans = text.getSpans(lineOffset, lineOffset, URLSpan::class.java)
-                                        spans.firstOrNull()?.let { span ->
-                                            onLinkClick?.invoke(span.url)
+                                            val spans = text.getSpans(lineOffset, lineOffset, URLSpan::class.java)
+                                            spans.firstOrNull()?.let { span ->
+                                                onLinkClick?.invoke(span.url)
+                                                clickedLink = true
+                                            }
                                         }
                                     }
                                 }
                             }
+                            
+                            // 只有点击到链接时才消费事件
+                            if (clickedLink) {
+                                up.consume()
+                            }
                         }
+                        // 如果不是点击或没有点击到链接，不消费事件，让它传递到外层
                     }
                 }
         ) {
@@ -692,7 +779,21 @@ private fun calculateLayout(
             val textPaint = PaintCache.getTextPaint(textColor, textSizePx, boldTypeface)
 
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor, skipHeaderMarkers = true)
+                // 处理子节点列表，去除第一个子节点中的标题标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = firstChild.content.toString().trimStart('#', ' ')
+                val newFirstChild = MarkdownNode(firstChild.type, initialContent = newContent)
+                newFirstChild.children.addAll(firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = fontSize
+                )
                 createStaticLayout(spannable, textPaint, availableWidthPx)
             } else {
                 LayoutCache.getLayout(headerText, textPaint, availableWidthPx, textColor, boldTypeface)
@@ -729,7 +830,23 @@ private fun calculateLayout(
             val contentWidth = availableWidthPx - contentX.toInt()
             
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                // 处理子节点列表，去除第一个子节点中的列表标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = numberMatch?.let {
+                    firstChild.content.toString().substring(it.range.last + 1)
+                } ?: firstChild.content.toString()
+                val newFirstChild = MarkdownNode(firstChild.type, initialContent = newContent)
+                newFirstChild.children.addAll(firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = bodyMediumSize
+                )
                 createStaticLayout(spannable, textPaint, contentWidth)
             } else {
                 LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
@@ -766,7 +883,23 @@ private fun calculateLayout(
             val contentWidth = availableWidthPx - contentX.toInt()
             
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                // 处理子节点列表，去除第一个子节点中的列表标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = markerMatch?.let {
+                    firstChild.content.toString().substring(it.range.last + 1)
+                } ?: firstChild.content.toString()
+                val newFirstChild = MarkdownNode(firstChild.type, initialContent = newContent)
+                newFirstChild.children.addAll(firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = bodyMediumSize
+                )
                 createStaticLayout(spannable, textPaint, contentWidth)
             } else {
                 LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
@@ -785,7 +918,13 @@ private fun calculateLayout(
             val textPaint = PaintCache.getTextPaint(textColor, textSizePx, normalTypeface)
             
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                val spannable = buildSpannableFromChildren(
+                    node.children, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = bodyMediumSize
+                )
                 createStaticLayout(spannable, textPaint, availableWidthPx)
             } else {
                 LayoutCache.getLayout(content.trimAll(), textPaint, availableWidthPx, textColor, normalTypeface)
@@ -814,16 +953,13 @@ private fun buildSpannableFromChildren(
     children: List<MarkdownNode>,
     textColor: Color,
     primaryColor: Color,
-    skipHeaderMarkers: Boolean = false
+    density: Density? = null,
+    fontSize: TextUnit? = null
 ): SpannableStringBuilder {
     val builder = SpannableStringBuilder()
-    children.forEachIndexed { index, child ->
-        var content = child.content.toString()
-        
-        // 如果是标题的第一个子节点，去除开头的 # 和空格
-        if (skipHeaderMarkers && index == 0) {
-            content = content.trimStart('#', ' ')
-        }
+    
+    children.forEach { child ->
+        val content = child.content.toString()
         
         when (child.type) {
             MarkdownProcessorType.LINK -> {
@@ -848,7 +984,64 @@ private fun buildSpannableFromChildren(
                 val end = builder.length
                 builder.setSpan(StyleSpan(Typeface.ITALIC), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            else -> { // PLAIN_TEXT, INLINE_CODE etc.
+            MarkdownProcessorType.INLINE_LATEX -> {
+                // 行内 LaTeX 渲染：使用 ImageSpan 嵌入渲染好的 LaTeX drawable
+                val latexContent = content.trimAll().removeSurrounding("$$", "$$")
+                
+                if (density != null && fontSize != null) {
+                    try {
+                        // 使用 JLatexMath 渲染 LaTeX 公式
+                        val textSizePx = with(density) { fontSize.toPx() }
+                        val drawable = LatexCache.getDrawable(
+                            latexContent,
+                            JLatexMathDrawable.builder(latexContent)
+                                .textSize(textSizePx)
+                                .padding(2)
+                                .color(textColor.toArgb())
+                                .background(0x00000000)
+                                .align(JLatexMathDrawable.ALIGN_LEFT)
+                        )
+                        
+                        // 设置 drawable 边界
+                        drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
+                        
+                        // 使用占位符空格，并应用 ImageSpan
+                        val start = builder.length
+                        builder.append(" ")  // 占位符
+                        val end = builder.length
+                        builder.setSpan(
+                            ImageSpan(drawable, ImageSpan.ALIGN_BASELINE),
+                            start,
+                            end,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    } catch (e: Exception) {
+                        // 渲染失败时回退到文本显示
+                        Log.e("CanvasMarkdown", "行内LaTeX渲染失败: $latexContent", e)
+                        val start = builder.length
+                        builder.append("[$latexContent]")
+                        val end = builder.length
+                        builder.setSpan(StyleSpan(Typeface.ITALIC), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        builder.setSpan(ForegroundColorSpan(primaryColor.toArgb()), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                } else {
+                    // 如果没有提供 density 和 fontSize，回退到文本显示
+                    val start = builder.length
+                    builder.append("[$latexContent]")
+                    val end = builder.length
+                    builder.setSpan(StyleSpan(Typeface.ITALIC), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    builder.setSpan(ForegroundColorSpan(primaryColor.toArgb()), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+            MarkdownProcessorType.INLINE_CODE -> {
+                val start = builder.length
+                builder.append(content)
+                val end = builder.length
+                builder.setSpan(StyleSpan(Typeface.MONOSPACE.style), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // 添加背景色 span（需要自定义 span）
+                builder.setSpan(ForegroundColorSpan(textColor.toArgb()), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            else -> { // PLAIN_TEXT etc.
                 builder.append(content)
             }
         }
