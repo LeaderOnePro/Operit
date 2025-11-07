@@ -10,8 +10,10 @@ import com.ai.assistance.operit.util.ChatUtils
 class TokenCacheManager {
     // 上一次的聊天历史
     private var previousChatHistory: List<Pair<String, String>> = emptyList()
+    // 对应于previousChatHistory的token数量
+    private var previousHistoryTokenCount = 0
     
-    // 缓存的输入token数量（对应于previousChatHistory）
+    // 缓存的输入token数量（对应于previousChatHistory的公共前缀）
     private var _cachedInputTokenCount = 0
     
     // 当前请求的新增token数量
@@ -49,6 +51,7 @@ class TokenCacheManager {
      */
     fun resetTokenCounts() {
         previousChatHistory = emptyList()
+        previousHistoryTokenCount = 0
         _cachedInputTokenCount = 0
         _currentInputTokenCount = 0
         _outputTokenCount = 0
@@ -93,7 +96,7 @@ class TokenCacheManager {
             // 有公共前缀，可以使用缓存
             val cachedTokens = if (commonPrefixLength == previousChatHistory.size) {
                 // 完全匹配之前的历史，直接使用缓存
-                _cachedInputTokenCount
+                previousHistoryTokenCount
             } else {
                 // 部分匹配，重新计算公共前缀的token数量
                 val commonPrefix = chatHistory.take(commonPrefixLength)
@@ -120,6 +123,7 @@ class TokenCacheManager {
         val newHistory = chatHistory.toMutableList()
         newHistory.add("user" to message)
         previousChatHistory = newHistory
+        previousHistoryTokenCount = totalInputTokenCount
         
         return totalInputTokenCount
     }

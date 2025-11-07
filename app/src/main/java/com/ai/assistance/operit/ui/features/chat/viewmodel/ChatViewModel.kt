@@ -282,20 +282,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         chatHistoryDelegate =
                 ChatHistoryDelegate(
                         context = context,
-                        coroutineScope = viewModelScope,  // 改用 coroutineScope 参数
-                        onChatHistoryLoaded = { messages: List<ChatMessage> ->
-                            // 移除了手动同步悬浮窗的逻辑，现在通过订阅chatHistory StateFlow自动同步
-                            
-                            // 当聊天记录加载时，更新实际的上下文窗口大小
-                            // 修复：直接使用从数据库加载的窗口大小，即使是0也不回退到最大值
-                            val currentChat = chatHistories.value.find { it.id == currentChatId.value }
-                            val currentSize = currentChat?.currentWindowSize ?: 0
-                            // uiStateDelegate.updateCurrentWindowSize(currentSize) // Removed
-                        },
+                        coroutineScope = viewModelScope,
                         onTokenStatisticsLoaded = { inputTokens, outputTokens, windowSize ->
                             tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, windowSize)
                         },
-
                         getEnhancedAiService = { enhancedAiService },
                         ensureAiServiceAvailable = { ensureAiServiceAvailable() },
                         getChatStatistics = {
