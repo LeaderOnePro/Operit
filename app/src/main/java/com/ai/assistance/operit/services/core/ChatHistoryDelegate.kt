@@ -24,9 +24,7 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 class ChatHistoryDelegate(
         private val context: Context,
         private val coroutineScope: CoroutineScope,
-        private val onChatHistoryLoaded: (List<ChatMessage>) -> Unit,
         private val onTokenStatisticsLoaded: (inputTokens: Int, outputTokens: Int, windowSize: Int) -> Unit,
-
         private val getEnhancedAiService: () -> EnhancedAIService?,
         private val ensureAiServiceAvailable: () -> Unit = {}, // 确保AI服务可用的回调
         private val getChatStatistics: () -> Triple<Int, Int, Int> = { Triple(0, 0, 0) }, // 获取（输入token, 输出token, 窗口大小）
@@ -108,7 +106,6 @@ class ChatHistoryDelegate(
 
             // 无论消息是否为空，都更新聊天历史
             _chatHistory.value = messages
-            onChatHistoryLoaded(messages)
 
             // 查找聊天元数据，更新token统计
             val selectedChat = _chatHistories.value.find { it.id == chatId }
@@ -144,14 +141,12 @@ class ChatHistoryDelegate(
                         val updated = existing.copy(content = opening, roleName = roleName)
                         currentMessages[existingIndex] = updated
                         _chatHistory.value = currentMessages
-                        onChatHistoryLoaded(currentMessages)
                         chatHistoryManager.updateMessage(chatId, updated)
                     }
                 } else {
                     val existing = currentMessages[existingIndex]
                     currentMessages.removeAt(existingIndex)
                     _chatHistory.value = currentMessages
-                    onChatHistoryLoaded(currentMessages)
                     chatHistoryManager.deleteMessage(chatId, existing.timestamp)
                 }
             } else if (opening.isNotBlank()) {
@@ -163,7 +158,6 @@ class ChatHistoryDelegate(
                 )
                 currentMessages.add(openingMessage)
                 _chatHistory.value = currentMessages
-                onChatHistoryLoaded(currentMessages)
                 chatHistoryManager.addMessage(chatId, openingMessage)
             }
         }
@@ -205,10 +199,8 @@ class ChatHistoryDelegate(
                 _chatHistory.value = messagesWithOpening
                 // 保存带开场白的消息到数据库
                 chatHistoryManager.addMessage(newChat.id, openingMessage)
-                onChatHistoryLoaded(messagesWithOpening)
             } else {
                 _chatHistory.value = newChat.messages
-                onChatHistoryLoaded(newChat.messages)
             }
             // --- 结束 ---
 
@@ -259,7 +251,6 @@ class ChatHistoryDelegate(
                         // 从内存中删除
                         currentMessages.removeAt(index)
                         _chatHistory.value = currentMessages
-                        onChatHistoryLoaded(currentMessages)
                     }
                 }
             }
@@ -278,7 +269,6 @@ class ChatHistoryDelegate(
                     // 直接在这里处理数据库和内存更新，避免重复加锁
                     chatHistoryManager.deleteMessagesFrom(chatId, messageToStartDeletingFrom.timestamp)
                     _chatHistory.value = newHistory
-                    onChatHistoryLoaded(newHistory)
                 }
             }
         }
@@ -410,7 +400,6 @@ class ChatHistoryDelegate(
 
             if (existingIndex >= 0) {
                 //只更新消息，不能重新加载聊天记录
-                val updated = currentMessages.toMutableList().also { it[existingIndex] = message }
                 chatHistoryManager.updateMessage(targetChatId, message)
             } else {
                 Log.d(
@@ -419,7 +408,6 @@ class ChatHistoryDelegate(
                 )
                 val updated = currentMessages + message
                 _chatHistory.value = updated
-                onChatHistoryLoaded(updated)
                 chatHistoryManager.addMessage(targetChatId, message)
             }
         }
@@ -456,7 +444,6 @@ class ChatHistoryDelegate(
 
                 // 更新内存中的聊天记录
                 _chatHistory.value = newHistory
-                onChatHistoryLoaded(newHistory)
             }
         }
     }
@@ -464,7 +451,6 @@ class ChatHistoryDelegate(
     /** 更新整个聊天历史 用于编辑或回档等操作 */
     fun updateChatHistory(newHistory: List<ChatMessage>) {
         _chatHistory.value = newHistory.toList()
-        onChatHistoryLoaded(_chatHistory.value)
     }
 
     /**
@@ -526,7 +512,6 @@ class ChatHistoryDelegate(
             _currentChatId.value = newChat.id
             _chatHistory.value = newChat.messages
 
-            onChatHistoryLoaded(newChat.messages)
             onTokenStatisticsLoaded(0, 0, 0)
         }
     }
@@ -567,7 +552,6 @@ class ChatHistoryDelegate(
 
                 // 更新消息列表
                 _chatHistory.value = currentMessages
-                onChatHistoryLoaded(_chatHistory.value)
 
                 // 使用带有索引的重载方法更新数据库
                 chatHistoryManager.addMessage(chatId, summaryMessage, insertPosition)

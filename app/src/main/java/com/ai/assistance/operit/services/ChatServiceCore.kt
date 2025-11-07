@@ -91,9 +91,6 @@ class ChatServiceCore(
         chatHistoryDelegate = ChatHistoryDelegate(
             context = context,
             coroutineScope = coroutineScope,
-            onChatHistoryLoaded = { messages ->
-                Log.d(TAG, "聊天历史已加载: ${messages.size} 条消息")
-            },
             onTokenStatisticsLoaded = { inputTokens, outputTokens, windowSize ->
                 tokenStatisticsDelegate.setTokenCounts(inputTokens, outputTokens, windowSize)
             },
