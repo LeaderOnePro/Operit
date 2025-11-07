@@ -18,6 +18,7 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.core.tools.defaultTool.PathValidator
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -73,6 +74,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -375,6 +377,8 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.readFileFull(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
+
         if (path.isBlank()) {
             return ToolResult(
                     toolName = tool.name,
@@ -483,6 +487,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.readFile(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -588,6 +593,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.readFilePart(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
         val partIndex = tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
         val partSize = apiPreferences.getPartSize()
 
@@ -702,6 +708,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.writeFile(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
         val content = tool.parameters.find { it.name == "content" }?.value ?: ""
         val append = tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
 
@@ -870,6 +877,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.deleteFile(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
         val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
 
         if (path.isBlank()) {
@@ -959,6 +967,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.fileExists(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -1039,6 +1048,8 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+        PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+        PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
         if (sourcePath.isBlank() || destPath.isBlank()) {
             return ToolResult(
@@ -1121,25 +1132,15 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     /** Copy a file or directory */
     override suspend fun copyFile(tool: AITool): ToolResult {
-        val sourceEnvironment = tool.parameters.find { it.name == "source_environment" }?.value
-        val destEnvironment = tool.parameters.find { it.name == "dest_environment" }?.value
         val environment = tool.parameters.find { it.name == "environment" }?.value
-        
-        // 确定源和目标环境
-        val srcEnv = sourceEnvironment ?: environment ?: "android"
-        val dstEnv = destEnvironment ?: environment ?: "android"
-        
-        // 只要有一个环境是Linux，就使用父类的跨环境复制功能
-        if (srcEnv.lowercase() == "linux" || dstEnv.lowercase() == "linux") {
+        if (environment == "linux") {
             return super.copyFile(tool)
         }
-        
-        // 如果都是Android环境，使用本地实现
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
-        val recursive =
-                tool.parameters.find { it.name == "recursive" }?.value?.toBoolean()
-                        ?: true // 默认为true以支持目录复制
+        val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
+        PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+        PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
         if (sourcePath.isBlank() || destPath.isBlank()) {
             return ToolResult(
@@ -1287,6 +1288,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.makeDirectory(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
         val createParents =
                 tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean() ?: false
 
@@ -1404,6 +1406,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.findFiles(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
         val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
 
         if (path.isBlank() || pattern.isBlank()) {
@@ -1493,6 +1496,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.fileInfo(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -1651,6 +1655,11 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
         val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+        PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+        PathValidator.validateAndroidPath(zipPath, tool.name, "destination")?.let { return it }
+
+        val actualSourcePath = sourcePath // No PathMapper in debugger tools
+        val actualZipPath = zipPath
 
         if (sourcePath.isBlank() || zipPath.isBlank()) {
             return ToolResult(
@@ -1863,6 +1872,11 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
         val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+        PathValidator.validateAndroidPath(zipPath, tool.name, "source")?.let { return it }
+        PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
+
+        val actualZipPath = zipPath
+        val actualDestPath = destPath
 
         if (zipPath.isBlank() || destPath.isBlank()) {
             return ToolResult(
@@ -2013,6 +2027,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.openFile(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -2112,7 +2127,8 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             return super.shareFile(tool)
         }
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-        val title = tool.parameters.find { it.name == "title" }?.value ?: "分享文件"
+        PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
+        val title = tool.parameters.find { it.name == "title" }?.value ?: "Share File"
 
         if (path.isBlank()) {
             return ToolResult(
@@ -2214,6 +2230,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
         val url = tool.parameters.find { it.name == "url" }?.value ?: ""
         val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+        PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
         if (url.isBlank() || destPath.isBlank()) {
             return ToolResult(

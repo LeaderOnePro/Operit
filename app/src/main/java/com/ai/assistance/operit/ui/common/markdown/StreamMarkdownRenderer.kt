@@ -145,12 +145,6 @@ fun StreamMarkdownRenderer(
         onLinkClick: ((String) -> Unit)? = null,
         xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() }
 ) {
-    // 监听流式渲染器的 recompose
-    SideEffect {
-        Log.d(TAG, "【Stream Renderer Recompose】markdownStream=${System.identityHashCode(markdownStream)}, " +
-                "textColor=${textColor.hashCode()}, onLinkClick=${onLinkClick?.hashCode()}, " +
-                "xmlRenderer=${xmlRenderer.hashCode()}")
-    }
     
     // 原始数据收集列表
     val nodes = remember { mutableStateListOf<MarkdownNode>() }
@@ -378,12 +372,6 @@ fun StreamMarkdownRenderer(
         onLinkClick: ((String) -> Unit)? = null,
         xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() }
 ) {
-    // 监听静态渲染器的 recompose
-    SideEffect {
-        Log.d(TAG, "【Static Renderer Recompose】content.hashCode=${content.hashCode()}, " +
-                "content.length=${content.length}, textColor=${textColor.hashCode()}, " +
-                "onLinkClick=${onLinkClick?.hashCode()}, xmlRenderer=${xmlRenderer.hashCode()}")
-    }
     
     // 移除渲染时间相关的变量和日志
 
@@ -658,12 +646,6 @@ private fun UnifiedMarkdownCanvas(
     xmlRenderer: XmlContentRenderer,
     modifier: Modifier = Modifier
 ) {
-    // 监听 UnifiedMarkdownCanvas 的 recompose
-    SideEffect {
-        Log.d(TAG, "【Canvas Recompose】UnifiedMarkdownCanvas: rendererId=$rendererId, " +
-                "nodes.size=${nodes.size}, textColor=${textColor.hashCode()}, " +
-                "onLinkClick=${onLinkClick.hashCode()}, xmlRenderer=${xmlRenderer.hashCode()}")
-    }
     
     val density = LocalDensity.current
     val typography = MaterialTheme.typography

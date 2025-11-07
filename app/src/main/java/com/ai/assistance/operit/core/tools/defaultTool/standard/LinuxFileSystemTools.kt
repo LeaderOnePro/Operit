@@ -11,6 +11,7 @@ import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.util.FileUtils
+import com.ai.assistance.operit.core.tools.defaultTool.PathValidator
 
 /**
  * Linux文件系统工具类，专门处理Linux环境下的文件操作
@@ -34,6 +35,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 列出Linux目录中的文件 */
     override suspend fun listFiles(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -105,6 +107,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 读取Linux文件的完整内容 */
     override suspend fun readFileFull(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -193,6 +196,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 检查Linux文件是否存在 */
     override suspend fun fileExists(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -248,6 +252,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 读取Linux文件（基础版本，带大小限制） */
     override suspend fun readFile(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -331,6 +336,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     override suspend fun readFilePart(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val partIndex = tool.parameters.find { it.name == "partIndex" }?.value?.toIntOrNull() ?: 0
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -409,6 +415,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val content = tool.parameters.find { it.name == "content" }?.value ?: ""
         val append = tool.parameters.find { it.name == "append" }?.value?.toBoolean() ?: false
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -475,6 +482,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     override suspend fun writeFileBinary(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val base64Content = tool.parameters.find { it.name == "base64Content" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -556,6 +564,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     override suspend fun deleteFile(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: false
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -633,8 +642,10 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
 
     /** 移动/重命名Linux文件 */
     override suspend fun moveFile(tool: AITool): ToolResult {
-        val sourcePath = tool.parameters.find { it.name == "sourcePath" }?.value ?: ""
-        val destPath = tool.parameters.find { it.name == "destPath" }?.value ?: ""
+        val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
+        val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
+        PathValidator.validateLinuxPath(sourcePath, tool.name, "source")?.let { return it }
+        PathValidator.validateLinuxPath(destPath, tool.name, "destination")?.let { return it }
 
         if (sourcePath.isBlank() || destPath.isBlank()) {
             return ToolResult(
@@ -712,9 +723,11 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
 
     /** 复制Linux文件或目录 */
     override suspend fun copyFile(tool: AITool): ToolResult {
-        val sourcePath = tool.parameters.find { it.name == "sourcePath" }?.value ?: ""
-        val destPath = tool.parameters.find { it.name == "destPath" }?.value ?: ""
+        val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
+        val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
         val recursive = tool.parameters.find { it.name == "recursive" }?.value?.toBoolean() ?: true
+        PathValidator.validateLinuxPath(sourcePath, tool.name, "source")?.let { return it }
+        PathValidator.validateLinuxPath(destPath, tool.name, "destination")?.let { return it }
 
         if (sourcePath.isBlank() || destPath.isBlank()) {
             return ToolResult(
@@ -779,7 +792,8 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 创建Linux目录 */
     override suspend fun makeDirectory(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
-        val createParents = tool.parameters.find { it.name == "createParents" }?.value?.toBoolean() ?: false
+        val createParents = tool.parameters.find { it.name == "create_parents" }?.value?.toBoolean() ?: false
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -843,8 +857,9 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
 
     /** 在Linux文件系统中查找文件 */
     override suspend fun findFiles(tool: AITool): ToolResult {
-        val basePath = tool.parameters.find { it.name == "basePath" }?.value ?: ""
+        val basePath = tool.parameters.find { it.name == "path" }?.value ?: ""
         val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
+        PathValidator.validateLinuxPath(basePath, tool.name, "path")?.let { return it }
 
         if (basePath.isBlank()) {
             return ToolResult(
@@ -907,6 +922,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 获取Linux文件信息 */
     override suspend fun fileInfo(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -957,6 +973,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 打开Linux文件（暂不支持） */
     override suspend fun openFile(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         return ToolResult(
             toolName = tool.name,
@@ -971,6 +988,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
         val pattern = tool.parameters.find { it.name == "pattern" }?.value ?: ""
         val maxResults = tool.parameters.find { it.name == "max_results" }?.value?.toIntOrNull() ?: 100
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         if (path.isBlank()) {
             return ToolResult(
@@ -1001,6 +1019,7 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
     /** 分享Linux文件（暂不支持） */
     override suspend fun shareFile(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""
+        PathValidator.validateLinuxPath(path, tool.name)?.let { return it }
 
         return ToolResult(
             toolName = tool.name,

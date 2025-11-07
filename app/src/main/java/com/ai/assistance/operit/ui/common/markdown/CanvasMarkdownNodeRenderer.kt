@@ -255,13 +255,6 @@ fun CanvasMarkdownNodeRenderer(
     index: Int,
     xmlRenderer: XmlContentRenderer
 ) {
-    // 监听整个 CanvasMarkdownNodeRenderer 的 recompose
-    SideEffect {
-        if (node.type == MarkdownProcessorType.XML_BLOCK) {
-            Log.d(TAG, "【全局Recompose】CanvasMarkdownNodeRenderer: index=$index, type=${node.type}, " +
-                    "textColor=${textColor.hashCode()}, xmlRenderer=${xmlRenderer.hashCode()}")
-        }
-    }
     
     val density = LocalDensity.current
     
@@ -431,11 +424,6 @@ private fun renderNodeContent(
         
         // ========== XML块：保留原组件 ==========
         MarkdownProcessorType.XML_BLOCK -> {
-            // 不使用 key()，让 Compose 根据位置自然识别组件
-            // 这样可以在流式渲染时保持组件实例不变，从而保留内部状态
-            SideEffect {
-                Log.d(TAG, "【XML渲染】XML块 Recompose: index=$index, 内容长度=${content.length}, content_hash=${content.hashCode()}")
-            }
             xmlRenderer.RenderXmlContent(
                 xmlContent = content,
                 modifier = Modifier.fillMaxWidth(),

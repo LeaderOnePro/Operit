@@ -45,6 +45,7 @@ import com.ai.assistance.operit.api.chat.enhance.FileBindingService
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.terminal.TerminalManager
 import com.ai.assistance.operit.terminal.provider.filesystem.FileSystemProvider
+import com.ai.assistance.operit.core.tools.defaultTool.PathValidator
 
 /**
  * Collection of file system operation tools for the AI assistant These tools use Java File APIs for
@@ -104,6 +105,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.listFiles(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -443,6 +445,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.readFileFull(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
                 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -522,6 +525,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.readFile(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -646,6 +650,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.readFilePart(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -746,6 +751,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.writeFile(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -875,6 +881,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.writeFileBinary(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1002,6 +1009,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.deleteFile(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1141,6 +1149,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.fileExists(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1206,6 +1215,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.moveFile(tool)
                 }
+                PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+                PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
                 if (sourcePath.isBlank() || destPath.isBlank()) {
                         return ToolResult(
@@ -1711,6 +1722,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                 )
                         )
                 }
+                PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+                PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
                 // Android环境内复制
                 return try {
@@ -1858,6 +1871,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.makeDirectory(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -1975,6 +1989,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.findFiles(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank() || pattern.isBlank()) {
                         return ToolResult(
@@ -2148,6 +2163,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.fileInfo(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -2272,6 +2288,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val sourcePath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val zipPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
+                PathValidator.validateAndroidPath(sourcePath, tool.name, "source")?.let { return it }
+                PathValidator.validateAndroidPath(zipPath, tool.name, "destination")?.let { return it }
 
                 val actualSourcePath = PathMapper.resolvePath(context, sourcePath, environment)
                 val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
@@ -2397,6 +2415,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val zipPath = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
+                PathValidator.validateAndroidPath(zipPath, tool.name, "source")?.let { return it }
+                PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
                 val actualZipPath = PathMapper.resolvePath(context, zipPath, environment)
                 val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
@@ -2507,6 +2527,10 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
                 val aiGeneratedCode = tool.parameters.find { it.name == "content" }?.value ?: ""
+                PathValidator.validateAndroidPath(path, tool.name)?.let {
+                        emit(it)
+                        return@flow
+                }
 
                 if (path.isBlank()) {
                         emit(
@@ -2760,6 +2784,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 val url = tool.parameters.find { it.name == "url" }?.value ?: ""
                 val destPath = tool.parameters.find { it.name == "destination" }?.value ?: ""
                 val environment = tool.parameters.find { it.name == "environment" }?.value
+                PathValidator.validateAndroidPath(destPath, tool.name, "destination")?.let { return it }
 
                 val actualDestPath = PathMapper.resolvePath(context, destPath, environment)
 
@@ -2913,6 +2938,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.openFile(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -3021,6 +3047,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.grepCode(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
                 
                 if (path.isBlank()) {
                         return ToolResult(
@@ -3209,6 +3236,7 @@ open class StandardFileSystemTools(protected val context: Context) {
                 if (isLinuxEnvironment(environment)) {
                         return linuxTools.shareFile(tool)
                 }
+                PathValidator.validateAndroidPath(path, tool.name)?.let { return it }
 
                 if (path.isBlank()) {
                         return ToolResult(
