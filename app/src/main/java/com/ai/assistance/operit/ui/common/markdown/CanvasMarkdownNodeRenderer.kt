@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.util.markdown.MarkdownNode
+import com.ai.assistance.operit.util.markdown.MarkdownNodeStable
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import java.util.concurrent.ConcurrentHashMap
 import android.graphics.Typeface
@@ -239,7 +240,7 @@ private sealed class DrawInstruction {
  */
 @Composable
 fun CanvasMarkdownNodeRenderer(
-    node: MarkdownNode,
+    node: MarkdownNodeStable,
     textColor: Color,
     modifier: Modifier = Modifier,
     onLinkClick: ((String) -> Unit)? = null,
@@ -280,7 +281,7 @@ fun CanvasMarkdownNodeRenderer(
     // 直接从 node 读取内容，不使用外层 key()
     // 让 Compose 根据节点的实际变化自然地触发 recompose，而不是强制重建
     // 这样可以保持 XML 渲染器等组件的内部状态（如折叠/展开状态）
-    val content = node.content.toString()
+    val content = node.content
     
     // 【不使用 key() 包裹】直接调用 renderNodeContent
     // 让内部的 remember 和组件自己根据 content 的变化来决定是否重组
@@ -311,7 +312,7 @@ private data class FontSizes(
 
 @Composable
 private fun renderNodeContent(
-    node: MarkdownNode,
+    node: MarkdownNodeStable,
     content: String,
     textColor: Color,
     fontSizes: FontSizes,
@@ -321,14 +322,17 @@ private fun renderNodeContent(
     xmlRenderer: XmlContentRenderer,
     index: Int
 ) {
-    when (node.type) {
+    // 【关键优化】只要节点内容不变，就记住原始节点实例，防止不必要的重组
+    val stableNode = remember(content) { node }
+
+    when (stableNode.type) {
         // ========== 简单文本类型：使用单个大 Canvas 绘制 ==========
         MarkdownProcessorType.HEADER,
         MarkdownProcessorType.PLAIN_TEXT,
         MarkdownProcessorType.ORDERED_LIST,
         MarkdownProcessorType.UNORDERED_LIST -> {
             UnifiedCanvasRenderer(
-                node = node,
+                node = stableNode,
                 textColor = textColor,
                 bodyMediumSize = fontSizes.bodyMedium,
                 headlineLargeSize = fontSizes.headlineLarge,
@@ -489,7 +493,7 @@ private fun renderNodeContent(
  */
 @Composable
 private fun UnifiedCanvasRenderer(
-    node: MarkdownNode,
+    node: MarkdownNodeStable,
     textColor: Color,
     bodyMediumSize: TextUnit,
     headlineLargeSize: TextUnit,
@@ -638,7 +642,7 @@ private fun UnifiedCanvasRenderer(
  * 计算布局和生成绘制指令
  */
 private fun calculateLayout(
-    node: MarkdownNode,
+    node: MarkdownNodeStable,
     textColor: Color,
     primaryColor: Color,
     bodyMediumSize: TextUnit,
@@ -653,7 +657,7 @@ private fun calculateLayout(
     density: Density,
     availableWidthPx: Int
 ): Pair<Float, List<DrawInstruction>> {
-    val content = node.content.toString()
+    val content = node.content
     val instructions = mutableListOf<DrawInstruction>()
     var currentY = 0f
     
@@ -692,7 +696,20 @@ private fun calculateLayout(
             val textPaint = PaintCache.getTextPaint(textColor, textSizePx, boldTypeface)
 
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor, skipHeaderMarkers = true)
+                // 处理子节点列表，去除第一个子节点中的标题标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = firstChild.content.trimStart('#', ' ')
+                val newFirstChild = MarkdownNodeStable(firstChild.type, content = newContent, children = firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = fontSize
+                )
                 createStaticLayout(spannable, textPaint, availableWidthPx)
             } else {
                 LayoutCache.getLayout(headerText, textPaint, availableWidthPx, textColor, boldTypeface)
@@ -729,7 +746,22 @@ private fun calculateLayout(
             val contentWidth = availableWidthPx - contentX.toInt()
             
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                // 处理子节点列表，去除第一个子节点中的列表标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = numberMatch?.let {
+                    firstChild.content.substring(it.range.last + 1)
+                } ?: firstChild.content
+                val newFirstChild = MarkdownNodeStable(firstChild.type, content = newContent, children = firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = bodyMediumSize
+                )
                 createStaticLayout(spannable, textPaint, contentWidth)
             } else {
                 LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
@@ -766,7 +798,22 @@ private fun calculateLayout(
             val contentWidth = availableWidthPx - contentX.toInt()
             
             val layout = if (node.children.isNotEmpty()) {
-                val spannable = buildSpannableFromChildren(node.children, textColor, primaryColor)
+                // 处理子节点列表，去除第一个子节点中的列表标记
+                val modifiedChildren = node.children.toMutableList()
+                val firstChild = modifiedChildren[0]
+                val newContent = markerMatch?.let {
+                    firstChild.content.substring(it.range.last + 1)
+                } ?: firstChild.content
+                val newFirstChild = MarkdownNodeStable(firstChild.type, content = newContent, children = firstChild.children)
+                modifiedChildren[0] = newFirstChild
+                
+                val spannable = buildSpannableFromChildren(
+                    modifiedChildren, 
+                    textColor, 
+                    primaryColor,
+                    density = density,
+                    fontSize = bodyMediumSize
+                )
                 createStaticLayout(spannable, textPaint, contentWidth)
             } else {
                 LayoutCache.getLayout(itemText, textPaint, contentWidth, textColor, normalTypeface)
@@ -811,19 +858,15 @@ private fun calculateLayout(
  * 从 MarkdownNode 的子节点构建 SpannableStringBuilder
  */
 private fun buildSpannableFromChildren(
-    children: List<MarkdownNode>,
+    children: List<MarkdownNodeStable>,
     textColor: Color,
     primaryColor: Color,
     skipHeaderMarkers: Boolean = false
 ): SpannableStringBuilder {
     val builder = SpannableStringBuilder()
-    children.forEachIndexed { index, child ->
-        var content = child.content.toString()
-        
-        // 如果是标题的第一个子节点，去除开头的 # 和空格
-        if (skipHeaderMarkers && index == 0) {
-            content = content.trimStart('#', ' ')
-        }
+    
+    children.forEach { child ->
+        val content = child.content
         
         when (child.type) {
             MarkdownProcessorType.LINK -> {

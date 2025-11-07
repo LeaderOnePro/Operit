@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ai.assistance.operit.ui.common.displays.LatexCache
 import com.ai.assistance.operit.util.markdown.MarkdownNode
+import com.ai.assistance.operit.util.markdown.MarkdownNodeStable
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import com.ai.assistance.operit.util.markdown.NestedMarkdownProcessor
 import com.ai.assistance.operit.util.stream.Stream
@@ -67,6 +68,18 @@ import ru.noties.jlatexmath.JLatexMathDrawable
 private const val TAG = "MarkdownRenderer"
 private const val RENDER_INTERVAL_MS = 100L // 渲染间隔 0.1 秒
 private const val FADE_IN_DURATION_MS = 800 // 淡入动画持续时间
+
+/**
+ * Converts a mutable [MarkdownNode] to an immutable, stable [MarkdownNodeStable].
+ * This function is recursive and converts the entire node tree.
+ */
+private fun MarkdownNode.toStableNode(): MarkdownNodeStable {
+    return MarkdownNodeStable(
+        type = this.type,
+        content = this.content.toString(),
+        children = this.children.map { it.toStableNode() }
+    )
+}
 
 // XML内容渲染器接口，用于自定义XML渲染
 interface XmlContentRenderer {
@@ -142,11 +155,13 @@ fun StreamMarkdownRenderer(
     // 原始数据收集列表
     val nodes = remember { mutableStateListOf<MarkdownNode>() }
     // 用于UI渲染的列表
-    val renderNodes = remember { mutableStateListOf<MarkdownNode>() }
+    val renderNodes = remember { mutableStateListOf<MarkdownNodeStable>() }
     // 节点动画状态映射表
     val nodeAnimationStates = remember { mutableStateMapOf<String, Boolean>() }
     // 用于在`finally`块中启动协程
     val scope = rememberCoroutineScope()
+    // 缓存转换后的稳定节点，避免不必要的对象创建
+    val conversionCache = remember { mutableStateMapOf<Int, Pair<Int, MarkdownNodeStable>>() }
 
     // 当流实例变化时，获得一个稳定的渲染器ID
     val rendererId =
@@ -168,6 +183,7 @@ fun StreamMarkdownRenderer(
                         BatchNodeUpdater(
                                 nodes = nodes,
                                 renderNodes = renderNodes,
+                                conversionCache = conversionCache,
                                 nodeAnimationStates = nodeAnimationStates,
                                 rendererId = rendererId,
                                 isInterceptedStream = processor.interceptedStream,
@@ -317,7 +333,7 @@ fun StreamMarkdownRenderer(
             Log.e(TAG, "【流渲染】Markdown流处理异常: ${e.message}", e)
         } finally {
             // 移除时间计算变量和日志
-            synchronizeRenderNodes(nodes, renderNodes, nodeAnimationStates, rendererId, scope)
+            synchronizeRenderNodes(nodes, renderNodes, conversionCache, nodeAnimationStates, rendererId, scope)
             // 移除最终同步耗时日志
         }
     }
@@ -376,6 +392,7 @@ fun StreamMarkdownRenderer(
 
     // 使用与流式版本相同的节点列表结构
     val nodes = remember(content) { mutableStateListOf<MarkdownNode>() }
+    val renderNodes = remember(content) { mutableStateListOf<MarkdownNodeStable>() }
     // 添加节点动画状态映射表，与流式版本保持一致
     val nodeAnimationStates = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
@@ -390,6 +407,8 @@ fun StreamMarkdownRenderer(
             // 移除时间计算变量
             nodes.clear()
             nodes.addAll(cachedNodes)
+            renderNodes.clear()
+            renderNodes.addAll(cachedNodes.map { it.toStableNode() })
             // 确保动画状态也被设置
             val newStates = mutableMapOf<String, Boolean>()
             cachedNodes.forEachIndexed { index, node ->
@@ -542,6 +561,8 @@ fun StreamMarkdownRenderer(
                     nodes.clear()
                     // 批量添加所有节点以减少UI重组次数
                     nodes.addAll(parsedNodes)
+                    renderNodes.clear()
+                    renderNodes.addAll(parsedNodes.map { it.toStableNode() })
 
                     // 更新所有节点的动画状态为可见
                     val newStates = mutableMapOf<String, Boolean>()
@@ -563,7 +584,7 @@ fun StreamMarkdownRenderer(
     Surface(modifier = modifier, color = Color.Transparent, shape = RoundedCornerShape(4.dp)) {
         key(rendererId) {
             UnifiedMarkdownCanvas(
-                nodes = nodes,
+                nodes = renderNodes,
                 rendererId = rendererId,
                 nodeAnimationStates = nodeAnimationStates,
                 textColor = textColor,
@@ -596,7 +617,7 @@ fun StreamMarkdownRenderer(
 @Composable
 private fun AnimatedNode(
     nodeKey: String,
-    node: MarkdownNode,
+    node: MarkdownNodeStable,
     index: Int,
     isVisible: Boolean,
     textColor: Color,
@@ -629,7 +650,7 @@ private fun AnimatedNode(
 
 @Composable
 private fun UnifiedMarkdownCanvas(
-    nodes: List<MarkdownNode>,
+    nodes: List<MarkdownNodeStable>,
     rendererId: String,
     nodeAnimationStates: Map<String, Boolean>,
     textColor: Color,
@@ -688,7 +709,8 @@ private fun UnifiedMarkdownCanvas(
 /** 批量节点更新器 - 负责将原始节点列表的更新批量应用到渲染节点列表 */
 private class BatchNodeUpdater(
         private val nodes: SnapshotStateList<MarkdownNode>,
-        private val renderNodes: SnapshotStateList<MarkdownNode>,
+        private val renderNodes: SnapshotStateList<MarkdownNodeStable>,
+        private val conversionCache: MutableMap<Int, Pair<Int, MarkdownNodeStable>>,
         private val nodeAnimationStates: MutableMap<String, Boolean>,
         private val rendererId: String,
         private val isInterceptedStream: Stream<Char>,
@@ -715,49 +737,61 @@ private class BatchNodeUpdater(
 
     private fun performBatchUpdate() {
         // 使用synchronizeRenderNodes函数进行节点同步
-        synchronizeRenderNodes(nodes, renderNodes, nodeAnimationStates, rendererId, scope)
+        synchronizeRenderNodes(nodes, renderNodes, conversionCache, nodeAnimationStates, rendererId, scope)
     }
 }
 
 /** 同步渲染节点 - 确保所有节点都被渲染 在流处理完成或出现异常时调用，确保最终状态一致 */
 private fun synchronizeRenderNodes(
-        nodes: SnapshotStateList<MarkdownNode>,
-        renderNodes: SnapshotStateList<MarkdownNode>,
-        nodeAnimationStates: MutableMap<String, Boolean>,
-        rendererId: String,
-        scope: CoroutineScope
+    nodes: SnapshotStateList<MarkdownNode>,
+    renderNodes: SnapshotStateList<MarkdownNodeStable>,
+    conversionCache: MutableMap<Int, Pair<Int, MarkdownNodeStable>>,
+    nodeAnimationStates: MutableMap<String, Boolean>,
+    rendererId: String,
+    scope: CoroutineScope
 ) {
-
     val keysToAnimate = mutableListOf<String>()
 
-    // 智能同步：只处理新增或被替换的节点，避免全局重绘
-    val maxCommonIndex = minOf(nodes.size, renderNodes.size)
+    // 1. 更新现有节点并添加新节点
+    nodes.forEachIndexed { i, sourceNode ->
+        val contentLength = sourceNode.content.length
+        val cached = conversionCache[i]
 
-    // 1. 检查并处理被替换的节点（例如LaTeX块）
-    for (i in 0 until maxCommonIndex) {
-        if (nodes[i] !== renderNodes[i]) { // 使用引用比较
-            val nodeKey = "node-$rendererId-$i-${nodes[i].type}"
+        val stableNode = if (cached != null && cached.first == contentLength) {
+            cached.second
+        } else {
+            sourceNode.toStableNode().also {
+                conversionCache[i] = contentLength to it
+            }
+        }
+
+        if (i < renderNodes.size) {
+            // 如果节点内容发生变化，则更新
+            if (renderNodes[i] != stableNode) {
+                renderNodes[i] = stableNode
+                Log.d(TAG, "【渲染性能】最终同步：替换节点 at index $i")
+            }
+        } else {
+            // 添加新节点
+            renderNodes.add(stableNode)
+            val nodeKey = "node-$rendererId-$i-${stableNode.type}"
             nodeAnimationStates[nodeKey] = false // 准备播放动画
             keysToAnimate.add(nodeKey)
-            renderNodes[i] = nodes[i]
-            Log.d(TAG, "【渲染性能】最终同步：替换节点 at index $i")
         }
     }
 
-    // 2. 添加在最后一次定时渲染后产生的新节点
-    if (nodes.size > renderNodes.size) {
-        for (i in renderNodes.size until nodes.size) {
-            val nodeKey = "node-$rendererId-$i-${nodes[i].type}"
-            nodeAnimationStates[nodeKey] = false // 准备播放动画
-            keysToAnimate.add(nodeKey)
-            renderNodes.add(nodes[i])
+    // 2. 如果源列表变小，则移除多余的节点
+    while (renderNodes.size > nodes.size) {
+        renderNodes.removeLast()
+    }
+
+    // 3. 清理多余的缓存条目
+    if (nodes.size < conversionCache.size) {
+        (nodes.size until conversionCache.size).forEach {
+            conversionCache.remove(it)
         }
     }
-    // 3. (安全校验) 如果源节点变少，则同步删除
-    else if (nodes.size < renderNodes.size) {
-        val removeCount = renderNodes.size - nodes.size
-        repeat(removeCount) { renderNodes.removeLast() }
-    }
+
 
     // 启动所有新标记节点的动画
     if (keysToAnimate.isNotEmpty()) {

@@ -57,6 +57,13 @@ class MarkdownNode(val type: MarkdownProcessorType, initialContent: String = "")
     val children: SnapshotStateList<MarkdownNode> = mutableStateListOf()
 }
 
+@Stable
+data class MarkdownNodeStable(
+    val type: MarkdownProcessorType,
+    val content: String,
+    val children: List<MarkdownNodeStable>
+)
+
 /** 将字符串转换为字符流 */
 fun String.toCharStream(): Stream<Char> {
     return stream {
