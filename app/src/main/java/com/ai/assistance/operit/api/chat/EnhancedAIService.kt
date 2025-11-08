@@ -959,7 +959,7 @@ class EnhancedAIService private constructor(private val context: Context) {
     /**
      * 构建工具不可用的错误信息，统一逻辑避免重复
      */
-    private fun buildToolNotAvailableErrorMessage(toolName: String): String {
+    private suspend fun buildToolNotAvailableErrorMessage(toolName: String): String {
         return when {
             toolName.contains('.') && !toolName.contains(':') -> {
                 val parts = toolName.split('.', limit = 2)

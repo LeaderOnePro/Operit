@@ -490,7 +490,7 @@ class StreamMarkdownPluginTest {
         // 测试不包含分隔符的链接
         val linkText = "这是[链接](https://example.com)"
         val linkStream = linkText.asCharStream()
-        val linkPlugin = StreamMarkdownLinkPlugin(includeDelimiters = false)
+        val linkPlugin = StreamMarkdownLinkPlugin()
 
         val linkGroups = collectGroups(linkStream, linkPlugin)
         assertEquals(2, linkGroups.size)

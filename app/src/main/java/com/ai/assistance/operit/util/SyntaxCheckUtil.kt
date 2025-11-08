@@ -435,13 +435,17 @@ object SyntaxCheckUtil {
         )
 
         val content = lines.joinToString("\n")
+        
+        // 预处理：移除HTML注释和script/style标签内的内容
+        val cleanedContent = removeHtmlCommentsAndScriptContent(content)
+        
         val tagPattern = Regex("<(/?)([a-zA-Z][a-zA-Z0-9]*)(\\s[^>]*)?>")
 
-        tagPattern.findAll(content).forEach { match ->
+        tagPattern.findAll(cleanedContent).forEach { match ->
             val isClosing = match.groupValues[1] == "/"
             val tagName = match.groupValues[2].lowercase()
             
-            // 计算行号和列号
+            // 计算行号和列号（基于原始内容）
             val position = match.range.first
             var line = 1
             var col = 1
@@ -499,6 +503,147 @@ object SyntaxCheckUtil {
             )
         }
     }
+    
+    /**
+     * 移除HTML注释和script/style标签内的内容，避免误判
+     * 用空格替代被移除的内容以保持位置索引不变
+     */
+    private fun removeHtmlCommentsAndScriptContent(content: String): String {
+        val result = StringBuilder()
+        var i = 0
+        
+        while (i < content.length) {
+            // 检查HTML注释
+            if (content.startsWith("<!--", i)) {
+                val commentEnd = content.indexOf("-->", i + 4)
+                if (commentEnd != -1) {
+                    // 用空格替换整个注释
+                    result.append(" ".repeat(commentEnd + 3 - i))
+                    i = commentEnd + 3
+                    continue
+                }
+            }
+            
+            // 检查script标签
+            val scriptMatch = Regex("<script(\\s[^>]*)?>", RegexOption.IGNORE_CASE).matchAt(content, i)
+            if (scriptMatch != null) {
+                val openingTag = scriptMatch.value
+                result.append(openingTag)
+                i += openingTag.length
+                
+                // 在script内容中查找真正的</script>闭合标签，需要跳过JavaScript字符串中的内容
+                val scriptContentEnd = findScriptEnd(content, i)
+                result.append(" ".repeat(scriptContentEnd - i))
+                i = scriptContentEnd
+                
+                // 添加</script>标签
+                if (content.startsWith("</script>", i, ignoreCase = true)) {
+                    result.append(content.substring(i, i + 9))
+                    i += 9
+                }
+                continue
+            }
+            
+            // 检查style标签
+            val styleMatch = Regex("<style(\\s[^>]*)?>", RegexOption.IGNORE_CASE).matchAt(content, i)
+            if (styleMatch != null) {
+                val openingTag = styleMatch.value
+                result.append(openingTag)
+                i += openingTag.length
+                
+                // 查找</style>闭合标签
+                val styleEnd = content.indexOf("</style>", i, ignoreCase = true)
+                if (styleEnd != -1) {
+                    result.append(" ".repeat(styleEnd - i))
+                    result.append(content.substring(styleEnd, styleEnd + 8))
+                    i = styleEnd + 8
+                    continue
+                }
+            }
+            
+            // 普通字符
+            result.append(content[i])
+            i++
+        }
+        
+        return result.toString()
+    }
+    
+    /**
+     * 在script标签内查找真正的</script>闭合标签位置
+     * 需要跳过JavaScript字符串和注释中的内容
+     */
+    private fun findScriptEnd(content: String, startIndex: Int): Int {
+        var i = startIndex
+        var inString = false
+        var stringChar = ' '
+        var inSingleLineComment = false
+        var inMultiLineComment = false
+        
+        while (i < content.length) {
+            val char = content[i]
+            
+            // 处理多行注释
+            if (!inString && !inSingleLineComment && i < content.length - 1) {
+                if (content[i] == '/' && content[i + 1] == '*') {
+                    inMultiLineComment = true
+                    i += 2
+                    continue
+                }
+                if (inMultiLineComment && content[i] == '*' && content[i + 1] == '/') {
+                    inMultiLineComment = false
+                    i += 2
+                    continue
+                }
+            }
+            
+            // 处理单行注释
+            if (!inString && !inMultiLineComment && i < content.length - 1 && content[i] == '/' && content[i + 1] == '/') {
+                inSingleLineComment = true
+                i += 2
+                continue
+            }
+            
+            // 换行符结束单行注释
+            if (inSingleLineComment && char == '\n') {
+                inSingleLineComment = false
+                i++
+                continue
+            }
+            
+            // 处理字符串
+            if (!inMultiLineComment && !inSingleLineComment && (char == '"' || char == '\'' || char == '`')) {
+                // 检查是否被转义
+                var escapeCount = 0
+                var j = i - 1
+                while (j >= 0 && content[j] == '\\') {
+                    escapeCount++
+                    j--
+                }
+                val isEscaped = escapeCount % 2 == 1
+                
+                if (!isEscaped) {
+                    if (!inString) {
+                        inString = true
+                        stringChar = char
+                    } else if (char == stringChar) {
+                        inString = false
+                    }
+                }
+            }
+            
+            // 检查是否遇到</script>标签（不在字符串或注释中）
+            if (!inString && !inSingleLineComment && !inMultiLineComment && 
+                content.startsWith("</script>", i, ignoreCase = true)) {
+                return i
+            }
+            
+            i++
+        }
+        
+        // 如果没找到闭合标签，返回内容结尾
+        return content.length
+    }
 
     /**
      * 检查HTML注释
@@ -514,7 +659,7 @@ object SyntaxCheckUtil {
         var i = 0
         for ((lineIndex, line) in lines.withIndex()) {
             var col = 0
-            while (col < line.length - 3) {
+            while (col < line.length) {
                 if (!inComment && line.substring(col).startsWith("<!--")) {
                     inComment = true
                     commentStartLine = lineIndex + 1
@@ -548,21 +693,22 @@ object SyntaxCheckUtil {
      * 检查HTML属性引号
      */
     private fun checkHtmlAttributeQuotes(lines: List<String>, errors: MutableList<SyntaxError>) {
-        val attrPattern = Regex("""(\w+)=([^"'\s>][^\s>]*)""")
+        val tagContentPattern = Regex("""<[^>]*>""")
+        val attrPattern = Regex("""\s([\w-]+)=([^"'\s>][^\s>]*)""")
 
         lines.forEachIndexed { lineIndex, line ->
-            attrPattern.findAll(line).forEach { match ->
-                val attrName = match.groupValues[1]
-                val attrValue = match.groupValues[2]
-                
-                errors.add(
-                    SyntaxError(
-                        lineIndex + 1,
-                        match.range.first + 1,
-                        "Attribute '$attrName' value should be quoted",
-                        SyntaxError.Severity.WARNING
+            tagContentPattern.findAll(line).forEach { tagMatch ->
+                attrPattern.findAll(tagMatch.value).forEach { attrMatch ->
+                    val (attrName, attrValue) = attrMatch.destructured
+                    errors.add(
+                        SyntaxError(
+                            lineIndex + 1,
+                            tagMatch.range.first + attrMatch.range.first + 1,
+                            "Attribute '$attrName' value should be quoted",
+                            SyntaxError.Severity.WARNING
+                        )
                     )
-                )
+                }
             }
         }
     }

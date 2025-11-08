@@ -104,13 +104,8 @@ fun ModelApiSettingsSection(
     // 保存设置的通用函数
     val saveSettings = {
         scope.launch {
-            // 强制在使用默认API密钥时使用默认模型
-            val modelToSave =
-                    if (apiKeyInput == ApiPreferences.DEFAULT_API_KEY) {
-                        ApiPreferences.DEFAULT_MODEL_NAME
-                    } else {
-                        modelNameInput
-                    }
+            // 允许用户自定义模型名称，即使使用默认API密钥
+            val modelToSave = modelNameInput
 
             Log.d(
                     TAG,
@@ -208,19 +203,10 @@ fun ModelApiSettingsSection(
     var modelsList by remember { mutableStateOf<List<ModelOption>>(emptyList()) }
     var modelLoadError by remember { mutableStateOf<String?>(null) }
 
-    // 检查是否使用默认API密钥
+    // 检查是否使用默认API密钥（仅用于UI显示）
     val isUsingDefaultApiKey = apiKeyInput == ApiPreferences.DEFAULT_API_KEY
-    var showModelRestrictionInfo by remember { mutableStateOf(isUsingDefaultApiKey) }
 
-    // 当使用默认API密钥时限制模型名称
-    LaunchedEffect(apiKeyInput) {
-        if (apiKeyInput == ApiPreferences.DEFAULT_API_KEY) {
-            modelNameInput = ApiPreferences.DEFAULT_MODEL_NAME
-            showModelRestrictionInfo = true
-        } else {
-            showModelRestrictionInfo = false
-        }
-    }
+    // 移除了强制锁定模型名称的逻辑，允许用户自由修改
 
     // API设置卡片
     Card(
@@ -465,19 +451,13 @@ fun ModelApiSettingsSection(
              if (selectedApiProvider != ApiProviderType.MNN) {
              OutlinedTextField(
                      value = if (isUsingDefaultApiKey) "" else apiKeyInput,
-                     onValueChange = {
-                         // 过滤换行和空格
-                         val filteredInput = it.replace("\n", "").replace("\r", "").replace(" ", "")
-                         apiKeyInput = filteredInput
-
-                         // 当API密钥改变时检查是否需要限制模型
-                         if (filteredInput == ApiPreferences.DEFAULT_API_KEY) {
-                             modelNameInput = ApiPreferences.DEFAULT_MODEL_NAME
-                             showModelRestrictionInfo = true
-                         } else {
-                             showModelRestrictionInfo = false
-                         }
-                     },
+                    onValueChange = {
+                        // 过滤换行和空格
+                        val filteredInput = it.replace("\n", "").replace("\r", "").replace(" ", "")
+                        apiKeyInput = filteredInput
+                        
+                        // 移除了强制锁定模型名称的逻辑
+                    },
                      label = { Text(stringResource(R.string.api_key)) },
                      placeholder = { Text(if (isUsingDefaultApiKey) stringResource(R.string.api_key_placeholder_default) else stringResource(R.string.api_key_placeholder_custom)) },
                      visualTransformation = VisualTransformation.None,
@@ -791,16 +771,8 @@ fun ModelApiSettingsSection(
                 }
             }
 
-            // 显示模型限制信息
-            if (showModelRestrictionInfo) {
-                Text(
-                        text = stringResource(R.string.default_config_model_restriction),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                        fontSize = 12.sp
-                )
-            }
+            // 移除了模型限制信息提示，用户现在可以自由修改模型名称
+            
             // 保存按钮
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(

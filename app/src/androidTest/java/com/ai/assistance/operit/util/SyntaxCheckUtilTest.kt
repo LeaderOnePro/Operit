@@ -345,7 +345,8 @@ class SyntaxCheckUtilTest {
         // This test expects the HTML check to fail because the current simple regex-based parser
         // does not correctly ignore script content or comments, leading to a false positive.
         // A more robust parser would be needed for this to pass.
-        assertTrue(result!!.hasErrors)
+        // UPDATE: With the improved parser, this should now pass.
+        assertFalse(result!!.hasErrors)
     }
 
     @Test
@@ -356,6 +357,41 @@ class SyntaxCheckUtilTest {
                 <P>Case insensitive test</P>
               </BODY>
             </HTML>
+        """.trimIndent()
+        val result = SyntaxCheckUtil.checkSyntax("test.html", htmlCode)
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+    }
+
+    // ==================== Fix Verification Tests ====================
+
+    @Test
+    fun testHtml_CommentAtLineEnd_ShouldReturnValid() {
+        val htmlCode = """
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <!--This is a comment-->
+            </body>
+            </html>
+        """.trimIndent()
+        val result = SyntaxCheckUtil.checkSyntax("test.html", htmlCode)
+        assertNotNull(result)
+        assertFalse(result!!.hasErrors)
+    }
+
+    @Test
+    fun testHtml_AttributeWithEqualsInValue_ShouldReturnValid() {
+        val htmlCode = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body>
+                <p>Test</p>
+            </body>
+            </html>
         """.trimIndent()
         val result = SyntaxCheckUtil.checkSyntax("test.html", htmlCode)
         assertNotNull(result)
