@@ -291,7 +291,7 @@ fun ChatScreenContent(
                 shape = RoundedCornerShape(12.dp),
                 tonalElevation = 2.dp,
                 shadowElevation = 4.dp,
-                color = Color.White.copy(alpha = 0.97f)
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)
             ) {
                 Row(
                     modifier = Modifier

@@ -89,7 +89,8 @@ fun ToolboxScreen(
         onSpeechToTextSelected: () -> Unit,
         onToolTesterSelected: () -> Unit,
         onAgreementSelected: () -> Unit,
-        onDefaultAssistantGuideSelected: () -> Unit
+        onDefaultAssistantGuideSelected: () -> Unit,
+        onProcessLimitRemoverSelected: () -> Unit
 ) {
         // 屏幕配置信息，用于响应式布局
         val configuration = LocalConfiguration.current
@@ -191,6 +192,13 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_log_viewer_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onLogcatSelected
+                        ),
+                        Tool(
+                                name = stringResource(R.string.tool_process_limit_remover),
+                                icon = Icons.Default.LockOpen,
+                                description = stringResource(R.string.tool_process_limit_remover_desc),
+                                category = ToolCategory.SYSTEM,
+                                onClick = onProcessLimitRemoverSelected
                         )
                 )
 

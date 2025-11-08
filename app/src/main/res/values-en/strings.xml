@@ -1300,6 +1300,41 @@
     <string name="tool_shell_executor_desc">Execute Shell commands and view output results with common command presets</string>
     <string name="tool_log_viewer">Log Viewer</string>
     <string name="tool_log_viewer_desc">Real-time capture and view system and application logs with filtering and search support</string>
+    <string name="tool_process_limit_remover">Phantom Process Limit Remover</string>
+    <string name="tool_process_limit_remover_desc">Manage Android 12+ phantom process count limits to allow more background child processes</string>
+    
+    <!-- Process Limit Remover Screen -->
+    <string name="process_limit_title">Phantom Process Limit Remover</string>
+    <string name="process_limit_subtitle">Manage Android 12+ phantom process count limits</string>
+    <string name="process_limit_info_title">About Phantom Process Limits</string>
+    <string name="process_limit_what_is_title">What are Phantom Process Limits?</string>
+    <string name="process_limit_what_is_desc">Android 12+ introduced the Phantom Processes mechanism to limit the number of background child processes, preventing apps from consuming system resources by creating excessive child processes.</string>
+    <string name="process_limit_benefits_title">Benefits of Removing Limits</string>
+    <string name="process_limit_benefits_desc">• Allow apps to create more background child processes\n• Improve background task execution capability\n• Prevent child processes from being unexpectedly terminated\n• Suitable for apps requiring multi-process handling</string>
+    <string name="process_limit_warnings_title">Cautions</string>
+    <string name="process_limit_warnings_desc">• Only supports Android 12 and above\n• May increase battery consumption and memory usage\n• Requires ADB Shell or Root privileges\n• Settings will be reset after device reboot</string>
+    <string name="process_limit_action_remove">Remove Limit</string>
+    <string name="process_limit_action_remove_desc">Remove Android system phantom process count limits</string>
+    <string name="process_limit_action_restore">Restore Limit</string>
+    <string name="process_limit_action_restore_desc">Restore Android system default phantom process limits</string>
+    <string name="process_limit_status_checking">Checking…</string>
+    <string name="process_limit_status_removed">Limit Removed (Max: %s)</string>
+    <string name="process_limit_status_limited">Limited (Current: %s processes)</string>
+    <string name="process_limit_status_default">Default Limit (No custom value set)</string>
+    <string name="process_limit_status_unknown">Unknown Status</string>
+    <string name="process_limit_status_unsupported">Device Not Supported (Requires Android 12+)</string>
+    <string name="process_limit_current_status">Current Status</string>
+    <string name="process_limit_choose_action">Choose Action</string>
+    <string name="process_limit_execute">Execute</string>
+    <string name="process_limit_executing">Executing…</string>
+    <string name="process_limit_success_title">Success</string>
+    <string name="process_limit_error_title">Failed</string>
+    <string name="process_limit_execution_history">Execution History</string>
+    <string name="process_limit_no_history">No execution history yet</string>
+    <string name="process_limit_output">Output</string>
+    <string name="process_limit_error_output">Error Output</string>
+    <string name="process_limit_exit_code">Exit Code: %d</string>
+    <string name="process_limit_command">Command</string>
     <string name="toolbox_description">Convenient and practical tool collection to improve your work efficiency</string>
     
     <!-- MCP Config Screen -->
@@ -2610,6 +2645,7 @@
     <string name="screen_title_tool_tester">Tool Testing Center</string>
     <string name="screen_title_text_to_speech">Text to Speech</string>
     <string name="screen_title_speech_to_text">Speech Recognition</string>
+    <string name="screen_title_process_limit_remover">Phantom Process Limit Remover</string>
     <string name="screen_title_default_assistant_guide">Default Assistant Setup</string>
     <string name="screen_title_mcp_market">MCP Market</string>
     <string name="screen_title_mcp_publish">Publish MCP Plugin</string>

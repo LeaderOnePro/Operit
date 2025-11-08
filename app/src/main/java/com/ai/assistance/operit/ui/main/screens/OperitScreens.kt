@@ -53,6 +53,7 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.TerminalToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.ToolboxScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.UIDebuggerToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.DefaultAssistantGuideToolScreen
+import com.ai.assistance.operit.ui.features.toolbox.screens.ProcessLimitRemoverToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.ffmpegtoolbox.FFmpegToolboxScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.speechtotext.SpeechToTextToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.texttospeech.TextToSpeechToolScreen
@@ -262,7 +263,8 @@ sealed class Screen(
                     onSpeechToTextSelected = { navigateTo(SpeechToText) },
                     onToolTesterSelected = { navigateTo(ToolTester) },
                     onAgreementSelected = { navigateTo(Agreement) },
-                    onDefaultAssistantGuideSelected = { navigateTo(DefaultAssistantGuide) }
+                    onDefaultAssistantGuideSelected = { navigateTo(DefaultAssistantGuide) },
+                    onProcessLimitRemoverSelected = { navigateTo(ProcessLimitRemover) }
             )
         }
     }
@@ -1063,6 +1065,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             DefaultAssistantGuideToolScreen(navController = navController)
+        }
+    }
+
+    data object ProcessLimitRemover :
+            Screen(parentScreen = Toolbox, navItem = NavItem.Toolbox, titleRes = R.string.screen_title_process_limit_remover) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            ProcessLimitRemoverToolScreen(navController = navController)
         }
     }
 

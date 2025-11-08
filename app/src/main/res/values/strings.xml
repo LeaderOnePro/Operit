@@ -1345,6 +1345,41 @@
     <string name="tool_shell_executor_desc">执行Shell命令并查看输出结果，支持常用命令预设</string>
     <string name="tool_log_viewer">日志查看器</string>
     <string name="tool_log_viewer_desc">实时捕获并查看系统和应用日志，支持过滤和搜索</string>
+    <string name="tool_process_limit_remover">解除幻象进程限制</string>
+    <string name="tool_process_limit_remover_desc">管理Android 12+的幻象进程数量限制，允许更多后台子进程</string>
+    
+    <!-- Process Limit Remover Screen -->
+    <string name="process_limit_title">解除幻象进程限制</string>
+    <string name="process_limit_subtitle">管理Android 12+的幻象进程数量限制</string>
+    <string name="process_limit_info_title">关于幻象进程限制</string>
+    <string name="process_limit_what_is_title">什么是幻象进程限制？</string>
+    <string name="process_limit_what_is_desc">Android 12+ 引入了幻象进程（Phantom Processes）机制，用于限制后台子进程的数量，防止应用通过创建大量子进程消耗系统资源。</string>
+    <string name="process_limit_benefits_title">解除限制的作用</string>
+    <string name="process_limit_benefits_desc">• 允许应用创建更多后台子进程\n• 提高后台任务的执行能力\n• 避免子进程被系统意外终止\n• 适用于需要多进程处理的应用</string>
+    <string name="process_limit_warnings_title">注意事项</string>
+    <string name="process_limit_warnings_desc">• 仅支持 Android 12 及以上版本\n• 可能增加电量消耗和内存占用\n• 需要 ADB Shell 权限或 Root 权限\n• 重启设备后设置将失效，需重新执行</string>
+    <string name="process_limit_action_remove">解除限制</string>
+    <string name="process_limit_action_remove_desc">解除Android系统的幻象进程数量限制</string>
+    <string name="process_limit_action_restore">恢复限制</string>
+    <string name="process_limit_action_restore_desc">恢复Android系统的默认幻象进程限制</string>
+    <string name="process_limit_status_checking">检查中…</string>
+    <string name="process_limit_status_removed">已解除限制（最大值：%s）</string>
+    <string name="process_limit_status_limited">已限制（当前限制：%s 个进程）</string>
+    <string name="process_limit_status_default">默认限制（未设置自定义值）</string>
+    <string name="process_limit_status_unknown">未知状态</string>
+    <string name="process_limit_status_unsupported">当前设备不支持（需要 Android 12+）</string>
+    <string name="process_limit_current_status">当前状态</string>
+    <string name="process_limit_choose_action">选择操作</string>
+    <string name="process_limit_execute">执行</string>
+    <string name="process_limit_executing">执行中…</string>
+    <string name="process_limit_success_title">执行成功</string>
+    <string name="process_limit_error_title">执行失败</string>
+    <string name="process_limit_execution_history">执行历史</string>
+    <string name="process_limit_no_history">暂无执行历史</string>
+    <string name="process_limit_output">输出</string>
+    <string name="process_limit_error_output">错误输出</string>
+    <string name="process_limit_exit_code">退出码：%d</string>
+    <string name="process_limit_command">命令</string>
     <string name="toolbox_description">便捷实用的工具集合，提升您的工作效率</string>
     
     <!-- MCP Config Screen -->
@@ -2610,6 +2645,7 @@
     <string name="screen_title_tool_tester">工具测试中心</string>
     <string name="screen_title_text_to_speech">文本转语音</string>
     <string name="screen_title_speech_to_text">语音识别</string>
+    <string name="screen_title_process_limit_remover">解除幻象进程限制</string>
     <string name="screen_title_default_assistant_guide">默认助手设置</string>
     <string name="screen_title_mcp_market">MCP 市场</string>
     <string name="screen_title_mcp_publish">发布 MCP 插件</string>
