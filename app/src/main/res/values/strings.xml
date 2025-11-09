@@ -856,6 +856,7 @@
     
     <!-- 聊天历史选择器 -->
     <string name="chat_history">对话历史</string>
+    <string name="search_chat_history_hint">搜索</string>
     <string name="new_chat">新建对话</string>
     <string name="new_conversation">新对话</string>
     

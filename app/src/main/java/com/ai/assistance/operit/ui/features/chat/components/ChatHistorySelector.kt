@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -29,6 +30,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
@@ -46,12 +49,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatHistory
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.ui.common.rememberLocal
 import me.saket.swipe.SwipeAction
 import me.saket.swipe.SwipeableActionsBox
@@ -69,6 +75,8 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
+import kotlinx.coroutines.delay
+import androidx.compose.material3.CircularProgressIndicator
 
 private sealed interface HistoryListItem {
     data class Header(val name: String) : HistoryListItem
@@ -89,7 +97,8 @@ fun ChatHistorySelector(
     onDeleteGroup: (groupName: String, deleteChats: Boolean) -> Unit,
         chatHistories: List<ChatHistory>,
         currentId: String?,
-        lazyListState: LazyListState? = null
+        lazyListState: LazyListState? = null,
+        onBack: (() -> Unit)? = null
 ) {
     var chatToEdit by remember { mutableStateOf<ChatHistory?>(null) }
     var showNewGroupDialog by remember { mutableStateOf(false) }
@@ -100,12 +109,57 @@ fun ChatHistorySelector(
     var groupToRename by remember { mutableStateOf<String?>(null) }
     var groupToDelete by remember { mutableStateOf<String?>(null) }
     var hasLongPressedGroup by rememberLocal("has_long_pressed_group", defaultValue = false)
+    
+    // 搜索相关状态
+    var showSearchBox by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var matchedChatIdsByContent by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isSearching by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val chatHistoryManager = remember { ChatHistoryManager.getInstance(context) }
     val actualLazyListState = lazyListState ?: rememberLazyListState()
     val ungroupedText = stringResource(R.string.ungrouped)
 
-    val flatItems = remember(chatHistories, collapsedGroups, ungroupedText) {
-        chatHistories
+    // 当搜索查询改变时，执行内容搜索（带防抖延迟）
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) {
+            // 延迟400ms，如果用户继续输入则取消本次搜索（LaunchedEffect会自动取消）
+            delay(400)
+            // 延迟后再次检查，确保 searchQuery 仍然有效
+            // 注意：如果 searchQuery 在延迟期间改变，LaunchedEffect 会重新启动，这里检查的是当前值
+            isSearching = true
+            try {
+                matchedChatIdsByContent = chatHistoryManager.searchChatIdsByContent(searchQuery)
+            } catch (e: Exception) {
+                // 如果搜索出错，清空结果
+                matchedChatIdsByContent = emptySet()
+            } finally {
+                isSearching = false
+            }
+        } else {
+            matchedChatIdsByContent = emptySet()
+            isSearching = false
+        }
+    }
+
+    val flatItems = remember(chatHistories, collapsedGroups, ungroupedText, searchQuery, matchedChatIdsByContent) {
+        // 根据搜索关键词过滤聊天历史
+        val filteredHistories = if (searchQuery.isNotBlank()) {
+            chatHistories.filter { history ->
+                // 搜索标题或分组
+                val matchesTitleOrGroup = history.title.contains(searchQuery, ignoreCase = true) ||
+                        (history.group?.contains(searchQuery, ignoreCase = true) == true)
+                // 搜索聊天内容
+                val matchesContent = matchedChatIdsByContent.contains(history.id)
+                // 如果匹配标题、分组或内容中的任意一项，就包含在结果中
+                matchesTitleOrGroup || matchesContent
+            }
+        } else {
+            chatHistories
+        }
+        
+        filteredHistories
             .groupBy { it.group ?: ungroupedText }
             .flatMap { (group, histories) ->
                 val header = HistoryListItem.Header(group)
@@ -483,33 +537,111 @@ fun ChatHistorySelector(
     }
 
     Column(modifier = modifier) {
-        Text(
+        // 标题行，左侧返回按钮和标题，右侧放置搜索和分组按钮
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 左侧：标题
+            Text(
                 text = stringResource(R.string.chat_history),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
-        )
+                style = MaterialTheme.typography.titleMedium
+            )
+            // 右侧：分组创建、搜索和返回按钮
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { showNewGroupDialog = true },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.AddCircleOutline,
+                        contentDescription = stringResource(R.string.new_group),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { 
+                        showSearchBox = !showSearchBox
+                        if (!showSearchBox) {
+                            searchQuery = ""
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        if (showSearchBox) Icons.Default.SearchOff else Icons.Default.Search,
+                        contentDescription = stringResource(R.string.search),
+                        tint = if (showSearchBox) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                if (onBack != null) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "返回",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
 
+        // 新建对话按钮独占一行
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.Center
         ) {
             Button(
-                    onClick = { onNewChat() },
-                    modifier = Modifier.weight(1f)
+                onClick = { onNewChat() },
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.new_chat))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.new_chat))
             }
-            IconButton(onClick = { showNewGroupDialog = true }) {
-                Icon(
-                        Icons.Default.AddCircleOutline,
-                        contentDescription = stringResource(R.string.new_group)
-                )
-            }
+        }
+
+        // 搜索框
+        if (showSearchBox) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text(stringResource(R.string.search)) },
+                placeholder = { Text(stringResource(R.string.search_chat_history_hint)) },
+                leadingIcon = {
+                    if (isSearching) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank() && !isSearching) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.SearchOff, contentDescription = stringResource(R.string.clear_search))
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                singleLine = true
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))

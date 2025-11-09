@@ -561,4 +561,20 @@ class ChatHistoryManager private constructor(private val context: Context) {
             }
         }
     }
+
+    /** 搜索包含特定关键词的聊天ID列表 */
+    suspend fun searchChatIdsByContent(query: String): Set<String> {
+        return kotlinx.coroutines.withContext(Dispatchers.IO) {
+            try {
+                if (query.isBlank()) {
+                    return@withContext emptySet()
+                }
+                val chatIds = messageDao.searchChatIdsByContent(query)
+                chatIds.toSet()
+            } catch (e: Exception) {
+                Log.e(TAG, "搜索聊天内容失败: $query", e)
+                emptySet()
+            }
+        }
+    }
 }

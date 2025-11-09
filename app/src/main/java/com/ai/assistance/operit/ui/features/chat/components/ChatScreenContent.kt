@@ -752,36 +752,8 @@ fun ChatHistorySelectorPanel(
                 },
                 chatHistories = chatHistories,
                 currentId = currentChatId,
-                lazyListState = historyListState
+                lazyListState = historyListState,
+                onBack = { actualViewModel.toggleChatHistorySelector() }
         )
-
-        // 在右侧添加浮动返回按钮
-        OutlinedButton(
-                onClick = { actualViewModel.toggleChatHistorySelector() },
-                modifier =
-                        Modifier.align(Alignment.TopEnd)
-                                .padding(top = 16.dp, end = 8.dp)
-                                .height(28.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                colors =
-                        ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary
-                        ),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
-                shape = RoundedCornerShape(4.dp)
-        ) {
-            Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                )
-                Text("返回", style = MaterialTheme.typography.bodySmall)
-            }
-        }
     }
 }

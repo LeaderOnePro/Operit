@@ -43,4 +43,8 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE chatId = :chatId AND timestamp = :timestamp")
     suspend fun deleteMessageByTimestamp(chatId: String, timestamp: Long)
+
+    /** 查找包含特定关键词的聊天ID列表（不重复） */
+    @Query("SELECT DISTINCT chatId FROM messages WHERE content LIKE '%' || :query || '%' COLLATE NOCASE")
+    suspend fun searchChatIdsByContent(query: String): List<String>
 }

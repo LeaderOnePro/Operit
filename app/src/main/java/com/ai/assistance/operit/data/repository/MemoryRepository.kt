@@ -379,6 +379,19 @@ class MemoryRepository(private val context: Context, profileId: String) {
             weight: Float = MEDIUM_LINK,
             description: String = ""
     ) = withContext(Dispatchers.IO) {
+        // 检查链接是否已存在
+        val existingLink = source.links.find { link ->
+            link.target.target?.id == target.id && 
+            link.type == type
+        }
+        
+        if (existingLink != null) {
+            // 链接已存在，可以选择更新或直接返回
+            // 这里我们选择直接返回，不创建重复链接
+            android.util.Log.d("MemoryRepo", "Link already exists from memory ${source.id} to ${target.id} with type $type")
+            return@withContext
+        }
+        
         // Coerce the weight to be within the valid range [0.0, 1.0] to ensure data integrity.
         val sanitizedWeight = weight.coerceIn(0.0f, 1.0f)
         val link = MemoryLink(type = type, weight = sanitizedWeight, description = description)
@@ -416,6 +429,19 @@ class MemoryRepository(private val context: Context, profileId: String) {
         folderPath: String? = null,
         semanticThreshold: Float = 0.6f
     ): List<Memory> = withContext(Dispatchers.IO) {
+        // 支持通配符搜索：如果查询是 "*"，返回所有记忆（在文件夹过滤后）
+        if (query.trim() == "*") {
+            return@withContext if (folderPath.isNullOrBlank() || folderPath == "未分类") {
+                if (folderPath == "未分类") {
+                    memoryBox.all.filter { it.folderPath.isNullOrEmpty() }
+                } else {
+                    memoryBox.all
+                }
+            } else {
+                getMemoriesByFolderPath(folderPath)
+            }
+        }
+        
         if (query.isBlank()) {
             return@withContext if (folderPath.isNullOrBlank() || folderPath == "未分类") {
                 memoryBox.all.filter { it.folderPath.isNullOrEmpty() }
@@ -1478,7 +1504,10 @@ class MemoryRepository(private val context: Context, profileId: String) {
                         )
                         newLink.source.target = sourceMemory
                         newLink.target.target = targetMemory
-                        linkBox.put(newLink)
+                        // 将链接添加到源记忆的 links 集合中，并保存源记忆
+                        // 这与 linkMemories 方法保持一致
+                        sourceMemory.links.add(newLink)
+                        memoryBox.put(sourceMemory)
                         newLinksCount++
                     }
                 }

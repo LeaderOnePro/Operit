@@ -56,7 +56,17 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         val query = tool.parameters.find { it.name == "query" }?.value ?: ""
         val folderPath = tool.parameters.find { it.name == "folder_path" }?.value
         val threshold = tool.parameters.find { it.name == "threshold" }?.value?.toFloatOrNull() ?: 0.25f
-        val limit = tool.parameters.find { it.name == "limit" }?.value?.toIntOrNull() ?: 5
+        val limitParam = tool.parameters.find { it.name == "limit" }?.value
+        val limit = limitParam?.toIntOrNull()
+        
+        // 如果查询是 "*" 且用户没有显式指定 limit，则返回所有结果
+        val isWildcardQuery = query.trim() == "*"
+        val defaultLimit = if (isWildcardQuery && limit == null) {
+            Int.MAX_VALUE // 使用最大值表示返回所有结果
+        } else {
+            5 // 普通查询默认返回 5 条
+        }
+        val finalLimit = limit ?: defaultLimit
 
         if (query.isBlank()) {
             return ToolResult(toolName = tool.name, success = false, result = StringResultData(""), error = "Query parameter cannot be empty.")
@@ -64,7 +74,8 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
         // 验证参数范围
         val validThreshold = threshold.coerceIn(0.0f, 1.0f)
-        val validLimit = limit.coerceIn(1, 20)
+        // limit 无上限，但至少为 1
+        val validLimit = if (finalLimit < 1) 1 else finalLimit
 
         Log.d(TAG, "Executing memory query: '$query' in folder: '${folderPath ?: "All"}', threshold: $validThreshold, limit: $validLimit")
 
@@ -75,7 +86,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 semanticThreshold = validThreshold
             )
             
-            val formattedResult = buildResultData(results.take(validLimit), query)
+            val formattedResult = buildResultData(results.take(validLimit), query, validLimit)
             Log.d(TAG, "Memory query result for '$query':\n$formattedResult")
             ToolResult(toolName = tool.name, success = true, result = formattedResult)
         } catch (e: Exception) {
@@ -119,7 +130,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             }
 
             // 默认行为：返回完整记忆
-            val formattedResult = buildResultData(listOf(memory), title)
+            val formattedResult = buildResultData(listOf(memory), title, 1)
             Log.d(TAG, "Found memory by title '$title':\n$formattedResult")
             ToolResult(
                 toolName = tool.name,
@@ -572,8 +583,12 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         }
     }
 
-    private suspend fun buildResultData(memories: List<Memory>, query: String): MemoryQueryResultData = withContext(Dispatchers.IO) {
+    private suspend fun buildResultData(memories: List<Memory>, query: String, limit: Int): MemoryQueryResultData = withContext(Dispatchers.IO) {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        // 当 limit > 20 时，只返回标题和截断内容
+        val isTruncatedMode = limit > 20
+        val maxContentLength = 40 // 截断后的最大内容长度（更严格）
+        
         val memoryInfos = memories.map { memory ->
             val content: String
             val chunkInfo: String?
@@ -596,23 +611,42 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                         "Chunks ${matchingChunks.map { it.chunkIndex + 1 }.take(5).joinToString(", ")}/$totalChunks"
                     }
                     
-                    // 将匹配的区块内容拼接起来，每个区块显示编号
-                    content = "Document: ${memory.title}\n" +
-                        matchingChunks.take(5) // 最多取5个最相关的区块
-                            .joinToString("\n---\n") { chunk -> 
-                                "Chunk ${chunk.chunkIndex + 1}/$totalChunks:\n${chunk.content}"
-                            }
+                    if (isTruncatedMode) {
+                        // 截断模式：只显示文档标题和分块信息
+                        content = "Document: ${memory.title} ($totalChunks chunks)"
+                    } else {
+                        // 将匹配的区块内容拼接起来，每个区块显示编号
+                        content = "Document: ${memory.title}\n" +
+                            matchingChunks.take(5) // 最多取5个最相关的区块
+                                .joinToString("\n---\n") { chunk -> 
+                                    "Chunk ${chunk.chunkIndex + 1}/$totalChunks:\n${chunk.content}"
+                                }
+                    }
                 } else {
                     // 如果二次探查未找到（理论上很少见，因为全局搜索已经认为它相关），提供一个回退信息
                     chunkInfo = null
                     chunkIndices = null
-                    content = "Document '${memory.title}' was found, but no specific chunks strongly matched the query '$query'. The document's general content is: ${memory.content}"
+                    if (isTruncatedMode) {
+                        content = "Document: ${memory.title}"
+                    } else {
+                        content = "Document '${memory.title}' was found, but no specific chunks strongly matched the query '$query'. The document's general content is: ${memory.content}"
+                    }
                 }
             } else {
-                // 对于普通记忆，直接使用其内容
-                content = memory.content
+                // 对于普通记忆
                 chunkInfo = null
                 chunkIndices = null
+                if (isTruncatedMode) {
+                    // 截断模式：只返回标题和部分内容
+                    content = if (memory.content.length > maxContentLength) {
+                        memory.content.take(maxContentLength) + "..."
+                    } else {
+                        memory.content
+                    }
+                } else {
+                    // 完整模式：返回完整内容
+                    content = memory.content
+                }
             }
 
             MemoryQueryResultData.MemoryInfo(

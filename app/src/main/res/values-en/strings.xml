@@ -872,6 +872,7 @@
     
     <!-- Chat History Selector -->
     <string name="chat_history">Chat History</string>
+    <string name="search_chat_history_hint">Search</string>
     <string name="new_chat">New Chat</string>
     <string name="new_conversation">New Conversation</string>
     
