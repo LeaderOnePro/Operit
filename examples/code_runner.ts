@@ -32,6 +32,24 @@
       ]
     },
     {
+      name: install_python_packages
+      description: 在持久虚拟环境(~/.code_runner/py)中安装 Python 包（使用 pip）
+      parameters: [
+        {
+          name: packages
+          description: 要安装的包名（用 | 分隔），如 "numpy|pydantic==2.*"
+          type: string
+          required: true
+        },
+        {
+          name: upgrade
+          description: 是否升级已安装的包，等价于 pip -U
+          type: boolean
+          required: false
+        }
+      ]
+    },
+    {
       name: run_python
       description: 运行自定义 Python 脚本。会捕获 print 函数的输出。
       parameters: [
@@ -263,6 +281,44 @@ const codeRunner = (function () {
     // Use a consistent session name to allow for session reuse
     const session = await Tools.System.terminal.create("code_runner_session");
     return await Tools.System.terminal.exec(session.sessionId, command);
+  }
+
+  // Ensure a persistent Python venv under ~/.code_runner/py and return python/pip paths
+  async function ensurePersistentVenv(): Promise<{ pythonBin: string; pipBin: string }> {
+    const venvDir = "~/.code_runner/py";
+    const pythonBin = `${venvDir}/bin/python`;
+    const pipBin = `${venvDir}/bin/pip`;
+
+    const exists = await executeTerminalCommand(`[ -x ${pythonBin} ] && echo OK || echo NO`);
+    if (exists.output.includes("OK")) {
+      return { pythonBin, pipBin };
+    }
+
+    const setup = await executeTerminalCommand(`python3 -m venv ${venvDir}`);
+    if (setup.exitCode !== 0 || hasError(setup.output)) {
+      throw new Error(`创建持久 venv 失败：\n${setup.output}`);
+    }
+    return { pythonBin, pipBin };
+  }
+
+  // Install Python packages into the persistent venv using pip
+  async function install_python_packages(params: { packages: string; upgrade?: boolean }) {
+    const raw = (params.packages || "").trim();
+    const pkgs = raw
+      .split("|")
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    if (!pkgs.length) throw new Error("请提供要安装的包列表（用 | 分隔）packages");
+
+    const upgradeFlag = params.upgrade ? "-U" : "";
+    const { pythonBin } = await ensurePersistentVenv();
+
+    // Fallback: use python -m pip to avoid missing pip executable shims
+    const r2 = await executeTerminalCommand(`${pythonBin} -m pip install ${upgradeFlag} ${pkgs.join(" ")}`.trim());
+    if (r2.exitCode !== 0 || hasError(r2.output)) {
+      throw new Error(`安装依赖失败：\n${r2.output}`);
+    }
+    return `Installed with pip:\n${r2.output}`.trim();
   }
 
   // Helper function to safely escape strings for shell commands
@@ -687,11 +743,13 @@ int main() {
       throw new Error("请提供要执行的 Python 脚本内容");
     }
 
+    // Use persistent venv interpreter
+    const { pythonBin } = await ensurePersistentVenv();
     const pythonFlags = params.python_flags || "";
     const tempFilePath = "/tmp/temp_script.py";
     try {
       await executeTerminalCommand(`cat <<'EOF' > ${tempFilePath}\n${script}\nEOF`);
-      const result = await executeTerminalCommand(`python3 ${pythonFlags} ${tempFilePath}`);
+      const result = await executeTerminalCommand(`${pythonBin} ${pythonFlags} ${tempFilePath}`);
       if (result.exitCode === 0 && !hasError(result.output)) {
         return result.output.trim();
       } else {
@@ -714,8 +772,10 @@ int main() {
       throw new Error(`Python 文件不存在或路径错误: ${filePath}`);
     }
 
+    // Use persistent venv interpreter
+    const { pythonBin } = await ensurePersistentVenv();
     const pythonFlags = params.python_flags || "";
-    const result = await executeTerminalCommand(`python3 ${pythonFlags} ${filePath}`);
+    const result = await executeTerminalCommand(`${pythonBin} ${pythonFlags} ${filePath}`);
     if (result.exitCode === 0 && !hasError(result.output)) {
       return result.output.trim();
     } else {
@@ -1063,6 +1123,7 @@ edition = "2021"
     main,
     run_javascript_es5,
     run_javascript_file,
+    install_python_packages,
     run_python,
     run_python_file,
     run_ruby,
@@ -1083,6 +1144,7 @@ edition = "2021"
 exports.main = codeRunner.wrap(codeRunner.main);
 exports.run_javascript_es5 = codeRunner.wrap(codeRunner.run_javascript_es5);
 exports.run_javascript_file = codeRunner.wrap(codeRunner.run_javascript_file);
+exports.install_python_packages = codeRunner.wrap(codeRunner.install_python_packages);
 exports.run_python = codeRunner.wrap(codeRunner.run_python);
 exports.run_python_file = codeRunner.wrap(codeRunner.run_python_file);
 exports.run_ruby = codeRunner.wrap(codeRunner.run_ruby);

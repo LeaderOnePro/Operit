@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -860,7 +862,9 @@ fun PersonaCardGenerationScreen(
                         if (!isUser) {
                             Card(colors = CardDefaults.cardColors(containerColor = bubbleContainer)) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(msg.content, color = bubbleTextColor)
+                                    SelectionContainer {
+                                        Text(msg.content, color = bubbleTextColor)
+                                    }
                                     Spacer(Modifier.height(4.dp))
                                     Text(
                                         timeFormatter.format(Date(msg.timestamp)),
@@ -874,7 +878,9 @@ fun PersonaCardGenerationScreen(
                             Spacer(Modifier.weight(1f))
                             Card(colors = CardDefaults.cardColors(containerColor = bubbleContainer)) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(msg.content, color = bubbleTextColor)
+                                    SelectionContainer {
+                                        Text(msg.content, color = bubbleTextColor)
+                                    }
                                     Spacer(Modifier.height(4.dp))
                                     Text(
                                         timeFormatter.format(Date(msg.timestamp)),
@@ -907,7 +913,13 @@ fun PersonaCardGenerationScreen(
                                 .heightIn(min = 48.dp),
                             placeholder = { Text(if (isGenerating) context.getString(R.string.currently_generating) else context.getString(R.string.describe_character_hint)) },
                             enabled = !isGenerating && chatMessages.size < MESSAGE_LIMIT,
-                            maxLines = 4
+                            maxLines = 4,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                errorContainerColor = Color.Transparent
+                            )
                         )
                         // 对话计数器 - 右上角小标签
                         Text(

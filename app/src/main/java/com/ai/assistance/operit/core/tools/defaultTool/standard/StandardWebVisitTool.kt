@@ -8,6 +8,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -778,6 +779,13 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
             isFocusable = true
             isFocusableInTouchMode = true
             requestFocus()
+
+            // 配置Cookie策略，确保第三方Cookie也被接受
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.setAcceptCookie(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                cookieManager.setAcceptThirdPartyCookies(this, true)
+            }
 
             // 改善内存管理
             setWillNotDraw(false)
