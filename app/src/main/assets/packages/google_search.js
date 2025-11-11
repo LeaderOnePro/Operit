@@ -11,7 +11,8 @@
                 { "name": "query", "description": "搜索关键词", "type": "string", "required": true },
                 { "name": "max_results", "description": "返回结果数量，默认 10，最大 20", "type": "number", "required": false },
                 { "name": "language", "description": "界面语言参数，默认 en", "type": "string", "required": false },
-                { "name": "region", "description": "地区参数，例如 us、cn。默认 us", "type": "string", "required": false }
+                { "name": "region", "description": "地区参数，例如 us、cn。默认 us", "type": "string", "required": false },
+                { "name": "includeLinks", "description": "是否在结果中包含可点击的链接列表，默认为false。", "type": "boolean", "required": false }
             ]
         },
         {
@@ -20,7 +21,18 @@
             "parameters": [
                 { "name": "query", "description": "搜索关键词", "type": "string", "required": true },
                 { "name": "max_results", "description": "返回结果数量，默认 10，最大 20", "type": "number", "required": false },
-                { "name": "language", "description": "界面语言参数，默认 en", "type": "string", "required": false }
+                { "name": "language", "description": "界面语言参数，默认 en", "type": "string", "required": false },
+                { "name": "includeLinks", "description": "是否在结果中包含可点击的链接列表，默认为false。", "type": "boolean", "required": false }
+            ]
+        },
+        {
+            "name": "search_scholar_mirror",
+            "description": "通过镜像站执行 Google Scholar 学术搜索，以绕过人机验证。",
+            "parameters": [
+                { "name": "query", "description": "搜索关键词", "type": "string", "required": true },
+                { "name": "max_results", "description": "返回结果数量，默认 10，最大 20", "type": "number", "required": false },
+                { "name": "language", "description": "界面语言参数，默认 en", "type": "string", "required": false },
+                { "name": "includeLinks", "description": "是否在结果中包含可点击的链接列表，默认为false。", "type": "boolean", "required": false }
             ]
         }
     ]
@@ -29,6 +41,9 @@
 const googleSearch = (function () {
     const GOOGLE_SEARCH_URL = "https://www.google.com/search";
     const GOOGLE_SCHOLAR_URL = "https://scholar.google.com/scholar";
+    const GOOGLE_SCHOLAR_MIRRORS = [
+        "https://xs.cntpj.com/scholar",
+    ];
     const MAX_RESULTS = 20;
     function buildUrl(base, params) {
         const queryString = Object.entries(params)
@@ -52,6 +67,32 @@ const googleSearch = (function () {
         return result;
     }
     // 解析相关逻辑已移除，直接返回 visit 的纯文本结果
+    async function performSearch(url, includeLinks = false, sourceName) {
+        try {
+            const result = await fetchHtmlViaWebVisit(url);
+            const content = result.content || '';
+            let parts = [];
+            if (result.visitKey) {
+                parts.push(`visit_key: ${result.visitKey}`);
+            }
+            if (includeLinks && result.links && result.links.length > 0) {
+                const linksLines = result.links.map((link, index) => `[${index + 1}] ${link.text}`);
+                parts.push(linksLines.join('\n'));
+            }
+            parts.push(content);
+            return {
+                success: true,
+                message: `${sourceName} 搜索成功`,
+                data: parts.join('\n\n')
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                message: `${sourceName} 搜索失败: ${error.message}`
+            };
+        }
+    }
     async function searchWeb(params) {
         if (!params.query || params.query.trim() === "") {
             throw new Error("请提供有效的 query 参数。");
@@ -66,21 +107,7 @@ const googleSearch = (function () {
             num: String(maxResults),
             pws: "0",
         });
-        try {
-            const result = await fetchHtmlViaWebVisit(url);
-            const content = result.content || '';
-            return {
-                success: true,
-                message: "Google 搜索成功",
-                data: content
-            };
-        }
-        catch (error) {
-            return {
-                success: false,
-                message: `Google 搜索失败: ${error.message}`
-            };
-        }
+        return performSearch(url, params.includeLinks, "Google");
     }
     async function searchScholar(params) {
         if (!params.query || params.query.trim() === "") {
@@ -94,26 +121,75 @@ const googleSearch = (function () {
             as_sdt: "0,5",
             num: String(maxResults)
         });
-        try {
-            const result = await fetchHtmlViaWebVisit(url);
-            const content = result.content || '';
-            return {
-                success: true,
-                message: "Google Scholar 搜索成功",
-                data: content
-            };
+        return performSearch(url, params.includeLinks, "Google Scholar");
+    }
+    async function searchScholarMirror(params) {
+        if (!params.query || params.query.trim() === "") {
+            throw new Error("请提供有效的 query 参数。");
         }
-        catch (error) {
+        const maxResults = Math.min(Math.max(params.max_results || 10, 1), MAX_RESULTS);
+        const language = params.language || "en";
+        const mirrorUrls = GOOGLE_SCHOLAR_MIRRORS.map(mirror => buildUrl(mirror, {
+            q: params.query,
+            hl: language,
+            as_sdt: "0,5",
+            num: String(maxResults)
+        }));
+        if (mirrorUrls.length === 0) {
             return {
                 success: false,
-                message: `Google Scholar 搜索失败: ${error.message}`
+                message: "没有可用的 Google Scholar 镜像地址。"
             };
         }
+        let lastError = null;
+        for (const currentUrl of mirrorUrls) {
+            try {
+                const searchResult = await performSearch(currentUrl, params.includeLinks, `Google Scholar 镜像 (${new URL(currentUrl).hostname})`);
+                if (searchResult.success && searchResult.data) {
+                    // Check for CAPTCHA in the content
+                    if (searchResult.data.includes("recaptcha") || searchResult.data.includes("人机身份验证")) {
+                        throw new Error("CAPTCHA required");
+                    }
+                    return searchResult;
+                }
+                // If performSearch itself fails, it will throw and be caught below.
+            }
+            catch (error) {
+                lastError = error;
+                console.log(`Attempt with ${currentUrl} failed: ${error.message}`);
+            }
+        }
+        return {
+            success: false,
+            message: `Google Scholar 镜像搜索在尝试所有镜像后失败: ${(lastError === null || lastError === void 0 ? void 0 : lastError.message) || 'Unknown error'}`
+        };
+    }
+    async function main() {
+        console.log("--- Testing Web Search ---");
+        const webResult = await searchWeb({ query: "TypeScript" });
+        console.log(JSON.stringify(webResult, null, 2));
+        console.log("\n--- Testing Scholar Search ---");
+        const scholarResult = await searchScholar({ query: "Large Language Models" });
+        console.log(JSON.stringify(scholarResult, null, 2));
+        console.log("\n--- Testing Scholar Mirror Search ---");
+        const scholarMirrorResult = await searchScholarMirror({ query: "Quantum Computing" });
+        console.log(JSON.stringify(scholarMirrorResult, null, 2));
+    }
+    function wrap(coreFunction) {
+        return async (params) => {
+            // The core function expects the params object directly.
+            return coreFunction(params);
+        };
     }
     return {
         search_web: searchWeb,
         search_scholar: searchScholar,
+        search_scholar_mirror: searchScholarMirror,
+        main,
+        wrap,
     };
 })();
-exports.search_web = googleSearch.search_web;
-exports.search_scholar = googleSearch.search_scholar;
+exports.search_web = googleSearch.wrap(googleSearch.search_web);
+exports.search_scholar = googleSearch.wrap(googleSearch.search_scholar);
+exports.search_scholar_mirror = googleSearch.wrap(googleSearch.search_scholar_mirror);
+exports.main = googleSearch.main;

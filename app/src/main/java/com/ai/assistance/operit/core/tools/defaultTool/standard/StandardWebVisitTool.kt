@@ -65,7 +65,7 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
     companion object {
         private const val TAG = "WebVisitTool"
         private const val USER_AGENT =
-                "Mozilla/5.0 (Linux; Android 12; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Mobile Safari/537.36"
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
         
         // Cache to store visit results
         private val visitCache = ConcurrentHashMap<String, VisitWebResultData>()
@@ -436,28 +436,27 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
         // 自动模式状态
         val autoModeEnabled = remember { mutableStateOf(true) } // 是否启用自动模式
         val autoCountdownActive = remember { mutableStateOf(false) } // 倒计时是否激活
-        val autoCountdownSeconds = remember { mutableStateOf(4) } // 倒计时秒数
+        val autoCountdownSeconds = remember { mutableStateOf(5) } // 倒计时秒数
+        val isCaptchaVerification = remember { mutableStateOf(false) } // 是否需要人机验证
 
         // 修改LaunchedEffect部分，使滚动和倒计时同时进行
-        LaunchedEffect(autoCountdownActive.value) {
+        LaunchedEffect(autoCountdownActive.value, isCaptchaVerification.value) {
             if (autoCountdownActive.value) {
-                autoCountdownSeconds.value = 4
-                
-                // 开始4秒倒计时
-                for (i in 4 downTo 1) {
+                val countdownDuration = if (isCaptchaVerification.value) 60 else 5
+                autoCountdownSeconds.value = countdownDuration
+
+                for (i in countdownDuration downTo 1) {
                     autoCountdownSeconds.value = i
-                    delay(1000) // 延迟1秒
-                    
-                    // 如果倒计时被取消，中断倒计时
+                    delay(1000)
+
                     if (!autoCountdownActive.value) {
                         break
                     }
                 }
-                
-                // 倒计时结束且未被取消，自动继续
+
                 if (autoCountdownActive.value) {
                     autoCountdownActive.value = false
-                    if (pageContent.value.isNotEmpty()) {
+                    if (pageContent.value.isNotEmpty() && !isCaptchaVerification.value) {
                         onContentExtracted(pageContent.value)
                     }
                 }
@@ -519,8 +518,8 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
                                         when {
                                             !pageLoaded.value -> "正在加载页面..."
                                             isLoading.value -> "等待页面完全加载..."
-                                            autoCountdownActive.value ->
-                                                    "正在提取内容，${autoCountdownSeconds.value}秒后自动继续..."
+                                            isCaptchaVerification.value -> "请在${autoCountdownSeconds.value}秒内完成人机验证..."
+                                            autoCountdownActive.value -> "正在提取内容，${autoCountdownSeconds.value}秒后自动继续..."
                                             hasExtractedContent.value -> "内容已提取，等待手动继续..."
                                             else -> "页面已加载，等待提取内容..."
                                         }
@@ -576,59 +575,63 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
                                                             isLoading.value = true
                                                             hasExtractedContent.value = false
                                                             pageContent.value = ""
-                                                            // 重置自动状态
                                                             autoCountdownActive.value = false
                                                             autoModeEnabled.value = true
+                                                            isCaptchaVerification.value = false
                                                         }
 
-                                                        // 页面加载完成后，延迟自动提取内容
-                                                        if (autoModeEnabled.value) {
-                                                            Handler(Looper.getMainLooper())
-                                                                    .postDelayed(
-                                                                            {
-                                                                                if (!view.isAttachedToWindow
-                                                                                ) {
-                                                                                    Log.d(
-                                                                                            TAG,
-                                                                                            "WebView不再附加到窗口，跳过提取"
-                                                                                    )
-                                                                                    return@postDelayed
-                                                                                }
-                                                                                
-                                                                                // 直接提取内容，不先滚动
-                                                                                Log.d(
-                                                                                        TAG,
-                                                                                        "页面加载完成，开始提取内容"
-                                                                                )
-                                                                                
-                                                                                if (!hasExtractedContent.value && 
-                                                                                        autoModeEnabled.value
-                                                                                ) {
-                                                                                    isLoading.value = true
-                                                                                    
-                                                                                    extractPageContent(
-                                                                                            view
-                                                                                    ) { content ->
-                                                                                        isLoading.value = false
-                                                                                        hasExtractedContent.value = true
-                                                                                        pageContent.value = content
-                                                                                        
-                                                                                        // 如果仍处于自动模式，自动开始倒计时
-                                                                                        if (autoModeEnabled.value) {
-                                                                                            autoCountdownActive.value = true
-                                                                                            
-                                                                                            // 在开始倒计时的同时滚动页面
-                                                                                            Log.d(TAG, "开始倒计时，同时滚动页面")
-                                                                                            autoScrollToBottom(view) {
-                                                                                                Log.d(TAG, "页面滚动完成")
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            },
-                                                                            800
-                                                                    ) // 缩短延迟到800毫秒
+                                                        // 检查是否是Google人机验证页面
+                                                        if (loadedUrl.contains("google.com/sorry/index")) {
+                                                            Log.d(TAG, "Google CAPTCHA page detected, returning error.")
+                                                            onContentExtracted("{\"error\":\"Google CAPTCHA detected. Please try again later or solve it in a browser.\"}")
+                                                            return@onPageFinished
                                                         }
+
+                                                        // 检查是否需要人机验证
+                                                        view.evaluateJavascript("(function() { return document.body.innerText.includes('人机验证') || document.body.innerHTML.includes('captcha'); })();") { result ->
+                                                            val isCaptcha = result?.toBoolean() ?: false
+                                                            if (isCaptcha && !isCaptchaVerification.value) {
+                                                                isCaptchaVerification.value = true
+                                                                autoModeEnabled.value = false // 需要手动验证，禁用自动模式
+                                                                autoCountdownActive.value = true // 开始60秒倒计时
+                                                            } else if (!isCaptcha && isCaptchaVerification.value) {
+                                                                // 用户完成了验证
+                                                                isCaptchaVerification.value = false
+                                                                autoModeEnabled.value = true
+                                                                // 重新触发内容提取和5秒倒计时
+                                                                triggerContentExtraction(view)
+                                                            }
+                                                        }
+
+                                                        // 页面加载完成后，如果不是人机验证模式，则延迟自动提取内容
+                                                        if (autoModeEnabled.value && !isCaptchaVerification.value) {
+                                                            triggerContentExtraction(view)
+                                                        }
+                                                    }
+
+                                                    private fun triggerContentExtraction(view: WebView) {
+                                                        Handler(Looper.getMainLooper()).postDelayed({
+                                                            if (!view.isAttachedToWindow) {
+                                                                Log.d(TAG, "WebView不再附加到窗口，跳过提取")
+                                                                return@postDelayed
+                                                            }
+
+                                                            if (!hasExtractedContent.value && autoModeEnabled.value) {
+                                                                isLoading.value = true
+                                                                extractPageContent(view) { content ->
+                                                                    isLoading.value = false
+                                                                    hasExtractedContent.value = true
+                                                                    pageContent.value = content
+
+                                                                    if (autoModeEnabled.value) {
+                                                                        autoCountdownActive.value = true
+                                                                        autoScrollToBottom(view) {
+                                                                            Log.d(TAG, "页面滚动完成")
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }, 800)
                                                     }
 
                                                     override fun shouldOverrideUrlLoading(
@@ -812,17 +815,38 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
             with(settings) {
                 javaScriptEnabled = true
                 domStorageEnabled = true
+                databaseEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
-                javaScriptCanOpenWindowsAutomatically = true
-                setSupportMultipleWindows(true)
                 builtInZoomControls = true
                 displayZoomControls = false
                 userAgentString = USER_AGENT
 
-                // 添加额外的设置以帮助内存管理
-                cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
-                mediaPlaybackRequiresUserGesture = true // 减少自动媒体加载
+                // 启用App Cache
+//                try {
+//                    val enableMethod = this::class.java.getMethod("setAppCacheEnabled", Boolean::class.javaPrimitiveType)
+//                    enableMethod.invoke(this, true)
+//                } catch (_: Exception) {
+//                    // AppCache API removed on newer Android versions
+//                }
+//                try {
+//                    val pathMethod = this::class.java.getMethod("setAppCachePath", String::class.java)
+//                    pathMethod.invoke(this, context.cacheDir.absolutePath)
+//                } catch (_: Exception) {
+//                    // AppCache API removed on newer Android versions
+//                }
+                allowFileAccess = true
+
+                // 设置默认缓存模式，而不是完全禁用
+                cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+
+                // 减少自动媒体加载
+                mediaPlaybackRequiresUserGesture = true
+
+                // 在Android 5.0及以上版本，默认阻止混合内容，这里明确设置
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                }
             }
 
             // 启用交互
