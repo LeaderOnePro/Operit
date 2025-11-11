@@ -66,19 +66,21 @@ const googleSearch = (function () {
             num: String(maxResults),
             pws: "0",
         });
-        const result = await fetchHtmlViaWebVisit(url);
-        const parts = [];
-        if (result.visitKey !== undefined) {
-            parts.push(String(result.visitKey));
+        try {
+            const result = await fetchHtmlViaWebVisit(url);
+            const content = result.content || '';
+            return {
+                success: true,
+                message: "Google 搜索成功",
+                data: content
+            };
         }
-        if (result.links && Array.isArray(result.links) && result.links.length > 0) {
-            const linksSummary = result.links.map((link, index) => `[${index + 1}] ${link.text}`).join('\n');
-            parts.push(linksSummary);
+        catch (error) {
+            return {
+                success: false,
+                message: `Google 搜索失败: ${error.message}`
+            };
         }
-        if (result.content !== undefined) {
-            parts.push(String(result.content));
-        }
-        return parts.join('\n');
     }
     async function searchScholar(params) {
         if (!params.query || params.query.trim() === "") {
@@ -92,61 +94,26 @@ const googleSearch = (function () {
             as_sdt: "0,5",
             num: String(maxResults)
         });
-        const result = await fetchHtmlViaWebVisit(url);
-        const parts = [];
-        if (result.visitKey !== undefined) {
-            parts.push(String(result.visitKey));
-        }
-        if (result.links && Array.isArray(result.links) && result.links.length > 0) {
-            const linksSummary = result.links.map((link, index) => `[${index + 1}] ${link.text}`).join('\n');
-            parts.push(linksSummary);
-        }
-        if (result.content !== undefined) {
-            parts.push(String(result.content));
-        }
-        return parts.join('\n');
-    }
-    async function wrapToolExecution(func, params, successMessage, failMessage) {
         try {
-            const data = await func(params);
-            complete({
+            const result = await fetchHtmlViaWebVisit(url);
+            const content = result.content || '';
+            return {
                 success: true,
-                message: successMessage,
-                data
-            });
+                message: "Google Scholar 搜索成功",
+                data: content
+            };
         }
         catch (error) {
-            console.error(`Tool ${func.name} failed:`, error);
-            complete({
+            return {
                 success: false,
-                message: `${failMessage}: ${error.message}`,
-                error_stack: error.stack
-            });
+                message: `Google Scholar 搜索失败: ${error.message}`
+            };
         }
     }
-    async function main() {
-        const web = await searchWeb({
-            query: "test",
-            max_results: 1,
-            language: "en",
-            region: "us"
-        });
-        const scholar = await searchScholar({
-            query: "test",
-            max_results: 1,
-            language: "en"
-        });
-        return `Web:\n${web}\n\nScholar:\n${scholar}`;
-    }
-    function runMainTool(_ = {}) {
-        return main();
-    }
     return {
-        search_web: (params) => wrapToolExecution(searchWeb, params, "Google 搜索成功", "Google 搜索失败"),
-        search_scholar: (params) => wrapToolExecution(searchScholar, params, "Google Scholar 搜索成功", "Google Scholar 搜索失败"),
-        main: () => wrapToolExecution(runMainTool, {}, "测试成功", "测试失败")
+        search_web: searchWeb,
+        search_scholar: searchScholar,
     };
 })();
 exports.search_web = googleSearch.search_web;
 exports.search_scholar = googleSearch.search_scholar;
-exports.main = googleSearch.main;

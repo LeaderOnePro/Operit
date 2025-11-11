@@ -14,6 +14,12 @@
           description: 搜索查询关键词
           type: string
           required: true
+        },
+        {
+          name: includeLinks
+          description: 是否在结果中包含可点击的链接列表，默认为false。如果为true，AI可以根据返回的链接序号进行深入访问。
+          type: boolean
+          required: false
         }
       ]
     },
@@ -31,6 +37,12 @@
           name: page
           description: 搜索结果页码，默认为1
           type: string
+          required: false
+        },
+        {
+          name: includeLinks
+          description: 是否在结果中包含可点击的链接列表，默认为false。如果为true，AI可以根据返回的链接序号进行深入访问。
+          type: boolean
           required: false
         }
       ]
@@ -50,6 +62,12 @@
           description: 搜索结果页码，默认为1
           type: string
           required: false
+        },
+        {
+          name: includeLinks
+          description: 是否在结果中包含可点击的链接列表，默认为false。如果为true，AI可以根据返回的链接序号进行深入访问。
+          type: boolean
+          required: false
         }
       ]
     },
@@ -67,6 +85,12 @@
           name: page
           description: 搜索结果页码，默认为1
           type: string
+          required: false
+        },
+        {
+          name: includeLinks
+          description: 是否在结果中包含可点击的链接列表，默认为false。如果为true，AI可以根据返回的链接序号进行深入访问。
+          type: boolean
           required: false
         }
       ]
@@ -86,6 +110,12 @@
           description: 搜索平台列表字符串，可选值包括"bing","baidu","sogou","quark"，多个平台用逗号分隔，比如"bing,baidu,sogou,quark"
           type: string
           required: true
+        },
+        {
+          name: includeLinks
+          description: 是否在结果中包含可点击的链接列表，默认为false。聚合搜索时建议保持为false以节省输出，仅在需要深入访问时对单个搜索引擎使用。
+          type: boolean
+          required: false
         }
       ]
     }
@@ -94,70 +124,75 @@
 */
 
 const various_search = (function () {
-  async function performSearch(platform: string, url: string, query: string, page?: number) {
+  async function performSearch(platform: string, url: string, query: string, page?: number, includeLinks: boolean = false) {
     try {
       const response = await Tools.Net.visit(url);
       if (!response) {
         throw new Error(`无法获取 ${platform} 搜索结果`);
       }
-      const result: any = {
+
+      let parts: string[] = [];
+      // visitKey
+      if (response.visitKey !== undefined) {
+        parts.push(String(response.visitKey));
+      }
+      // links: [index] text （不包含链接本身）
+      if (includeLinks && response.links && Array.isArray(response.links) && response.links.length > 0) {
+        const linksLines = response.links.map((link: any, index: number) => `[${index + 1}] ${link.text}`);
+        parts.push(linksLines.join('\n'));
+      }
+      // content
+      if (response.content !== undefined) {
+        parts.push(String(response.content));
+      }
+
+      return {
         platform,
-        success: true,
-        query: query,
-        page: page,
-        content: response.content,
-        visitKey: response.visitKey,
-        links: response.links || []
+        content: parts.join('\n')
       };
-      return result;
     } catch (error: any) {
       return {
         platform,
-        success: false,
-        message: `${platform} 搜索失败: ${error.message}`
+        content: `${platform} 搜索失败: ${error.message}`
       };
     }
   }
 
-  async function search_bing(params: { query: string }) {
-    const { query } = params;
+  async function search_bing(query: string, includeLinks: boolean = false) {
     const encodedQuery = encodeURIComponent(query);
     const url = `https://cn.bing.com/search?q=${encodedQuery}&FORM=HDRSC1`;
-    return performSearch('bing', url, query);
+    return performSearch('bing', url, query, 1, includeLinks);
   }
 
-  async function search_baidu(params: { query: string, page?: string }) {
-    const { query } = params;
+  async function search_baidu(query: string, pageStr?: string, includeLinks: boolean = false) {
     let page = 1;
-    if (params.page) {
-      page = parseInt(params.page, 10);
+    if (pageStr) {
+      page = parseInt(pageStr, 10);
     }
     const pn = (page - 1) * 10;
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.baidu.com/s?wd=${encodedQuery}&pn=${pn}`;
-    return performSearch('baidu', url, query, page);
+    return performSearch('baidu', url, query, page, includeLinks);
   }
 
-  async function search_sogou(params: { query: string, page?: string }) {
-    const { query } = params;
+  async function search_sogou(query: string, pageStr?: string, includeLinks: boolean = false) {
     let page = 1;
-    if (params.page) {
-      page = parseInt(params.page, 10);
+    if (pageStr) {
+      page = parseInt(pageStr, 10);
     }
     const encodedQuery = encodeURIComponent(query);
     const url = `https://www.sogou.com/web?query=${encodedQuery}&page=${page}`;
-    return performSearch('sogou', url, query, page);
+    return performSearch('sogou', url, query, page, includeLinks);
   }
 
-  async function search_quark(params: { query: string, page?: string }) {
-    const { query } = params;
+  async function search_quark(query: string, pageStr?: string, includeLinks: boolean = false) {
     let page = 1;
-    if (params.page) {
-      page = parseInt(params.page, 10);
+    if (pageStr) {
+      page = parseInt(pageStr, 10);
     }
     const encodedQuery = encodeURIComponent(query);
     const url = `https://quark.sm.cn/s?q=${encodedQuery}&page=${page}`;
-    return performSearch('quark', url, query, page);
+    return performSearch('quark', url, query, page, includeLinks);
   }
 
   const searchFunctions: any = {
@@ -167,8 +202,7 @@ const various_search = (function () {
     quark: search_quark
   };
 
-  async function combined_search(params: { query: string, platforms: string }) {
-    const { query, platforms } = params;
+  async function combined_search(query: string, platforms: string, includeLinks: boolean = false) {
     const platformKeysRaw = platforms.split(',');
     const platformKeys: string[] = [];
     for (const platform of platformKeysRaw) {
@@ -182,7 +216,8 @@ const various_search = (function () {
     for (const platform of platformKeys) {
       const searchFn = searchFunctions[platform];
       if (searchFn) {
-        searchPromises.push(searchFn({ query, page: '1' }));
+        // 注意：这里我们假设组合搜索总是从第一页开始
+        searchPromises.push(searchFn(query, '1', includeLinks));
       } else {
         searchPromises.push(Promise.resolve({ platform, success: false, message: `不支持的搜索平台: ${platform}` }));
       }
@@ -192,41 +227,17 @@ const various_search = (function () {
   }
 
   async function main() {
-    const result = await combined_search({ query: '如何学习编程', platforms: 'bing,baidu,sogou,quark' });
-    console.log(result);
+    const result = await combined_search('如何学习编程', 'bing,baidu,sogou,quark');
+    console.log(JSON.stringify(result, null, 2));
   }
 
-  function wrap(coreFunction: (params: any) => Promise<any>) {
+  function wrap(coreFunction: (...args: any[]) => Promise<any>) {
     return async (params: any) => {
-      const result = await coreFunction(params);
-
-      const formatOne = (item: any) => {
-        if (!item || item.success === false) {
-          return '';
-        }
-        let parts: string[] = [];
-        // visitKey
-        if (item.visitKey !== undefined) {
-          parts.push(String(item.visitKey));
-        }
-        // links: [index] text （不包含链接本身）
-        if (item.links && Array.isArray(item.links) && item.links.length > 0) {
-          const linksLines = item.links.map((link: any, index: number) => `[${index + 1}] ${link.text}`);
-          parts.push(linksLines.join('\n'));
-        }
-        // content
-        if (item.content !== undefined) {
-          parts.push(String(item.content));
-        }
-        return parts.join('\n');
-      };
-
-      if (Array.isArray(result)) {
-        const formatted = result.map(formatOne).filter(Boolean).join('\n');
-        return formatted;
-      }
-
-      return formatOne(result);
+      // wrap函数负责将JSON对象参数解构为独立参数
+      // 并调用核心函数。
+      // 它直接返回核心函数的JSON结果，不做任何修改。
+      const args = Object.values(params);
+      return coreFunction(...args);
     };
   }
 

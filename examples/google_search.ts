@@ -77,7 +77,7 @@ const googleSearch = (function () {
 
     // 解析相关逻辑已移除，直接返回 visit 的纯文本结果
 
-    async function searchWeb(params: SearchParams): Promise<string> {
+    async function searchWeb(params: SearchParams) {
         if (!params.query || params.query.trim() === "") {
             throw new Error("请提供有效的 query 参数。");
         }
@@ -92,22 +92,23 @@ const googleSearch = (function () {
             pws: "0",
         });
 
-        const result = await fetchHtmlViaWebVisit(url);
-        const parts: string[] = [];
-        if ((result as any).visitKey !== undefined) {
-            parts.push(String((result as any).visitKey));
+        try {
+            const result = await fetchHtmlViaWebVisit(url);
+            const content = result.content || '';
+            return {
+                success: true,
+                message: "Google 搜索成功",
+                data: content
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: `Google 搜索失败: ${error.message}`
+            };
         }
-        if ((result as any).links && Array.isArray((result as any).links) && (result as any).links.length > 0) {
-            const linksSummary = (result as any).links.map((link: any, index: number) => `[${index + 1}] ${link.text}`).join('\n');
-            parts.push(linksSummary);
-        }
-        if ((result as any).content !== undefined) {
-            parts.push(String((result as any).content));
-        }
-        return parts.join('\n');
     }
 
-    async function searchScholar(params: ScholarSearchParams): Promise<string> {
+    async function searchScholar(params: ScholarSearchParams) {
         if (!params.query || params.query.trim() === "") {
             throw new Error("请提供有效的 query 参数。");
         }
@@ -120,73 +121,28 @@ const googleSearch = (function () {
             num: String(maxResults)
         });
 
-        const result = await fetchHtmlViaWebVisit(url);
-        const parts: string[] = [];
-        if ((result as any).visitKey !== undefined) {
-            parts.push(String((result as any).visitKey));
-        }
-        if ((result as any).links && Array.isArray((result as any).links) && (result as any).links.length > 0) {
-            const linksSummary = (result as any).links.map((link: any, index: number) => `[${index + 1}] ${link.text}`).join('\n');
-            parts.push(linksSummary);
-        }
-        if ((result as any).content !== undefined) {
-            parts.push(String((result as any).content));
-        }
-        return parts.join('\n');
-    }
-
-    async function wrapToolExecution<P>(
-        func: (params: P) => Promise<string>,
-        params: P,
-        successMessage: string,
-        failMessage: string
-    ) {
         try {
-            const data = await func(params);
-            complete({
+            const result = await fetchHtmlViaWebVisit(url);
+            const content = result.content || '';
+            return {
                 success: true,
-                message: successMessage,
-                data
-            });
+                message: "Google Scholar 搜索成功",
+                data: content
+            };
         } catch (error: any) {
-            console.error(`Tool ${func.name} failed:`, error);
-            complete({
+            return {
                 success: false,
-                message: `${failMessage}: ${error.message}`,
-                error_stack: error.stack
-            });
+                message: `Google Scholar 搜索失败: ${error.message}`
+            };
         }
-    }
-
-    async function main(): Promise<string> {
-        const web = await searchWeb({
-            query: "test",
-            max_results: 1,
-            language: "en",
-            region: "us"
-        });
-        const scholar = await searchScholar({
-            query: "test",
-            max_results: 1,
-            language: "en"
-        });
-        return `Web:\n${web}\n\nScholar:\n${scholar}`;
-    }
-
-    function runMainTool(_: {} = {}): Promise<string> {
-        return main();
     }
 
     return {
-        search_web: (params: SearchParams) =>
-            wrapToolExecution(searchWeb, params, "Google 搜索成功", "Google 搜索失败"),
-        search_scholar: (params: ScholarSearchParams) =>
-            wrapToolExecution(searchScholar, params, "Google Scholar 搜索成功", "Google Scholar 搜索失败"),
-        main: () => wrapToolExecution(runMainTool, {}, "测试成功", "测试失败")
+        search_web: searchWeb,
+        search_scholar: searchScholar,
     };
 })();
 
 exports.search_web = googleSearch.search_web;
 exports.search_scholar = googleSearch.search_scholar;
-exports.main = googleSearch.main;
 
