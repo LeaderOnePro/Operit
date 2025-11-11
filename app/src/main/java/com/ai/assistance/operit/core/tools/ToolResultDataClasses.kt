@@ -504,41 +504,18 @@ data class VisitWebResultData(
 
     override fun toString(): String {
         val sb = StringBuilder()
-        sb.appendLine("网页内容提取结果:")
-        visitKey?.let { sb.appendLine("Visit Key: $it") }
-        sb.appendLine("URL: $url")
-        sb.appendLine("标题: $title")
-
-        if (metadata.isNotEmpty()) {
-            sb.appendLine("\n元数据:")
-            metadata.entries.take(5).forEach { (key, value) -> sb.appendLine("$key: $value") }
-            if (metadata.size > 5) {
-                sb.appendLine("... 以及 ${metadata.size - 5} 个其他元数据项")
-            }
-            sb.appendLine()
-        }
+        visitKey?.let { sb.appendLine("Visit key: $it\n") }
 
         if (links.isNotEmpty()) {
-            sb.appendLine("\n页面链接 (${links.size} 个):")
-            links.take(20).forEachIndexed { index, link ->
-                sb.appendLine("${index + 1}. ${link.text}")
-            }
-            if (links.size > 20) {
-                sb.appendLine("... 以及 ${links.size - 20} 个其他链接")
+            sb.appendLine("Results:")
+            links.forEachIndexed { index, link ->
+                sb.appendLine("[${index + 1}] ${link.text}")
             }
             sb.appendLine()
         }
 
-        sb.appendLine("\n页面内容:")
-
-        // 如果内容太长，只显示部分
-        val maxContentLength = 1000
-        if (content.length > maxContentLength) {
-            sb.append(content.substring(0, maxContentLength))
-            sb.appendLine("\n...(内容已截断，共 ${content.length} 字符)")
-        } else {
-            sb.append(content)
-        }
+        sb.appendLine("Content:")
+        sb.append(content)
 
         return sb.toString()
     }

@@ -688,7 +688,7 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // Main flow: Detect and process tool invocations
             // Try to detect tool invocations
-            val toolInvocations = toolHandler.extractToolInvocations(enhancedContent)
+            val toolInvocations = ToolExecutionManager.extractToolInvocations(enhancedContent)
 
             if (toolInvocations.isNotEmpty()) {
                 // Handle wait for user need marker
@@ -837,56 +837,13 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         val processToolJob = toolProcessingScope.launch {
-            // 1. 权限检查
-            val permittedInvocations = mutableListOf<ToolInvocation>()
-            val permissionDeniedResults = mutableListOf<ToolResult>()
-            for (invocation in toolInvocations) {
-                val (hasPermission, errorResult) = ToolExecutionManager.checkToolPermission(toolHandler, invocation)
-                if (hasPermission) {
-                    permittedInvocations.add(invocation)
-                } else {
-                    permissionDeniedResults.add(errorResult!!)
-                    val errorStatusContent = ConversationMarkupManager.createErrorStatus("权限拒绝", "操作 '${invocation.tool.name}' 未授权")
-                    context.roundManager.appendContent(errorStatusContent)
-                    collector.emit(errorStatusContent)
-                    val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(errorResult)
-                    context.roundManager.appendContent(toolResultStatusContent)
-                    collector.emit(toolResultStatusContent)
-                }
-            }
-
-            // 2. 按并行/串行对工具进行分组
-            val parallelizableToolNames = setOf(
-                "list_files", "read_file", "read_file_part", "read_file_full", "file_exists",
-                "find_files", "file_info", "grep_code", "query_memory", "calculate", "ffmpeg_info"
+            val allToolResults = ToolExecutionManager.executeInvocations(
+                invocations = toolInvocations,
+                toolHandler = toolHandler,
+                packageManager = packageManager,
+                collector = collector
             )
-            val (parallelInvocations, serialInvocations) = permittedInvocations.partition { parallelizableToolNames.contains(it.tool.name) }
 
-            // 3. 执行工具并收集聚合结果
-            val executionResults = ConcurrentHashMap<ToolInvocation, ToolResult>()
-
-            // 启动并行工具
-            val parallelJobs = parallelInvocations.map { invocation ->
-                async {
-                    val result = executeAndEmitTool(invocation, context, collector)
-                    executionResults[invocation] = result
-                }
-            }
-
-            // 顺序执行串行工具
-            for (invocation in serialInvocations) {
-                val result = executeAndEmitTool(invocation, context, collector)
-                executionResults[invocation] = result
-            }
-
-            // 等待所有并行任务完成
-            parallelJobs.awaitAll()
-
-            // 4. 按原始顺序重新排序结果
-            val orderedAggregated = permittedInvocations.mapNotNull { executionResults[it] }
-
-            // 5. 组合所有结果并进行最终处理
-            val allToolResults = permissionDeniedResults + orderedAggregated
             if (allToolResults.isNotEmpty()) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
                 processToolResults(
@@ -909,95 +866,6 @@ class EnhancedAIService private constructor(private val context: Context) {
         Log.d(TAG, "工具调用处理耗时: ${System.currentTimeMillis() - startTime}ms")
     }
 
-    /**
-     * 封装单个工具的执行、实时输出和结果聚合的辅助函数
-     */
-    private suspend fun executeAndEmitTool(
-        invocation: ToolInvocation,
-        context: MessageExecutionContext,
-        collector: StreamCollector<String>
-    ): ToolResult {
-        val executor = toolHandler.getToolExecutor(invocation.tool.name)
-        if (executor == null) {
-            val toolName = invocation.tool.name
-            val errorMessage = buildToolNotAvailableErrorMessage(toolName)
-            val notAvailableContent = ConversationMarkupManager.createToolNotAvailableError(toolName, errorMessage)
-            context.roundManager.appendContent(notAvailableContent)
-            collector.emit(notAvailableContent)
-            return ToolResult(toolName = toolName, success = false, result = StringResultData(""), error = errorMessage)
-        }
-
-        val collectedResults = mutableListOf<ToolResult>()
-        ToolExecutionManager.executeToolSafely(invocation, executor).collect { result ->
-            collectedResults.add(result)
-            // 实时输出每个结果
-            val toolResultStatusContent = ConversationMarkupManager.formatToolResultForMessage(result)
-            context.roundManager.appendContent(toolResultStatusContent)
-            collector.emit(toolResultStatusContent)
-        }
-
-        // 为此调用聚合最终结果
-        if (collectedResults.isEmpty()) {
-            return ToolResult(toolName = invocation.tool.name, success = false, result = StringResultData(""), error = "工具执行后未返回任何结果。")
-        }
-
-        val lastResult = collectedResults.last()
-        val combinedResultString = collectedResults.joinToString("\n") { res ->
-            (if (res.success) res.result.toString() else "步骤错误: ${res.error ?: "未知错误"}").trim()
-        }.trim()
-
-        return ToolResult(
-            toolName = invocation.tool.name,
-            success = lastResult.success,
-            result = StringResultData(combinedResultString),
-            error = lastResult.error
-        )
-    }
-
-    /**
-     * 构建工具不可用的错误信息，统一逻辑避免重复
-     */
-    private suspend fun buildToolNotAvailableErrorMessage(toolName: String): String {
-        return when {
-            toolName.contains('.') && !toolName.contains(':') -> {
-                val parts = toolName.split('.', limit = 2)
-                "工具调用语法错误: 对于工具包中的工具，应使用 'packName:toolName' 格式，而不是 '${toolName}'。您可能想调用 '${parts.getOrNull(0)}:${parts.getOrNull(1)}'。"
-            }
-            toolName.contains(':') -> {
-                val parts = toolName.split(':', limit = 2)
-                val packName = parts[0]
-                val toolNamePart = parts.getOrNull(1) ?: ""
-                val isAvailable = packageManager.getAvailablePackages().containsKey(packName)
-                
-                if (!isAvailable) {
-                    "工具包 '$packName' 不存在。"
-                } else {
-                    // 包存在，检查是否已激活（通过检查该包的任何工具是否已注册）
-                    val packageTools = packageManager.getPackageTools(packName)?.tools ?: emptyList()
-                    val isPackageActivated = packageTools.any { 
-                        toolHandler.getToolExecutor("$packName:${it.name}") != null 
-                    }
-                    
-                    if (isPackageActivated) {
-                        // 包已激活但工具不存在
-                        "工具 '$toolNamePart' 在工具包 '$packName' 中不存在。请使用 'use_package' 工具并指定包名 '$packName' 来查看该包的所有可用工具。"
-                    } else {
-                        // 包未激活
-                        "工具包 '$packName' 已导入但未在当前会话中激活。请先使用 'use_package' 工具并指定包名 '$packName' 来激活它。"
-                    }
-                }
-            }
-            else -> {
-                // 检查是否直接把包名当作工具名调用了
-                val isPackageName = packageManager.getAvailablePackages().containsKey(toolName)
-                if (isPackageName) {
-                    "错误: '$toolName' 是一个工具包，不是工具。请先使用 'use_package' 工具并指定包名 '$toolName' 来激活这个工具包，然后才能使用其中的工具。"
-                } else {
-                    "工具 '${toolName}' 不可用或不存在。如果这是一个工具包中的工具，请使用 'packName:toolName' 格式调用。"
-                }
-            }
-        }
-    }
 
     /** Process tool execution result - simplified version without callbacks */
     private suspend fun processToolResults(

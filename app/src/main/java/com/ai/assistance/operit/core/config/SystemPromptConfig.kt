@@ -155,7 +155,7 @@ HTTP Tools:
 - http_request: Send HTTP request. Parameters: url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
 - multipart_request: Upload files. Parameters: url, method (POST/PUT), headers, form_data, files (file array)
 - manage_cookies: Manage cookies. Parameters: action (get/set/clear), domain, cookies
-- visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)"""
+- visit_web: Visit a webpage and extract its content. This tool can be used in two ways: 1. Provide a `url` to visit a new page. 2. Provide a `visit_key` from a previous search result and a `link_number` to visit a specific link from that search. This is the preferred way to follow up on a search. Parameters: url (optional, webpage URL), visit_key (optional, string, the key from a previous search), link_number (optional, int, the number of the link to visit from the search results)"""
     }
     
     private const val MEMORY_TOOLS_EN = """
@@ -251,7 +251,7 @@ HTTP工具：
 - http_request: 发送HTTP请求。参数：url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
 - multipart_request: 上传文件。参数：url, method (POST/PUT), headers, form_data, files (文件数组)
 - manage_cookies: 管理cookies。参数：action (get/set/clear), domain, cookies
-- visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)"""
+- visit_web: 访问网页并提取内容。此工具有两种用法：1. 提供 `url` 访问新页面。2. 提供先前搜索结果中的 `visit_key` 和 `link_number` 来访问该搜索中的特定链接。这是跟进搜索的首选方式。参数：url (可选, 网页URL), visit_key (可选, 字符串, 上一次搜索返回的密钥), link_number (可选, 整数, 要访问的搜索结果链接的编号)"""
     }
     
     private const val MEMORY_TOOLS_CN = """

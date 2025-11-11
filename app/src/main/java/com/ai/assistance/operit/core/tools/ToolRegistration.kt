@@ -201,8 +201,9 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             },
             executor = { tool ->
                 val packageName = tool.parameters.find { it.name == "package_name" }?.value ?: ""
-                val result = handler.getOrCreatePackageManager().usePackage(packageName)
-                ToolResult(toolName = tool.name, success = true, result = StringResultData(result))
+                handler
+                    .getOrCreatePackageManager()
+                    .executeUsePackageTool(tool.name, packageName)
             }
     )
 
@@ -239,8 +240,16 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "visit_web",
             descriptionGenerator = { tool ->
-                val url = tool.parameters.find { it.name == "url" }?.value ?: ""
-                "访问网页: $url"
+                val url = tool.parameters.find { it.name == "url" }?.value
+                val visitKey = tool.parameters.find { it.name == "visit_key" }?.value
+                val linkNumber = tool.parameters.find { it.name == "link_number" }?.value
+
+                when {
+                    !visitKey.isNullOrBlank() && !linkNumber.isNullOrBlank() ->
+                        "访问先前搜索结果中的链接 #${linkNumber} (Visit Key: ${visitKey.take(8)}...)"
+                    !url.isNullOrBlank() -> "访问网页: $url"
+                    else -> "访问网页"
+                }
             },
             executor = { tool ->
                 val webVisitTool = ToolGetter.getWebVisitTool(context)

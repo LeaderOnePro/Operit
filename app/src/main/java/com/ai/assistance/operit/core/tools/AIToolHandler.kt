@@ -170,58 +170,6 @@ class AIToolHandler private constructor(private val context: Context) {
         return availableTools[toolName]
     }
 
-    /**
-     * Extract tool invocations from the AI response Public method to be used by EnhancedAIService
-     */
-    fun extractToolInvocations(response: String): List<ToolInvocation> {
-        val invocations = mutableListOf<ToolInvocation>()
-        val content = response
-
-        // 使用流式处理识别 XML 工具调用
-        kotlinx.coroutines.runBlocking {
-            val charStream = content.stream()
-
-            val plugins = listOf(com.ai.assistance.operit.util.stream.plugins.StreamXmlPlugin())
-
-            // 使用 splitBy 将字符流分割为 XML 和非 XML 部分
-            charStream.splitBy(plugins).collect { group ->
-                val chunkContent = StringBuilder()
-                group.stream.collect { chunk -> chunkContent.append(chunk) }
-                val chunkString = chunkContent.toString()
-
-                if (chunkString.isEmpty()) return@collect
-
-                // 只处理 XML 部分
-                if (group.tag is com.ai.assistance.operit.util.stream.plugins.StreamXmlPlugin) {
-                    // 检查是否是工具调用 XML (<tool>)
-                    if (chunkString.startsWith("<tool") && chunkString.contains("</tool>")) {
-                        // 提取工具名称
-                        val nameMatch = MessageContentParser.namePattern.find(chunkString)
-                        val toolName = nameMatch?.groupValues?.get(1) ?: return@collect
-
-                        // 提取参数
-                        val parameters = mutableListOf<ToolParameter>()
-                        MessageContentParser.toolParamPattern.findAll(chunkString).forEach {
-                                paramMatch: MatchResult ->
-                            val paramName = paramMatch.groupValues[1]
-                            val paramValue = paramMatch.groupValues[2]
-                            parameters.add(ToolParameter(paramName, unescapeXml(paramValue)))
-                        }
-
-                        // 创建工具实例和调用
-                        val tool = AITool(name = toolName, parameters = parameters)
-                        invocations.add(ToolInvocation(tool, chunkString, chunkString.indices))
-                    }
-                }
-            }
-        }
-
-        Log.d(
-                TAG,
-                "Found ${invocations.size} tool invocations: ${invocations.map { it.tool.name }}"
-        )
-        return invocations
-    }
 
     /** Executes a tool directly */
     fun executeTool(tool: AITool): ToolResult {

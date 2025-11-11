@@ -97,16 +97,19 @@ const various_search = (function () {
   async function performSearch(platform: string, url: string, query: string, page?: number) {
     try {
       const response = await Tools.Net.visit(url);
-      if (!response || !response.content) {
+      if (!response) {
         throw new Error(`无法获取 ${platform} 搜索结果`);
       }
-      return {
+      const result: any = {
         platform,
         success: true,
         query: query,
         page: page,
-        content: response.content
+        content: response.content,
+        visitKey: response.visitKey,
+        links: response.links || []
       };
+      return result;
     } catch (error: any) {
       return {
         platform,
@@ -196,7 +199,34 @@ const various_search = (function () {
   function wrap(coreFunction: (params: any) => Promise<any>) {
     return async (params: any) => {
       const result = await coreFunction(params);
-      return result;
+
+      const formatOne = (item: any) => {
+        if (!item || item.success === false) {
+          return '';
+        }
+        let parts: string[] = [];
+        // visitKey
+        if (item.visitKey !== undefined) {
+          parts.push(String(item.visitKey));
+        }
+        // links: [index] text （不包含链接本身）
+        if (item.links && Array.isArray(item.links) && item.links.length > 0) {
+          const linksLines = item.links.map((link: any, index: number) => `[${index + 1}] ${link.text}`);
+          parts.push(linksLines.join('\n'));
+        }
+        // content
+        if (item.content !== undefined) {
+          parts.push(String(item.content));
+        }
+        return parts.join('\n');
+      };
+
+      if (Array.isArray(result)) {
+        const formatted = result.map(formatOne).filter(Boolean).join('\n');
+        return formatted;
+      }
+
+      return formatOne(result);
     };
   }
 

@@ -897,7 +897,7 @@ fun PersonaCardGenerationScreen(
             }
 
             // 底部输入栏
-            Surface(color = MaterialTheme.colorScheme.surface) {
+            Surface(color = Color.Transparent) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

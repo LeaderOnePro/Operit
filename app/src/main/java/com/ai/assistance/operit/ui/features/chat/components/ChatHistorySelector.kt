@@ -557,12 +557,12 @@ fun ChatHistorySelector(
             ) {
                 IconButton(
                     onClick = { showNewGroupDialog = true },
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         Icons.Default.AddCircleOutline,
                         contentDescription = stringResource(R.string.new_group),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
@@ -572,24 +572,24 @@ fun ChatHistorySelector(
                             searchQuery = ""
                         }
                     },
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
                         if (showSearchBox) Icons.Default.SearchOff else Icons.Default.Search,
                         contentDescription = stringResource(R.string.search),
                         tint = if (showSearchBox) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 if (onBack != null) {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "返回",
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

@@ -96,16 +96,19 @@ const various_search = (function () {
     async function performSearch(platform, url, query, page) {
         try {
             const response = await Tools.Net.visit(url);
-            if (!response || !response.content) {
+            if (!response) {
                 throw new Error(`无法获取 ${platform} 搜索结果`);
             }
-            return {
+            const result = {
                 platform,
                 success: true,
                 query: query,
                 page: page,
-                content: response.content
+                content: response.content,
+                visitKey: response.visitKey,
+                links: response.links || []
             };
+            return result;
         }
         catch (error) {
             return {
@@ -187,7 +190,31 @@ const various_search = (function () {
     function wrap(coreFunction) {
         return async (params) => {
             const result = await coreFunction(params);
-            return result;
+            const formatOne = (item) => {
+                if (!item || item.success === false) {
+                    return '';
+                }
+                let parts = [];
+                // visitKey
+                if (item.visitKey !== undefined) {
+                    parts.push(String(item.visitKey));
+                }
+                // links: [index] text （不包含链接本身）
+                if (item.links && Array.isArray(item.links) && item.links.length > 0) {
+                    const linksLines = item.links.map((link, index) => `[${index + 1}] ${link.text}`);
+                    parts.push(linksLines.join('\n'));
+                }
+                // content
+                if (item.content !== undefined) {
+                    parts.push(String(item.content));
+                }
+                return parts.join('\n');
+            };
+            if (Array.isArray(result)) {
+                const formatted = result.map(formatOne).filter(Boolean).join('\n');
+                return formatted;
+            }
+            return formatOne(result);
         };
     }
     return {

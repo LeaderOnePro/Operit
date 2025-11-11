@@ -192,8 +192,7 @@ private fun PermissionRequestContent(
 
                             Column(
                                 modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Button(
                                     onClick = onAllow,
@@ -209,13 +208,16 @@ private fun PermissionRequestContent(
                                         )
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "以后都允许",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontSize = 12.sp
                                     ),
                                     color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable { onAlwaysAllow() }
+                                    modifier = Modifier
+                                        .clickable { onAlwaysAllow() }
+                                        .padding(vertical = 4.dp)
                                 )
                             }
                         }

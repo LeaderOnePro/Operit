@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.tools.packTool
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.PackageToolExecutor
 import com.ai.assistance.operit.core.tools.ToolPackage
 import com.ai.assistance.operit.core.tools.javascript.JsEngine
@@ -10,6 +11,7 @@ import com.ai.assistance.operit.core.tools.mcp.MCPManager
 import com.ai.assistance.operit.core.tools.mcp.MCPPackage
 import com.ai.assistance.operit.core.tools.mcp.MCPServerConfig
 import com.ai.assistance.operit.core.tools.mcp.MCPToolExecutor
+import com.ai.assistance.operit.data.model.ToolResult
 import java.io.File
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -387,6 +389,27 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         }
 
         return "Package not found: $packageName. Please import it first or register it as an MCP server."
+    }
+
+    /**
+     * Wrapper for tool execution: builds ToolResult for the 'use_package' tool.
+     * Keeps registration site minimal by centralizing result construction here.
+     */
+    fun executeUsePackageTool(toolName: String, packageName: String): ToolResult {
+        if (packageName.isBlank()) {
+            return ToolResult(
+                toolName = toolName,
+                success = false,
+                result = StringResultData(""),
+                error = "缺少必需参数: package_name"
+            )
+        }
+        val text = usePackage(packageName)
+        return ToolResult(
+            toolName = toolName,
+            success = true,
+            result = StringResultData(text)
+        )
     }
 
     /**

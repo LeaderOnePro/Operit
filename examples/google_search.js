@@ -37,10 +37,19 @@ const googleSearch = (function () {
         return `${base}?${queryString}`;
     }
     async function fetchHtmlViaWebVisit(url) {
-        var _a;
         const result = await Tools.Net.visit(url);
-        // VisitWebResultData may include content and final URL
-        return typeof result === "string" ? result : ((_a = result === null || result === void 0 ? void 0 : result.content) !== null && _a !== void 0 ? _a : "");
+        // The result can be a string if the underlying tool returns a simple string.
+        // We'll normalize it to a VisitWebResultData object.
+        if (typeof result === "string") {
+            return {
+                url: url,
+                title: "",
+                content: result,
+                links: [],
+                toString: () => result,
+            };
+        }
+        return result;
     }
     // 解析相关逻辑已移除，直接返回 visit 的纯文本结果
     async function searchWeb(params) {
@@ -56,10 +65,20 @@ const googleSearch = (function () {
             gl: region,
             num: String(maxResults),
             pws: "0",
-            // 避免显式设置 tbm/source 触发挑战页
         });
-        // 直接返回文本
-        return await fetchHtmlViaWebVisit(url);
+        const result = await fetchHtmlViaWebVisit(url);
+        const parts = [];
+        if (result.visitKey !== undefined) {
+            parts.push(String(result.visitKey));
+        }
+        if (result.links && Array.isArray(result.links) && result.links.length > 0) {
+            const linksSummary = result.links.map((link, index) => `[${index + 1}] ${link.text}`).join('\n');
+            parts.push(linksSummary);
+        }
+        if (result.content !== undefined) {
+            parts.push(String(result.content));
+        }
+        return parts.join('\n');
     }
     async function searchScholar(params) {
         if (!params.query || params.query.trim() === "") {
@@ -73,8 +92,19 @@ const googleSearch = (function () {
             as_sdt: "0,5",
             num: String(maxResults)
         });
-        // 直接返回文本
-        return await fetchHtmlViaWebVisit(url);
+        const result = await fetchHtmlViaWebVisit(url);
+        const parts = [];
+        if (result.visitKey !== undefined) {
+            parts.push(String(result.visitKey));
+        }
+        if (result.links && Array.isArray(result.links) && result.links.length > 0) {
+            const linksSummary = result.links.map((link, index) => `[${index + 1}] ${link.text}`).join('\n');
+            parts.push(linksSummary);
+        }
+        if (result.content !== undefined) {
+            parts.push(String(result.content));
+        }
+        return parts.join('\n');
     }
     async function wrapToolExecution(func, params, successMessage, failMessage) {
         try {
