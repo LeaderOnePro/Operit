@@ -22,7 +22,6 @@ import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.ApiPreferences
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.StreamCollector
 import com.ai.assistance.operit.util.stream.plugins.StreamXmlPlugin
@@ -833,8 +832,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         if (!isSubTask) {
             withContext(Dispatchers.Main) {
                 val toolNames = toolInvocations.joinToString(", ") { it.tool.name }
-                val firstCategory = toolHandler.getToolExecutor(toolInvocations.first().tool.name)?.getCategory() ?: ToolCategory.SYSTEM_OPERATION
-                _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames, firstCategory)
+                _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames)
             }
         }
 

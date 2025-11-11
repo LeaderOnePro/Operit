@@ -41,8 +41,7 @@ METADATA
                 }
             ]
         },
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 const baiduMap = (function () {

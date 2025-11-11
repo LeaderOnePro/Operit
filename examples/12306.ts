@@ -75,8 +75,7 @@
                 { "name": "depart_date", "description": "列车从 `from_station_telecode` 指定的车站出发的日期 (格式: yyyy-MM-dd)。如果用户提供的是相对日期，请务必先调用 `get_current_date` 解析。", "type": "string", "required": true }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 

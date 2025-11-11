@@ -23,8 +23,7 @@
                 { "name": "language", "description": "界面语言参数，默认 en", "type": "string", "required": false }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 

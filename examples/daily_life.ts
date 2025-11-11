@@ -195,8 +195,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "SYSTEM_OPERATION"
+    ]
 }
 */
 

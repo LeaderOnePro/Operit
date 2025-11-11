@@ -3105,4 +3105,25 @@
     <string name="voice_interaction_service_name">Operit AI 助手</string>
     <string name="voice_interaction_service_summary">智能语音助手服务</string>
 
+    <!-- Tool Permission Settings -->
+    <string name="tool_permissions_title">工具权限</string>
+    <string name="tool_permissions_description">默认情况下，所有工具都需要您"询问"。您可以在下面添加例外。</string>
+    <string name="global_permission_switch">全局权限开关</string>
+    <string name="global_permission_switch_description">此设置作为主控制，可以覆盖单个工具权限。</string>
+    <string name="permission_level_allow">允许</string>
+    <string name="permission_level_allow_description">这些工具将自动运行。</string>
+    <string name="permission_level_cautious">谨慎</string>
+    <string name="permission_level_cautious_description">这些工具只会在危险操作时询问。</string>
+    <string name="permission_level_forbid">禁止</string>
+    <string name="permission_level_forbid_description">这些工具永远不会运行。</string>
+    <string name="permission_level_ask">询问</string>
+    <string name="permission_level_ask_description">所有工具的默认行为。</string>
+    <string name="add_tool">添加工具</string>
+    <string name="no_tools_in_group">此组中未添加任何工具。</string>
+    <string name="remove_tool">移除</string>
+    <string name="select_tools">选择工具</string>
+    <string name="search_tools">搜索</string>
+    <string name="done">完成</string>
+    <string name="forbid">禁止</string>
+
 </resources>

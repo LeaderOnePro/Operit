@@ -11,11 +11,14 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.data.model.AITool
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
@@ -46,29 +49,6 @@ enum class PermissionLevel {
 }
 
 /**
- * Tool categories with different security implications
- */
-enum class ToolCategory {
-    SYSTEM_OPERATION,    // System operations (settings modifications)
-    NETWORK,             // Network operations (HTTP requests)
-    UI_AUTOMATION,       // UI automation (clicks, touches)
-    FILE_READ,           // File reading operations
-    FILE_WRITE;          // File writing/deletion operations
-
-    companion object {
-        fun getDefaultPermissionLevel(category: ToolCategory): PermissionLevel {
-            return when (category) {
-                SYSTEM_OPERATION -> PermissionLevel.ASK
-                NETWORK -> PermissionLevel.ALLOW
-                UI_AUTOMATION -> PermissionLevel.CAUTION
-                FILE_READ -> PermissionLevel.ALLOW
-                FILE_WRITE -> PermissionLevel.ASK
-            }
-        }
-    }
-}
-
-/**
  * Centralized tool permission system that manages both permission storage and checking
  */
 class ToolPermissionSystem private constructor(private val context: Context) {
@@ -79,11 +59,6 @@ class ToolPermissionSystem private constructor(private val context: Context) {
         
         // DataStore keys
         private val MASTER_SWITCH = stringPreferencesKey("master_switch")
-        private val SYSTEM_OPERATION_PERMISSION = stringPreferencesKey("system_operation_permission")
-        private val NETWORK_PERMISSION = stringPreferencesKey("network_permission")
-        private val UI_AUTOMATION_PERMISSION = stringPreferencesKey("ui_automation_permission")
-        private val FILE_READ_PERMISSION = stringPreferencesKey("file_read_permission")
-        private val FILE_WRITE_PERMISSION = stringPreferencesKey("file_write_permission")
         
         // Default permission setting
         private val DEFAULT_MASTER_SWITCH = PermissionLevel.ASK.name
@@ -97,6 +72,9 @@ class ToolPermissionSystem private constructor(private val context: Context) {
             }
         }
     }
+    
+    // 工具权限存储：使用 "tool_permission_<tool_name>" 作为key
+    private fun toolPermissionKey(toolName: String) = stringPreferencesKey("tool_permission_$toolName")
     
     // Permission request management
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -124,39 +102,15 @@ class ToolPermissionSystem private constructor(private val context: Context) {
         PermissionLevel.fromString(preferences[MASTER_SWITCH] ?: DEFAULT_MASTER_SWITCH)
     }
     
-    val systemOperationPermissionFlow: Flow<PermissionLevel> = context.toolPermissionsDataStore.data.map { preferences ->
-        PermissionLevel.fromString(
-            preferences[SYSTEM_OPERATION_PERMISSION]
-                ?: ToolCategory.getDefaultPermissionLevel(ToolCategory.SYSTEM_OPERATION).name
-        )
-    }
-    
-    val networkPermissionFlow: Flow<PermissionLevel> = context.toolPermissionsDataStore.data.map { preferences ->
-        PermissionLevel.fromString(
-            preferences[NETWORK_PERMISSION]
-                ?: ToolCategory.getDefaultPermissionLevel(ToolCategory.NETWORK).name
-        )
-    }
-    
-    val uiAutomationPermissionFlow: Flow<PermissionLevel> = context.toolPermissionsDataStore.data.map { preferences ->
-        PermissionLevel.fromString(
-            preferences[UI_AUTOMATION_PERMISSION]
-                ?: ToolCategory.getDefaultPermissionLevel(ToolCategory.UI_AUTOMATION).name
-        )
-    }
-    
-    val fileReadPermissionFlow: Flow<PermissionLevel> = context.toolPermissionsDataStore.data.map { preferences ->
-        PermissionLevel.fromString(
-            preferences[FILE_READ_PERMISSION]
-                ?: ToolCategory.getDefaultPermissionLevel(ToolCategory.FILE_READ).name
-        )
-    }
-    
-    val fileWritePermissionFlow: Flow<PermissionLevel> = context.toolPermissionsDataStore.data.map { preferences ->
-        PermissionLevel.fromString(
-            preferences[FILE_WRITE_PERMISSION]
-                ?: ToolCategory.getDefaultPermissionLevel(ToolCategory.FILE_WRITE).name
-        )
+    /**
+     * Get permission level flow for a specific tool
+     * If no permission is set for the tool, returns ASK as default
+     */
+    fun getToolPermissionFlow(toolName: String): Flow<PermissionLevel> {
+        return context.toolPermissionsDataStore.data.map { preferences ->
+            val key = toolPermissionKey(toolName)
+            PermissionLevel.fromString(preferences[key] ?: PermissionLevel.ASK.name)
+        }
     }
     
     // Registry of dangerous operations by tool name
@@ -198,52 +152,36 @@ class ToolPermissionSystem private constructor(private val context: Context) {
         }
     }
     
-    suspend fun saveSystemOperationPermission(level: PermissionLevel) {
+    /**
+     * Save permission level for a specific tool
+     */
+    suspend fun saveToolPermission(toolName: String, level: PermissionLevel) {
         context.toolPermissionsDataStore.edit { preferences ->
-            preferences[SYSTEM_OPERATION_PERMISSION] = level.name
+            val key = toolPermissionKey(toolName)
+            preferences[key] = level.name
         }
     }
     
-    suspend fun saveNetworkPermission(level: PermissionLevel) {
+    /**
+     * Save permission levels for multiple tools at once
+     */
+    suspend fun saveToolPermissions(toolPermissions: Map<String, PermissionLevel>) {
         context.toolPermissionsDataStore.edit { preferences ->
-            preferences[NETWORK_PERMISSION] = level.name
+            toolPermissions.forEach { (toolName, level) ->
+                val key = toolPermissionKey(toolName)
+                preferences[key] = level.name
+            }
         }
     }
     
-    suspend fun saveUIAutomationPermission(level: PermissionLevel) {
-        context.toolPermissionsDataStore.edit { preferences ->
-            preferences[UI_AUTOMATION_PERMISSION] = level.name
-        }
-    }
-    
-    suspend fun saveFileReadPermission(level: PermissionLevel) {
-        context.toolPermissionsDataStore.edit { preferences ->
-            preferences[FILE_READ_PERMISSION] = level.name
-        }
-    }
-    
-    suspend fun saveFileWritePermission(level: PermissionLevel) {
-        context.toolPermissionsDataStore.edit { preferences ->
-            preferences[FILE_WRITE_PERMISSION] = level.name
-        }
-    }
-    
-    suspend fun saveAllPermissions(
-        masterSwitch: PermissionLevel,
-        systemOperation: PermissionLevel,
-        network: PermissionLevel,
-        uiAutomation: PermissionLevel,
-        fileRead: PermissionLevel,
-        fileWrite: PermissionLevel
-    ) {
-        context.toolPermissionsDataStore.edit { preferences ->
-            preferences[MASTER_SWITCH] = masterSwitch.name
-            preferences[SYSTEM_OPERATION_PERMISSION] = systemOperation.name
-            preferences[NETWORK_PERMISSION] = network.name
-            preferences[UI_AUTOMATION_PERMISSION] = uiAutomation.name
-            preferences[FILE_READ_PERMISSION] = fileRead.name
-            preferences[FILE_WRITE_PERMISSION] = fileWrite.name
-        }
+    /**
+     * Get permission level for a specific tool (synchronous, for one-time reads)
+     * If no permission is set for the tool, returns ASK as default
+     */
+    suspend fun getToolPermission(toolName: String): PermissionLevel {
+        val preferences = context.toolPermissionsDataStore.data.first()
+        val key = toolPermissionKey(toolName)
+        return PermissionLevel.fromString(preferences[key] ?: PermissionLevel.ASK.name)
     }
     
     /**
@@ -279,20 +217,8 @@ class ToolPermissionSystem private constructor(private val context: Context) {
             return requestPermission(tool)
         }
         
-        // Get tool category
-        val toolCategory = tool.category ?: ToolCategory.UI_AUTOMATION
-        
-        // Get permission level for the category
-        val permissionLevel = when (toolCategory) {
-            ToolCategory.SYSTEM_OPERATION -> systemOperationPermissionFlow.first()
-            ToolCategory.NETWORK -> networkPermissionFlow.first()
-            ToolCategory.UI_AUTOMATION -> uiAutomationPermissionFlow.first()
-            ToolCategory.FILE_READ -> fileReadPermissionFlow.first()
-            ToolCategory.FILE_WRITE -> fileWritePermissionFlow.first()
-            // This case is actually unreachable since we cover all enum values above,
-            // but the Kotlin compiler needs this for type safety
-            else -> PermissionLevel.ASK
-        }
+        // Get tool-specific permission level
+        val permissionLevel = getToolPermission(tool.name)
         
         return when (permissionLevel) {
             PermissionLevel.ALLOW -> true
@@ -340,9 +266,15 @@ class ToolPermissionSystem private constructor(private val context: Context) {
                     when (result) {
                         PermissionRequestResult.ALLOW -> continuation.resume(true)
                         PermissionRequestResult.DENY -> continuation.resume(false)
-                        PermissionRequestResult.DISCONNECT -> {
-                            if (continuation.isActive) continuation.cancel()
-                            continuation.resume(false)
+                        PermissionRequestResult.ALWAYS_ALLOW -> {
+                            // Save the permission and resume
+                            tool.let {
+                                val toolScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                                toolScope.launch {
+                                    saveToolPermission(it.name, PermissionLevel.ALLOW)
+                                }
+                            }
+                            continuation.resume(true)
                         }
                     }
                 }

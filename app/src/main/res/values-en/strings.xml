@@ -3108,4 +3108,25 @@
     <string name="voice_interaction_service_name">Operit AI Assistant</string>
     <string name="voice_interaction_service_summary">Intelligent voice assistant service</string>
 
+    <!-- Tool Permission Settings -->
+    <string name="tool_permissions_title">Tool Permissions</string>
+    <string name="tool_permissions_description">By default, all tools require you to \'Ask\'. You can add exceptions below.</string>
+    <string name="global_permission_switch">Global Permission Switch</string>
+    <string name="global_permission_switch_description">This setting acts as a master control and can override individual tool permissions.</string>
+    <string name="permission_level_allow">Allowed</string>
+    <string name="permission_level_allow_description">These tools will run automatically.</string>
+    <string name="permission_level_cautious">Cautious</string>
+    <string name="permission_level_cautious_description">These tools will ask only for dangerous operations.</string>
+    <string name="permission_level_forbid">Forbidden</string>
+    <string name="permission_level_forbid_description">These tools will never run.</string>
+    <string name="permission_level_ask">Ask</string>
+    <string name="permission_level_ask_description">Default behavior for all tools.</string>
+    <string name="add_tool">Add Tool</string>
+    <string name="no_tools_in_group">No tools added to this group.</string>
+    <string name="remove_tool">Remove</string>
+    <string name="select_tools">Select Tools</string>
+    <string name="search_tools">Search</string>
+    <string name="done">Done</string>
+    <string name="forbid">Forbid</string>
+
 </resources>

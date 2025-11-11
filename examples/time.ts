@@ -15,9 +15,7 @@
       description: 格式化时间。提供各种时间格式化选项。
       parameters: []
     }
-  ],
-  // Tool category
-  category: SYSTEM_OPERATION
+  ]
 }
 */
 

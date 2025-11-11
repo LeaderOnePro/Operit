@@ -42,8 +42,7 @@
                 { "name": "mid", "description": "用户的数字ID (UID)", "type": "number", "required": true }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 //参考了https://github.com/vruses/bili-api-interceptor/blob/master/dist/bili-api-interceptor.user.js 特此感谢

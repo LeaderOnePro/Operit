@@ -159,8 +159,7 @@ METADATA
             "description": "运行所有网络测试",
             "parameters": []
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 

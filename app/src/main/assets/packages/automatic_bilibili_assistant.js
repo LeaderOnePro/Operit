@@ -136,8 +136,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "UI_AUTOMATION"
+    ]
 }
 */
 var __rest = (this && this.__rest) || function (s, e) {

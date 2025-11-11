@@ -34,8 +34,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 const duckduckgo = (function () {

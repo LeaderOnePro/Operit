@@ -7,7 +7,6 @@ import com.ai.assistance.operit.core.tools.ToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.FFprobeKit
@@ -87,10 +86,6 @@ class StandardFFmpegToolExecutor(private val context: Context) : ToolExecutor {
 
         return ToolValidationResult(valid = true)
     }
-
-    override fun getCategory(): ToolCategory {
-        return ToolCategory.FILE_WRITE
-    }
 }
 
 /** FFmpeg信息工具执行器 获取有关系统FFmpeg配置的信息 */
@@ -140,10 +135,6 @@ class StandardFFmpegInfoToolExecutor : ToolExecutor {
     override fun validateParameters(tool: AITool): ToolValidationResult {
         // 不需要参数
         return ToolValidationResult(valid = true)
-    }
-
-    override fun getCategory(): ToolCategory {
-        return ToolCategory.FILE_READ
     }
 }
 
@@ -370,9 +361,5 @@ class StandardFFmpegConvertToolExecutor(private val context: Context) : ToolExec
         }
 
         return ToolValidationResult(valid = true)
-    }
-
-    override fun getCategory(): ToolCategory {
-        return ToolCategory.FILE_WRITE
     }
 }

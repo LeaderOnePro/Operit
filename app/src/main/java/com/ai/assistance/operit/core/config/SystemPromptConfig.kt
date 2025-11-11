@@ -98,9 +98,9 @@ $readFileDescription
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
 - apply_file: Applies precise, line-number-based edits to a file.
   - **How it works**: You will be given files with line numbers (e.g., "123| code"). You must generate a patch using the structured format below to modify the file.
-  - **CRITICAL RULE 1: CONTEXT BLOCK MUST CONTAIN VERBATIM CODE**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its **sole** purpose is to provide a code "anchor" for the system to locate the target precisely, even if line numbers have shifted.
-    - **Strict Requirement**: The `[CONTEXT]` block **MUST** only contain **verbatim, character-for-character identical lines of code** from the source file.
-    - **Forbidden**: **DO NOT** include any descriptive text, comments, or explanations inside the `[CONTEXT]` block. Any non-source-code content will cause the operation to fail.
+  - **CRITICAL RULE 1: CONTEXT BLOCK GUIDES THE SEARCH**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its purpose is to provide a code "anchor" for the system to locate the target. The system will use this context to perform a **fuzzy, semantic search** to find the best match, so the context does not need to be character-for-character identical, but it should be as representative as possible.
+    - **Best Practice**: Provide enough unique code in the `[CONTEXT]` block to ensure it points to the correct location.
+    - **Forbidden**: **DO NOT** include any descriptive text, comments, or explanations inside the `[CONTEXT]` block. It should only contain code.
     - **Targeting Logic**:
         - For `REPLACE` and `DELETE`, the context should contain the **first line (or first few lines)** of the code block defined by `start-end`. This serves as a precise anchor. The system will then operate on the full line range you provide. Providing just enough lines to make the anchor unique is the best practice.
         - For `INSERT`, the context **is the single line of code at the line number specified** (i.e., line `N` for `after_line=N`).
@@ -194,9 +194,9 @@ $readFileDescription
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
 - apply_file: 对文件进行精确的、基于行号的编辑。
   - **工作原理**: 你会收到带行号的文件内容 (例如 "123| code")。你必须使用下述结构化格式生成补丁来修改文件。
-  - **关键规则1: 上下文块必须包含逐字代码**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的**唯一**目的，是为系统提供一个代码“锚点”，以便在行号变化时也能精确定位。
-    - **严格要求**: `[CONTEXT]` 块内部**必须**只包含源文件中**逐字逐句、完全相同**的代码行。
-    - **禁止**: **严禁**在 `[CONTEXT]` 块中加入任何描述性文字、注释、或者对代码的解释。任何非源代码内容都会导致定位失败。
+  - **关键规则1: 上下文块引导搜索**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的目的是为系统提供一个代码“锚点”以定位目标。系统将使用此上下文进行**模糊语义搜索**来寻找最佳匹配，因此上下文无需逐字完全相同，但应尽可能具有代表性。
+    - **最佳实践**: 在 `[CONTEXT]` 块中提供足够独特的代码，以确保它指向正确的位置。
+    - **禁止**: **严禁**在 `[CONTEXT]` 块中加入任何描述性文字、注释、或者对代码的解释。它应该只包含代码。
     - **定位逻辑**:
         - 对于 `REPLACE` 和 `DELETE` 操作，上下文应包含由 `起始-结束` 行号定义的**代码块的开头一行（或几行）**。这是一个精确定位锚点。系统随后将按你提供的完整行号范围执行操作。通常提供足以保证锚点唯一性的代码行即可。
         - 对于 `INSERT` 操作，上下文**就是指定行号上的那一行代码**（即 `after_line=N` 中的第 `N` 行）。
@@ -528,6 +528,7 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
               - Use the `apply_file` tool to create web files (HTML/CSS/JS).
               - The main file must be `index.html` for user previews.
               - It's recommended to split code into multiple files for better stability and maintainability.
+              - For more complex projects, consider creating `js` and `css` folders and organizing files accordingly.
               - Always use relative paths for file references.
               - **Best Practice for Code Modifications**: Before modifying any file, use `grep_code` to search for relevant code patterns and `read_file_part` to read the specific sections with context. This ensures you understand the surrounding code structure before making changes.
               """.trimIndent()
@@ -538,6 +539,7 @@ AVAILABLE_TOOLS_SECTION""".trimIndent()
               - 使用 apply_file 工具创建网页文件 (HTML/CSS/JS)。
               - 主文件必须是 index.html，用户可直接预览。
               - 建议将代码拆分到不同文件，以提高稳定性和可维护性。
+              - 如果项目较为复杂，可以考虑新建js文件夹和css文件夹并创建多个文件。
               - 文件引用请使用相对路径。
               - **代码修改最佳实践**：修改任何文件之前，建议组合使用 `grep_code` 搜索相关代码模式和 `read_file_part` 读取对应部分的上下文。这样可以确保你在修改前充分理解周围的代码结构。
               """.trimIndent()

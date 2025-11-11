@@ -55,8 +55,7 @@
                 { "name": "limit", "description": "爬虫将处理的总链接数", "type": "number", "required": false, "default": 50 }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 

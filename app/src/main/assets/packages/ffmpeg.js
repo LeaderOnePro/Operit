@@ -28,8 +28,7 @@
                 { "name": "bitrate", "description": "可选，视频比特率，例如 '1000k'。", "type": "string", "required": false }
             ]
         }
-    ],
-    "category": "FILE_READ"
+    ]
 }
 */
 const FFmpegTools = (function () {

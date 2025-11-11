@@ -165,8 +165,7 @@ METADATA
             description: "从帖子详情页返回到信息流列表",
             parameters: []
         }
-    ],
-    "category": "UI_AUTOMATION"
+    ]
 }
 */
 var __rest = (this && this.__rest) || function (s, e) {

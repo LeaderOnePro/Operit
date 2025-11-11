@@ -9,7 +9,6 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
 import com.ai.assistance.operit.ui.common.displays.MessageContentParser
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import com.ai.assistance.operit.ui.permissions.ToolPermissionSystem
 import com.ai.assistance.operit.util.stream.splitBy
 import com.ai.assistance.operit.util.stream.stream
@@ -45,6 +44,13 @@ class AIToolHandler private constructor(private val context: Context) {
     fun getToolPermissionSystem(): ToolPermissionSystem {
         return toolPermissionSystem
     }
+    
+    /**
+     * Get all registered tool names
+     */
+    fun getAllToolNames(): List<String> {
+        return availableTools.keys.sorted()
+    }
 
     /** Force refresh permission request state Can be called if permission dialog is not showing */
     fun refreshPermissionState(): Boolean {
@@ -54,45 +60,11 @@ class AIToolHandler private constructor(private val context: Context) {
     // 工具注册的唯一方法 - 提供完整信息的注册
     fun registerTool(
             name: String,
-            category: ToolCategory,
             dangerCheck: ((AITool) -> Boolean)? = null,
             descriptionGenerator: ((AITool) -> String)? = null,
             executor: ToolExecutor
     ) {
-        // 注册工具的类别
-        val wrappedExecutor =
-                object : ToolExecutor {
-                    override fun invoke(tool: AITool): ToolResult {
-                        // 创建一个带类别的工具实例（如果需要）
-                        val toolWithCategory =
-                                if (tool.category == null) {
-                                    tool.copy(category = category)
-                                } else {
-                                    tool
-                                }
-                        return executor.invoke(toolWithCategory)
-                    }
-
-                    override fun invokeAndStream(tool: AITool): Flow<ToolResult> {
-                        val toolWithCategory =
-                                if (tool.category == null) {
-                                    tool.copy(category = category)
-                                } else {
-                                    tool
-                                }
-                        return executor.invokeAndStream(toolWithCategory)
-                    }
-
-                    override fun validateParameters(tool: AITool): ToolValidationResult {
-                        return executor.validateParameters(tool)
-                    }
-
-                    override fun getCategory(): ToolCategory {
-                        return category
-                    }
-                }
-
-        availableTools[name] = wrappedExecutor
+        availableTools[name] = executor
 
         // 注册危险操作检查（如果提供）
         if (dangerCheck != null) {
@@ -108,14 +80,12 @@ class AIToolHandler private constructor(private val context: Context) {
     // 添加重载方法接受函数式接口作为executor的便捷写法
     fun registerTool(
             name: String,
-            category: ToolCategory,
             dangerCheck: ((AITool) -> Boolean)? = null,
             descriptionGenerator: ((AITool) -> String)? = null,
             executor: (AITool) -> ToolResult
     ) {
         registerTool(
                 name = name,
-                category = category,
                 dangerCheck = dangerCheck,
                 descriptionGenerator = descriptionGenerator,
                 executor =
@@ -294,10 +264,5 @@ interface ToolExecutor {
      */
     fun validateParameters(tool: AITool): ToolValidationResult {
         return ToolValidationResult(valid = true)
-    }
-
-    /** Get the tool's category, default to UI_AUTOMATION as highest security level */
-    fun getCategory(): ToolCategory {
-        return ToolCategory.UI_AUTOMATION
     }
 }

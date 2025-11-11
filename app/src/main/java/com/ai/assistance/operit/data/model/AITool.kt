@@ -1,7 +1,6 @@
 package com.ai.assistance.operit.data.model
 
 import com.ai.assistance.operit.core.tools.ToolResultData
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
@@ -13,8 +12,7 @@ import kotlinx.serialization.Serializable
 data class AITool(
         val name: String,
         val parameters: List<ToolParameter> = emptyList(),
-        val description: String = "",
-        val category: ToolCategory? = null
+        val description: String = ""
 )
 
 /** Represents an invocation of a tool in the AI's response */

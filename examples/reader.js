@@ -138,8 +138,6 @@
       ]
     }
   ]
-  
-  category: FILE_WRITE
 }
 */
 /**

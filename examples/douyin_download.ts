@@ -29,8 +29,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 const douyin = (function () {

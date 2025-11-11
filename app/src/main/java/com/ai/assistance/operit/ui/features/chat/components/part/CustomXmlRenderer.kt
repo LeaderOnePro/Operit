@@ -254,7 +254,7 @@ class CustomXmlRenderer(
         val paramsText = params.entries.joinToString("\n") { (name, value) -> "$name: $value" }
 
         // 定义短内容和长内容的阈值
-        val contentLengthThreshold = 100
+        val contentLengthThreshold = 200
         val isLongContent = paramText.length > contentLengthThreshold
 
         if (isLongContent) {

@@ -5,7 +5,6 @@ import com.ai.assistance.operit.core.tools.PackageTool
 import com.ai.assistance.operit.core.tools.PackageToolParameter
 import com.ai.assistance.operit.core.tools.ToolPackage
 import com.ai.assistance.operit.data.mcp.plugins.MCPBridgeClient
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 
@@ -149,9 +148,7 @@ data class MCPPackage(
         return ToolPackage(
                 name = serverConfig.name, // 直接使用服务器名称，不添加mcp:前缀
                 description = serverConfig.description,
-                tools = tools,
-                // 使用标准文件操作类别，可以根据需要调整
-                category = ToolCategory.FILE_READ
+                tools = tools
         )
     }
 

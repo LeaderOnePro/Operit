@@ -426,7 +426,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         // Register each tool with the format packageName:toolName
         toolPackage.tools.forEach { packageTool ->
             val toolName = "${toolPackage.name}:${packageTool.name}"
-            aiToolHandler.registerTool(toolName, toolPackage.category) { tool ->
+            aiToolHandler.registerTool(toolName) { tool ->
                 packageToolExecutor.invoke(tool)
             }
         }
@@ -632,7 +632,6 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
             // 使用MCP特定的执行器注册工具
             aiToolHandler.registerTool(
                     name = toolName,
-                    category = toolPackage.category,
                     executor = mcpToolExecutor
             )
 

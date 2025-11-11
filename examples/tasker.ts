@@ -17,8 +17,7 @@
         { "name": "args_json", "description": "以JSON形式传递任意参数", "type": "string", "required": false }
       ]
     }
-  ],
-  "category": "SYSTEM_OPERATION"
+  ]
 }
 */
 /// <reference path="./types/index.d.ts" />

@@ -495,11 +495,17 @@ data class VisitWebResultData(
         val url: String,
         val title: String,
         val content: String,
-        val metadata: Map<String, String> = emptyMap()
+        val metadata: Map<String, String> = emptyMap(),
+        val links: List<LinkData> = emptyList(),
+        val visitKey: String? = null
 ) : ToolResultData() {
+    @Serializable
+    data class LinkData(val url: String, val text: String)
+
     override fun toString(): String {
         val sb = StringBuilder()
         sb.appendLine("网页内容提取结果:")
+        visitKey?.let { sb.appendLine("Visit Key: $it") }
         sb.appendLine("URL: $url")
         sb.appendLine("标题: $title")
 
@@ -508,6 +514,17 @@ data class VisitWebResultData(
             metadata.entries.take(5).forEach { (key, value) -> sb.appendLine("$key: $value") }
             if (metadata.size > 5) {
                 sb.appendLine("... 以及 ${metadata.size - 5} 个其他元数据项")
+            }
+            sb.appendLine()
+        }
+
+        if (links.isNotEmpty()) {
+            sb.appendLine("\n页面链接 (${links.size} 个):")
+            links.take(20).forEachIndexed { index, link ->
+                sb.appendLine("${index + 1}. ${link.text}")
+            }
+            if (links.size > 20) {
+                sb.appendLine("... 以及 ${links.size - 20} 个其他链接")
             }
             sb.appendLine()
         }

@@ -1,41 +1,40 @@
 /*
 METADATA
 {
-   "name": "duckduckgo",
-   "description": "使用DuckDuckGo进行网络搜索和内容抓取。",
-   "tools": [
-       {
-           "name": "search",
-           "description": "执行DuckDuckGo搜索并返回格式化的结果。",
-           "parameters": [
-               {
-                   "name": "query",
-                   "description": "搜索查询字符串",
-                   "type": "string",
-                   "required": true
-               },
-               {
-                   "name": "max_results",
-                   "description": "返回的最大结果数 (默认: 10)",
-                   "type": "string",
-                   "required": false
-               }
-           ]
-       },
-       {
-           "name": "fetch_content",
-           "description": "从网页URL抓取和解析内容。",
-           "parameters": [
-               {
-                   "name": "url",
-                   "description": "要抓取内容的网页URL",
-                   "type": "string",
-                   "required": true
-               }
-           ]
-       }
-   ],
-   "category": "NETWORK"
+    "name": "duckduckgo",
+    "description": "使用DuckDuckGo进行网络搜索和内容抓取。",
+    "tools": [
+        {
+            "name": "search",
+            "description": "执行DuckDuckGo搜索并返回格式化的结果。",
+            "parameters": [
+                {
+                    "name": "query",
+                    "description": "搜索查询字符串",
+                    "type": "string",
+                    "required": true
+                },
+                {
+                    "name": "max_results",
+                    "description": "返回的最大结果数 (默认: 10)",
+                    "type": "string",
+                    "required": false
+                }
+            ]
+        },
+        {
+            "name": "fetch_content",
+            "description": "从网页URL抓取和解析内容。",
+            "parameters": [
+                {
+                    "name": "url",
+                    "description": "要抓取内容的网页URL",
+                    "type": "string",
+                    "required": true
+                }
+            ]
+        }
+    ]
 }
 */
 const duckduckgo = (function () {
@@ -101,8 +100,8 @@ const duckduckgo = (function () {
             .method('POST')
             .body({ q: query, b: '', kl: '' }, 'form')
             .headers({
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            });
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        });
         const response = await request.build().execute();
         if (!response.isSuccessful()) {
             throw new Error(`HTTP 错误! 状态码: ${response.statusCode}`);
@@ -111,7 +110,7 @@ const duckduckgo = (function () {
         const results = [];
         const resultRegex = /<h2 class="result__title">[\s\S]*?<a.*?href="([^"]+)".*?>([\s\S]+?)<\/a>[\s\S]*?<\/h2>[\s\S]*?<a class="result__snippet".*?>([\s\S]+?)<\/a>/g;
         let match;
-        while ((match = resultRegex.exec(html)) !== null) {
+        while ((match = resultRegex.exec(html)) !== undefined) {
             if (results.length >= max_results) {
                 break;
             }

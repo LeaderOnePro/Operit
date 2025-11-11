@@ -136,8 +136,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "UI_AUTOMATION"
+    ]
 }
 */
 

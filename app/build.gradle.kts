@@ -66,6 +66,24 @@ android {
         debug {
             signingConfig = signingConfigs.getByName("release")
         }
+        create("nightly") {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = signingConfigs.getByName("release")
+            matchingFallbacks += listOf("release")
+        }
+    }
+    applicationVariants.all {
+        if (buildType.name == "nightly") {
+            outputs.all {
+                val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+                output.outputFileName = "app-nightly.apk"
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -215,6 +215,8 @@ export interface VisitWebResultData {
     title: string;
     content: string;
     metadata?: Record<string, string>;
+    links?: Link[];
+    visitKey?: string;
     toString(): string;
 }
 

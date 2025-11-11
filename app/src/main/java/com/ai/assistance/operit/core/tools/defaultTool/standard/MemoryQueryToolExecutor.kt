@@ -11,7 +11,6 @@ import com.ai.assistance.operit.data.model.Memory
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
 import com.ai.assistance.operit.data.repository.MemoryRepository
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
@@ -669,9 +668,5 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             return ToolValidationResult(valid = false, errorMessage = "Missing or empty required parameter: query")
         }
         return ToolValidationResult(valid = true)
-    }
-
-    override fun getCategory(): ToolCategory {
-        return ToolCategory.FILE_READ
     }
 } 

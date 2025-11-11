@@ -53,8 +53,7 @@
         { "name": "workflow_id", "description": "工作流 ID", "type": "string", "required": true }
       ]
     }
-  ],
-  "category": "SYSTEM_OPERATION"
+  ]
 }
 */
 

@@ -76,7 +76,7 @@ object ModelListFetcher {
                         }
                     }
                     ApiProviderType.DEEPSEEK -> "${extractBaseUrl(apiEndpoint)}/v1/models"
-                    ApiProviderType.OPENROUTER -> "${extractBaseUrl(apiEndpoint)}/api/v1/models"
+                    ApiProviderType.OPENROUTER -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     ApiProviderType.MOONSHOT -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     ApiProviderType.SILICONFLOW -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     ApiProviderType.BAICHUAN -> "${extractBaseUrl(apiEndpoint)}/v1/models"

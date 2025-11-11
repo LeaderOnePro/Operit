@@ -4,7 +4,6 @@ METADATA
     // 百度地图智能助手
     name: "Automatic_baiduMap_assistant",
     description: "高级百度地图智能助手，通过UI自动化技术实现地图交互，支持地点搜索、路线规划、周边查询等功能，为AI提供强大的地理位置服务能力。适用于出行规划、信息查询、智能问答等场景。",
-    "category": "UI_AUTOMATION",
 
     // Tools in this package
     tools: [

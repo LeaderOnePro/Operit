@@ -1,6 +1,5 @@
 /* METADATA
 {
-    "category": "FILE_WRITE",
     "name": "file_converter",
     "description": "提供全面的文件格式转换功能。支持常见的音频/视频（如 MP4、MOV、MP3、WAV）、图像（如 JPG、PNG、WEBP）以及文档（如 Markdown、HTML、DOCX、PDF）之间的相互转换。",
     "enabledByDefault": true,

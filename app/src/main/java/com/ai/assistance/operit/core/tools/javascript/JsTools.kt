@@ -115,7 +115,14 @@ fun getJsToolsDefinition(): String {
                     }
                     return toolCall("http_request", params);
                 },
-                visit: (url) => toolCall("visit_web", { url }),
+                visit: (params) => {
+                    if (typeof params === 'string') {
+                        // 向后兼容，如果只传入一个字符串，则假定为URL
+                        return toolCall("visit_web", { url: params });
+                    }
+                    // 否则，假定为参数对象
+                    return toolCall("visit_web", params);
+                },
                 // 新增增强版HTTP请求
                 http: (options) => {
                     const params = { ...options };

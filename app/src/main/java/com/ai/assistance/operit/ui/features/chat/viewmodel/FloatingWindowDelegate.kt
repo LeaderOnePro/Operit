@@ -14,7 +14,6 @@ import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.toSerializable
 import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.ui.floating.FloatingMode
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -143,8 +142,7 @@ class FloatingWindowDelegate(
     private fun setupInputStateCollection() {
         coroutineScope.launch {
             inputProcessingState.collect { state ->
-                val isUiToolExecuting = state is InputProcessingState.ExecutingTool &&
-                        state.category == ToolCategory.UI_AUTOMATION
+                val isUiToolExecuting = state is InputProcessingState.ExecutingTool
 
                 // Update UI busy state directly on the window state
                 // floatingService?.windowState?.isUiBusy?.value = isUiToolExecuting

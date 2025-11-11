@@ -81,16 +81,9 @@ object WorkspaceAttachmentProcessor {
         try {
             // 提醒AI分离文件
             suggestions.add("请将HTML, CSS, 和 JavaScript 代码分别存放到独立的文件中。")
-
-            // 当文件数量较多时，建议创建子目录（排除gitignore中的文件）
-            val ignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
-            val files = workspaceDir.listFiles()?.filter { file ->
-                !GitIgnoreFilter.shouldIgnore(file, workspaceDir, ignoreRules)
-            } ?: emptyList()
             
-            if (files.size > 10) {
-                suggestions.add("项目文件较多，建议创建 'css', 'js' 等子目录来组织文件，保持结构清晰。")
-            }
+            // 建议创建子目录来组织文件（常驻建议）
+            suggestions.add("如果项目较为复杂，可以考虑新建js文件夹和css文件夹并创建多个文件。")
 
             return if (suggestions.isNotEmpty()) {
                 suggestions.joinToString("\n")

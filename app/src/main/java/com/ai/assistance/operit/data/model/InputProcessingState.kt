@@ -1,8 +1,5 @@
 package com.ai.assistance.operit.data.model
 
-import com.ai.assistance.operit.ui.permissions.ToolCategory
-
-
 /** UI状态，用于显示AI服务在做什么 */
 sealed class InputProcessingState {
     /** 空闲状态 */
@@ -18,7 +15,7 @@ sealed class InputProcessingState {
     data class Receiving(val message: String) : InputProcessingState()
 
     /** 新增：正在执行工具 */
-    data class ExecutingTool(val toolName: String, val category: ToolCategory) : InputProcessingState()
+    data class ExecutingTool(val toolName: String) : InputProcessingState()
 
     /** 新增：正在处理工具结果 */
     data class ProcessingToolResult(val toolName: String) : InputProcessingState()

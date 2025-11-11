@@ -90,8 +90,6 @@
       ]
     }
   ]
-  
-  category: NETWORK
 }
 */
 

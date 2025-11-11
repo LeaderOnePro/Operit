@@ -20,8 +20,15 @@
     -   如果 `data` 是一个对象，它会被自动序列化为 JSON 字符串，并且 `Content-Type` 头会被设置为 `application/json`。
     -   如果 `data` 是一个字符串，它会按原样作为请求体发送。
 
--   `visit(url: string): Promise<VisitWebResultData>`:
-    访问一个网页并尝试提取其主要内容。这不仅仅是下载 HTML，还可能包含对页面内容的智能解析，返回页面的标题和正文文本。
+-   `visit(urlOrParams: string | object): Promise<VisitWebResultData>`:
+    访问一个网页并提取其内容。此函数支持两种调用方式：
+    1.  **通过 URL 访问**:
+        -   传入一个字符串 `url` 来访问一个新页面。
+        -   `Tools.Net.visit("https://example.com")`
+    2.  **通过链接编号继续访问**:
+        -   传入一个对象，包含上一次访问返回的 `visit_key` 和要点击的链接编号 `link_number`。
+        -   `Tools.Net.visit({ visit_key: "some-key-from-previous-result", link_number: 3 })`
+    -   函数返回一个 `VisitWebResultData` 对象，其中包含页面标题、内容、提取到的链接列表以及用于后续交互的 `visit_key`。
 
 ### 高级请求函数
 

@@ -266,9 +266,6 @@
       ]
     }
   ]
-  
-  // Tool category
-  category: SYSTEM_OPERATION
 }
 */
 const codeRunner = (function () {

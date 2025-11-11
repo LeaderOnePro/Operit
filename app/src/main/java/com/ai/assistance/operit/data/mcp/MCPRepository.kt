@@ -12,7 +12,6 @@ import com.ai.assistance.operit.core.tools.mcp.MCPServerConfig
 import com.ai.assistance.operit.core.tools.mcp.MCPToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -1080,7 +1079,6 @@ class MCPRepository(private val context: Context) {
                     runBlocking {
                         toolHandler.registerTool(
                             name = prefixedToolName,
-                            category = ToolCategory.FILE_READ,
                             executor = mcpToolExecutor,
                             descriptionGenerator = { tool ->
                                 val baseDescription = toolInfo.description

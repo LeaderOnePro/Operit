@@ -11,9 +11,7 @@
       // This tool takes parameters
       parameters: []
     }
-  ],
-  // Tool category
-  category: NETWORK
+  ]
 }
 */
 const variousOutput = (function () {

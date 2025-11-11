@@ -42,8 +42,7 @@
                 { "name": "mid", "description": "用户的数字ID (UID)", "type": "number", "required": true }
             ]
         }
-    ],
-    "category": "NETWORK"
+    ]
 }
 */
 

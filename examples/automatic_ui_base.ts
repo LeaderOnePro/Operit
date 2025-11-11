@@ -60,8 +60,7 @@
                 { "name": "duration", "description": "持续时间，毫秒，默认300", "type": "number", "required": false }
             ]
         }
-    ],
-    "category": "UI_AUTOMATION"
+    ]
 }
 */
 

@@ -8,7 +8,6 @@ import com.ai.assistance.operit.core.tools.javascript.JsToolManager
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import com.ai.assistance.operit.ui.permissions.ToolCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.last
 
@@ -20,7 +19,6 @@ data class ToolPackage(
     val name: String,
     val description: String,
     val tools: List<PackageTool>,
-    val category: ToolCategory = ToolCategory.FILE_READ, // Default to a safer category
     val isBuiltIn: Boolean = false,
     val enabledByDefault: Boolean = false
 )
@@ -151,10 +149,6 @@ class PackageToolExecutor(
         return ToolValidationResult(valid = true)
     }
     
-    override fun getCategory(): ToolCategory {
-        return toolPackage.category
-    }
-    
     /**
      * Returns information about the tools available in this package
      */
@@ -162,7 +156,6 @@ class PackageToolExecutor(
         val sb = StringBuilder()
         sb.appendLine("Package: ${toolPackage.name}")
         sb.appendLine("Description: ${toolPackage.description}")
-        sb.appendLine("Category: ${toolPackage.category}")
         sb.appendLine("Tools:")
         
         toolPackage.tools.forEach { tool ->

@@ -19,6 +19,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,9 +86,9 @@ import kotlinx.coroutines.delay
 private fun PermissionRequestContent(
     toolName: String,
     operationDescription: String,
-    toolCategory: String?,
     onAllow: () -> Unit,
     onDeny: () -> Unit,
+    onAlwaysAllow: () -> Unit,
     colorScheme: ColorScheme? = null,
     tool: AITool? = null
 ) {
@@ -163,7 +164,6 @@ private fun PermissionRequestContent(
                             PermissionDetails(
                                 operationDescription = operationDescription,
                                 toolName = toolName,
-                                toolCategory = toolCategory,
                                 toolParameters = tool?.parameters
                             )
                         }
@@ -183,25 +183,39 @@ private fun PermissionRequestContent(
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                             ) {
                                 Text(
-                                    "拒绝", 
+                                    "拒绝",
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontSize = 15.sp
                                     )
                                 )
                             }
 
-                            Button(
-                                onClick = onAllow,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp),
-                                shape = RoundedCornerShape(12.dp)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    "允许", 
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontSize = 15.sp
+                                Button(
+                                    onClick = onAllow,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        "允许",
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontSize = 15.sp
+                                        )
                                     )
+                                }
+                                Text(
+                                    text = "以后都允许",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 12.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable { onAlwaysAllow() }
                                 )
                             }
                         }
@@ -227,7 +241,6 @@ private fun PermissionRequestContent(
 private fun PermissionDetails(
     operationDescription: String,
     toolName: String,
-    toolCategory: String?,
     toolParameters: List<ToolParameter>? = null
 ) {
     val scrollState = rememberScrollState()
@@ -243,9 +256,6 @@ private fun PermissionDetails(
     ) {
         DetailItem(label = stringResource(R.string.requested_operation), value = operationDescription)
         DetailItem(label = stringResource(R.string.used_tool), value = toolName)
-        toolCategory?.let {
-            DetailItem(label = stringResource(R.string.tool_category), value = it)
-        }
         
         if (!toolParameters.isNullOrEmpty()) {
             Text(
@@ -354,8 +364,8 @@ class PermissionRequestOverlay(private val context: Context) {
                 // 可选：使用Toast提示用户
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(
-                        context, 
-                        "需要悬浮窗权限，请在设置中允许此权限", 
+                        context,
+                        "需要悬浮窗权限，请在设置中允许此权限",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -401,7 +411,6 @@ class PermissionRequestOverlay(private val context: Context) {
                 PermissionRequestContent(
                     toolName = tool.name,
                     operationDescription = operationDescription,
-                    toolCategory = tool.category?.name,
                     colorScheme = colorScheme,
                     tool = tool,
                     onAllow = {
@@ -410,6 +419,10 @@ class PermissionRequestOverlay(private val context: Context) {
                     },
                     onDeny = {
                         onResult(PermissionRequestResult.DENY)
+                        dismiss()
+                    },
+                    onAlwaysAllow = {
+                        onResult(PermissionRequestResult.ALWAYS_ALLOW)
                         dismiss()
                     }
                 )

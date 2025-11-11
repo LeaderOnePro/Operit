@@ -109,20 +109,20 @@ You will be given:
     c.  The new code (for REPLACE/INSERT).
 
 **Your ONLY job is to:**
-1.  For each edit block in the `Patch Code`, take the content of its `[CONTEXT]` block.
-2.  Find the exact location of that context within the `Source Code`.
-3.  Based on the location you found, determine the correct starting and ending line numbers for the operation.
+1.  For each edit block in the `Patch Code`, treat the content of its `[CONTEXT]` block as your primary guide.
+2.  Your goal is to find the **best possible match** for this context in the `Source Code`. This is a **fuzzy search**, not an exact one. Use your judgment to find the location that best matches the semantic meaning and structure of the context, even if there are minor differences in whitespace, comments, or syntax.
+3.  Based on the best-match location you identify, determine the correct starting and ending line numbers for the operation.
 4.  Generate a mapping from the old, incorrect line specifier to the new, correct one.
 5.  Output **ONLY** the mapping block.
 
 **CRITICAL RULES:**
 - **Your output MUST start with one of the following markers: `[MAPPING]`, `[MAPPING-FAILED]`, or `[MAPPING-SYNTAX-ERROR]`. No other text or preamble is allowed before the marker.**
 - **Syntax Validation First**: Before searching for context, validate the `Patch Code`'s syntax. If an edit block is malformed (e.g., missing `[CONTEXT]`, `[END-...]`, or has mismatched tags), you must report a syntax error.
-- The `[CONTEXT]` block is your ground truth for finding the location. Ignore the line numbers in the original `[START-...]` tag; they are likely wrong.
-- For `INSERT:after_line=N` operations, the context is the line you need to insert after. Your corrected mapping **MUST** use the exact format `INSERT:after_line=new_line_number`. **Using a colon (:) or any other separator instead of an equals sign (=) is strictly forbidden.**
+- The `[CONTEXT]` block is your ground truth. Use it to perform a **fuzzy, semantic search**. Ignore the line numbers in the original `[START-...]` tag; they are likely wrong.
+- For `INSERT:after_line=N` operations, the context is the line you need to insert after. Your corrected mapping **MUST** use the exact format `INSERT:after_line=new_line_number`.
 - For `REPLACE` and `DELETE`, find the full context block. Your corrected mapping should be `REPLACE:new_start-new_end` or `DELETE:new_start-new_end`. The line range must be inclusive, covering the first and last lines of the matched context block.
-- If you find the context successfully, output the mapping block.
-- If the patch syntax is valid but you cannot find the exact context for one or more blocks, you MUST output a failure report. It must start with `[MAPPING-FAILED]`, followed by a concise explanation of which context block(s) could not be found and why. Be specific about the context that failed.
+- If you are confident in your fuzzy match, output the mapping block.
+- If the patch syntax is valid but you cannot find a sufficiently similar context for one or more blocks, you MUST output a failure report. It must start with `[MAPPING-FAILED]`, followed by a concise explanation of which context block(s) could not be found and why. Describe the context you were looking for and why you believe no suitable match exists.
 - If the patch syntax is invalid, output a syntax error report. It must start with `[MAPPING-SYNTAX-ERROR]`, followed by a short explanation of the problem and an example of the correct format.
 
 **EXAMPLE MAPPING OUTPUT:**

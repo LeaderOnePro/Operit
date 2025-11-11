@@ -41,8 +41,7 @@ METADATA
                 }
             ]
         }
-    ],
-    "category": "SYSTEM_OPERATION"
+    ]
 }
 */
 const superAdmin = (function () {

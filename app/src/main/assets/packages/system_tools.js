@@ -79,8 +79,7 @@
             "description": "获取详细的设备信息，包括型号、操作系统版本、内存、存储、网络状态等。",
             "parameters": []
         }
-    ],
-    "category": "SYSTEM_OPERATION"
+    ]
 }
 */
 const SystemTools = (function () {
