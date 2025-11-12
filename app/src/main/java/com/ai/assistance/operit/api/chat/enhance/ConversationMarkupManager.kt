@@ -139,11 +139,6 @@ class ConversationMarkupManager {
             return content.contains("<status type=\"wait_for_user_need\"></status>")
         }
 
-        /** 创建通用错误状态 */
-        fun createErrorStatus(title: String, message: String): String {
-            return "<status type=\"error\"><title>$title</title><message>$message</message></status>"
-        }
-
 
     }
 }

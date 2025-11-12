@@ -3128,4 +3128,9 @@
     <string name="done">完成</string>
     <string name="forbid">禁止</string>
 
+    <!-- 屏幕方向改变对话框 -->
+    <string name="dialog_title_orientation_change">屏幕方向变化</string>
+    <string name="dialog_message_orientation_change">检测到屏幕方向发生变化，是否重新加载页面？</string>
+    <string name="dialog_button_confirm">重新加载</string>
+    <string name="dialog_button_dismiss">取消</string>
 </resources>

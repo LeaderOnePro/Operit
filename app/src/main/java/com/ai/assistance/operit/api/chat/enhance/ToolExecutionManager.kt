@@ -161,8 +161,7 @@ object ToolExecutionManager {
                         toolName = invocation.tool.name,
                         success = false,
                         result = StringResultData(""),
-                        error =
-                        "Permission denied: Operation '${invocation.tool.name}' was not authorized by the user"
+                        error = "User cancelled the tool execution."
                     )
 
                 return Pair(false, errorResult)
@@ -198,11 +197,6 @@ object ToolExecutionManager {
             } else {
                 errorResult?.let {
                     permissionDeniedResults.add(it)
-                    val errorStatusContent = ConversationMarkupManager.createErrorStatus(
-                        "权限拒绝",
-                        "操作 '${invocation.tool.name}' 未授权"
-                    )
-                    collector.emit(errorStatusContent)
                     val toolResultStatusContent =
                         ConversationMarkupManager.formatToolResultForMessage(it)
                     collector.emit(toolResultStatusContent)

@@ -51,9 +51,16 @@ import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.GitHubAuthBus
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
+
+    // ======== 屏幕方向变更状态 ========
+    private var showOrientationChangeDialog by mutableStateOf(false)
+
+    private var lastOrientation: Int? = null
 
     // ======== 工具和管理器 ========
     private lateinit var toolHandler: AIToolHandler
@@ -125,6 +132,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lastOrientation = resources.configuration.orientation
         Log.d(TAG, "onCreate: Android SDK version: ${Build.VERSION.SDK_INT}")
 
         // Set window background to solid color to prevent system theme leaking through
@@ -365,10 +373,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        Log.d(TAG, "onConfigurationChanged: orientation=${newConfig.orientation}")
+        Log.d(TAG, "onConfigurationChanged: new orientation=${newConfig.orientation}, last orientation=${lastOrientation}")
 
         // 屏幕方向变化时，确保加载界面不可见
         pluginLoadingState.hide()
+
+        // 仅当方向确实发生变化时才处理
+        if (newConfig.orientation != lastOrientation) {
+            // 记录变化前的方向
+            val orientationBeforeChange = lastOrientation
+            // 更新最后的方向记录
+            lastOrientation = newConfig.orientation
+
+            // 检查是否是“转回去”的操作
+            if (showOrientationChangeDialog && newConfig.orientation == orientationBeforeChange) {
+                // 如果是，隐藏弹窗并结束
+                showOrientationChangeDialog = false
+                return
+            }
+            
+            // 如果不是“转回去”，或者弹窗还未显示，则显示弹窗
+            showOrientationChangeDialog = true
+        }
     }
 
     // ======== 初始化组件 ========
@@ -565,6 +591,20 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.zIndex(10f) // 确保加载界面在最上层
                     )
                 }
+
+                // 方向改变时显示对话框
+                if (showOrientationChangeDialog) {
+                    OrientationChangeDialog(
+                        onConfirm = {
+                            showOrientationChangeDialog = false
+                            // 重新创建Activity以重新加载页面
+                            recreate()
+                        },
+                        onDismiss = {
+                            showOrientationChangeDialog = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -696,7 +736,7 @@ class MainActivity : ComponentActivity() {
                             deletedCount++
                         }
                     }
-
+                    
                     Log.d(TAG, "已删除${deletedCount}个临时文件")
                 }
             } catch (e: Exception) {
@@ -704,4 +744,23 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+@Composable
+private fun OrientationChangeDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(id = R.string.dialog_title_orientation_change)) },
+        text = { Text(text = stringResource(id = R.string.dialog_message_orientation_change)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(id = R.string.dialog_button_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.dialog_button_dismiss))
+            }
+        }
+    )
 }

@@ -3131,4 +3131,9 @@
     <string name="done">Done</string>
     <string name="forbid">Forbid</string>
 
+    <!-- Orientation Change Dialog -->
+    <string name="dialog_title_orientation_change">Screen Orientation Change</string>
+    <string name="dialog_message_orientation_change">Screen orientation has changed. Reload the page?</string>
+    <string name="dialog_button_confirm">Reload</string>
+    <string name="dialog_button_dismiss">Cancel</string>
 </resources>

@@ -548,7 +548,8 @@ fun ChatHistorySelector(
             // 左侧：标题
             Text(
                 text = stringResource(R.string.chat_history),
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
             // 右侧：分组创建、搜索和返回按钮
             Row(
@@ -562,7 +563,8 @@ fun ChatHistorySelector(
                     Icon(
                         Icons.Default.AddCircleOutline,
                         contentDescription = stringResource(R.string.new_group),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 IconButton(
@@ -589,7 +591,8 @@ fun ChatHistorySelector(
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "返回",
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
