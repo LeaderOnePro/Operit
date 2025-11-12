@@ -214,6 +214,10 @@ object AIMessageManager {
                 activePlanModeManager = null // Clear manager if disabled
             }
             
+            // 获取流式输出设置
+            val disableStreamOutput = apiPreferences.disableStreamOutputFlow.first()
+            val enableStream = !disableStreamOutput
+            
             // 使用普通模式
             enhancedAiService.sendMessage(
                 message = messageContent,
@@ -227,7 +231,8 @@ object AIMessageManager {
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError,
                 characterName = characterName,
-                avatarUri = avatarUri
+                avatarUri = avatarUri,
+                stream = enableStream
             ).share(scope) // 使用.share()将其转换为共享流
         }
     }

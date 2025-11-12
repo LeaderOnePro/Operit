@@ -1008,6 +1008,8 @@
     <string name="auto_read_message">自动朗读</string>
     <string name="auto_read_desc">启用后，AI回复会自动朗读</string>
     <string name="auto_read_active">自动朗读已启用</string>
+    <string name="disable_stream_output">禁用流式输出</string>
+    <string name="disable_stream_output_desc">禁用后，AI回复将一次性完整显示，而不是逐字流式显示</string>
     <string name="reply_message">回复</string>
     <string name="stop_reading">停止朗读</string>
     <string name="edit_and_resend">编辑并重发</string>

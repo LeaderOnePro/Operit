@@ -89,6 +89,8 @@ fun ChatSettingsBar(
     onToggleAutoRead: () -> Unit,
     enableTools: Boolean,
     onToggleTools: () -> Unit,
+    disableStreamOutput: Boolean,
+    onToggleDisableStreamOutput: () -> Unit,
     onManualMemoryUpdate: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -211,8 +213,16 @@ fun ChatSettingsBar(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-
-                IconButton(onClick = { showMenu = !showMenu }, modifier = Modifier.size(28.dp)) {
+                AnimatedVisibility(visible = disableStreamOutput) {
+                    Icon(
+                        imageVector = Icons.Outlined.Block,
+                        contentDescription = stringResource(R.string.disable_stream_output),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+ 
+                 IconButton(onClick = { showMenu = !showMenu }, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.Tune,
                         contentDescription = stringResource(R.string.settings_options),
@@ -377,6 +387,28 @@ fun ChatSettingsBar(
                                 onInfoClick = {
                                         infoPopupContent =
                                                 context.getString(R.string.auto_read_message) to context.getString(R.string.auto_read_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            // 禁用流式输出
+                            SettingItem(
+                                title = stringResource(R.string.disable_stream_output),
+                                    icon =
+                                            if (disableStreamOutput) Icons.Outlined.Block
+                                            else Icons.Outlined.Speed,
+                                    iconTint =
+                                            if (disableStreamOutput)
+                                                    MaterialTheme.colorScheme.error // 开启时为红色
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f // 关闭时为灰色
+                                                    ),
+                                isChecked = disableStreamOutput,
+                                onToggle = onToggleDisableStreamOutput,
+                                onInfoClick = {
+                                        infoPopupContent =
+                                                context.getString(R.string.disable_stream_output) to context.getString(R.string.disable_stream_output_desc)
                                     showMenu = false
                                 }
                             )

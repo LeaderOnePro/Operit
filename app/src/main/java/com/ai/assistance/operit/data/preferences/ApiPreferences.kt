@@ -98,6 +98,9 @@ class ApiPreferences private constructor(private val context: Context) {
         // Key for Tools Enable/Disable
         val ENABLE_TOOLS = booleanPreferencesKey("enable_tools")
 
+        // Key for Disable Stream Output
+        val DISABLE_STREAM_OUTPUT = booleanPreferencesKey("disable_stream_output")
+
         // Keys for Summary Settings
         val ENABLE_SUMMARY = booleanPreferencesKey("enable_summary")
         val ENABLE_SUMMARY_BY_MESSAGE_COUNT = booleanPreferencesKey("enable_summary_by_message_count")
@@ -147,6 +150,9 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Default value for Tools Enable/Disable
         const val DEFAULT_ENABLE_TOOLS = true
+
+        // Default value for Disable Stream Output (default false, meaning stream is enabled by default)
+        const val DEFAULT_DISABLE_STREAM_OUTPUT = false
 
         // Default values for Summary Settings
         const val DEFAULT_ENABLE_SUMMARY = true
@@ -285,6 +291,12 @@ class ApiPreferences private constructor(private val context: Context) {
     val enableToolsFlow: Flow<Boolean> =
         context.apiDataStore.data.map { preferences ->
             preferences[ENABLE_TOOLS] ?: DEFAULT_ENABLE_TOOLS
+        }
+
+    // Flow for Disable Stream Output
+    val disableStreamOutputFlow: Flow<Boolean> =
+        context.apiDataStore.data.map { preferences ->
+            preferences[DISABLE_STREAM_OUTPUT] ?: DEFAULT_DISABLE_STREAM_OUTPUT
         }
 
     // Flows for Summary Settings
@@ -449,6 +461,13 @@ class ApiPreferences private constructor(private val context: Context) {
     suspend fun saveEnableTools(isEnabled: Boolean) {
         context.apiDataStore.edit { preferences ->
             preferences[ENABLE_TOOLS] = isEnabled
+        }
+    }
+
+    // Save Disable Stream Output setting
+    suspend fun saveDisableStreamOutput(isDisabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[DISABLE_STREAM_OUTPUT] = isDisabled
         }
     }
 

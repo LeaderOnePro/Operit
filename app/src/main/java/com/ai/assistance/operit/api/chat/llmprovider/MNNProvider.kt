@@ -216,6 +216,7 @@ class MNNProvider(
         chatHistory: List<Pair<String, String>>,
         modelParameters: List<ModelParameter<*>>,
         enableThinking: Boolean,
+        stream: Boolean,
         onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
         onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {

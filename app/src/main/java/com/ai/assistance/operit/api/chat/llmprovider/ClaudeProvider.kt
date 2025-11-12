@@ -201,11 +201,12 @@ class ClaudeProvider(
             message: String,
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>> = emptyList(),
-            enableThinking: Boolean
+            enableThinking: Boolean,
+            stream: Boolean = true
     ): RequestBody {
         val jsonObject = JSONObject()
         jsonObject.put("model", modelName)
-        jsonObject.put("stream", true)
+        jsonObject.put("stream", stream)
 
         // 添加已启用的模型参数
         addParameters(jsonObject, modelParameters)
@@ -326,6 +327,7 @@ class ClaudeProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
+            stream: Boolean,
             onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
@@ -359,7 +361,7 @@ class ClaudeProvider(
                     currentHistory = chatHistory
                 }
 
-                val requestBody = createRequestBody(currentMessage, currentHistory, modelParameters, enableThinking)
+                val requestBody = createRequestBody(currentMessage, currentHistory, modelParameters, enableThinking, stream)
                 onTokensUpdated(
                         tokenCacheManager.totalInputTokenCount,
                         tokenCacheManager.cachedInputTokenCount,
@@ -385,77 +387,123 @@ class ClaudeProvider(
 
                     Log.d("AIService", "连接成功，等待响应...")
                     val responseBody = response.body ?: throw IOException("API响应为空")
-                    val reader = responseBody.charStream().buffered()
-                    var wasCancelled = false
+                    
+                    // 根据stream参数处理响应
+                    if (stream) {
+                        // 处理流式响应
+                        val reader = responseBody.charStream().buffered()
+                        var wasCancelled = false
 
-                    try {
-                        reader.useLines { lines ->
-                            lines.forEach { line ->
-                                // 如果call已被取消，提前退出
-                                if (activeCall?.isCanceled() == true) {
-                                    Log.d("AIService", "流式传输已被取消，提前退出处理")
-                                    wasCancelled = true
-                                    return@forEach
-                                }
-
-                                if (line.startsWith("data: ")) {
-                                    val data = line.substring(6).trim()
-                                    if (data == "[DONE]") {
+                        try {
+                            reader.useLines { lines ->
+                                lines.forEach { line ->
+                                    // 如果call已被取消，提前退出
+                                    if (activeCall?.isCanceled() == true) {
+                                        Log.d("AIService", "流式传输已被取消，提前退出处理")
+                                        wasCancelled = true
                                         return@forEach
                                     }
 
-                                    try {
-                                        val jsonResponse = JSONObject(data)
-
-                                        // Claude API在响应中包含content
-                                        val type = jsonResponse.optString("type", "")
-                                        
-                                        // 根据type处理不同的事件
-                                        when (type) {
-                                            "content_block_delta" -> {
-                                                val delta = jsonResponse.optJSONObject("delta")
-                                                if (delta != null) {
-                                                    val content = delta.optString("text", "")
-                                                    if (content.isNotEmpty()) {
-                                                        tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(content))
-                                                        onTokensUpdated(
-                                                                tokenCacheManager.totalInputTokenCount,
-                                                                tokenCacheManager.cachedInputTokenCount,
-                                                                tokenCacheManager.outputTokenCount
-                                                        )
-                                                        emit(content)
-                                                        receivedContent.append(content)
-                                                    }
-                                                }
-                                            }
-                                            "message_delta" -> {
-                                                 //  可以处理stop_reason等
-                                            }
-                                            "content_block_stop" -> {
-                                                // 块停止
-                                            }
+                                    if (line.startsWith("data: ")) {
+                                        val data = line.substring(6).trim()
+                                        if (data == "[DONE]") {
+                                            return@forEach
                                         }
 
-                                    } catch (e: Exception) {
-                                        // 忽略解析错误，继续处理下一行
-                                        Log.w("AIService", "JSON解析错误: ${e.message}")
+                                        try {
+                                            val jsonResponse = JSONObject(data)
+
+                                            // Claude API在响应中包含content
+                                            val type = jsonResponse.optString("type", "")
+                                            
+                                            // 根据type处理不同的事件
+                                            when (type) {
+                                                "content_block_delta" -> {
+                                                    val delta = jsonResponse.optJSONObject("delta")
+                                                    if (delta != null) {
+                                                        val content = delta.optString("text", "")
+                                                        if (content.isNotEmpty()) {
+                                                            tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(content))
+                                                            onTokensUpdated(
+                                                                    tokenCacheManager.totalInputTokenCount,
+                                                                    tokenCacheManager.cachedInputTokenCount,
+                                                                    tokenCacheManager.outputTokenCount
+                                                            )
+                                                            emit(content)
+                                                            receivedContent.append(content)
+                                                        }
+                                                    }
+                                                }
+                                                "message_delta" -> {
+                                                     //  可以处理stop_reason等
+                                                }
+                                                "content_block_stop" -> {
+                                                    // 块停止
+                                                }
+                                            }
+
+                                        } catch (e: Exception) {
+                                            // 忽略解析错误，继续处理下一行
+                                            Log.w("AIService", "JSON解析错误: ${e.message}")
+                                        }
                                     }
                                 }
                             }
+                        } catch (e: IOException) {
+                            if (isManuallyCancelled) {
+                                Log.d("AIService", "【Claude】流式传输已被用户取消，停止后续操作。")
+                                throw UserCancellationException("请求已被用户取消", e)
+                            }
+                            // 捕获IO异常，可能是由于取消Call导致的
+                            if (activeCall?.isCanceled() == true) {
+                                Log.d("AIService", "流式传输已被取消，处理IO异常")
+                                wasCancelled = true
+                            } else {
+                                 Log.e("AIService", "【Claude】流式读取时发生IO异常，准备重试", e)
+                                lastException = e
+                                throw e
+                            }
                         }
-                    } catch (e: IOException) {
-                        if (isManuallyCancelled) {
-                            Log.d("AIService", "【Claude】流式传输已被用户取消，停止后续操作。")
-                            throw UserCancellationException("请求已被用户取消", e)
-                        }
-                        // 捕获IO异常，可能是由于取消Call导致的
-                        if (activeCall?.isCanceled() == true) {
-                            Log.d("AIService", "流式传输已被取消，处理IO异常")
-                            wasCancelled = true
-                        } else {
-                             Log.e("AIService", "【Claude】流式读取时发生IO异常，准备重试", e)
-                            lastException = e
-                            throw e
+                    } else {
+                        // 处理非流式响应
+                        val responseText = responseBody.string()
+                        Log.d("AIService", "收到完整响应，长度: ${responseText.length}")
+                        
+                        try {
+                            val jsonResponse = JSONObject(responseText)
+                            
+                            // Claude非流式响应格式
+                            val content = jsonResponse.optJSONArray("content")
+                            if (content != null && content.length() > 0) {
+                                val fullText = StringBuilder()
+                                for (i in 0 until content.length()) {
+                                    val block = content.getJSONObject(i)
+                                    if (block.optString("type") == "text") {
+                                        val text = block.optString("text", "")
+                                        if (text.isNotEmpty()) {
+                                            fullText.append(text)
+                                        }
+                                    }
+                                }
+                                
+                                val resultText = fullText.toString()
+                                if (resultText.isNotEmpty()) {
+                                    // 直接发送整个内容块，下游会自己处理
+                                    emit(resultText)
+                                    receivedContent.append(resultText)
+                                    tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(resultText))
+                                    onTokensUpdated(
+                                            tokenCacheManager.totalInputTokenCount,
+                                            tokenCacheManager.cachedInputTokenCount,
+                                            tokenCacheManager.outputTokenCount
+                                    )
+                                }
+                            }
+                            
+                            Log.d("AIService", "【Claude】非流式响应处理完成")
+                        } catch (e: Exception) {
+                            Log.e("AIService", "【Claude】解析非流式响应失败", e)
+                            throw IOException("解析响应失败: ${e.message}", e)
                         }
                     }
 

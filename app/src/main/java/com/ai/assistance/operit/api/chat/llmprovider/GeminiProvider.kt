@@ -270,6 +270,7 @@ class GeminiProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
+            stream: Boolean,
             onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
@@ -326,7 +327,7 @@ class GeminiProvider(
                         tokenCacheManager.cachedInputTokenCount,
                         tokenCacheManager.outputTokenCount
                 )
-                val request = createRequest(requestBody, true, requestId) // 使用流式请求
+                val request = createRequest(requestBody, stream, requestId) // 根据stream参数决定使用流式还是非流式
 
                 val call = client.newCall(request)
                 activeCall = call
@@ -352,8 +353,14 @@ class GeminiProvider(
                             throw IOException("API请求失败: ${response.code}, $errorBody")
                         }
 
-                        // 处理响应
-                        processStreamingResponse(response, streamCollector, requestId, onTokensUpdated, receivedContent)
+                        // 根据stream参数处理响应
+                        if (stream) {
+                            // 处理流式响应
+                            processStreamingResponse(response, streamCollector, requestId, onTokensUpdated, receivedContent)
+                        } else {
+                            // 处理非流式响应并转换为Stream
+                            processNonStreamingResponse(response, streamCollector, requestId, onTokensUpdated, receivedContent)
+                        }
                     }
                 }
 
@@ -783,6 +790,53 @@ class GeminiProvider(
             }
         } catch (e: Exception) {
             logError("处理响应时发生异常: ${e.message}", e)
+            throw e
+        } finally {
+            activeCall = null
+        }
+    }
+
+    /** 处理API非流式响应 */
+    private suspend fun processNonStreamingResponse(
+            response: Response,
+            streamCollector: StreamCollector<String>,
+            requestId: String,
+            onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
+            receivedContent: StringBuilder
+    ) {
+        Log.d(TAG, "开始处理非流式响应")
+        val responseBody = response.body ?: throw IOException("响应为空")
+        
+        try {
+            val responseText = responseBody.string()
+            logDebug("收到完整响应，长度: ${responseText.length}")
+            
+            // 解析JSON响应
+            val json = JSONObject(responseText)
+            
+            // 提取内容
+            val content = extractContentFromJson(json, requestId, onTokensUpdated)
+            
+            if (content.isNotEmpty()) {
+                receivedContent.append(content)
+                
+                // 直接发送整个内容块，下游会自己处理
+                streamCollector.emit(content)
+                
+                logDebug("非流式响应处理完成，总长度: ${content.length}")
+            } else {
+                logDebug("未检测到内容，发送空格")
+                streamCollector.emit(" ")
+            }
+            
+            // 确保思考模式正确结束
+            if (isInThinkingMode) {
+                logDebug("非流式响应结束时仍在思考模式，添加结束标签")
+                streamCollector.emit("</think>")
+                isInThinkingMode = false
+            }
+        } catch (e: Exception) {
+            logError("处理非流式响应时发生异常: ${e.message}", e)
             throw e
         } finally {
             activeCall = null

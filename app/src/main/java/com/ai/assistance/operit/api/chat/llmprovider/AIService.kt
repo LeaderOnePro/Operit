@@ -37,13 +37,18 @@ interface AIService {
      * @param message 用户消息内容
      * @param chatHistory 聊天历史记录，(角色, 内容)对的列表
      * @param modelParameters 模型参数列表
-     * @return 流式响应内容的Stream
+     * @param enableThinking 是否启用思考模式
+     * @param stream 是否使用流式输出，true为流式，false为非流式（但返回值仍为Stream）
+     * @param onTokensUpdated Token更新回调
+     * @param onNonFatalError 非致命错误回调
+     * @return 流式响应内容的Stream（无论stream参数如何，都返回Stream）
      */
     suspend fun sendMessage(
             message: String,
             chatHistory: List<Pair<String, String>> = emptyList(),
             modelParameters: List<ModelParameter<*>> = emptyList(),
             enableThinking: Boolean = false,
+            stream: Boolean = true,
             onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit = { _, _, _ -> },
             onNonFatalError: suspend (error: String) -> Unit = {}
     ): Stream<String>

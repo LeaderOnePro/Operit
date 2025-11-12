@@ -74,6 +74,9 @@ class ApiConfigDelegate(
     private val _enableTools = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_TOOLS)
     val enableTools: StateFlow<Boolean> = _enableTools.asStateFlow()
 
+    private val _disableStreamOutput = MutableStateFlow(ApiPreferences.DEFAULT_DISABLE_STREAM_OUTPUT)
+    val disableStreamOutput: StateFlow<Boolean> = _disableStreamOutput.asStateFlow()
+
     // 为了兼容现有代码，添加API密钥状态流
     private val _apiKey = MutableStateFlow("")
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
@@ -210,6 +213,13 @@ class ApiConfigDelegate(
                 _enableTools.value = enabled
             }
         }
+
+        // Collect disable stream output setting
+        coroutineScope.launch {
+            apiPreferences.disableStreamOutputFlow.collect { disabled ->
+                _disableStreamOutput.value = disabled
+            }
+        }
     }
 
     /**
@@ -325,6 +335,15 @@ class ApiConfigDelegate(
             val newValue = !_enableAutoRead.value
             apiPreferences.saveEnableAutoRead(newValue)
             _enableAutoRead.value = newValue
+        }
+    }
+
+    /** 切换禁用流式输出 */
+    fun toggleDisableStreamOutput() {
+        coroutineScope.launch {
+            val newValue = !_disableStreamOutput.value
+            apiPreferences.saveDisableStreamOutput(newValue)
+            _disableStreamOutput.value = newValue
         }
     }
 

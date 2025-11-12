@@ -281,6 +281,8 @@
     <string name="auto_read_message">Auto Read</string>
     <string name="auto_read_desc">When enabled, AI responses will be automatically read aloud</string>
     <string name="auto_read_active">Auto read enabled</string>
+    <string name="disable_stream_output">Disable Stream Output</string>
+    <string name="disable_stream_output_desc">When disabled, AI responses will be displayed all at once instead of streaming word by word</string>
     <string name="stop_reading">Stop Reading</string>
     <string name="edit_and_resend">Edit &amp; Resend</string>
     <string name="reply_message">Reply</string>

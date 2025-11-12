@@ -142,9 +142,10 @@ open class OpenAIProvider(
             message: String,
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>> = emptyList(),
-            enableThinking: Boolean = false
+            enableThinking: Boolean = false,
+            stream: Boolean = true
     ): RequestBody {
-        val jsonString = createRequestBodyInternal(message, chatHistory, modelParameters)
+        val jsonString = createRequestBodyInternal(message, chatHistory, modelParameters, stream)
         return jsonString.toRequestBody(JSON)
     }
 
@@ -154,11 +155,12 @@ open class OpenAIProvider(
     protected fun createRequestBodyInternal(
         message: String,
         chatHistory: List<Pair<String, String>>,
-        modelParameters: List<ModelParameter<*>> = emptyList()
+        modelParameters: List<ModelParameter<*>> = emptyList(),
+        stream: Boolean = true
     ): String {
         val jsonObject = JSONObject()
         jsonObject.put("model", modelName)
-        jsonObject.put("stream", true) // 启用流式响应
+        jsonObject.put("stream", stream) // 根据stream参数设置
 
         // 添加已启用的模型参数
         for (param in modelParameters) {
@@ -349,6 +351,7 @@ open class OpenAIProvider(
             chatHistory: List<Pair<String, String>>,
             modelParameters: List<ModelParameter<*>>,
             enableThinking: Boolean,
+            stream: Boolean,
             onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit,
             onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
@@ -397,7 +400,7 @@ open class OpenAIProvider(
                         "AIService",
                         "【发送消息】准备构建请求体，模型参数数量: ${modelParameters.size}，已启用参数: ${modelParameters.count { it.isEnabled }}"
                 )
-                val requestBody = createRequestBody(currentMessage, standardizedHistory, modelParameters, enableThinking)
+                val requestBody = createRequestBody(currentMessage, standardizedHistory, modelParameters, enableThinking, stream)
                 onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
                 val request = createRequest(requestBody)
                 Log.d("AIService", "【发送消息】请求体构建完成，目标模型: $modelName，API端点: $apiEndpoint")
@@ -426,13 +429,15 @@ open class OpenAIProvider(
                         throw IOException("API请求失败，状态码: ${response.code}，错误信息: $errorBody")
                     }
 
-                    Log.d("AIService", "【发送消息】连接成功(状态码: ${response.code})，准备处理流式响应...")
+                    Log.d("AIService", "【发送消息】连接成功(状态码: ${response.code})，准备处理响应...")
                     val responseBody = response.body ?: throw IOException("API响应为空")
 
-                    // 在IO线程中读取响应
-                    withContext(Dispatchers.IO) {
-                        Log.d("AIService", "【发送消息】开始读取流式响应")
-                        val reader = responseBody.charStream().buffered()
+                    // 根据stream参数处理响应
+                    if (stream) {
+                        // 处理流式响应
+                        withContext(Dispatchers.IO) {
+                            Log.d("AIService", "【发送消息】开始读取流式响应")
+                            val reader = responseBody.charStream().buffered()
                         var currentContent = StringBuilder()
                         var isFirstResponse = true
                         var wasCancelled = false
@@ -623,6 +628,64 @@ open class OpenAIProvider(
                                 lastException = e
                                 // 跳出useLines和try-catch，进入外层while循环进行重试
                                 throw e
+                            }
+                        }
+                        }
+                    } else {
+                        // 处理非流式响应
+                        withContext(Dispatchers.IO) {
+                            Log.d("AIService", "【发送消息】开始读取非流式响应")
+                            val responseText = responseBody.string()
+                            Log.d("AIService", "收到完整响应，长度: ${responseText.length}")
+                            
+                            try {
+                                val jsonResponse = JSONObject(responseText)
+                                val choices = jsonResponse.getJSONArray("choices")
+                                
+                                if (choices.length() > 0) {
+                                    val choice = choices.getJSONObject(0)
+                                    val message = choice.optJSONObject("message")
+                                    
+                                    if (message != null) {
+                                        val reasoningContent = message.optString("reasoning_content", "")
+                                        val regularContent = message.optString("content", "")
+                                        
+                                        // 处理思考内容（如果有）
+                                        if (reasoningContent.isNotEmpty() && reasoningContent != "null") {
+                                            val thinkContent = "<think>" + reasoningContent + "</think>"
+                                            // 直接发送整个内容块，下游会自己处理
+                                            emit(thinkContent)
+                                            receivedContent.append(thinkContent)
+                                            tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(reasoningContent))
+                                            onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
+                                        }
+                                        
+                                        // 处理常规内容
+                                        if (regularContent.isNotEmpty() && regularContent != "null") {
+                                            // 直接发送整个内容块，下游会自己处理
+                                            emit(regularContent)
+                                            receivedContent.append(regularContent)
+                                            tokenCacheManager.addOutputTokens(ChatUtils.estimateTokenCount(regularContent))
+                                            onTokensUpdated(tokenCacheManager.totalInputTokenCount, tokenCacheManager.cachedInputTokenCount, tokenCacheManager.outputTokenCount)
+                                        }
+                                    }
+                                }
+                                
+                                // 更新token统计（如果有）
+                                val usage = jsonResponse.optJSONObject("usage")
+                                if (usage != null) {
+                                    val promptTokens = usage.optInt("prompt_tokens", 0)
+                                    val completionTokens = usage.optInt("completion_tokens", 0)
+                                    if (promptTokens > 0) {
+                                        tokenCacheManager.updateActualTokens(promptTokens, 0)
+                                        onTokensUpdated(promptTokens, 0, completionTokens)
+                                    }
+                                }
+                                
+                                Log.d("AIService", "【发送消息】非流式响应处理完成")
+                            } catch (e: Exception) {
+                                Log.e("AIService", "【发送消息】解析非流式响应失败", e)
+                                throw IOException("解析响应失败: ${e.message}", e)
                             }
                         }
                     }

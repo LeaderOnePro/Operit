@@ -339,7 +339,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         customSystemPromptTemplate: String? = null,
         isSubTask: Boolean = false,
         characterName: String? = null,
-        avatarUri: String? = null
+        avatarUri: String? = null,
+        stream: Boolean = true
     ): Stream<String> {
         Log.d(
                 TAG,
@@ -404,13 +405,14 @@ class EnhancedAIService private constructor(private val context: Context) {
                     _perRequestTokenCounts.value = null
 
                     // 使用新的Stream API
-                    Log.d(TAG, "调用AI服务，处理时间: ${System.currentTimeMillis() - startTime}ms")
-                    val stream =
+                    Log.d(TAG, "调用AI服务，处理时间: ${System.currentTimeMillis() - startTime}ms, 流式输出: $stream")
+                    val responseStream =
                             serviceForFunction.sendMessage(
                                     message = processedInput,
                                     chatHistory = preparedHistory,
                                     modelParameters = modelParameters,
                                     enableThinking = enableThinking,
+                                    stream = stream,
                                     onTokensUpdated = { input, cachedInput, output ->
                                         _perRequestTokenCounts.value = Pair(input, output)
                                     },
@@ -430,7 +432,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     var lastLogTime = System.currentTimeMillis()
                     val streamStartTime = System.currentTimeMillis()
 
-                    stream.collect { content ->
+                    responseStream.collect { content ->
                         // 第一次收到响应，更新状态
                         if (isFirstChunk) {
                             if (!isSubTask) {
@@ -516,7 +518,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             } finally {
                 // 确保流处理完成后调用
                 val collector = this
-                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri) }
+                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream) }
             }
         }
     }
@@ -625,7 +627,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             tokenUsageThreshold: Double,
             isSubTask: Boolean,
             characterName: String? = null,
-            avatarUri: String? = null
+            avatarUri: String? = null,
+            stream: Boolean = true
     ) {
         try {
             val startTime = System.currentTimeMillis()
@@ -724,7 +727,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                         tokenUsageThreshold,
                         isSubTask,
                         characterName,
-                        avatarUri
+                        avatarUri,
+                        stream = stream
                 )
                 return
             }
@@ -825,7 +829,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         tokenUsageThreshold: Double,
         isSubTask: Boolean,
         characterName: String? = null,
-        avatarUri: String? = null
+        avatarUri: String? = null,
+        stream: Boolean = true
     ) {
         val startTime = System.currentTimeMillis()
 
@@ -849,7 +854,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 processToolResults(
                     allToolResults, context, functionType, collector, enableThinking,
                     enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask,
-                    characterName, avatarUri
+                    characterName, avatarUri, stream
                 )
             }
         }
@@ -880,7 +885,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             tokenUsageThreshold: Double,
             isSubTask: Boolean,
             characterName: String? = null,
-            avatarUri: String? = null
+            avatarUri: String? = null,
+            stream: Boolean = true
     ) {
         val startTime = System.currentTimeMillis()
         val toolNames = results.joinToString(", ") { it.toolName }
@@ -966,12 +972,13 @@ class EnhancedAIService private constructor(private val context: Context) {
             try {
                 // 发送消息并获取响应流
                 val aiStartTime = System.currentTimeMillis()
-                val stream =
+                val responseStream =
                         serviceForFunction.sendMessage(
                                 message = toolResultMessage,
                                 chatHistory = currentChatHistory,
                                 modelParameters = modelParameters,
                                 enableThinking = enableThinking,
+                                stream = stream,
                                 onTokensUpdated = { input, cachedInput, output ->
                                     _perRequestTokenCounts.value = Pair(input, output)
                                 },
@@ -991,7 +998,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 var totalChars = 0
                 var lastLogTime = System.currentTimeMillis()
 
-                stream.collect { content ->
+                responseStream.collect { content ->
                     // 更新streamBuffer
                     context.streamBuffer.append(content)
 
@@ -1032,7 +1039,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "工具结果AI处理完成，收到 $totalChars 字符，耗时: ${processingTime}ms")
 
                 // 流处理完成，处理完成逻辑
-                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri)
+                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream)
             } catch (e: Exception) {
                 Log.e(TAG, "处理工具执行结果时出错", e)
                 withContext(Dispatchers.Main) {
