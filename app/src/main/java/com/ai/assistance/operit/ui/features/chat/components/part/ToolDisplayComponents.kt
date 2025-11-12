@@ -55,11 +55,11 @@ fun CompactToolDisplay(
 
     // 显示详细内容的弹窗 - 仅在启用弹窗时显示
     if (showDetailDialog && hasParams && enableDialog) {
-        ToolParamsDetailDialog(
-                toolName = toolName,
-                params = params,
-                onDismiss = { showDetailDialog = false },
-                onCopy = { clipboardManager.setText(AnnotatedString(params)) }
+        ContentDetailDialog(
+            title = "$toolName 调用参数",
+            content = params,
+            icon = getToolIcon(toolName),
+            onDismiss = { showDetailDialog = false }
         )
     }
 
@@ -97,8 +97,15 @@ fun CompactToolDisplay(
 
         // 参数内容（如果有）
         if (params.isNotBlank()) {
+            val summary = remember(params) {
+                // 尝试从XML中提取第一个参数的值作为摘要
+                val firstParamRegex = "<param.*?>([^<]*)<\\/param>".toRegex()
+                val match = firstParamRegex.find(params)
+                match?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: params.replace("\n", " ").trim() // 如果没有匹配或值为空，则显示清理后的原始参数
+            }
             Text(
-                    text = params,
+                    text = summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = textColor.copy(alpha = 0.7f),
                     maxLines = 1,
@@ -125,11 +132,11 @@ fun DetailedToolDisplay(
 
     // 显示详细内容的弹窗 - 仅在启用弹窗时显示
     if (showDetailDialog && hasParams && enableDialog) {
-        ToolParamsDetailDialog(
-                toolName = toolName,
-                params = params,
-                onDismiss = { showDetailDialog = false },
-                onCopy = { clipboardManager.setText(AnnotatedString(params)) }
+        ContentDetailDialog(
+            title = "$toolName 调用参数",
+            content = params,
+            icon = getToolIcon(toolName),
+            onDismiss = { showDetailDialog = false }
         )
     }
 
@@ -230,14 +237,17 @@ fun DetailedToolDisplay(
 
 /** 显示带行号的代码内容 */
 @Composable
-private fun CodeContentWithLineNumbers(
-        lines: List<String>,
-        textColor: Color,
-        listState: LazyListState,
-        modifier: Modifier = Modifier
+internal fun CodeContentWithLineNumbers(
+    lines: List<String>,
+    textColor: Color,
+    listState: LazyListState,
+    modifier: Modifier = Modifier
 ) {
     val isXml =
-            remember(lines) { lines.any { it.trim().startsWith("<") && it.trim().endsWith(">") } }
+            remember(lines) {
+                val text = lines.joinToString("\n")
+                text.contains("<") && text.contains(">") && text.contains("/")
+            }
 
     LazyColumn(modifier = modifier, state = listState) {
         itemsIndexed(items = lines, key = { index, _ -> index }) { index, line ->
@@ -286,7 +296,7 @@ private fun CodeContentWithLineNumbers(
 
 /** XML语法高亮文本 - 异步计算高亮以避免阻塞主线程 */
 @Composable
-private fun FormattedXmlText(text: String, modifier: Modifier = Modifier) {
+internal fun FormattedXmlText(text: String, modifier: Modifier = Modifier) {
     // 使用状态保存格式化后的文本
     var formattedText by remember(text) { mutableStateOf<AnnotatedString?>(null) }
     
@@ -375,114 +385,6 @@ private fun FormattedXmlText(text: String, modifier: Modifier = Modifier) {
 }
 
 /** 工具参数详情弹窗 美观的弹窗显示完整的工具参数内容 */
-@Composable
-private fun ToolParamsDetailDialog(
-        toolName: String,
-        params: String,
-        onDismiss: () -> Unit,
-        onCopy: () -> Unit
-) {
-    Dialog(
-            onDismissRequest = onDismiss,
-            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
-    ) {
-        Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // 标题栏
-                Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 工具图标
-                    Icon(
-                            imageVector = getToolIcon(toolName),
-                            contentDescription = "工具调用",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    // 工具名称
-                    Text(
-                            text = "$toolName 调用参数",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // 复制按钮
-                    IconButton(onClick = onCopy) {
-                        Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "复制参数",
-                                tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 分隔线
-                Divider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 参数内容
-                Box(
-                        modifier =
-                                Modifier.fillMaxWidth()
-                                        .heightIn(min = 50.dp, max = 300.dp)
-                                        .background(
-                                                color =
-                                                        MaterialTheme.colorScheme.surfaceVariant
-                                                                .copy(alpha = 0.5f),
-                                                shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp)
-                ) {
-                    // 按行拆分参数文本
-                    val lines = remember(params) { params.lines() }
-
-                    // 为弹窗内的代码视图创建独立的LazyListState
-                    val dialogListState = rememberLazyListState()
-
-                    // 当内容更新时，自动滚动到底部
-                    LaunchedEffect(lines.size) {
-                        if (lines.isNotEmpty()) dialogListState.animateScrollToItem(lines.lastIndex)
-                    }
-
-                    // 显示带行号的代码内容
-                    CodeContentWithLineNumbers(
-                            lines = lines,
-                            textColor = MaterialTheme.colorScheme.onSurface,
-                            listState = dialogListState,
-                            modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 关闭按钮
-                Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.End),
-                        colors =
-                                ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                )
-                ) { Text("关闭") }
-            }
-        }
-    }
-}
 
 /** 根据工具名称选择合适的图标 */
 private fun getToolIcon(toolName: String): ImageVector {

@@ -98,7 +98,9 @@ fun ChatHistorySelector(
         chatHistories: List<ChatHistory>,
         currentId: String?,
         lazyListState: LazyListState? = null,
-        onBack: (() -> Unit)? = null
+        onBack: (() -> Unit)? = null,
+        searchQuery: String,
+        onSearchQueryChange: (String) -> Unit
 ) {
     var chatToEdit by remember { mutableStateOf<ChatHistory?>(null) }
     var showNewGroupDialog by remember { mutableStateOf(false) }
@@ -112,7 +114,6 @@ fun ChatHistorySelector(
     
     // 搜索相关状态
     var showSearchBox by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
     var matchedChatIdsByContent by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isSearching by remember { mutableStateOf(false) }
 
@@ -568,11 +569,9 @@ fun ChatHistorySelector(
                     )
                 }
                 IconButton(
-                    onClick = { 
+                    onClick = {
                         showSearchBox = !showSearchBox
-                        if (!showSearchBox) {
-                            searchQuery = ""
-                        }
+                        // 不再重置搜索查询
                     },
                     modifier = Modifier.size(32.dp)
                 ) {
@@ -620,7 +619,7 @@ fun ChatHistorySelector(
         if (showSearchBox) {
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = onSearchQueryChange,
                 label = { Text(stringResource(R.string.search)) },
                 placeholder = { Text(stringResource(R.string.search_chat_history_hint)) },
                 leadingIcon = {
@@ -635,7 +634,7 @@ fun ChatHistorySelector(
                 },
                 trailingIcon = {
                     if (searchQuery.isNotBlank() && !isSearching) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
                             Icon(Icons.Default.SearchOff, contentDescription = stringResource(R.string.clear_search))
                         }
                     }

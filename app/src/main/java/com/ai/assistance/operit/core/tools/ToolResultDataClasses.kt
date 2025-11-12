@@ -250,13 +250,23 @@ data class FileOperationData(
 /** Represents the result of an 'apply_file' operation, including the AI-generated diff */
 @Serializable
 data class FileApplyResultData(
-    val operation: FileOperationData, 
+    val operation: FileOperationData,
     val aiDiffInstructions: String,
-    val syntaxCheckResult: String? = null
+    val syntaxCheckResult: String? = null,
+    val diffContent: String? = null
 ) : ToolResultData() {
     override fun toString(): String {
         val sb = StringBuilder()
         sb.appendLine(operation.details)
+
+        // If diffContent is available, embed it in a custom XML-like tag for the renderer.
+        if (diffContent != null) {
+            val encodedDiff = diffContent.replace("&", "&").replace("<", "<").replace(">", ">")
+            sb.append("<file-diff path=\"${operation.path}\" details=\"${operation.details}\">")
+            sb.append("<![CDATA[$encodedDiff]]>")
+            sb.append("</file-diff>")
+        }
+
         if (aiDiffInstructions.isNotEmpty() && !aiDiffInstructions.startsWith("Error")) {
             sb.appendLine("\n--- AI-Generated Diff ---")
             sb.appendLine(aiDiffInstructions)

@@ -257,24 +257,50 @@ class CustomXmlRenderer(
         val contentLengthThreshold = 200
         val isLongContent = paramText.length > contentLengthThreshold
 
-        if (isLongContent) {
-            // 使用详细工具显示组件
-            DetailedToolDisplay(
+        val isClosed = isXmlFullyClosed(content)
+
+        // 特殊处理 apply_file 工具
+        if (toolName == "apply_file") {
+            if (isClosed) {
+                // 调用完成后，使用紧凑视图
+                CompactToolDisplay(
+                    toolName = toolName,
+                    params = paramText, // 传递完整的原始参数
+                    textColor = textColor,
+                    modifier = modifier,
+                    enableDialog = enableDialogs
+                )
+            } else {
+                // 调用过程中，使用详细视图
+                DetailedToolDisplay(
                     toolName = toolName,
                     params = paramText,
                     textColor = textColor,
                     modifier = modifier,
-                    enableDialog = enableDialogs  // 传递弹窗启用状态
-            )
+                    enableDialog = enableDialogs
+                )
+            }
         } else {
-            // 使用简洁工具显示组件
-            CompactToolDisplay(
-                    toolName = toolName,
-                    params = paramsText,
-                    textColor = textColor,
-                    modifier = modifier,
-                    enableDialog = enableDialogs  // 传递弹窗启用状态
-            )
+            // 对于其他工具，保持原有逻辑
+            if (isLongContent) {
+                // 使用详细工具显示组件
+                DetailedToolDisplay(
+                        toolName = toolName,
+                        params = paramText,
+                        textColor = textColor,
+                        modifier = modifier,
+                        enableDialog = enableDialogs  // 传递弹窗启用状态
+                )
+            } else {
+                // 使用简洁工具显示组件
+                CompactToolDisplay(
+                        toolName = toolName,
+                        params = paramText, // 传递原始XML文本
+                        textColor = textColor,
+                        modifier = modifier,
+                        enableDialog = enableDialogs  // 传递弹窗启用状态
+                )
+            }
         }
     }
 
@@ -299,29 +325,50 @@ class CustomXmlRenderer(
         val contentMatch = contentRegex.find(content)
         val resultContent = contentMatch?.groupValues?.get(1)?.trim() ?: ""
 
-        // 如果是错误状态，尝试提取错误信息
-        val errorContent =
-                if (!isSuccess) {
-                    val errorRegex = "<error>(.*?)</error>".toRegex(RegexOption.DOT_MATCHES_ALL)
-                    val errorMatch = errorRegex.find(resultContent)
-                    errorMatch?.groupValues?.get(1)?.trim() ?: resultContent
-                } else {
-                    resultContent
-                }
+        // 检查结果是否为 file-diff
+        if (toolName == "apply_file" && isSuccess && resultContent.contains("<file-diff")) {
+            val pathRegex = "<file-diff path=\"([^\"]+)\"".toRegex()
+            val detailsRegex = "details=\"([^\"]+)\"".toRegex()
+            val cdataRegex = "<!\\[CDATA\\[(.*?)\\]\\]>".toRegex(RegexOption.DOT_MATCHES_ALL)
 
-        // 使用ToolResultDisplay组件显示结果
-        ToolResultDisplay(
-                toolName = toolName,
-                result = if (isSuccess) resultContent else errorContent,
-                isSuccess = isSuccess,
-                onCopyResult = {
-                    val textToCopy = if (isSuccess) resultContent else errorContent
-                    if (textToCopy.isNotBlank()) {
-                        clipboardManager.setText(AnnotatedString(textToCopy))
+            val path = pathRegex.find(resultContent)?.groupValues?.get(1) ?: ""
+            val details = detailsRegex.find(resultContent)?.groupValues?.get(1) ?: ""
+            val diffContent = cdataRegex.find(resultContent)?.groupValues?.get(1)?.trim() ?: ""
+
+            // unescape XML characters
+            val unescapedDiffContent = diffContent
+                .replace("<", "<")
+                .replace(">", ">")
+                .replace("&", "&")
+
+            FileDiffDisplay(diff = FileDiff(path, unescapedDiffContent, details))
+        } else {
+            // 如果是错误状态，尝试提取错误信息
+            val errorContent =
+                    if (!isSuccess) {
+                        val errorRegex = "<error>(.*?)</error>".toRegex(RegexOption.DOT_MATCHES_ALL)
+                        val errorMatch = errorRegex.find(resultContent)
+                        errorMatch?.groupValues?.get(1)?.trim() ?: resultContent
+                    } else {
+                        // 从结果中移除 file-diff 块（如果存在）
+                        val fileDiffRegex = """<file-diff.*</file-diff>""".toRegex(RegexOption.DOT_MATCHES_ALL)
+                        resultContent.replace(fileDiffRegex, "").trim()
                     }
-                },
-                enableDialog = enableDialogs  // 传递弹窗启用状态
-        )
+
+            // 使用ToolResultDisplay组件显示结果
+            ToolResultDisplay(
+                    toolName = toolName,
+                    result = if (isSuccess) errorContent else errorContent, // now errorContent contains the cleaned result for success case
+                    isSuccess = isSuccess,
+                    onCopyResult = {
+                        val textToCopy = if (isSuccess) errorContent else errorContent
+                        if (textToCopy.isNotBlank()) {
+                            clipboardManager.setText(AnnotatedString(textToCopy))
+                        }
+                    },
+                    enableDialog = enableDialogs  // 传递弹窗启用状态
+            )
+        }
     }
 
     /** 渲染状态信息标签 <status type="..." tool="..." uuid="..." title="..." subtitle="...">...</status> */

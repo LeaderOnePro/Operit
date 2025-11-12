@@ -2601,18 +2601,23 @@ open class StandardFileSystemTools(protected val context: Context) {
                             )
                         )
 
-                        val formattedDiff = FileBindingService.formatNewFileContentAsDiff(aiGeneratedCode)
+                        val diffContent = FileBindingService(context).generateUnifiedDiff("", aiGeneratedCode)
 
                         if (writeResult.success) {
                             emit(
                                 ToolResult(
                                     toolName = tool.name,
                                     success = true,
-                                    result = FileOperationData(
-                                        operation = "create",
-                                        path = path,
-                                        successful = true,
-                                        details = "Successfully created new file with AI code: $path\n\n--- AI-Generated Diff ---\n$formattedDiff"
+                                    result = FileApplyResultData(
+                                        operation = FileOperationData(
+                                            operation = "create",
+                                            path = path,
+                                            successful = true,
+                                            details = "Successfully created new file: $path"
+                                        ),
+                                        aiDiffInstructions = "",
+                                        syntaxCheckResult = null,
+                                        diffContent = diffContent
                                     )
                                 )
                             )
@@ -2745,6 +2750,7 @@ open class StandardFileSystemTools(protected val context: Context) {
 
                 // 执行语法检查
                 val syntaxCheckResult = performSyntaxCheck(path, mergedContent)
+                val diffContent = FileBindingService(context).generateUnifiedDiff(originalContent, mergedContent)
 
                 emit(
                         ToolResult(
@@ -2754,7 +2760,8 @@ open class StandardFileSystemTools(protected val context: Context) {
                                         FileApplyResultData(
                                                 operation = operationData,
                                                 aiDiffInstructions = aiInstructions,
-                                                syntaxCheckResult = syntaxCheckResult
+                                                syntaxCheckResult = syntaxCheckResult,
+                                                diffContent = diffContent
                                         ),
                                 error = ""
                         )

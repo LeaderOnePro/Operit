@@ -228,9 +228,17 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 附件相关
     val attachments: StateFlow<List<AttachmentInfo>> by lazy { attachmentDelegate.attachments }
+
+    // 聊天历史搜索状态
+    private val _chatHistorySearchQuery = MutableStateFlow("")
+    val chatHistorySearchQuery: StateFlow<String> = _chatHistorySearchQuery.asStateFlow()
+
+    fun onChatHistorySearchQueryChange(query: String) {
+        _chatHistorySearchQuery.value = query
+    }
     
     // 总结状态
-    val isSummarizing: StateFlow<Boolean> by lazy { 
+    val isSummarizing: StateFlow<Boolean> by lazy {
         if (::messageCoordinationDelegate.isInitialized) {
             messageCoordinationDelegate.isSummarizing
         } else {

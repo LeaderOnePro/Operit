@@ -499,12 +499,15 @@ fun ChatScreenContent(
                 exit = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)),
                 modifier = Modifier.align(Alignment.TopStart)
         ) {
+            val chatHistorySearchQuery by actualViewModel.chatHistorySearchQuery.collectAsState()
             ChatHistorySelectorPanel(
                     actualViewModel = actualViewModel,
                     chatHistories = chatHistories,
                     currentChatId = currentChatId,
                     showChatHistorySelector = showChatHistorySelector,
-                    historyListState = historyListState
+                    historyListState = historyListState,
+                    searchQuery = chatHistorySearchQuery,
+                    onSearchQueryChange = actualViewModel::onChatHistorySearchQueryChange
             )
         }
 
@@ -704,7 +707,9 @@ fun ChatHistorySelectorPanel(
         chatHistories: List<ChatHistory>,
         currentChatId: String,
         showChatHistorySelector: Boolean,
-        historyListState: LazyListState
+        historyListState: LazyListState,
+        searchQuery: String,
+        onSearchQueryChange: (String) -> Unit
 ) {
     // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
     Box(
@@ -753,7 +758,9 @@ fun ChatHistorySelectorPanel(
                 chatHistories = chatHistories,
                 currentId = currentChatId,
                 lazyListState = historyListState,
-                onBack = { actualViewModel.toggleChatHistorySelector() }
+                onBack = { actualViewModel.toggleChatHistorySelector() },
+                searchQuery = searchQuery,
+                onSearchQueryChange = onSearchQueryChange
         )
     }
 }

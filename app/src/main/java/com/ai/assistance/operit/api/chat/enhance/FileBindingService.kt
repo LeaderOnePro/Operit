@@ -4,14 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.core.config.FunctionalPrompts
 import com.ai.assistance.operit.data.model.FunctionType
-import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.util.ChatUtils
 import com.github.difflib.DiffUtils
 import com.github.difflib.UnifiedDiffUtils
 
 class FileBindingService(context: Context) {
-
-    private val apiPreferences = ApiPreferences.getInstance(context)
 
     companion object {
         private const val TAG = "FileBindingService"
@@ -19,33 +16,6 @@ class FileBindingService(context: Context) {
             """//\s*\[START-(REPLACE|INSERT|DELETE):(?:after_line=)?([\d-]+)\]\n?(?:(?://\s*\[CONTEXT\]\s*(.*?)\s*//\s*\[/CONTEXT\]\s*(.*?))|(.*?))\s*//\s*\[END-\1\]""".toRegex(
                 RegexOption.DOT_MATCHES_ALL
             )
-
-        /**
-         * A dedicated utility function to generate a diff-like view for brand new file content.
-         * This is intended for callers who handle file creation separately and just need to format the output,
-         * ensuring new files also get line numbers and a diff-like appearance.
-         *
-         * @param newContent The full content of the newly created file.
-         * @return A string formatted as a diff, with each line prefixed by '+' and a line number.
-         */
-        fun formatNewFileContentAsDiff(newContent: String): String {
-            val modifiedLines = if (newContent.isEmpty()) emptyList() else newContent.lines()
-            if (modifiedLines.isEmpty()) {
-                return "Changes: +0 -0 lines\n\n(File created with empty content)"
-            }
-
-            val additions = modifiedLines.size
-            val sb = StringBuilder()
-            sb.appendLine("Changes: +$additions -0 lines")
-            sb.appendLine()
-
-            modifiedLines.forEachIndexed { index, line ->
-                val newLineNum = index + 1
-                sb.appendLine("+${newLineNum.toString().padEnd(4)}|$line")
-            }
-
-            return sb.toString()
-        }
     }
 
     private enum class EditAction {
@@ -136,6 +106,18 @@ class FileBindingService(context: Context) {
     }
 
     private fun generateDiff(original: String, modified: String): String {
+        return generateUnifiedDiff(original, modified)
+    }
+
+    /**
+     * Generates a unified diff string with line numbers and change indicators (+, -).
+     * This is a public utility that can be used by other services.
+     *
+     * @param original The original text content.
+     * @param modified The modified text content.
+     * @return A formatted string representing the unified diff.
+     */
+    fun generateUnifiedDiff(original: String, modified: String): String {
         val originalLines = if (original.isEmpty()) emptyList() else original.lines()
         val modifiedLines = if (modified.isEmpty()) emptyList() else modified.lines()
         val patch = DiffUtils.diff(originalLines, modifiedLines)
@@ -160,7 +142,7 @@ class FileBindingService(context: Context) {
             }
         }
         sb.appendLine("Changes: +$additions -$deletions lines")
-        sb.appendLine()
+        // sb.appendLine()
 
         // Generate a standard unified diff to process
         val unifiedDiffLines = UnifiedDiffUtils.generateUnifiedDiff(
@@ -178,7 +160,7 @@ class FileBindingService(context: Context) {
 
         for (line in unifiedDiffLines) {
             when {
-                line.startsWith("---") || line.startsWith("+++") -> resultLines.add(line)
+                line.startsWith("---") || line.startsWith("+++") -> continue // Skip header lines
                 line.startsWith("@@") -> {
                     resultLines.add(line)
                     hunkHeaderRegex.find(line)?.let {
