@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.GitIgnoreFilter
 import com.ai.assistance.operit.util.FileUtils
 
 @Serializable
@@ -90,10 +91,9 @@ class WorkspaceBackupManager(private val context: Context) {
 
         val newManifestFiles = mutableMapOf<String, String>()
 
+        val gitignoreRules = GitIgnoreFilter.loadRules(workspaceDir)
         workspaceDir.walkTopDown()
-            .onEnter { dir -> dir.name != BACKUP_DIR_NAME } // Exclude .backup directory
-            .filter { it.isFile }
-            .filter { FileUtils.isTextBasedFile(it) } // Only backup text-based files
+            .filter { FileUtils.isWorkspaceFile(it, workspaceDir, gitignoreRules) }
             .forEach { file ->
                 try {
                     val hash = getFileHash(file)

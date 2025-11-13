@@ -214,6 +214,30 @@ object FileUtils {
     }
 
     /**
+     * Checks if a file is a valid workspace file to be shown or backed up.
+     * This combines several rules:
+     * - Must be a text-based file.
+     * - Must not be a hidden file (name starts with '.').
+     * - Must not be inside a '.backup' directory.
+     *
+     * @param file The file to check.
+     * @param workspaceRoot The root of the workspace, for path checking.
+     * @param gitignoreRules A list of .gitignore rules.
+     * @return True if the file should be included in the workspace view/backup.
+     */
+    fun isWorkspaceFile(file: File, workspaceRoot: File, gitignoreRules: List<String>): Boolean {
+        if (!file.isFile) return false
+
+        // Use GitIgnoreFilter to check if the file should be ignored
+        if (com.ai.assistance.operit.ui.features.chat.webview.workspace.process.GitIgnoreFilter.shouldIgnore(file, workspaceRoot, gitignoreRules)) {
+            return false
+        }
+
+        // Also apply the basic text-based file check
+        return isTextBasedFile(file)
+    }
+
+    /**
      * Check if a URI points to a video file
      * @param context The application context
      * @param uri The URI to check

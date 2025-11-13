@@ -2,6 +2,7 @@ package com.ai.assistance.operit.services
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.ui.text.input.TextFieldValue
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
@@ -262,7 +263,7 @@ class ChatServiceCore(
     // ========== StateFlow 暴露 ==========
 
     // 消息处理相关
-    val userMessage: StateFlow<String>
+    val userMessage: StateFlow<TextFieldValue>
         get() = messageProcessingDelegate.userMessage
 
     val isLoading: StateFlow<Boolean>

@@ -191,8 +191,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             // 委托给FileBindingService处理
             return instance.fileBindingService.processFileBinding(
                     originalContent,
-                    aiGeneratedCode,
-                    instance.multiServiceManager
+                    aiGeneratedCode
             )
         }
 
@@ -1256,8 +1255,7 @@ class EnhancedAIService private constructor(private val context: Context) {
     ): Pair<String, String> {
         return fileBindingService.processFileBinding(
                 originalContent,
-                aiGeneratedCode,
-                multiServiceManager
+                aiGeneratedCode
         )
     }
 

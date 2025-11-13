@@ -2679,30 +2679,29 @@ open class StandardFileSystemTools(protected val context: Context) {
                 // 提取原始文件内容
                 val originalContent = (readResult.result as? FileContentData)?.content ?: ""
 
-                // 2. 使用EnhancedAIService处理文件绑定
-                val enhancedAIService = EnhancedAIService.getInstance(context)
-                val bindingResult = enhancedAIService.applyFileBinding(originalContent, aiGeneratedCode)
+                // 2. 使用FileBindingService处理文件绑定
+                val bindingResult = EnhancedAIService.applyFileBinding(context, originalContent, aiGeneratedCode)
                 val mergedContent = bindingResult.first
                 val aiInstructions = bindingResult.second
 
                 // 检查文件绑定是否返回错误
                 if (aiInstructions.startsWith("Error", ignoreCase = true)) {
-                        Log.e(TAG, "File binding failed: $aiInstructions")
-                        emit(
-                                ToolResult(
-                                        toolName = tool.name,
-                                        success = false,
-                                        result =
-                                                FileOperationData(
-                                                        operation = "apply",
-                                                        path = path,
-                                                        successful = false,
-                                                        details = "File binding failed: $aiInstructions"
-                                                ),
-                                        error = aiInstructions
-                                )
+                    Log.e(TAG, "File binding failed: $aiInstructions")
+                    emit(
+                        ToolResult(
+                            toolName = tool.name,
+                            success = false,
+                            result =
+                            FileOperationData(
+                                operation = "apply",
+                                path = path,
+                                successful = false,
+                                details = "File binding failed: $aiInstructions"
+                            ),
+                            error = aiInstructions
                         )
-                        return@flow
+                    )
+                    return@flow
                 }
 
                 // 3. 将合并后的内容写回文件

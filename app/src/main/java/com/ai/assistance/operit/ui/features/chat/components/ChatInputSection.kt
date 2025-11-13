@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -54,8 +55,8 @@ import android.net.Uri
 @Composable
 fun ChatInputSection(
     actualViewModel: ChatViewModel,
-    userMessage: String,
-    onUserMessageChange: (String) -> Unit,
+    userMessage: TextFieldValue,
+    onUserMessageChange: (TextFieldValue) -> Unit,
     onSendMessage: () -> Unit,
     onCancelMessage: () -> Unit,
     isLoading: Boolean,
@@ -78,7 +79,8 @@ fun ChatInputSection(
     showInputProcessingStatus: Boolean = true,
     enableTools: Boolean = true, // 工具是否启用
     replyToMessage: ChatMessage? = null, // 回复目标消息
-    onClearReply: (() -> Unit)? = null // 清除回复状态的回调
+    onClearReply: (() -> Unit)? = null, // 清除回复状态的回调
+    isWorkspaceOpen: Boolean = false
 ) {
     val showTokenLimitDialog = remember { mutableStateOf(false) }
 
@@ -114,7 +116,7 @@ fun ChatInputSection(
     val currentWindowSize by actualViewModel.currentWindowSize.collectAsState()
     val maxWindowSizeInK by actualViewModel.maxWindowSizeInK.collectAsState()
     val maxTokens = (maxWindowSizeInK * 1024).toInt()
-    val userMessageTokens = remember(userMessage) { ChatUtils.estimateTokenCount(userMessage) }
+    val userMessageTokens = remember(userMessage.text) { ChatUtils.estimateTokenCount(userMessage.text) }
 
     val isOverTokenLimit =
         if (maxTokens > 0) {
@@ -123,7 +125,7 @@ fun ChatInputSection(
             false
         }
 
-    val canSendMessage = userMessage.isNotBlank() || attachments.isNotEmpty()
+    val canSendMessage = userMessage.text.isNotBlank() || attachments.isNotEmpty()
     val sendButtonEnabled =
         when {
             isProcessing -> true // Cancel button
@@ -319,7 +321,10 @@ fun ChatInputSection(
                     value = userMessage,
                     onValueChange = onUserMessageChange,
                     placeholder = {
-                        Text("请输入您的问题...", style = modernTextStyle)
+                        Text(
+                            if (isWorkspaceOpen) "输入问题，使用@来引用文件" else "请输入您的问题...",
+                            style = modernTextStyle
+                        )
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -506,7 +511,7 @@ fun ChatInputSection(
                 onAttachLocation = onAttachLocation,
                 onAttachMemory = onAttachMemory,
                 onTakePhoto = onTakePhoto,
-                userQuery = userMessage,
+                userQuery = userMessage.text,
                 onDismiss = { setShowAttachmentPanel(false) }
             )
 

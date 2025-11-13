@@ -96,47 +96,28 @@ File System Tools:
 - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
 $readFileDescription
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
-- apply_file: Applies precise, line-number-based edits to a file.
-  - **How it works**: You will be given files with line numbers (e.g., "123| code"). You must generate a patch using the structured format below to modify the file.
-  - **CRITICAL RULE 1: CONTEXT BLOCK GUIDES THE SEARCH**: For every `REPLACE`, `INSERT`, or `DELETE` block, you **MUST** provide a `[CONTEXT]` block. Its purpose is to provide a code "anchor" for the system to locate the target. The system will use this context to perform a **fuzzy, semantic search** to find the best match, so the context does not need to be character-for-character identical, but it should be as representative as possible.
-    - **Best Practice**: Provide enough unique code in the `[CONTEXT]` block to ensure it points to the correct location.
-    - **Forbidden**: **DO NOT** include any descriptive text, comments, or explanations inside the `[CONTEXT]` block. It should only contain code.
-    - **Targeting Logic**:
-        - For `REPLACE` and `DELETE`, the context should contain the **first line (or first few lines)** of the code block defined by `start-end`. This serves as a precise anchor. The system will then operate on the full line range you provide. Providing just enough lines to make the anchor unique is the best practice.
-        - For `INSERT`, the context **is the single line of code at the line number specified** (i.e., line `N` for `after_line=N`).
-  - **CRITICAL RULE 2: SYNTAX**: Control tags like `[START-REPLACE]`, `[CONTEXT]`, etc., must be commented out (e.g., `// [START-REPLACE:1-5]`). The code you provide for insertion or replacement, however, must be the raw, pure code without any line numbers or comment prefixes.
+- apply_file: Applies edits to a file by finding and replacing content blocks.
+  - **How it works**: This tool locates code based on the content inside the `[OLD]` block, not by line numbers. It then replaces this content with the content from the `[NEW]` block.
+  - **CRITICAL RULES**:
+    1.  **Use Semantic Blocks**: `REPLACE` requires both `[OLD]` and `[NEW]` blocks. `DELETE` only requires an `[OLD]` block.
+    2.  **Correct Syntax**: All tags (e.g., `[START-REPLACE]`, `[OLD]`) must be on their own lines.
 
-  - **Operations**:
-    - **Replace**: `// [START-REPLACE:start-end]` (Inclusive range. Replaces the code specified in `[CONTEXT]`).
-    // [CONTEXT]
-    const container = document.getElementById('profile');
-    // [/CONTEXT]
-    ... new code ...
-    // [END-REPLACE]
-    - **Insert**: `// [START-INSERT:after_line=N]` (Inserts new code *after* line N).
-    // [CONTEXT]
-    const user = { name, email };
-    // [/CONTEXT]
-    ... new code to insert ...
-    // [END-INSERT]
-    - **Delete**: `// [START-DELETE:start-end]` (Inclusive range. Deletes the code specified in `[CONTEXT]`).
-    // [CONTEXT]
-    function calculateLegacyReport(data) {
-      // ... all lines of the function to be deleted ...
-      return report;
-    }
-    // [/CONTEXT]
-    // [END-DELETE]
+  - **Operations & Examples**:
+    - **Replace**: `[START-REPLACE]`
+      [OLD]
+      ...content to be replaced...
+      [/OLD]
+      [NEW]
+      ...new content...
+      [/NEW]
+      [END-REPLACE]
+    - **Delete**: `[START-DELETE]`
+      [OLD]
+      ...content to be deleted...
+      [/OLD]
+      [END-DELETE]
 
-  - **Best Practices & Common Pitfalls**:
-    - **Inserting at the Start of a File**: To insert code at the very beginning of a file, use `// [START-INSERT:after_line=0]`. The `[CONTEXT]` block should then contain the file's current first line of code.
-    - **Appending to the End of a File**: To append code to the end of a file that has `L` lines, use `// [START-INSERT:after_line=L]`. The `[CONTEXT]` block should contain the file's current last line of code (line `L`).
-    - **Uniqueness**: The context you provide must be unique within the source file. If it's not, expand the context by including more surrounding lines until it becomes unique.
-    - **Handling Whitespace**: Be extremely precise with whitespace and blank lines. When deleting a function or a code block, it's often necessary to include the surrounding blank lines in your `DELETE` range to avoid leaving awkward double blank lines or squashing code together.
-    - **Combining Edits**: You can and should provide multiple edit blocks in a single `apply_file` call for efficiency. The system processes them in a way that handles shifting line numbers.
-    - **Full Content**: For full replacement, provide the full file content without any special blocks.
-
-  - Parameters: path (file path), content (the string containing all your edit blocks)
+  - **Parameters**: path (file path), content (the string containing all your edit blocks)
 - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
 - file_exists: Check if a file or directory exists. Parameters: path (target path)
 - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
@@ -192,47 +173,28 @@ Note: The memory library and user personality profile are automatically updated 
 - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
 $readFileDescription
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
-- apply_file: 对文件进行精确的、基于行号的编辑。
-  - **工作原理**: 你会收到带行号的文件内容 (例如 "123| code")。你必须使用下述结构化格式生成补丁来修改文件。
-  - **关键规则1: 上下文块引导搜索**: 对于每一个 `REPLACE`, `INSERT`, 或 `DELETE` 操作块，你**必须**提供一个 `[CONTEXT]` 块。此块的目的是为系统提供一个代码“锚点”以定位目标。系统将使用此上下文进行**模糊语义搜索**来寻找最佳匹配，因此上下文无需逐字完全相同，但应尽可能具有代表性。
-    - **最佳实践**: 在 `[CONTEXT]` 块中提供足够独特的代码，以确保它指向正确的位置。
-    - **禁止**: **严禁**在 `[CONTEXT]` 块中加入任何描述性文字、注释、或者对代码的解释。它应该只包含代码。
-    - **定位逻辑**:
-        - 对于 `REPLACE` 和 `DELETE` 操作，上下文应包含由 `起始-结束` 行号定义的**代码块的开头一行（或几行）**。这是一个精确定位锚点。系统随后将按你提供的完整行号范围执行操作。通常提供足以保证锚点唯一性的代码行即可。
-        - 对于 `INSERT` 操作，上下文**就是指定行号上的那一行代码**（即 `after_line=N` 中的第 `N` 行）。
-  - **关键规则2: 语法**: 像 `[START-REPLACE]`, `[CONTEXT]` 这样的控制标签必须以注释形式出现 (例如 `// [START-REPLACE:1-5]`)。然而，你在标签之间提供的用于插入或替换的代码，必须是**不带行号或注释前缀的纯粹的原始代码**。
+- apply_file: 通过查找并替换内容块来编辑文件。
+  - **工作原理**: 此工具根据 `[OLD]` 块中的内容（而不是行号）来定位代码，然后用 `[NEW]` 块中的内容替换它。
+  - **关键规则**:
+    1.  **使用语义块**: `REPLACE` 操作需要同时包含 `[OLD]` 和 `[NEW]` 块。`DELETE` 操作只需要 `[OLD]` 块。
+    2.  **正确的语法**: 所有标签（例如 `[START-REPLACE]`, `[OLD]`）都必须独占一行。
 
-  - **操作指令**:
-    - **替换**: `// [START-REPLACE:起始-结束]` (范围是闭区间。替换 `[CONTEXT]` 中指定的代码)。
-    // [CONTEXT]
-    const container = document.getElementById('profile');
-    // [/CONTEXT]
-    ... 新代码 ...
-    // [END-REPLACE]
-    - **插入**: `// [START-INSERT:after_line=N]` (在第 N 行*之后*插入新代码)。
-    // [CONTEXT]
-    const user = { name, email };
-    // [/CONTEXT]
-    ... 要插入的新代码 ...
-    // [END-INSERT]
-    - **删除**: `// [START-DELETE:起始-结束]` (范围是闭区间。删除 `[CONTEXT]` 中指定的代码)。
-    // [CONTEXT]
-    function calculateLegacyReport(data) {
-      // ... all lines of the function to be deleted ...
-      return report;
-    }
-    // [/CONTEXT]
-    // [END-DELETE]
+  - **操作示例**:
+    - **替换**: `[START-REPLACE]`
+      [OLD]
+      ...要被替换的内容...
+      [/OLD]
+      [NEW]
+      ...新的内容...
+      [/NEW]
+      [END-REPLACE]
+    - **删除**: `[START-DELETE]`
+      [OLD]
+      ...要被删除的内容...
+      [/OLD]
+      [END-DELETE]
 
-  - **最佳实践与常见陷阱**:
-    - **文件开头插入**: 要在文件最开头插入代码，使用 `// [START-INSERT:after_line=0]`。`[CONTEXT]` 块应包含文件当前的第一行代码。
-    - **文件末尾追加**: 要在文件末尾追加代码，假设文件共有 `L` 行，使用 `// [START-INSERT:after_line=L]`。`[CONTEXT]` 块应包含文件当前的最后一行（即第 `L` 行）代码。
-    - **唯一性**: 你提供的上下文必须在源文件中是唯一的。如果不是，请扩大上下文范围（增加更多行），直到它变得唯一为止。
-    - **处理空白行**: 对待空白行和缩进必须极其精确。当删除一个函数或一个代码块时，通常需要将周围的空行也包含在 `DELETE` 的范围内，以避免留下尴尬的双重空行或导致代码紧贴在一起，破坏格式。
-    - **合并编辑**: 为了效率，你应该在单次 `apply_file` 调用中提供多个编辑块。系统会处理行号动态变化的问题。
-    - **完整内容**: 若要完整替换，直接提供完整文件内容，不要使用特殊块。
-
-  - 参数: path (文件路径), content (包含所有编辑块的字符串)
+  - **参数**: path (文件路径), content (包含所有编辑块的字符串)
 - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
 - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
 - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）

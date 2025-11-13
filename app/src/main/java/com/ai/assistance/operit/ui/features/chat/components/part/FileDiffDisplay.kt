@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,7 +40,7 @@ fun FileDiffDisplay(diff: FileDiff) {
         ContentDetailDialog(
             title = "File Changes: ${diff.path.substringAfterLast('/')}",
             content = diff.diffContent,
-            icon = Icons.Default.FileOpen,
+            icon = Icons.Default.Difference,
             onDismiss = { showDetailDialog = false },
             isDiffContent = true
         )
@@ -77,7 +77,7 @@ fun FileDiffDisplay(diff: FileDiff) {
 
             Spacer(modifier = Modifier.width(8.dp))
             Icon(
-                imageVector = Icons.Default.FileOpen,
+                imageVector = Icons.Default.Difference,
                 contentDescription = "File Diff",
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp)

@@ -9,6 +9,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.content.FileProvider
 import com.ai.assistance.operit.ui.features.chat.components.ChatStyle
 import androidx.lifecycle.ViewModel
@@ -167,7 +169,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val currentChatId: StateFlow<String?> by lazy { chatHistoryDelegate.currentChatId }
 
     // 消息处理相关
-    val userMessage: StateFlow<String> by lazy { messageProcessingDelegate.userMessage }
+    val userMessage: StateFlow<TextFieldValue> by lazy { messageProcessingDelegate.userMessage }
     val isLoading: StateFlow<Boolean> by lazy { messageProcessingDelegate.isLoading }
     val inputProcessingState: StateFlow<InputProcessingState> by lazy {
         messageProcessingDelegate.inputProcessingState
@@ -254,6 +256,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val _showWebView = MutableStateFlow(false)
     val showWebView: StateFlow<Boolean> = _showWebView
 
+    // 添加工作区状态
+    val isWorkspaceOpen: StateFlow<Boolean> by lazy {
+        combine(currentChatId, chatHistories) { id, histories ->
+            histories.find { it.id == id }?.workspace?.isNotBlank() == true
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    }
+
     // 添加AI电脑显示状态的状态流
     private val _showAiComputer = MutableStateFlow(false)
     val showAiComputer: StateFlow<Boolean> = _showAiComputer
@@ -261,6 +270,14 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 添加WebView刷新控制流 - 使用Int计数器避免重复刷新问题
     private val _webViewRefreshCounter = MutableStateFlow(0)
     val webViewRefreshCounter: StateFlow<Int> = _webViewRefreshCounter
+
+    // 控制工作区文件选择器的可见性
+    private val _showWorkspaceFileSelector = MutableStateFlow(false)
+    val showWorkspaceFileSelector: StateFlow<Boolean> = _showWorkspaceFileSelector.asStateFlow()
+
+    // 工作区文件搜索词
+    private val _workspaceFileSearchQuery = MutableStateFlow("")
+    val workspaceFileSearchQuery: StateFlow<String> = _workspaceFileSearchQuery.asStateFlow()
 
     // 文件选择相关回调
     private var fileChooserCallback: ((Int, Intent?) -> Unit)? = null
@@ -749,7 +766,29 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     // 消息处理相关方法
-    fun updateUserMessage(message: String) = messageProcessingDelegate.updateUserMessage(message)
+    fun updateUserMessage(value: TextFieldValue) {
+        messageProcessingDelegate.updateUserMessage(value)
+        val message = value.text
+        // 当用户输入@且工作-区打开时，显示文件选择器
+        // 新逻辑：提取@后的内容作为搜索词，并根据条件决定是否显示选择器
+        val lastAt = message.lastIndexOf('@')
+        if (isWorkspaceOpen.value && lastAt != -1) {
+            val substringAfterAt = message.substring(lastAt + 1)
+            if (substringAfterAt.contains(' ')) {
+                // 如果@后面有空格，则认为提及结束，隐藏选择器并清空搜索词
+                _showWorkspaceFileSelector.value = false
+                _workspaceFileSearchQuery.value = ""
+            } else {
+                // 如果@后面没有空格，则显示选择器，并更新搜索词
+                _showWorkspaceFileSelector.value = true
+                _workspaceFileSearchQuery.value = substringAfterAt
+            }
+        } else {
+            // 如果没有@或者工作区未打开，则隐藏并清空
+            _showWorkspaceFileSelector.value = false
+            _workspaceFileSearchQuery.value = ""
+        }
+    }
 
     fun sendUserMessage(promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT) {
         messageCoordinationDelegate.sendUserMessage(promptFunctionType)
@@ -844,17 +883,24 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         val attachmentRef = attachmentDelegate.createAttachmentReference(attachment)
 
         // Insert at the end of the current message
-        updateUserMessage("$currentMessage $attachmentRef ")
+        val currentText = currentMessage.text
+        val newText = "$currentText $attachmentRef "
+        updateUserMessage(TextFieldValue(newText, selection = TextRange(newText.length)))
 
         // Show a toast to confirm insertion
         uiStateDelegate.showToast("已插入附件引用: ${attachment.fileName}")
+    }
+
+    /** 隐藏工作区文件选择器 */
+    fun hideWorkspaceFileSelector() {
+        _showWorkspaceFileSelector.value = false
     }
 
     /** Captures the current screen content and attaches it to the message */
     fun captureScreenContent() {
         viewModelScope.launch {
             try {
-                messageProcessingDelegate.updateUserMessage("")
+                messageProcessingDelegate.updateUserMessage(TextFieldValue(""))
                 // 显示屏幕内容获取进度
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取屏幕内容...")
                 uiStateDelegate.showToast("正在获取屏幕内容...")
@@ -876,7 +922,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun captureNotifications() {
         viewModelScope.launch {
             try {
-                messageProcessingDelegate.updateUserMessage("")
+                messageProcessingDelegate.updateUserMessage(TextFieldValue(""))
                 // 显示通知获取进度
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取当前通知...")
                 uiStateDelegate.showToast("正在获取当前通知...")
@@ -898,7 +944,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun captureLocation() {
         viewModelScope.launch {
             try {
-                messageProcessingDelegate.updateUserMessage("")
+                messageProcessingDelegate.updateUserMessage(TextFieldValue(""))
                 // 显示位置获取进度
                 messageProcessingDelegate.setInputProcessingState(true, "正在获取位置信息...")
                 uiStateDelegate.showToast("正在获取位置信息...")
@@ -922,7 +968,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun captureMemoryFolders(folderPaths: List<String>) {
         viewModelScope.launch {
             try {
-                messageProcessingDelegate.updateUserMessage("")
+                messageProcessingDelegate.updateUserMessage(TextFieldValue(""))
                 // 显示记忆文件夹附着进度
                 messageProcessingDelegate.setInputProcessingState(true, "正在附着记忆文件夹...")
                 uiStateDelegate.showToast("正在附着记忆文件夹...")
@@ -993,8 +1039,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 
                 // Set the pre-filled message
                 Log.d(TAG, "Setting pre-filled message")
-                messageProcessingDelegate.updateUserMessage("帮我看看这个文件")
-                
+                messageProcessingDelegate.updateUserMessage(TextFieldValue("帮我看看这个文件"))
+
                 // Clear processing state
                 messageProcessingDelegate.setInputProcessingState(false, "")
                 

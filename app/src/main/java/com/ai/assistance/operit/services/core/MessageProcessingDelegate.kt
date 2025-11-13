@@ -2,6 +2,8 @@ package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
@@ -60,8 +62,8 @@ class MessageProcessingDelegate(
     // 功能配置管理器，用于获取正确的模型配置ID
     private val functionalConfigManager = FunctionalConfigManager(context)
 
-    private val _userMessage = MutableStateFlow("")
-    val userMessage: StateFlow<String> = _userMessage.asStateFlow()
+    private val _userMessage = MutableStateFlow(TextFieldValue(""))
+    val userMessage: StateFlow<TextFieldValue> = _userMessage.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -92,7 +94,11 @@ class MessageProcessingDelegate(
     }
 
     fun updateUserMessage(message: String) {
-        _userMessage.value = message
+        _userMessage.value = TextFieldValue(message)
+    }
+
+    fun updateUserMessage(value: TextFieldValue) {
+        _userMessage.value = value
     }
 
     fun scrollToBottom() {
@@ -112,7 +118,7 @@ class MessageProcessingDelegate(
             tokenUsageThreshold: Double,
             replyToMessage: ChatMessage? = null // 新增回复消息参数
     ) {
-        if (_userMessage.value.isBlank() && attachments.isEmpty()) return
+        if (_userMessage.value.text.isBlank() && attachments.isEmpty()) return
         // 若当前存在其它会话的流式任务，允许“抢占”：取消正在进行的会话并继续发送当前会话的消息
         if (_isLoading.value) {
             val activeId = _activeStreamingChatId.value
@@ -133,8 +139,8 @@ class MessageProcessingDelegate(
             }
         }
 
-        val messageText = _userMessage.value.trim()
-        _userMessage.value = ""
+        val messageText = _userMessage.value.text.trim()
+        _userMessage.value = TextFieldValue("")
         _isLoading.value = true
         // 标记当前活跃的流式会话
         _activeStreamingChatId.value = chatId

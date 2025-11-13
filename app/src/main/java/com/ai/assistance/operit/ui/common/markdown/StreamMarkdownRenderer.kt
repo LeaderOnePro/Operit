@@ -751,7 +751,7 @@ private fun synchronizeRenderNodes(
             // 如果节点内容发生变化，则更新
             if (renderNodes[i] != stableNode) {
                 renderNodes[i] = stableNode
-                Log.d(TAG, "【渲染性能】最终同步：替换节点 at index $i")
+                // Log.d(TAG, "【渲染性能】最终同步：替换节点 at index $i")
             }
         } else {
             // 添加新节点
