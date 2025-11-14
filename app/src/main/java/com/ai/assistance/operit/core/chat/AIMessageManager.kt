@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import com.ai.assistance.operit.data.model.InputProcessingState
 
 /**
  * 单例对象，负责管理与 EnhancedAIService 的所有通信。
@@ -197,7 +198,7 @@ object AIMessageManager {
                     
                     // 设置执行计划的特定UI状态
                     enhancedAiService.setInputProcessingState(
-                        com.ai.assistance.operit.data.model.InputProcessingState.ExecutingPlan("正在执行深度搜索...")
+                        InputProcessingState.ExecutingPlan("正在执行深度搜索...")
                     )
                     
                     // 使用深度搜索模式

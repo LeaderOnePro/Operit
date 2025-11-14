@@ -10,6 +10,7 @@ import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.stream
 import com.google.gson.Gson
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 计划模式管理器，负责协调整个深度搜索模式的执行
@@ -18,6 +19,8 @@ class PlanModeManager(
     private val context: Context,
     private val enhancedAIService: EnhancedAIService
 ) {
+    private val isCancelled = AtomicBoolean(false)
+
     companion object {
         private const val TAG = "PlanModeManager"
         
@@ -82,6 +85,7 @@ class PlanModeManager(
         onNonFatalError: suspend (error: String) -> Unit
     ): Stream<String> = stream {
         
+        isCancelled.set(false) // 重置取消状态
         try {
             // 开始时设置执行状态，整个计划执行期间保持这个状态
             enhancedAIService.setInputProcessingState(
@@ -105,6 +109,11 @@ class PlanModeManager(
                 onNonFatalError
             )
             
+            if (isCancelled.get()) {
+                emit("<log>🟡 任务已取消。</log>\n")
+                return@stream
+            }
+
             if (executionGraph == null) {
                 emit("<error>❌ 无法生成有效的执行计划，切换回普通模式</error>\n")
                 // 计划生成失败，恢复idle状态
@@ -141,6 +150,12 @@ class PlanModeManager(
             executionStream.collect { message ->
                 emit(message)
             }
+
+            if (isCancelled.get()) {
+                emit("<log>🟡 任务已取消，正在停止...</log>\n")
+                emit("</plan>\n")
+                return@stream
+            }
             
             emit("<log>🎯 所有子任务执行完成，开始汇总结果...</log>\n")
             
@@ -172,12 +187,19 @@ class PlanModeManager(
             )
             
         } catch (e: Exception) {
-            Log.e(TAG, "深度搜索模式执行失败", e)
-            emit("<error>❌ 深度搜索模式执行失败: ${e.message}</error>\n")
-            // 执行失败，设置为idle状态
+            if (e is kotlinx.coroutines.CancellationException || isCancelled.get()) {
+                Log.d(TAG, "深度搜索模式被取消")
+                emit("<log>🟡 深度搜索模式已取消。</log>\n")
+            } else {
+                Log.e(TAG, "深度搜索模式执行失败", e)
+                emit("<error>❌ 深度搜索模式执行失败: ${e.message}</error>\n")
+            }
+            // 执行失败或取消，设置为idle状态
             enhancedAIService.setInputProcessingState(
                 InputProcessingState.Idle
             )
+        } finally {
+            isCancelled.set(false) // 确保在退出时重置状态
         }
     }
     
@@ -197,20 +219,23 @@ class PlanModeManager(
             val planningRequest = buildPlanningRequest(userMessage)
             
             // 调用 AI 生成计划
-            val planningStream = enhancedAIService.sendMessage(
-                message = planningRequest,
-                chatHistory = emptyList(), // 规划阶段使用空历史，专注于当前任务
-                workspacePath = workspacePath,
-                functionType = FunctionType.CHAT,
-                promptFunctionType = PromptFunctionType.CHAT,
+            // 获取专门用于聊天的AI服务实例
+            val planningService = EnhancedAIService.getAIServiceForFunction(context, FunctionType.CHAT)
+
+            // 使用获取到的服务实例来发送规划请求
+            // 准备包含系统提示词的聊天历史
+            val planningHistory = listOf(Pair("system", planningRequest))
+
+            // 使用获取到的服务实例来发送规划请求
+            val planningStream = planningService.sendMessage(
+                message = "请为这个请求生成详细的执行计划",
+                chatHistory = planningHistory, // 传入包含系统提示词的历史
+                modelParameters = emptyList(), // 修正类型为 List
                 enableThinking = false,
-                thinkingGuidance = false,
-                enableMemoryQuery = false,
-                maxTokens = maxTokens,
-                tokenUsageThreshold = tokenUsageThreshold,
+                stream = true, // 明确启用流式传输
+                onTokensUpdated = { _, _, _ -> }, // 空的 token 更新回调
                 onNonFatalError = onNonFatalError
             )
-            
             // 收集规划结果
             val planBuilder = StringBuilder()
             planningStream.collect { chunk ->
@@ -238,7 +263,11 @@ class PlanModeManager(
             return executionGraph
             
         } catch (e: Exception) {
-            Log.e(TAG, "生成执行计划时发生错误", e)
+            if (e is kotlinx.coroutines.CancellationException) {
+                Log.d(TAG, "执行计划生成被取消")
+            } else {
+                Log.e(TAG, "生成执行计划时发生错误", e)
+            }
             return null
         }
     }
@@ -252,8 +281,6 @@ $PLAN_GENERATION_PROMPT
 
 用户请求：
 $userMessage
-
-请为这个请求生成详细的执行计划。
         """.trim()
     }
     
@@ -261,7 +288,11 @@ $userMessage
      * 取消当前执行
      */
     fun cancel() {
+        isCancelled.set(true)
         taskExecutor.cancelAllTasks()
+        // 可以在这里取消正在进行的 planningService.sendMessage
+        // 但由于 planningService 是局部变量，需要修改结构或依赖注入
+        Log.d(TAG, "PlanModeManager cancel called")
     }
     
     /**
