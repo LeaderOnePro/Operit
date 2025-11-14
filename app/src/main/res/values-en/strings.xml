@@ -292,6 +292,8 @@
     <string name="delete_from_here">Delete From Here</string>
     <string name="multi_select">Multi-select</string>
     <string name="exit_multi_select">Exit Multi-select</string>
+    <string name="select_all_messages">Select all</string>
+    <string name="clear_selection">Clear selection</string>
     <string name="delete_selected">Delete Selected</string>
     <string name="share_selected">Share</string>
     <string name="selected_count">%d selected</string>
@@ -366,6 +368,8 @@
     <string name="microphone_permission_floating_required">Floating window feature requires microphone permission for voice interaction</string>
     
     <!-- AI Tools -->
+    <string name="max_mode_title">Max Mode</string>
+    <string name="max_mode_info">When Max Mode (extra-large context) is on, the context window is %2$sk. Turn it off to return to %1$sk. You can customize these values in Settings.</string>
     <string name="ai_tools_enabled">AI Tools Enabled</string>
     <string name="tools_extracting">Detecting tool calls...</string>
     <string name="tools_executing">Executing tool: %1$s</string>
@@ -3136,4 +3140,6 @@
     <string name="dialog_message_orientation_change">Screen orientation has changed. Reload the page?</string>
     <string name="dialog_button_confirm">Reload</string>
     <string name="dialog_button_dismiss">Cancel</string>
+    <string name="settings_context_card_title">Setup Instructions:</string>
+    <string name="settings_context_card_content">· Context Length: Recommended to set to your daily maximum usage value.\n· Max Context Length: Recommended to set to the maximum value supported by the model API.\nThe software will automatically compress the context when the threshold is reached to prevent exceeding the limit. Note that a larger context is not always better; user cooperation with the software is required.</string>
 </resources>

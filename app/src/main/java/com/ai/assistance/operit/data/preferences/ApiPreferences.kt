@@ -108,6 +108,8 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Key for Context Length
         val CONTEXT_LENGTH = floatPreferencesKey("context_length")
+        val MAX_CONTEXT_LENGTH = floatPreferencesKey("max_context_length")
+        val ENABLE_MAX_CONTEXT_MODE = booleanPreferencesKey("enable_max_context_mode")
 
         // Key for Summary Token Threshold
         val SUMMARY_TOKEN_THRESHOLD = floatPreferencesKey("summary_token_threshold")
@@ -161,6 +163,8 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Default value for Context Length (in K)
         const val DEFAULT_CONTEXT_LENGTH = 48.0f
+        const val DEFAULT_MAX_CONTEXT_LENGTH = 128.0f
+        const val DEFAULT_ENABLE_MAX_CONTEXT_MODE = false
 
         // Default value for Summary Token Threshold
         const val DEFAULT_SUMMARY_TOKEN_THRESHOLD = 0.70f
@@ -320,12 +324,21 @@ class ApiPreferences private constructor(private val context: Context) {
         context.apiDataStore.data.map { preferences ->
             preferences[CONTEXT_LENGTH] ?: DEFAULT_CONTEXT_LENGTH
         }
+// Flow for Summary Token Threshold
+val summaryTokenThresholdFlow: Flow<Float> =
+    context.apiDataStore.data.map { preferences ->
+        preferences[SUMMARY_TOKEN_THRESHOLD] ?: DEFAULT_SUMMARY_TOKEN_THRESHOLD
+    }
 
-    // Flow for Summary Token Threshold
-    val summaryTokenThresholdFlow: Flow<Float> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[SUMMARY_TOKEN_THRESHOLD] ?: DEFAULT_SUMMARY_TOKEN_THRESHOLD
-        }
+val maxContextLengthFlow: Flow<Float> =
+    context.apiDataStore.data.map { preferences ->
+        preferences[MAX_CONTEXT_LENGTH] ?: DEFAULT_MAX_CONTEXT_LENGTH
+    }
+
+val enableMaxContextModeFlow: Flow<Boolean> =
+    context.apiDataStore.data.map { preferences ->
+        preferences[ENABLE_MAX_CONTEXT_MODE] ?: DEFAULT_ENABLE_MAX_CONTEXT_MODE
+    }
 
     // Custom Prompt Flows
     val customIntroPromptFlow: Flow<String> =
@@ -512,6 +525,18 @@ class ApiPreferences private constructor(private val context: Context) {
         context.apiDataStore.edit { preferences ->
             preferences[SHOW_FPS_COUNTER] = showFpsCounter
             preferences[KEEP_SCREEN_ON] = keepScreenOn
+        }
+    }
+
+    suspend fun saveMaxContextLength(length: Float) {
+        context.apiDataStore.edit { preferences ->
+            preferences[MAX_CONTEXT_LENGTH] = length
+        }
+    }
+
+    suspend fun saveEnableMaxContextMode(isEnabled: Boolean) {
+        context.apiDataStore.edit { preferences ->
+            preferences[ENABLE_MAX_CONTEXT_MODE] = isEnabled
         }
     }
 
@@ -886,6 +911,8 @@ class ApiPreferences private constructor(private val context: Context) {
         context.apiDataStore.edit { preferences ->
             // Context Settings
             preferences[CONTEXT_LENGTH] = DEFAULT_CONTEXT_LENGTH
+            preferences[MAX_CONTEXT_LENGTH] = DEFAULT_MAX_CONTEXT_LENGTH
+            preferences[ENABLE_MAX_CONTEXT_MODE] = DEFAULT_ENABLE_MAX_CONTEXT_MODE
 
             // Summary Settings
             preferences[ENABLE_SUMMARY] = DEFAULT_ENABLE_SUMMARY

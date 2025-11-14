@@ -352,6 +352,8 @@
     <string name="disable_tools">禁用工具</string>
     <string name="disable_tools_desc">禁用后，AI将无法调用文件系统、HTTP等常规工具。但如果"记忆附着"开关开启，AI仍可访问记忆库进行知识查询和管理</string>
     <string name="tools_disabled">工具已禁用</string>
+    <string name="max_mode_title">Max模式</string>
+    <string name="max_mode_info">Max Mode（超大上下文模式）开启后将使用 %2$sk 上下文窗口，关闭则回到 %1$sk。您可以在设置中自定义这些数值。</string>
     <string name="processing_input">正在处理输入...</string>
     <string name="references">参考资料:</string>
     <string name="tool_weather">天气查询</string>
@@ -1019,6 +1021,8 @@
     <string name="delete_from_here">删除到此</string>
     <string name="multi_select">多选</string>
     <string name="exit_multi_select">退出多选</string>
+    <string name="select_all_messages">全选</string>
+    <string name="clear_selection">取消全选</string>
     <string name="delete_selected">删除选中</string>
     <string name="share_selected">分享</string>
     <string name="selected_count">已选择 %d 条</string>
@@ -3133,4 +3137,6 @@
     <string name="dialog_message_orientation_change">检测到屏幕方向发生变化，是否重新加载页面？</string>
     <string name="dialog_button_confirm">重新加载</string>
     <string name="dialog_button_dismiss">取消</string>
+    <string name="settings_context_card_title">设置说明:</string>
+    <string name="settings_context_card_content">· 上下文长度: 建议设为您日常使用的最大值。\n· 最大上下文长度: 建议设为模型API支持的最大值。\n软件会在上下文达到阈值时自动压缩，以防超限。请注意，上下文并非越大越好，需用户与软件协同配合。</string>
 </resources>

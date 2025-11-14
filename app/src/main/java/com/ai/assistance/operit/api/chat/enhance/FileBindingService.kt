@@ -248,17 +248,20 @@ class FileBindingService(context: Context) {
                     i++
                 }
 
+                val normalizedOld = oldContent.trimTrailingNewline()
+                val normalizedNew = newContent.trimTrailingNewline()
+
                 // Basic validation
-                if ((action == EditAction.REPLACE || action == EditAction.DELETE) && oldContent.isBlank()) {
+                if ((action == EditAction.REPLACE || action == EditAction.DELETE) && normalizedOld.isBlank()) {
                     i++
                     continue // Skip invalid operation
                 }
-                if (action == EditAction.REPLACE && newContent.isBlank()) {
+                if (action == EditAction.REPLACE && normalizedNew.isBlank()) {
                     i++
                     continue // Skip invalid operation
                 }
 
-                operations.add(EditOperation(action, oldContent.trim(), newContent.trim()))
+                operations.add(EditOperation(action, normalizedOld, normalizedNew))
             }
             i++
         }
@@ -349,4 +352,6 @@ class FileBindingService(context: Context) {
         val transpositions = t / 2.0
         return ((matches.toDouble() / len1) + (matches.toDouble() / len2) + ((matches - transpositions) / matches)) / 3.0
     }
+
+    private fun String.trimTrailingNewline(): String = this.trimEnd('\n', '\r')
 }

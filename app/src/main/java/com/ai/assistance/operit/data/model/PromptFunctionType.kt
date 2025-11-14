@@ -6,6 +6,5 @@ package com.ai.assistance.operit.data.model
 enum class PromptFunctionType {
     CHAT,
     VOICE,
-    DESKTOP_PET,
-    CONTINUE_FROM_SUMMARY
+    DESKTOP_PET
 }

@@ -50,6 +50,8 @@ fun ContextSummarySettingsScreen(
 
         // State for UI components - using String to hold input
         var contextLengthInput by remember { mutableStateOf("") }
+        var maxContextLengthInput by remember { mutableStateOf("") }
+        var enableMaxContextMode by remember { mutableStateOf(false) }
         var summaryTokenThresholdInput by remember { mutableStateOf("") }
         var enableSummary by remember { mutableStateOf(false) }
         var enableSummaryByMessageCount by remember { mutableStateOf(false) }
@@ -64,6 +66,8 @@ fun ContextSummarySettingsScreen(
         // Load initial values once and convert to String
         LaunchedEffect(Unit) {
             contextLengthInput = (apiPreferences.contextLengthFlow.first()).toString()
+            maxContextLengthInput = (apiPreferences.maxContextLengthFlow.first()).toString()
+            enableMaxContextMode = apiPreferences.enableMaxContextModeFlow.first()
             summaryTokenThresholdInput = apiPreferences.summaryTokenThresholdFlow.first().toString()
             enableSummary = apiPreferences.enableSummaryFlow.first()
             enableSummaryByMessageCount = apiPreferences.enableSummaryByMessageCountFlow.first()
@@ -99,6 +103,7 @@ fun ContextSummarySettingsScreen(
             }
 
             if (!validateFloat(contextLengthInput, "上下文长度")) return false
+            if (!validateFloat(maxContextLengthInput, "最大上下文长度")) return false
             if (!validateFloat(summaryTokenThresholdInput, "总结触发阈值")) return false
             if (!validateInt(summaryMessageCountThresholdInput, "消息数量阈值")) return false
             if (!validateInt(maxFileSizeBytesInput, "最大文件大小")) return false
@@ -120,6 +125,8 @@ fun ContextSummarySettingsScreen(
             scope.launch {
                 // All values are already validated, so toFloat/toInt is safe
                 apiPreferences.saveContextLength(contextLengthInput.toFloat())
+                apiPreferences.saveMaxContextLength(maxContextLengthInput.toFloat())
+                apiPreferences.saveEnableMaxContextMode(enableMaxContextMode)
                 apiPreferences.saveSummaryTokenThreshold(summaryTokenThresholdInput.toFloat())
                 apiPreferences.saveEnableSummary(enableSummary)
                 apiPreferences.saveEnableSummaryByMessageCount(enableSummaryByMessageCount)
@@ -146,6 +153,33 @@ fun ContextSummarySettingsScreen(
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                 .verticalScroll(scrollState)
                 ) {
+
+                        Card(
+                                modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 12.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = stringResource(id = R.string.settings_context_card_title),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = stringResource(id = R.string.settings_context_card_content),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+                        }
                         // ======= 上下文设置 =======
                         SectionTitle(
                                 text = stringResource(id = R.string.settings_context_title),
@@ -162,9 +196,26 @@ fun ContextSummarySettingsScreen(
                             backgroundColor = componentBackgroundColor
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        SettingsInputField(
+                            title = "最大上下文长度",
+                            subtitle = "在Max模式下使用的上下文长度",
+                            value = maxContextLengthInput,
+                            onValueChange = { maxContextLengthInput = it },
+                            unitText = "k",
+                            backgroundColor = componentBackgroundColor
+                        )
 
-                        // ======= 总结设置 =======
+                        CompactToggleWithDescription(
+                            title = "启用Max模式",
+                            description = "使用更大的上下文窗口",
+                            checked = enableMaxContextMode,
+                            onCheckedChange = { enableMaxContextMode = it },
+                            backgroundColor = componentBackgroundColor
+                        )
+ 
+                         Spacer(modifier = Modifier.height(16.dp))
+ 
+                         // ======= 总结设置 =======
                         SectionTitle(
                                 text = stringResource(id = R.string.settings_summary_title),
                                 icon = Icons.Default.Summarize
@@ -276,6 +327,8 @@ fun ContextSummarySettingsScreen(
                                                 apiPreferences.resetContextSummaryAndTruncationSettings()
                                                 // Reload all settings after reset
                                                 contextLengthInput = (apiPreferences.contextLengthFlow.first()).toString()
+                                                maxContextLengthInput = (apiPreferences.maxContextLengthFlow.first()).toString()
+                                                enableMaxContextMode = apiPreferences.enableMaxContextModeFlow.first()
                                                 summaryTokenThresholdInput = apiPreferences.summaryTokenThresholdFlow.first().toString()
                                                 enableSummary = apiPreferences.enableSummaryFlow.first()
                                                 enableSummaryByMessageCount = apiPreferences.enableSummaryByMessageCountFlow.first()

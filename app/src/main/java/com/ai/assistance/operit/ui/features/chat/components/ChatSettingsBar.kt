@@ -22,11 +22,13 @@ import androidx.compose.material.icons.outlined.Portrait
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Whatshot
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Whatshot
 import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,6 +61,7 @@ import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.PromptPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
 import java.text.DecimalFormat
 import kotlinx.coroutines.flow.first
@@ -80,6 +83,8 @@ fun ChatSettingsBar(
     onContextLengthChange: (Float) -> Unit,
     enableMemoryQuery: Boolean,
     onToggleMemoryQuery: () -> Unit,
+    enableMaxContextMode: Boolean,
+    onToggleEnableMaxContextMode: () -> Unit,
     summaryTokenThreshold: Float,
     onSummaryTokenThresholdChange: (Float) -> Unit,
     onNavigateToUserPreferences: () -> Unit,
@@ -108,12 +113,17 @@ fun ChatSettingsBar(
     val scope = rememberCoroutineScope()
     val functionalConfigManager = remember { FunctionalConfigManager(context) }
     val modelConfigManager = remember { ModelConfigManager(context) }
+    val apiPreferences = remember { ApiPreferences.getInstance(context) }
     val configMapping by
             functionalConfigManager.functionConfigMappingFlow.collectAsState(initial = emptyMap())
     var configSummaries by remember { mutableStateOf<List<ModelConfigSummary>>(emptyList()) }
     LaunchedEffect(Unit) { configSummaries = modelConfigManager.getAllConfigSummaries() }
     val currentConfigId =
             configMapping[FunctionType.CHAT] ?: FunctionalConfigManager.DEFAULT_CONFIG_ID
+    
+    // 获取上下文长度设置，用于显示在 MaxMode 描述中
+    val normalContextLength by apiPreferences.contextLengthFlow.collectAsState(initial = ApiPreferences.DEFAULT_CONTEXT_LENGTH)
+    val maxContextLength by apiPreferences.maxContextLengthFlow.collectAsState(initial = ApiPreferences.DEFAULT_MAX_CONTEXT_LENGTH)
             
     // 新增：用户偏好（记忆）选择逻辑
     val userPreferencesManager = remember { UserPreferencesManager(context) }
@@ -222,6 +232,15 @@ fun ChatSettingsBar(
                     )
                 }
  
+                AnimatedVisibility(visible = enableMaxContextMode) {
+                    Icon(
+                        imageVector = Icons.Rounded.Whatshot,
+                        contentDescription = stringResource(R.string.max_mode_title),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                  IconButton(onClick = { showMenu = !showMenu }, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.Tune,
@@ -321,6 +340,33 @@ fun ChatSettingsBar(
                                 onInfoClick = {
                                         infoPopupContent =
                                                 context.getString(R.string.memory_attachment) to context.getString(R.string.memory_attachment_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            // Max模式
+                            SettingItem(
+                                title = stringResource(R.string.max_mode_title),
+                                icon = if (enableMaxContextMode) Icons.Rounded.Whatshot else Icons.Outlined.Whatshot,
+                                iconTint = if (enableMaxContextMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                isChecked = enableMaxContextMode,
+                                onToggle = onToggleEnableMaxContextMode,
+                                onInfoClick = {
+                                    val normalLengthText = if (normalContextLength % 1f == 0f) {
+                                        normalContextLength.toInt().toString()
+                                    } else {
+                                        String.format("%.1f", normalContextLength)
+                                    }
+                                    val maxLengthText = if (maxContextLength % 1f == 0f) {
+                                        maxContextLength.toInt().toString()
+                                    } else {
+                                        String.format("%.1f", maxContextLength)
+                                    }
+                                    infoPopupContent = context.getString(R.string.max_mode_title) to context.getString(
+                                        R.string.max_mode_info,
+                                        normalLengthText,
+                                        maxLengthText
+                                    )
                                     showMenu = false
                                 }
                             )

@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -56,7 +58,17 @@ class ApiConfigDelegate(
     val enableAutoRead: StateFlow<Boolean> = _enableAutoRead.asStateFlow()
 
     private val _contextLength = MutableStateFlow(ApiPreferences.DEFAULT_CONTEXT_LENGTH)
-    val contextLength: StateFlow<Float> = _contextLength.asStateFlow()
+    private val _maxContextLength = MutableStateFlow(ApiPreferences.DEFAULT_MAX_CONTEXT_LENGTH)
+    private val _enableMaxContextMode = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_MAX_CONTEXT_MODE)
+    val enableMaxContextMode: StateFlow<Boolean> = _enableMaxContextMode.asStateFlow()
+
+    val contextLength: StateFlow<Float> = combine(
+        _enableMaxContextMode,
+        _contextLength,
+        _maxContextLength
+    ) { isMaxMode, normalLength, maxLength ->
+        if (isMaxMode) maxLength else normalLength
+    }.stateIn(coroutineScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, ApiPreferences.DEFAULT_CONTEXT_LENGTH)
 
     private val _summaryTokenThreshold =
             MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_TOKEN_THRESHOLD)
@@ -176,6 +188,18 @@ class ApiConfigDelegate(
         coroutineScope.launch {
             apiPreferences.contextLengthFlow.collect { length ->
                 _contextLength.value = length
+            }
+        }
+
+        coroutineScope.launch {
+            apiPreferences.maxContextLengthFlow.collect { length ->
+                _maxContextLength.value = length
+            }
+        }
+
+        coroutineScope.launch {
+            apiPreferences.enableMaxContextModeFlow.collect { isEnabled ->
+                _enableMaxContextMode.value = isEnabled
             }
         }
 
@@ -354,7 +378,6 @@ class ApiConfigDelegate(
             _contextLength.value = length
         }
     }
-
     fun updateSummaryTokenThreshold(threshold: Float) {
         coroutineScope.launch {
             apiPreferences.saveSummaryTokenThreshold(threshold)
@@ -362,6 +385,20 @@ class ApiConfigDelegate(
         }
     }
 
+    fun updateMaxContextLength(length: Float) {
+        coroutineScope.launch {
+            apiPreferences.saveMaxContextLength(length)
+            _maxContextLength.value = length
+        }
+    }
+
+    fun toggleEnableMaxContextMode() {
+        coroutineScope.launch {
+            val newValue = !_enableMaxContextMode.value
+            apiPreferences.saveEnableMaxContextMode(newValue)
+            _enableMaxContextMode.value = newValue
+        }
+    }
     /** 切换启用总结功能 */
     fun toggleEnableSummary() {
         coroutineScope.launch {

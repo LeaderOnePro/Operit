@@ -159,6 +159,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 上下文长度
     val maxWindowSizeInK: StateFlow<Float> by lazy { apiConfigDelegate.contextLength }
+    val enableMaxContextMode: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMaxContextMode }
 
     // 聊天历史相关
     val chatHistory: StateFlow<List<ChatMessage>> by lazy { chatHistoryDelegate.chatHistory }
@@ -485,6 +486,14 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 更新上下文长度
     fun updateContextLength(length: Float) {
         apiConfigDelegate.updateContextLength(length)
+    }
+
+    fun updateMaxContextLength(length: Float) {
+        apiConfigDelegate.updateMaxContextLength(length)
+    }
+
+    fun toggleEnableMaxContextMode() {
+        apiConfigDelegate.toggleEnableMaxContextMode()
     }
 
     fun updateSummaryTokenThreshold(threshold: Float) {

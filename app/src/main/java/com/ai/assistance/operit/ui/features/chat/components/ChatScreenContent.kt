@@ -42,6 +42,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.OutlinedTextField
@@ -126,6 +127,11 @@ fun ChatScreenContent(
     // 多选模式状态
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedMessageIndices by remember { mutableStateOf(setOf<Int>()) }
+    val selectableMessageIndices = remember(chatHistory) {
+        chatHistory.mapIndexedNotNull { index, message ->
+            if (message.sender == "user" || message.sender == "ai") index else null
+        }.toSet()
+    }
     var isGeneratingImage by remember { mutableStateOf(false) }
 
     // 获取WebView状态
@@ -337,6 +343,32 @@ fun ChatScreenContent(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val allSelectableSelected =
+                            selectableMessageIndices.isNotEmpty() &&
+                                    selectableMessageIndices.all { selectedMessageIndices.contains(it) }
+
+                        TextButton(
+                            onClick = {
+                                selectedMessageIndices =
+                                        if (allSelectableSelected) {
+                                            emptySet()
+                                        } else {
+                                            selectableMessageIndices
+                                        }
+                            },
+                            enabled = selectableMessageIndices.isNotEmpty(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SelectAll,
+                                contentDescription = stringResource(
+                                        if (allSelectableSelected) R.string.clear_selection else R.string.select_all_messages
+                                ),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
                         // 分享按钮
                         FilledIconButton(
                             onClick = {

@@ -189,6 +189,7 @@ fun AIChatScreen(
     val enableThinkingGuidance by
             actualViewModel.enableThinkingGuidance.collectAsState() // 收集思考引导状态
     val enableMemoryQuery by actualViewModel.enableMemoryQuery.collectAsState()
+    val enableMaxContextMode by actualViewModel.enableMaxContextMode.collectAsState()
     val enableTools by actualViewModel.enableTools.collectAsState()
     val disableStreamOutput by actualViewModel.disableStreamOutput.collectAsState()
     val summaryTokenThreshold by actualViewModel.summaryTokenThreshold.collectAsState()
@@ -697,6 +698,10 @@ fun AIChatScreen(
                                 enableMemoryQuery = enableMemoryQuery,
                                 onToggleMemoryQuery = {
                                     actualViewModel.toggleMemoryQuery()
+                                },
+                                enableMaxContextMode = enableMaxContextMode,
+                                onToggleEnableMaxContextMode = {
+                                    actualViewModel.toggleEnableMaxContextMode()
                                 },
                                 summaryTokenThreshold = summaryTokenThreshold,
                                 onSummaryTokenThresholdChange = {
