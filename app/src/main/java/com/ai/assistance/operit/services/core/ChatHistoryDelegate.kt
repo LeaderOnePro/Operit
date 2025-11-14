@@ -215,9 +215,8 @@ class ChatHistoryDelegate(
             saveCurrentChat(inputTokens, outputTokens, windowSize) // 切换前使用正确的窗口大小保存
 
             chatHistoryManager.setCurrentChatId(chatId)
-            _currentChatId.value = chatId
-
-            loadChatMessages(chatId)
+            // _currentChatId.value will be updated by the collector, no need to set it here.
+            // loadChatMessages(chatId) is also called by the collector.
 
             delay(200)
             onScrollToBottom()
