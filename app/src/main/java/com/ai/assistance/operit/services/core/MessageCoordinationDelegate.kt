@@ -42,6 +42,9 @@ class MessageCoordinationDelegate(
     // 总结状态
     private val _isSummarizing = MutableStateFlow(false)
     val isSummarizing: StateFlow<Boolean> = _isSummarizing.asStateFlow()
+    
+    // 保存当前的 promptFunctionType，用于自动继续时保持提示词一致性
+    private var currentPromptFunctionType: PromptFunctionType = PromptFunctionType.CHAT
 
     /**
      * 发送用户消息
@@ -70,7 +73,10 @@ class MessageCoordinationDelegate(
                     return@launch
                 }
 
-                Log.d(TAG, "新对话创建完成，ID: ${chatHistoryDelegate.currentChatId.value}，现在发送消息")
+                Log.d(
+                    TAG,
+                    "新对话创建完成，ID: ${chatHistoryDelegate.currentChatId.value}，现在发送消息"
+                )
 
                 // 对话创建完成后，发送消息
                 sendMessageInternal(promptFunctionType)
@@ -84,7 +90,16 @@ class MessageCoordinationDelegate(
     /**
      * 内部发送消息的逻辑
      */
-    private fun sendMessageInternal(promptFunctionType: PromptFunctionType) {
+    private fun sendMessageInternal(
+        promptFunctionType: PromptFunctionType,
+        isContinuation: Boolean = false,
+        skipSummaryCheck: Boolean = false,
+        isAutoContinuation: Boolean = false
+    ) {
+        // 如果不是自动续写，更新当前的 promptFunctionType
+        if (!isAutoContinuation) {
+            currentPromptFunctionType = promptFunctionType
+        }
         // 获取当前聊天ID和工作区路径
         val chatId = chatHistoryDelegate.currentChatId.value
         val currentChat = chatHistoryDelegate.chatHistories.value.find { it.id == chatId }
@@ -96,73 +111,58 @@ class MessageCoordinationDelegate(
         // 获取当前附件列表
         val currentAttachments = attachmentDelegate.attachments.value
 
-        // 使用 AIMessageManager 检查是否应该生成总结
-        val currentMessages = chatHistoryDelegate.chatHistory.value
-        val currentTokens = tokenStatsDelegate.currentWindowSizeFlow.value
-        val maxTokens = (apiConfigDelegate.contextLength.value * 1024).toInt()
+        // 如果不是续写，检查是否需要总结
+        if (!isContinuation && !skipSummaryCheck) {
+            val currentMessages = chatHistoryDelegate.chatHistory.value
+            val currentTokens = tokenStatsDelegate.currentWindowSizeFlow.value
+            val maxTokens = (apiConfigDelegate.contextLength.value * 1024).toInt()
 
-        val isShouldGenerateSummary = AIMessageManager.shouldGenerateSummary(
-            messages = currentMessages,
-            currentTokens = currentTokens,
-            maxTokens = maxTokens,
-            tokenUsageThreshold = apiConfigDelegate.summaryTokenThreshold.value.toDouble(),
-            enableSummary = apiConfigDelegate.enableSummary.value,
-            enableSummaryByMessageCount = apiConfigDelegate.enableSummaryByMessageCount.value,
-            summaryMessageCountThreshold = apiConfigDelegate.summaryMessageCountThreshold.value
-        )
+            val isShouldGenerateSummary = AIMessageManager.shouldGenerateSummary(
+                messages = currentMessages,
+                currentTokens = currentTokens,
+                maxTokens = maxTokens,
+                tokenUsageThreshold = apiConfigDelegate.summaryTokenThreshold.value.toDouble(),
+                enableSummary = apiConfigDelegate.enableSummary.value,
+                enableSummaryByMessageCount = apiConfigDelegate.enableSummaryByMessageCount.value,
+                summaryMessageCountThreshold = apiConfigDelegate.summaryMessageCountThreshold.value
+            )
 
-        if (isShouldGenerateSummary) {
-            _isSummarizing.value = true
-            // 1. 在调用挂起函数之前，根据当前的消息快照预先计算好插入位置
-            val insertPosition = chatHistoryDelegate.findProperSummaryPosition(currentMessages)
+            if (isShouldGenerateSummary) {
+                // 主动触发总结，总结后会自动继续
+                // 保存当前输入，清空输入框，并立即更新UI状态为总结中
+                val userInput = messageProcessingDelegate.userMessage.value.text
+                messageProcessingDelegate.updateUserMessage("") // 清空输入框
+                messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Summarizing("正在压缩历史记录..."))
 
-            // 2. 异步触发总结生成
-            coroutineScope.launch(Dispatchers.IO) {
-                try {
-                    getEnhancedAiService()?.let { service ->
-                        // 传入快照进行总结
-                        val summaryMessage = AIMessageManager.summarizeMemory(service, currentMessages)
-                        summaryMessage?.let {
-                            // 3. 使用预先计算好的位置插入总结消息
-                            chatHistoryDelegate.addSummaryMessage(it, insertPosition)
-
-                            // 4. 更新窗口大小
-                            val newHistoryForTokens = AIMessageManager.getMemoryFromMessages(chatHistoryDelegate.chatHistory.value)
-                            val chatService = service.getAIServiceForFunction(FunctionType.CHAT)
-                            val newWindowSize = chatService.calculateInputTokens("", newHistoryForTokens)
-                            val inputTokens = tokenStatsDelegate.cumulativeInputTokensFlow.value
-                            val outputTokens = tokenStatsDelegate.cumulativeOutputTokensFlow.value
-                            chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, newWindowSize)
-                            // 更新UI上的显示
-                            withContext(Dispatchers.Main) {
-                                tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, newWindowSize)
-                            }
-                            Log.d(TAG, "总结完成，更新窗口大小为: $newWindowSize")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "生成总结时出错: ${e.message}", e)
-                    uiStateDelegate.showErrorMessage("生成聊天总结时出错: ${e.message}")
-                } finally {
-                    _isSummarizing.value = false
-                    // 如果UI还在显示总结状态，则更新为完成
-                    if (messageProcessingDelegate.inputProcessingState.value is InputProcessingState.Summarizing) {
-                        messageProcessingDelegate.handleInputProcessingState(
-                            InputProcessingState.Completed
+                coroutineScope.launch {
+                    val summarySuccess = summarizeHistory(autoContinue = false, promptFunctionType = promptFunctionType)
+                    if (summarySuccess) {
+                        // 总结成功后，恢复用户输入并继续发送
+                        messageProcessingDelegate.updateUserMessage(userInput)
+                        sendMessageInternal(
+                            promptFunctionType = promptFunctionType,
+                            isContinuation = false, // 仍然是用户发起
+                            skipSummaryCheck = true // 跳过再次检查
                         )
+                    } else {
+                        // 总结失败，恢复用户输入并提示
+                        messageProcessingDelegate.updateUserMessage(userInput)
+                        uiStateDelegate.showErrorMessage("历史记录总结失败，消息未发送")
                     }
                 }
+                return // 阻止当前的消息发送流程
             }
         }
 
+
         // 检测是否附着了记忆文件夹
-        val hasMemoryFolder = currentAttachments.any { 
-            it.fileName == "memory_context.xml" && it.mimeType == "application/xml" 
+        val hasMemoryFolder = currentAttachments.any {
+            it.fileName == "memory_context.xml" && it.mimeType == "application/xml"
         }
-        
+
         // 如果附着了记忆文件夹，临时启用记忆查询功能
         val shouldEnableMemoryQuery = apiConfigDelegate.enableMemoryQuery.value || hasMemoryFolder
-        
+
         // 调用messageProcessingDelegate发送消息，并传递附件信息和工作区路径
         messageProcessingDelegate.sendUserMessage(
             attachments = currentAttachments,
@@ -173,12 +173,10 @@ class MessageCoordinationDelegate(
             thinkingGuidance = apiConfigDelegate.enableThinkingGuidance.value,
             enableMemoryQuery = shouldEnableMemoryQuery,
             enableWorkspaceAttachment = !workspacePath.isNullOrBlank(),
-            maxTokens = maxTokens,
-            //如果记忆总结没开，直接调1；如果已经在生成总结了，那么这个值可以宽松一点，让下一次对话不会被截断
-            tokenUsageThreshold = if (!apiConfigDelegate.enableSummary.value) 1.0 
-                                 else if (isShouldGenerateSummary) apiConfigDelegate.summaryTokenThreshold.value.toDouble() + 0.5 
-                                 else apiConfigDelegate.summaryTokenThreshold.value.toDouble(),
-            replyToMessage = getReplyToMessage()
+            maxTokens = (apiConfigDelegate.contextLength.value * 1024).toInt(),
+            tokenUsageThreshold = apiConfigDelegate.summaryTokenThreshold.value.toDouble(),
+            replyToMessage = getReplyToMessage(),
+            isAutoContinuation = isAutoContinuation
         )
 
         // 在sendMessageInternal中，添加对nonFatalErrorEvent的收集
@@ -188,16 +186,14 @@ class MessageCoordinationDelegate(
             }
         }
 
-        // 发送后清空附件列表
-        if (currentAttachments.isNotEmpty()) {
-            attachmentDelegate.clearAttachments()
+        // 只有在非续写（即用户主动发送）时才清空附件和UI状态
+        if (!isContinuation) {
+            if (currentAttachments.isNotEmpty()) {
+                attachmentDelegate.clearAttachments()
+            }
+            resetAttachmentPanelState()
+            clearReplyToMessage()
         }
-
-        // 重置附件面板状态 - 在发送消息后关闭附件面板
-        resetAttachmentPanelState()
-
-        // 清除回复状态
-        clearReplyToMessage()
     }
 
     /**
@@ -219,7 +215,8 @@ class MessageCoordinationDelegate(
                 // Convert ChatMessage list to List<Pair<String, String>>
                 val history = chatHistoryDelegate.chatHistory.value.map { it.sender to it.content }
                 // Get the last message content
-                val lastMessageContent = chatHistoryDelegate.chatHistory.value.lastOrNull()?.content ?: ""
+                val lastMessageContent =
+                    chatHistoryDelegate.chatHistory.value.lastOrNull()?.content ?: ""
 
                 enhancedAiService.saveConversationToMemory(
                     history,
@@ -232,5 +229,93 @@ class MessageCoordinationDelegate(
             }
         }
     }
-}
 
+    /**
+     * 处理Token超限的情况，触发一次历史总结并继续。
+     */
+    fun handleTokenLimitExceeded() {
+        Log.d(TAG, "接收到Token超限信号，开始执行总结并继续...")
+        coroutineScope.launch {
+            summarizeHistory(autoContinue = true)
+        }
+    }
+
+    /**
+     * 执行历史总结并自动继续对话的核心逻辑
+     */
+    private suspend fun summarizeHistory(
+        autoContinue: Boolean = true,
+        promptFunctionType: PromptFunctionType? = null
+    ): Boolean {
+        if (_isSummarizing.value) {
+            Log.d(TAG, "已在总结中，忽略本次请求")
+            return false
+        }
+        _isSummarizing.value = true
+        messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Summarizing("正在压缩历史记录..."))
+
+        var summarySuccess = false
+        try {
+            val service = getEnhancedAiService()
+            if (service == null) {
+                uiStateDelegate.showErrorMessage("AI服务不可用，无法进行总结")
+                return false
+            }
+
+            val currentMessages = chatHistoryDelegate.chatHistory.value
+            if (currentMessages.isEmpty()) {
+                Log.d(TAG, "历史记录为空，无需总结")
+                return false
+            }
+
+            val insertPosition = chatHistoryDelegate.findProperSummaryPosition(currentMessages)
+            val summaryMessage = AIMessageManager.summarizeMemory(service, currentMessages, autoContinue)
+
+            if (summaryMessage != null) {
+                chatHistoryDelegate.addSummaryMessage(summaryMessage, insertPosition)
+
+                // 更新窗口大小
+                val newHistoryForTokens =
+                    AIMessageManager.getMemoryFromMessages(chatHistoryDelegate.chatHistory.value)
+                val chatService = service.getAIServiceForFunction(FunctionType.CHAT)
+                val newWindowSize = chatService.calculateInputTokens("", newHistoryForTokens)
+                val (inputTokens, outputTokens) = tokenStatsDelegate.getCumulativeTokenCounts()
+                chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, newWindowSize)
+                withContext(Dispatchers.Main) {
+                    tokenStatsDelegate.setTokenCounts(inputTokens, outputTokens, newWindowSize)
+                }
+                Log.d(TAG, "总结完成，更新窗口大小为: $newWindowSize")
+                summarySuccess = true
+            } else {
+                Log.w(TAG, "总结失败或无需总结")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "生成总结时出错: ${e.message}", e)
+            uiStateDelegate.showErrorMessage("生成聊天总结时出错: ${e.message}")
+        } finally {
+            _isSummarizing.value = false
+            val wasSummarizing =
+                messageProcessingDelegate.inputProcessingState.value is InputProcessingState.Summarizing
+
+            // 确保加载状态被重置，避免阻塞自动续写
+            messageProcessingDelegate.resetLoadingState()
+
+            if (summarySuccess) {
+                if (autoContinue) {
+                    Log.d(TAG, "总结成功，自动继续对话...")
+                    // 使用传入的 promptFunctionType 或当前保存的 promptFunctionType，保持提示词一致性
+                    val continuationPromptType = promptFunctionType ?: currentPromptFunctionType
+                    sendMessageInternal(
+                        promptFunctionType = continuationPromptType,
+                        isContinuation = true,
+                        isAutoContinuation = true
+                    )
+                }
+            } else if (wasSummarizing) {
+                // 总结未成功时才恢复到Idle，避免覆盖后续续写状态
+                messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Idle)
+            }
+        }
+        return summarySuccess
+    }
+}

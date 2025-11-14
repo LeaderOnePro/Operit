@@ -309,12 +309,15 @@ open class OpenAIProvider(
             messageObject.put("content", buildContentField(message))
             messagesArray.put(messageObject)
         } else {
-            val lastMessage = messagesArray.getJSONObject(messagesArray.length() - 1)
-            val lastContent = lastMessage.get("content")
-            val lastText = if (lastContent is String) lastContent else ""
-            if (lastText != message) {
-                val combinedContent = lastText + "\n" + message
-                lastMessage.put("content", buildContentField(combinedContent))
+            // 如果消息为空，不触发拼接
+            if (message.isNotBlank()) {
+                val lastMessage = messagesArray.getJSONObject(messagesArray.length() - 1)
+                val lastContent = lastMessage.get("content")
+                val lastText = if (lastContent is String) lastContent else ""
+                if (lastText != message) {
+                    val combinedContent = lastText + "\n" + message
+                    lastMessage.put("content", buildContentField(combinedContent))
+                }
             }
         }
         return Pair(messagesArray, tokenCount)

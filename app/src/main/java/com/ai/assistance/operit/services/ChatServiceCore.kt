@@ -146,6 +146,9 @@ class ChatServiceCore(
             speakMessage = { text ->
                 // TTS 功能需要在外部实现
                 Log.d(TAG, "朗读消息: $text")
+            },
+            onTokenLimitExceeded = {
+                messageCoordinationDelegate.handleTokenLimitExceeded()
             }
         )
 

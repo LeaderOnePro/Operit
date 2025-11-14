@@ -45,6 +45,7 @@ class MessageProcessingDelegate(
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
         private val onTurnComplete: () -> Unit,
+        private val onTokenLimitExceeded: suspend () -> Unit, // 新增：Token超限回调
         // 添加自动朗读相关的回调
         private val getIsAutoReadEnabled: () -> Boolean,
         private val speakMessage: (String) -> Unit
@@ -116,9 +117,10 @@ class MessageProcessingDelegate(
             enableWorkspaceAttachment: Boolean = false, // 新增工作区附着参数
             maxTokens: Int,
             tokenUsageThreshold: Double,
-            replyToMessage: ChatMessage? = null // 新增回复消息参数
+            replyToMessage: ChatMessage? = null, // 新增回复消息参数
+            isAutoContinuation: Boolean = false // 标识是否为自动续写
     ) {
-        if (_userMessage.value.text.isBlank() && attachments.isEmpty()) return
+        if (_userMessage.value.text.isBlank() && attachments.isEmpty() && !isAutoContinuation) return
         // 若当前存在其它会话的流式任务，允许“抢占”：取消正在进行的会话并继续发送当前会话的消息
         if (_isLoading.value) {
             val activeId = _activeStreamingChatId.value
@@ -139,7 +141,9 @@ class MessageProcessingDelegate(
             }
         }
 
-        val messageText = _userMessage.value.text.trim()
+        val originalMessageText = _userMessage.value.text.trim()
+        var messageText = originalMessageText
+        
         _userMessage.value = TextFieldValue("")
         _isLoading.value = true
         // 标记当前活跃的流式会话
@@ -152,7 +156,7 @@ class MessageProcessingDelegate(
             if (isFirstMessage && chatId != null) {
                 val newTitle =
                     when {
-                        messageText.isNotBlank() -> messageText
+                        originalMessageText.isNotBlank() -> originalMessageText
                         attachments.isNotEmpty() -> attachments.first().fileName
                         else -> context.getString(R.string.new_conversation)
                     }
@@ -179,8 +183,14 @@ class MessageProcessingDelegate(
                 enableDirectImageProcessing
             )
 
+            // 自动继续且原本消息为空时，不添加到聊天历史（虽然会发送"继续"给AI）
+            val shouldAddUserMessageToChat =
+                !(isAutoContinuation &&
+                        originalMessageText.isBlank() &&
+                        attachments.isEmpty())
+            var userMessageAdded = false
             val userMessage = ChatMessage(
-                sender = "user", 
+                sender = "user",
                 content = finalMessageContent,
                 roleName = "用户" // 用户消息的角色名固定为"用户"
             )
@@ -197,9 +207,10 @@ class MessageProcessingDelegate(
                 }
             }
 
-            if (chatId != null) {
+            if (shouldAddUserMessageToChat && chatId != null) {
                 // 等待消息添加到聊天历史完成，确保getChatHistory()包含新消息
                 addMessageToChat(chatId, userMessage)
+                userMessageAdded = true
             }
 
             lateinit var aiMessage: ChatMessage
@@ -241,7 +252,11 @@ class MessageProcessingDelegate(
                     enhancedAiService = service,
                     messageContent = finalMessageContent,
                     //现在chatHistory 100%包含最新的用户输入，所以可以截掉
-                    chatHistory = chatHistory.subList(0, chatHistory.size-1),
+                    chatHistory = if (userMessageAdded && chatHistory.isNotEmpty()) {
+                        chatHistory.subList(0, chatHistory.size - 1)
+                    } else {
+                        chatHistory
+                    },
                     workspacePath = workspacePath,
                     promptFunctionType = promptFunctionType,
                     enableThinking = enableThinking,
@@ -253,7 +268,8 @@ class MessageProcessingDelegate(
                         _nonFatalErrorEvent.emit(error)
                     },
                     characterName = characterName,
-                    avatarUri = avatarUri
+                    avatarUri = avatarUri,
+                    onTokenLimitExceeded = onTokenLimitExceeded // 传递回调
                 )
 
                 // 将字符串流共享，以便多个收集器可以使用
@@ -482,6 +498,15 @@ class MessageProcessingDelegate(
                 saveCurrentChat()
             }
         }
+    }
+
+    /**
+     * 强制重置加载状态，允许新的发送流程开始。
+     * 主要用于在执行内部流程（如历史总结）后确保状态不会阻塞后续操作。
+     */
+    fun resetLoadingState() {
+        _isLoading.value = false
+        _activeStreamingChatId.value = null
     }
 
     fun setInputProcessingState(isProcessing: Boolean, message: String) {

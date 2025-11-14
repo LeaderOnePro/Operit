@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.core.chat
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
@@ -35,6 +36,7 @@ import kotlinx.coroutines.withContext
  * - **职责明确**: 仅处理与AI服务的交互，UI更新和数据持久化由调用方负责。
  * - **封装逻辑**: 内部封装了与AI交互的策略，如是否需要总结、如何从历史中提取记忆等。
  */
+@SuppressLint("StaticFieldLeak")
 object AIMessageManager {
     private const val TAG = "AIMessageManager"
     // 聊天总结的消息数量阈值 - 移除硬编码，改用动态设置
@@ -171,6 +173,7 @@ object AIMessageManager {
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit,
+        onTokenLimitExceeded: (suspend () -> Unit)? = null, // 新增回调
         characterName: String? = null,
         avatarUri: String? = null
     ): SharedStream<String> {
@@ -230,6 +233,7 @@ object AIMessageManager {
                 maxTokens = maxTokens,
                 tokenUsageThreshold = tokenUsageThreshold,
                 onNonFatalError = onNonFatalError,
+                onTokenLimitExceeded = onTokenLimitExceeded, // 传递回调
                 characterName = characterName,
                 avatarUri = avatarUri,
                 stream = enableStream
@@ -265,11 +269,13 @@ object AIMessageManager {
      *
      * @param enhancedAiService AI服务实例。
      * @param messages 需要总结的消息列表。
+     * @param autoContinue 是否为自动续写模式，如果是则在总结消息尾部添加续写提示。
      * @return 包含总结内容的ChatMessage对象，如果无需总结或总结失败则返回null。
      */
     suspend fun summarizeMemory(
         enhancedAiService: EnhancedAIService,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        autoContinue: Boolean = false
     ): ChatMessage? {
         val lastSummaryIndex = messages.indexOfLast { it.sender == "summary" }
         val previousSummary = if (lastSummaryIndex != -1) messages[lastSummaryIndex].content.trim() else null
@@ -304,9 +310,17 @@ object AIMessageManager {
                 Log.e(TAG, "AI生成的总结内容为空，放弃本次总结")
                 null
             } else {
+                // 如果是自动续写，在总结消息尾部添加续写提示
+                val finalSummary = if (autoContinue) {
+                    val trimmedSummary = summary.trim()
+                    "$trimmedSummary\n\n请你继续，如果任务完成，输出总结"
+                } else {
+                    summary.trim()
+                }
+                
                 ChatMessage(
                     sender = "summary",
-                    content = summary.trim(),
+                    content = finalSummary,
                     timestamp = System.currentTimeMillis(),
                     roleName = "system" // 总结消息的角色名
                 )

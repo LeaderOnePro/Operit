@@ -363,7 +363,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         },
                         // 传递自动朗读状态和方法
                         getIsAutoReadEnabled = { isAutoReadEnabled.value },
-                        speakMessage = ::speakMessage
+                        speakMessage = ::speakMessage,
+                        onTokenLimitExceeded = {
+                            messageCoordinationDelegate.handleTokenLimitExceeded()
+                        }
                 )
 
         // Initialize message coordination delegate

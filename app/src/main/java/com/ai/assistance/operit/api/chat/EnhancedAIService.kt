@@ -335,6 +335,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         maxTokens: Int,
         tokenUsageThreshold: Double,
         onNonFatalError: suspend (error: String) -> Unit = {},
+        onTokenLimitExceeded: (suspend () -> Unit)? = null,
         customSystemPromptTemplate: String? = null,
         isSubTask: Boolean = false,
         characterName: String? = null,
@@ -517,7 +518,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             } finally {
                 // 确保流处理完成后调用
                 val collector = this
-                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream) }
+                withContext(Dispatchers.IO) { processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, onTokenLimitExceeded, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream) }
             }
         }
     }
@@ -622,6 +623,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             enableThinking: Boolean = false,
             enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
+            onTokenLimitExceeded: (suspend () -> Unit)? = null,
             maxTokens: Int,
             tokenUsageThreshold: Double,
             isSubTask: Boolean,
@@ -722,6 +724,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                         enableThinking,
                         enableMemoryQuery,
                         onNonFatalError,
+                        onTokenLimitExceeded,
                         maxTokens,
                         tokenUsageThreshold,
                         isSubTask,
@@ -824,6 +827,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         enableThinking: Boolean = false,
         enableMemoryQuery: Boolean = true,
         onNonFatalError: suspend (error: String) -> Unit,
+        onTokenLimitExceeded: (suspend () -> Unit)? = null,
         maxTokens: Int,
         tokenUsageThreshold: Double,
         isSubTask: Boolean,
@@ -852,7 +856,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "所有工具结果收集完毕，准备最终处理。")
                 processToolResults(
                     allToolResults, context, functionType, collector, enableThinking,
-                    enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask,
+                    enableMemoryQuery, onNonFatalError, onTokenLimitExceeded, maxTokens, tokenUsageThreshold, isSubTask,
                     characterName, avatarUri, stream
                 )
             }
@@ -880,6 +884,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             enableThinking: Boolean = false,
             enableMemoryQuery: Boolean = true,
             onNonFatalError: suspend (error: String) -> Unit,
+            onTokenLimitExceeded: (suspend () -> Unit)? = null,
             maxTokens: Int,
             tokenUsageThreshold: Double,
             isSubTask: Boolean,
@@ -940,26 +945,18 @@ class EnhancedAIService private constructor(private val context: Context) {
 
         // After a tool call, check if token usage exceeds the threshold
         if (maxTokens > 0) {
-            // 精确计算下一次调用（空消息，只依赖历史）将产生的token
             val currentTokens = serviceForFunction.calculateInputTokens("", currentChatHistory)
             val usageRatio = currentTokens.toDouble() / maxTokens.toDouble()
 
             if (usageRatio >= tokenUsageThreshold) {
-                Log.w(TAG, "Token usage ($usageRatio) exceeds threshold ($tokenUsageThreshold) after tool call. Terminating turn.")
-
-                val warningMessage = ConversationMarkupManager.createWarningStatus("已达到单次对话Token限制。请继续对话以触发历史压缩")
-                collector.emit(warningMessage)
-                context.roundManager.appendContent(warningMessage)
-                context.conversationHistory.add(Pair("assistant", warningMessage))
-
+                Log.w(TAG, "Token usage ($usageRatio) exceeds threshold ($tokenUsageThreshold) after tool call. Triggering summary.")
+                onTokenLimitExceeded?.invoke()
                 context.isConversationActive.set(false)
                 if (!isSubTask) {
-                withContext(Dispatchers.Main) {
-                    _inputProcessingState.value = InputProcessingState.Completed
+                    stopAiService(characterName, avatarUri)
                 }
-                stopAiService(characterName, avatarUri)
-                }
-                return // Stop further processing
+                // 关键修复：在触发总结后，直接返回，因为后续流程将由回调处理
+                return
             }
         }
 
@@ -1038,7 +1035,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 Log.d(TAG, "工具结果AI处理完成，收到 $totalChars 字符，耗时: ${processingTime}ms")
 
                 // 流处理完成，处理完成逻辑
-                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream)
+                processStreamCompletion(context, functionType, collector, enableThinking, enableMemoryQuery, onNonFatalError, onTokenLimitExceeded, maxTokens, tokenUsageThreshold, isSubTask, characterName, avatarUri, stream)
             } catch (e: Exception) {
                 Log.e(TAG, "处理工具执行结果时出错", e)
                 withContext(Dispatchers.Main) {

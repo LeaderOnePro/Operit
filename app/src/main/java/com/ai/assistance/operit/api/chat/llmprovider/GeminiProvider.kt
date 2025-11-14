@@ -191,35 +191,36 @@ class GeminiProvider(
             contentsArray.put(userContentObject)
             tokenCount += ChatUtils.estimateTokenCount(message)
         } else {
-            // Last message is already user, try to merge
-            val lastMessage = contentsArray.getJSONObject(contentsArray.length() - 1)
-            val lastParts = lastMessage.getJSONArray("parts")
+            // 如果消息为空，不触发拼接
+            if (message.isNotBlank()) {
+                // Last message is already user, try to merge
+                val lastMessage = contentsArray.getJSONObject(contentsArray.length() - 1)
+                val lastParts = lastMessage.getJSONArray("parts")
 
-            // Find the text part by searching backwards from the end of the parts array.
-            // This is because image parts are added first, followed by a single optional text part.
-            val textPart = (lastParts.length() - 1 downTo 0)
-                .map { lastParts.getJSONObject(it) }
-                .find { it.has("text") }
+                // Find the text part by searching backwards from the end of the parts array.
+                // This is because image parts are added first, followed by a single optional text part.
+                val textPart = (lastParts.length() - 1 downTo 0)
+                    .map { lastParts.getJSONObject(it) }
+                    .find { it.has("text") }
 
-            val lastText = textPart?.optString("text", "") ?: ""
+                val lastText = textPart?.optString("text", "") ?: ""
 
-            if (lastText != message) {
-                tokenCount += ChatUtils.estimateTokenCount(message)
-                if (textPart != null) {
-                    // Found an existing text part, so we'll merge the new message into it.
-                    val combinedText = "$lastText\n$message"
-                    textPart.put("text", combinedText)
-                    logDebug("合并连续的user消息")
-                } else {
-                    // No text part was found in the previous message, so add a new one.
-                    // This handles cases where the last user message contained only an image.
-                    lastParts.put(JSONObject().apply { put("text", message) })
-                    logDebug("为连续的user消息添加新的文本部分")
+                if (lastText != message) {
+                    tokenCount += ChatUtils.estimateTokenCount(message)
+                    if (textPart != null) {
+                        // Found an existing text part, so we'll merge the new message into it.
+                        val combinedText = "$lastText\n$message"
+                        textPart.put("text", combinedText)
+                        logDebug("合并连续的user消息")
+                    } else {
+                        // No text part was found in the previous message, so add a new one.
+                        // This handles cases where the last user message contained only an image.
+                        lastParts.put(JSONObject().apply { put("text", message) })
+                        logDebug("为连续的user消息添加新的文本部分")
+                    }
                 }
-            } else {
-                // The new message is identical to the last one, so we can skip it.
-                logDebug("跳过重复的user消息")
             }
+            // 如果消息为空，不执行任何操作，不触发拼接
         }
 
         return Pair(Pair(contentsArray, systemInstruction), tokenCount)

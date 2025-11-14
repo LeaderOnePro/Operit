@@ -246,6 +246,12 @@ class MNNProvider(
             // 应用模型参数（采样参数）
             applyModelParameters(session, modelParameters)
 
+            // 如果消息为空，不添加到历史记录
+            if (message.isBlank()) {
+                Log.d(TAG, "消息为空，跳过处理")
+                return@stream
+            }
+
             // 构建历史记录（添加当前消息）
             val fullHistory = chatHistory.toMutableList().apply {
                 add("user" to message)

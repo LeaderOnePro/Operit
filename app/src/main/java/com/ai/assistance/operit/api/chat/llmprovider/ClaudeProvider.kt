@@ -176,12 +176,15 @@ class ClaudeProvider(
             messagesArray.put(userMessage)
             tokenCount += ChatUtils.estimateTokenCount(message)
         } else {
-            val lastMessage = messagesArray.getJSONObject(lastMessageIndex)
-            val lastContentArray = lastMessage.getJSONArray("content")
-            val lastContentObject = lastContentArray.getJSONObject(lastContentArray.length() - 1)
-            val existingText = lastContentObject.optString("text", "")
-            lastContentObject.put("text", existingText + "\n" + message)
-            tokenCount += ChatUtils.estimateTokenCount(message)
+            // 如果消息为空，不触发拼接
+            if (message.isNotBlank()) {
+                val lastMessage = messagesArray.getJSONObject(lastMessageIndex)
+                val lastContentArray = lastMessage.getJSONArray("content")
+                val lastContentObject = lastContentArray.getJSONObject(lastContentArray.length() - 1)
+                val existingText = lastContentObject.optString("text", "")
+                lastContentObject.put("text", existingText + "\n" + message)
+                tokenCount += ChatUtils.estimateTokenCount(message)
+            }
         }
 
         return Triple(messagesArray, systemPrompt, tokenCount)
