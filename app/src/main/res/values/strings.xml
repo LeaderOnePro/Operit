@@ -181,7 +181,6 @@
     <string name="config_get_token">获取Token</string>
     <string name="config_use_free">薅贡献者的</string>
     <string name="config_custom">自定义</string>
-    <string name="config_tip">自己的token更加稳定，薅贡献者的用多了作者会破产，软件就没有更新了</string>
     <string name="config_free_usage_exceeded">今日免费次数已用完</string>
     
     <!-- 一键配置相关 -->

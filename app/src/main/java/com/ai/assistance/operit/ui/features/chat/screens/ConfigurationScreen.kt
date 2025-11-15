@@ -241,21 +241,6 @@ fun ConfigurationScreen(
                                         )
                                 }
                         }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // 极简底部提示
-                        Text(
-                                text = stringResource(id = R.string.config_tip),
-                                style = MaterialTheme.typography.bodySmall,
-                                color =
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                alpha = 0.7f
-                                        ),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 4.dp),
-                                fontSize = 10.sp
-                        )
                 }
         }
 }
