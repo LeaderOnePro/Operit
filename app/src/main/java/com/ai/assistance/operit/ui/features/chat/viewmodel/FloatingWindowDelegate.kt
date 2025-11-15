@@ -13,6 +13,7 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.toSerializable
 import com.ai.assistance.operit.services.FloatingChatService
+import com.ai.assistance.operit.services.core.ChatHistoryDelegate
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,8 @@ class FloatingWindowDelegate(
     private val context: Context,
     private val coroutineScope: CoroutineScope,
     private val inputProcessingState: StateFlow<InputProcessingState>,
-    private val chatHistoryFlow: StateFlow<List<ChatMessage>>? = null
+    private val chatHistoryFlow: StateFlow<List<ChatMessage>>? = null,
+    private val chatHistoryDelegate: ChatHistoryDelegate? = null
 ) {
     companion object {
         private const val TAG = "FloatingWindowDelegate"
@@ -47,6 +49,22 @@ class FloatingWindowDelegate(
                     // 设置回调，允许服务通知委托关闭
                     binder.setCloseCallback {
                         closeFloatingWindow()
+                    }
+                    // 设置反向通信回调，允许悬浮窗通知应用重新加载消息
+                    binder.setReloadCallback {
+                        coroutineScope.launch {
+                            try {
+                                val chatId = chatHistoryDelegate?.currentChatId?.value
+                                if (chatId != null) {
+                                    Log.d(TAG, "收到悬浮窗重新加载请求，chatId: $chatId")
+                                    chatHistoryDelegate?.reloadChatMessagesSmart(chatId)
+                                } else {
+                                    Log.w(TAG, "当前没有活跃对话，无法重新加载消息")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "重新加载消息失败", e)
+                            }
+                        }
                     }
                     // 订阅聊天历史更新
                     setupChatHistoryCollection()
@@ -183,6 +201,14 @@ class FloatingWindowDelegate(
                 }
             }
         } ?: Log.w(TAG, "chatHistoryFlow为空，无法订阅聊天历史更新")
+    }
+
+    /** 通知悬浮窗服务重新加载消息 */
+    fun notifyFloatingServiceReload() {
+        if (_isFloatingMode.value && floatingService != null) {
+            Log.d(TAG, "通知悬浮窗服务重新加载消息")
+            floatingService?.reloadChatMessages()
+        }
     }
 
     /** 清理资源 */

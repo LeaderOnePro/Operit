@@ -71,13 +71,25 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     inner class LocalBinder : Binder() {
         private var closeCallback: (() -> Unit)? = null
+        private var reloadCallback: (() -> Unit)? = null
+        
         fun getService(): FloatingChatService = this@FloatingChatService
         fun getChatCore(): ChatServiceCore = chatCore
+        
         fun setCloseCallback(callback: () -> Unit) {
             this.closeCallback = callback
         }
+        
         fun notifyClose() {
             closeCallback?.invoke()
+        }
+        
+        fun setReloadCallback(callback: () -> Unit) {
+            this.reloadCallback = callback
+        }
+        
+        fun notifyReload() {
+            reloadCallback?.invoke()
         }
     }
 
@@ -130,6 +142,12 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             // 初始化 ChatServiceCore
             chatCore = ChatServiceCore(context = this, coroutineScope = serviceScope)
             Log.d(TAG, "ChatServiceCore 已初始化")
+            
+            // 设置额外的 onTurnComplete 回调，用于通知应用重新加载消息
+            chatCore.setAdditionalOnTurnComplete {
+                Log.d(TAG, "流完成，通知应用重新加载消息")
+                binder.notifyReload()
+            }
             
             // 订阅聊天历史更新
             serviceScope.launch {
@@ -372,7 +390,28 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                     TAG,
                     "服务收到消息更新: ${messages.size} 条. 最后一条消息的 stream is null: ${messages.lastOrNull()?.contentStream == null}"
             )
-            chatMessages.value = messages
+            
+            // 智能合并：通过 timestamp 匹配已存在的消息，保持原实例不变
+            val currentMessages = chatMessages.value
+            val currentMessageMap = currentMessages.associateBy { it.timestamp }
+            
+            val mergedMessages = messages.map { newMsg ->
+                val existingMsg = currentMessageMap[newMsg.timestamp]
+                if (existingMsg != null) {
+                    // 消息已存在，保持原实例，但更新内容（如果内容有变化）
+                    if (existingMsg.content != newMsg.content || existingMsg.roleName != newMsg.roleName) {
+                        existingMsg.copy(content = newMsg.content, roleName = newMsg.roleName)
+                    } else {
+                        existingMsg
+                    }
+                } else {
+                    // 新消息，直接添加
+                    newMsg
+                }
+            }
+            
+            chatMessages.value = mergedMessages
+            Log.d(TAG, "智能合并完成: 当前 ${currentMessages.size} 条 -> 合并后 ${mergedMessages.size} 条")
         }
     }
 
@@ -499,4 +538,24 @@ class FloatingChatService : Service(), FloatingWindowCallback {
      * @return ChatServiceCore 聊天服务核心实例
      */
     fun getChatCore(): ChatServiceCore = chatCore
+
+    /**
+     * 重新加载聊天消息（从数据库加载并智能合并）
+     * 用于在流完成时同步消息，保持已存在消息的实例不变
+     */
+    fun reloadChatMessages() {
+        serviceScope.launch {
+            try {
+                val chatId = chatCore.currentChatId.value
+                if (chatId != null) {
+                    Log.d(TAG, "重新加载聊天消息，chatId: $chatId")
+                    chatCore.reloadChatMessagesSmart(chatId)
+                } else {
+                    Log.w(TAG, "当前没有活跃对话，无法重新加载消息")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "重新加载聊天消息失败", e)
+            }
+        }
+    }
 }

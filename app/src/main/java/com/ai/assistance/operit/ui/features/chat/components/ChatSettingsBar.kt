@@ -286,6 +286,7 @@ fun ChatSettingsBar(
                                         Modifier.padding(vertical = 4.dp)
                                 .verticalScroll(rememberScrollState())
                         ) {
+                            // ========== 基础配置类 ==========
                             // 模型选择器
                             ModelSelectorItem(
                                 configSummaries = configSummaries,
@@ -322,28 +323,6 @@ fun ChatSettingsBar(
                                 }
                             )
 
-                            // 记忆附着
-                            SettingItem(
-                                title = stringResource(R.string.memory_attachment),
-                                    icon =
-                                            if (enableMemoryQuery) Icons.Rounded.Link
-                                            else Icons.Outlined.LinkOff,
-                                    iconTint =
-                                            if (enableMemoryQuery)
-                                                    MaterialTheme.colorScheme.primary
-                                            else
-                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                            alpha = 0.7f
-                                                    ),
-                                isChecked = enableMemoryQuery,
-                                onToggle = onToggleMemoryQuery,
-                                onInfoClick = {
-                                        infoPopupContent =
-                                                context.getString(R.string.memory_attachment) to context.getString(R.string.memory_attachment_desc)
-                                    showMenu = false
-                                }
-                            )
-
                             // Max模式
                             SettingItem(
                                 title = stringResource(R.string.max_mode_title),
@@ -371,40 +350,53 @@ fun ChatSettingsBar(
                                 }
                             )
 
-                            // 上下文长度设置
-                            // SettingSliderItem(
-                            //     label = "上下文长度",
-                            //     icon = Icons.Outlined.History,
-                            //     value = maxWindowSizeInK,
-                            //     onValueChange = onContextLengthChange,
-                            //     onInfoClick = {
-                            //         infoPopupContent =
-                            //             "上下文长度" to
-                            //                 "控制模型记忆的对话长度（单位：千tokens）。较短的长度可以节省Token，但可能会忘记早期对话内容。"
-                            //         showMenu = false
-                            //     },
-                            //     valueRange = 1f..1024f,
-                            //     steps = 1022,
-                            //     decimalFormatPattern = "#.#",
-                            //     unitText = "k"
-                            // )
+                            Divider(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                thickness = 0.5.dp,
+                                    color =
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                    alpha = 0.2f
+                                            )
+                            )
 
-                            // // 摘要阈值设置
-                            // SettingSliderItem(
-                            //     label = "摘要阈值",
-                            //     icon = Icons.Outlined.Speed,
-                            //     value = summaryTokenThreshold,
-                            //     onValueChange = onSummaryTokenThresholdChange,
-                            //     onInfoClick = {
-                            //         infoPopupContent =
-                            //             "摘要阈值" to
-                            //                 "当上下文Token使用率超过此阈值时，自动触发聊天摘要。范围 0.1-0.95。"
-                            //         showMenu = false
-                            //     },
-                            //     valueRange = 0.1f..0.95f,
-                            //     steps = 84,
-                            //     decimalFormatPattern = "#.##"
-                            // )
+                            // ========== 记忆相关 ==========
+                            // 记忆附着
+                            SettingItem(
+                                title = stringResource(R.string.memory_attachment),
+                                    icon =
+                                            if (enableMemoryQuery) Icons.Rounded.Link
+                                            else Icons.Outlined.LinkOff,
+                                    iconTint =
+                                            if (enableMemoryQuery)
+                                                    MaterialTheme.colorScheme.primary
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    ),
+                                isChecked = enableMemoryQuery,
+                                onToggle = onToggleMemoryQuery,
+                                onInfoClick = {
+                                        infoPopupContent =
+                                                context.getString(R.string.memory_attachment) to context.getString(R.string.memory_attachment_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            // 手动更新记忆
+                            ActionSettingItem(
+                                title = stringResource(R.string.manual_memory_update),
+                                icon = Icons.Outlined.Save,
+                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                onClick = {
+                                    onManualMemoryUpdate()
+                                    showMenu = false
+                                },
+                                onInfoClick = {
+                                    infoPopupContent =
+                                        context.getString(R.string.manual_memory_update) to context.getString(R.string.manual_memory_update_desc)
+                                    showMenu = false
+                                }
+                            )
 
                             Divider(
                                 modifier = Modifier.padding(vertical = 2.dp),
@@ -415,6 +407,7 @@ fun ChatSettingsBar(
                                             )
                             )
 
+                            // ========== 输出相关 ==========
                             // 自动朗读
                             SettingItem(
                                 title = stringResource(R.string.auto_read_message),
@@ -458,7 +451,7 @@ fun ChatSettingsBar(
                                     showMenu = false
                                 }
                             )
-                            
+
                             Divider(
                                 modifier = Modifier.padding(vertical = 2.dp),
                                 thickness = 0.5.dp,
@@ -468,6 +461,7 @@ fun ChatSettingsBar(
                                             )
                             )
 
+                            // ========== AI功能类 ==========
                             // AI计划模式
                             SettingItem(
                                 title = stringResource(R.string.ai_planning_mode),
@@ -489,77 +483,6 @@ fun ChatSettingsBar(
                                 }
                             )
 
-                            Divider(
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                thickness = 0.5.dp,
-                                    color =
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                    alpha = 0.2f
-                                            )
-                            )
-
-                            // 禁用工具
-                            SettingItem(
-                                title = stringResource(R.string.disable_tools),
-                                    icon =
-                                            if (!enableTools) Icons.Outlined.Block
-                                            else Icons.Outlined.Build,
-                                    iconTint =
-                                            if (!enableTools) MaterialTheme.colorScheme.error
-                                            else
-                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                            alpha = 0.7f
-                                                    ),
-                                isChecked = !enableTools,
-                                onToggle = onToggleTools,
-                                onInfoClick = {
-                                        infoPopupContent =
-                                                context.getString(R.string.disable_tools) to context.getString(R.string.disable_tools_desc)
-                                    showMenu = false
-                                }
-                            )
-
-                            Divider(
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                thickness = 0.5.dp,
-                                    color =
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                    alpha = 0.2f
-                                            )
-                            )
-
-                            // 自动批准
-                            SettingItem(
-                                title = stringResource(R.string.auto_approve),
-                                    icon =
-                                            if (permissionLevel == PermissionLevel.ALLOW)
-                                                    Icons.Rounded.Security
-                                            else Icons.Outlined.Security,
-                                    iconTint =
-                                            if (permissionLevel == PermissionLevel.ALLOW)
-                                                    MaterialTheme.colorScheme.primary
-                                            else
-                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                            alpha = 0.7f
-                                                    ),
-                                isChecked = permissionLevel == PermissionLevel.ALLOW,
-                                onToggle = onTogglePermission,
-                                onInfoClick = {
-                                        infoPopupContent =
-                                                context.getString(R.string.auto_approve) to context.getString(R.string.auto_approve_desc)
-                                    showMenu = false
-                                }
-                            )
-
-                            Divider(
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                thickness = 0.5.dp,
-                                    color =
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                    alpha = 0.2f
-                                            )
-                            )
-
                             // 思考模式
                             SettingItem(
                                 title = stringResource(R.string.thinking_mode),
@@ -579,15 +502,6 @@ fun ChatSettingsBar(
                                     infoPopupContent = context.getString(R.string.thinking_mode) to context.getString(R.string.thinking_mode_desc)
                                     showMenu = false
                                 }
-                            )
-
-                            Divider(
-                                modifier = Modifier.padding(vertical = 2.dp),
-                                thickness = 0.5.dp,
-                                    color =
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                    alpha = 0.2f
-                                            )
                             )
 
                             // 思考引导
@@ -612,18 +526,56 @@ fun ChatSettingsBar(
                                 }
                             )
 
-                            // 手动更新记忆
-                            ActionSettingItem(
-                                title = stringResource(R.string.manual_memory_update),
-                                icon = Icons.Outlined.Save,
-                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                onClick = {
-                                    onManualMemoryUpdate()
-                                    showMenu = false
-                                },
+                            Divider(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                thickness = 0.5.dp,
+                                    color =
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                    alpha = 0.2f
+                                            )
+                            )
+
+                            // ========== 权限与工具 ==========
+                            // 禁用工具
+                            SettingItem(
+                                title = stringResource(R.string.disable_tools),
+                                    icon =
+                                            if (!enableTools) Icons.Outlined.Block
+                                            else Icons.Outlined.Build,
+                                    iconTint =
+                                            if (!enableTools) MaterialTheme.colorScheme.error
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    ),
+                                isChecked = !enableTools,
+                                onToggle = onToggleTools,
                                 onInfoClick = {
-                                    infoPopupContent =
-                                        context.getString(R.string.manual_memory_update) to context.getString(R.string.manual_memory_update_desc)
+                                        infoPopupContent =
+                                                context.getString(R.string.disable_tools) to context.getString(R.string.disable_tools_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            // 自动批准
+                            SettingItem(
+                                title = stringResource(R.string.auto_approve),
+                                    icon =
+                                            if (permissionLevel == PermissionLevel.ALLOW)
+                                                    Icons.Rounded.Security
+                                            else Icons.Outlined.Security,
+                                    iconTint =
+                                            if (permissionLevel == PermissionLevel.ALLOW)
+                                                    MaterialTheme.colorScheme.primary
+                                            else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                            alpha = 0.7f
+                                                    ),
+                                isChecked = permissionLevel == PermissionLevel.ALLOW,
+                                onToggle = onTogglePermission,
+                                onInfoClick = {
+                                        infoPopupContent =
+                                                context.getString(R.string.auto_approve) to context.getString(R.string.auto_approve_desc)
                                     showMenu = false
                                 }
                             )
@@ -675,16 +627,6 @@ fun ChatSettingsBar(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Divider(
-                                thickness = 0.5.dp,
-                                    color =
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                    alpha = 0.3f
-                                            )
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -977,11 +919,6 @@ private fun MemorySelectorItem(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                Divider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1119,11 +1056,6 @@ private fun ModelSelectorItem(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                Divider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1241,11 +1173,6 @@ private fun PromptSelectorItem(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                Divider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

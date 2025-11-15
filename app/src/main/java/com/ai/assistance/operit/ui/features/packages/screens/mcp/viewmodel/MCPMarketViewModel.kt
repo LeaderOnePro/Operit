@@ -429,16 +429,14 @@ class MCPMarketViewModel(
      * 启动GitHub登录流程
      */
     fun initiateGitHubLogin(context: Context) {
-        viewModelScope.launch {
-            try {
-                val authUrl = githubAuth.getAuthorizationUrl()
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                _errorMessage.value = "启动登录失败: ${e.message}"
-                Log.e(TAG, "Failed to initiate GitHub login", e)
-            }
+        try {
+            val authUrl = githubAuth.getAuthorizationUrl()
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            _errorMessage.value = "启动登录失败: ${e.message}"
+            Log.e(TAG, "Failed to initiate GitHub login", e)
         }
     }
 
@@ -451,17 +449,8 @@ class MCPMarketViewModel(
                 _isLoading.value = true
                 Log.d(TAG, "Handling GitHub callback with code: $code")
 
-                // 获取并清除Code Verifier
-                val codeVerifier = githubAuth.getAndClearCodeVerifier()
-                if (codeVerifier == null) {
-                    _errorMessage.value = "登录会话已过期，请重试"
-                    Log.e(TAG, "Code verifier not found in preferences.")
-                    _isLoading.value = false
-                    return@launch
-                }
-
                 // 获取访问令牌
-                val tokenResult = githubApiService.getAccessToken(code, codeVerifier)
+                val tokenResult = githubApiService.getAccessToken(code)
                 
                 tokenResult.fold(
                     onSuccess = { tokenResponse ->

@@ -58,6 +58,9 @@ class ChatServiceCore(
     // 回调：当 EnhancedAIService 初始化或更新时
     private var onEnhancedAiServiceReady: ((EnhancedAIService) -> Unit)? = null
     
+    // 额外的 onTurnComplete 回调（用于悬浮窗通知应用等场景）
+    private var additionalOnTurnComplete: (() -> Unit)? = null
+    
     private fun initializeDelegates() {
         // 初始化 UI 状态委托
         uiStateDelegate = UiStateDelegate()
@@ -139,6 +142,8 @@ class ChatServiceCore(
                 val (inputTokens, outputTokens) = tokenStatisticsDelegate.getCumulativeTokenCounts()
                 val windowSize = tokenStatisticsDelegate.getLastCurrentWindowSize()
                 chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, windowSize)
+                // 调用额外的回调（用于悬浮窗通知应用等场景）
+                additionalOnTurnComplete?.invoke()
             },
             getIsAutoReadEnabled = {
                 apiConfigDelegate.enableAutoRead.value
@@ -361,6 +366,16 @@ class ChatServiceCore(
         onEnhancedAiServiceReady = callback
         // 如果已经初始化，立即调用回调
         enhancedAiService?.let { callback(it) }
+    }
+    
+    /** 设置额外的 onTurnComplete 回调（用于悬浮窗通知应用等场景） */
+    fun setAdditionalOnTurnComplete(callback: (() -> Unit)?) {
+        additionalOnTurnComplete = callback
+    }
+    
+    /** 重新加载聊天消息（智能合并） */
+    suspend fun reloadChatMessagesSmart(chatId: String) {
+        chatHistoryDelegate.reloadChatMessagesSmart(chatId)
     }
 }
 

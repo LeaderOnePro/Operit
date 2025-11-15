@@ -122,32 +122,105 @@ class ChatHistoryDelegate(
         }
     }
 
-    private suspend fun syncOpeningStatementIfNoUserMessage(chatId: String) {
-        val hasUserMessage = _chatHistory.value.any { it.sender == "user" }
-        if (hasUserMessage) return
-
-        val activeCard = characterCardManager.activeCharacterCardFlow.first()
-        val opening = activeCard.openingStatement
-        val roleName = activeCard.name
-
+    /**
+     * 智能重新加载聊天消息，通过 timestamp 匹配已存在的消息，保持原实例不变
+     * 这样可以防止UI重组，提高性能
+     * 
+     * @param chatId 聊天ID
+     */
+    suspend fun reloadChatMessagesSmart(chatId: String) {
         historyUpdateMutex.withLock {
-            val currentMessages = _chatHistory.value.toMutableList()
+            try {
+                // 从数据库加载最新消息
+                val newMessages = chatHistoryManager.loadChatMessages(chatId)
+                val currentMessages = _chatHistory.value
+                
+                Log.d(TAG, "智能重新加载聊天 $chatId: 当前 ${currentMessages.size} 条，数据库 ${newMessages.size} 条")
+                
+                // 创建 timestamp 到消息的映射，用于快速查找
+                val currentMessageMap = currentMessages.associateBy { it.timestamp }
+                
+                // 智能合并：保持已存在消息的实例，只更新内容（如果变化）
+                val mergedMessages = newMessages.map { newMsg ->
+                    val existingMsg = currentMessageMap[newMsg.timestamp]
+                    if (existingMsg != null) {
+                        // 消息已存在，保持原实例，但更新内容（如果内容有变化）
+                        if (existingMsg.content != newMsg.content || existingMsg.roleName != newMsg.roleName) {
+                            existingMsg.copy(content = newMsg.content, roleName = newMsg.roleName)
+                        } else {
+                            existingMsg
+                        }
+                    } else {
+                        // 新消息，直接添加
+                        newMsg
+                    }
+                }
+                
+                // 更新聊天历史
+                _chatHistory.value = mergedMessages
+                
+                Log.d(TAG, "智能合并完成: ${mergedMessages.size} 条消息")
+            } catch (e: Exception) {
+                Log.e(TAG, "智能重新加载聊天消息失败", e)
+            }
+        }
+    }
+
+    private suspend fun syncOpeningStatementIfNoUserMessage(chatId: String) {
+        Log.d(TAG, "开始同步开场白，聊天ID: $chatId")
+        
+        historyUpdateMutex.withLock {
+            // 在互斥锁内，先从数据库加载最新消息，确保数据一致性
+            // 这样可以避免竞态条件：如果内存中的_chatHistory还未加载，直接从数据库检查
+            val dbMessages = chatHistoryManager.loadChatMessages(chatId)
+            val hasUserMessage = dbMessages.any { it.sender == "user" }
+            
+            Log.d(TAG, "从数据库检查消息 - 数据库消息数: ${dbMessages.size}, 内存消息数: ${_chatHistory.value.size}, 是否有用户消息: $hasUserMessage")
+            
+            if (hasUserMessage) {
+                Log.d(TAG, "聊天 $chatId 已存在用户消息，跳过开场白同步")
+                // 如果数据库有消息但内存中没有，同步一下内存状态
+                if (_chatHistory.value.size != dbMessages.size) {
+                    Log.d(TAG, "同步内存消息列表，从 ${_chatHistory.value.size} 条更新为 ${dbMessages.size} 条")
+                    _chatHistory.value = dbMessages
+                }
+                return@withLock
+            }
+
+            val activeCard = characterCardManager.activeCharacterCardFlow.first()
+            val opening = activeCard.openingStatement
+            val roleName = activeCard.name
+            Log.d(TAG, "获取角色卡信息 - 名称: $roleName, 开场白长度: ${opening.length}, 是否为空: ${opening.isBlank()}")
+
+            // 使用数据库中的消息作为基准，但优先使用内存中的消息（如果已加载）
+            val currentMessages = if (_chatHistory.value.isNotEmpty() && _chatHistory.value.size >= dbMessages.size) {
+                _chatHistory.value.toMutableList()
+            } else {
+                dbMessages.toMutableList()
+            }
             val existingIndex = currentMessages.indexOfFirst { it.sender == "ai" }
+            Log.d(TAG, "当前消息数量: ${currentMessages.size}, 现有AI消息索引: $existingIndex")
 
             if (existingIndex >= 0) {
                 if (opening.isNotBlank()) {
                     val existing = currentMessages[existingIndex]
                     if (existing.content != opening || existing.roleName != roleName) {
+                        Log.d(TAG, "更新现有开场白消息 - 原内容长度: ${existing.content.length}, 新内容长度: ${opening.length}, 原角色名: ${existing.roleName}, 新角色名: $roleName")
                         val updated = existing.copy(content = opening, roleName = roleName)
                         currentMessages[existingIndex] = updated
                         _chatHistory.value = currentMessages
                         chatHistoryManager.updateMessage(chatId, updated)
+                        Log.d(TAG, "开场白消息更新完成")
+                    } else {
+                        Log.d(TAG, "开场白内容未变化，无需更新")
                     }
                 } else {
                     val existing = currentMessages[existingIndex]
+                    Log.d(TAG, "开场白为空，删除现有AI消息，时间戳: ${existing.timestamp}")
                     currentMessages.removeAt(existingIndex)
                     _chatHistory.value = currentMessages
                     chatHistoryManager.deleteMessage(chatId, existing.timestamp)
+                    Log.d(TAG, "AI消息删除完成")
                 }
             } else if (opening.isNotBlank()) {
                 val openingMessage = ChatMessage(
@@ -156,11 +229,17 @@ class ChatHistoryDelegate(
                     timestamp = System.currentTimeMillis(),
                     roleName = roleName
                 )
+                Log.d(TAG, "添加新开场白消息 - 时间戳: ${openingMessage.timestamp}, 角色名: $roleName, 内容长度: ${opening.length}")
                 currentMessages.add(openingMessage)
                 _chatHistory.value = currentMessages
                 chatHistoryManager.addMessage(chatId, openingMessage)
+                Log.d(TAG, "开场白消息添加完成，当前消息总数: ${currentMessages.size}")
+            } else {
+                Log.d(TAG, "无现有AI消息且开场白为空，无需操作")
             }
         }
+        
+        Log.d(TAG, "开场白同步完成，聊天ID: $chatId")
     }
 
     /** 检查是否应该创建新聊天，确保同步 */

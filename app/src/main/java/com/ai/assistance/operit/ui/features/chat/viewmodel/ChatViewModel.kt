@@ -361,6 +361,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                                 tokenStatsDelegate.getCumulativeTokenCounts()
                             val windowSize = tokenStatsDelegate.getLastCurrentWindowSize()
                             chatHistoryDelegate.saveCurrentChat(inputTokens, outputTokens, windowSize)
+                            
+                            // 如果悬浮窗正在运行，通知其重新加载消息
+                            if (isFloatingMode.value) {
+                                viewModelScope.launch {
+                                    floatingWindowDelegate.notifyFloatingServiceReload()
+                                }
+                            }
                         },
                         // 传递自动朗读状态和方法
                         getIsAutoReadEnabled = { isAutoReadEnabled.value },
@@ -393,7 +400,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         context = context,
                         coroutineScope = viewModelScope,
                         inputProcessingState = this.inputProcessingState,
-                        chatHistoryFlow = chatHistoryDelegate.chatHistory
+                        chatHistoryFlow = chatHistoryDelegate.chatHistory,
+                        chatHistoryDelegate = chatHistoryDelegate
                 )
     }
 
