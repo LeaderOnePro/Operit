@@ -466,6 +466,10 @@ class EnhancedAIService private constructor(private val context: Context) {
                         emit(content)
                     }
 
+                    // 流收集完成后，添加用户消息到对话历史
+                    // 只有在成功收到响应后，才将用户消息添加到历史记录中
+                    context.conversationHistory.add(Pair("user", processedInput))
+
                     // Update accumulated token counts and persist them
                     val inputTokens = serviceForFunction.inputTokenCount
                     val cachedInputTokens = serviceForFunction.cachedInputTokenCount
