@@ -477,13 +477,13 @@ private fun MessageItem(
             // 回复选项
             if (message.sender == "ai") {
                 DropdownMenuItem(
-        text = {
+                text = {
                         Text(
                             stringResource(R.string.reply_message),
                             style = MaterialTheme.typography.bodyMedium,
                             fontSize = 13.sp
-            )
-        },
+                       )
+                },
                 onClick = {
                         onReplyToMessage?.invoke(message)
                         showContextMenu = false
@@ -524,9 +524,7 @@ private fun MessageItem(
                 modifier = Modifier.height(36.dp)
             )
         }
-
-
-}
+    }
 }
 
 

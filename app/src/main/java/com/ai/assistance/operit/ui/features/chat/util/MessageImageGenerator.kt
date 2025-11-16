@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -263,12 +264,12 @@ object MessageImageGenerator {
                     val contentHeight = scrollView.getChildAt(0).height
                     Log.d(TAG, "内容完整高度: $contentHeight")
                     
-                    capturedBitmap = Bitmap.createBitmap(
+                    var tempBitmap = Bitmap.createBitmap(
                         scrollView.width,
                         contentHeight,
                         Bitmap.Config.ARGB_8888
                     )
-                    val canvas = Canvas(capturedBitmap)
+                    val canvas = Canvas(tempBitmap)
                     
                     // 根据当前主题填充背景色
                     val backgroundColor = if (isDarkTheme) {
@@ -279,6 +280,17 @@ object MessageImageGenerator {
                     canvas.drawColor(backgroundColor)
                     
                     scrollView.draw(canvas)
+                    
+                    // 检查是否为硬件 Bitmap，如果是则转换为软件 Bitmap
+                    // 软件渲染不支持硬件 Bitmap，需要转换为软件 Bitmap
+                    capturedBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && tempBitmap.config == Bitmap.Config.HARDWARE) {
+                        Log.d(TAG, "检测到硬件 Bitmap，转换为软件 Bitmap")
+                        val softwareBitmap = tempBitmap.copy(Bitmap.Config.ARGB_8888, false)
+                        tempBitmap.recycle()
+                        softwareBitmap
+                    } else {
+                        tempBitmap
+                    }
                     
                     Log.d(TAG, "捕获成功，图片尺寸: ${capturedBitmap.width}x${capturedBitmap.height}")
                 } catch (e: Throwable) {

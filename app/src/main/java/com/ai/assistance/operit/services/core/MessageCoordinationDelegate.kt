@@ -132,6 +132,8 @@ class MessageCoordinationDelegate(
                 // 保存当前输入，清空输入框，并立即更新UI状态为总结中
                 val userInput = messageProcessingDelegate.userMessage.value.text
                 messageProcessingDelegate.updateUserMessage("") // 清空输入框
+                // 先设置activeStreamingChatId，确保UI能显示总结状态
+                messageProcessingDelegate.setActiveStreamingChatId(chatId)
                 messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Summarizing("正在压缩历史记录..."))
 
                 coroutineScope.launch {
@@ -252,6 +254,9 @@ class MessageCoordinationDelegate(
             return false
         }
         _isSummarizing.value = true
+        // 先设置activeStreamingChatId，确保UI能显示总结状态
+        val currentChatId = chatHistoryDelegate.currentChatId.value
+        messageProcessingDelegate.setActiveStreamingChatId(currentChatId)
         messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Summarizing("正在压缩历史记录..."))
 
         var summarySuccess = false

@@ -509,6 +509,10 @@ class MessageProcessingDelegate(
         _activeStreamingChatId.value = null
     }
 
+    fun setActiveStreamingChatId(chatId: String?) {
+        _activeStreamingChatId.value = chatId
+    }
+
     fun setInputProcessingState(isProcessing: Boolean, message: String) {
         if(isProcessing) {
             _inputProcessingState.value = EnhancedInputProcessingState.Processing(message)
