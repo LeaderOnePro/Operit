@@ -428,7 +428,7 @@ class MessageProcessingDelegate(
                             }
                         } else {
                             // 普通模式，直接清理流
-                            val finalMessage = aiMessage.copy(content = finalContent)
+                            val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
                             withContext(Dispatchers.Main) {
                                 if (chatId != null) {
                                     addMessageToChat(chatId, finalMessage)
@@ -448,15 +448,11 @@ class MessageProcessingDelegate(
                     // 如果waifu模式处理失败，回退到普通模式
                     try {
                         val finalContent = aiMessage.content
-                        val finalMessage = aiMessage.copy(content = finalContent, contentStream = null)
+                        val finalMessage = aiMessage.copy(content = finalContent)
                         withContext(Dispatchers.Main) {
                             if (chatId != null) {
                                 addMessageToChat(chatId, finalMessage)
                             }
-                            // 如果启यो-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------t--了自动朗读，也朗读最终消息
-                            // if (getIsAutoReadEnabled()) {
-                            //     speakMessage(finalContent)
-                            // }
                         }
                     } catch (ex: Exception) {
                         Log.e(TAG, "回退到普通模式也失败", ex)

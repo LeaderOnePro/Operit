@@ -186,6 +186,9 @@ class ChatServiceCore(
 
     /** 取消当前消息 */
     fun cancelCurrentMessage() {
+        // 先取消总结（如果正在进行）
+        messageCoordinationDelegate.cancelSummary()
+        // 然后取消消息处理
         messageProcessingDelegate.cancelCurrentMessage()
     }
 

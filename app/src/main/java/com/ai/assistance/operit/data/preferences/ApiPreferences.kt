@@ -159,7 +159,7 @@ class ApiPreferences private constructor(private val context: Context) {
         // Default values for Summary Settings
         const val DEFAULT_ENABLE_SUMMARY = true
         const val DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT = true
-        const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 8
+        const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 16
 
         // Default value for Context Length (in K)
         const val DEFAULT_CONTEXT_LENGTH = 48.0f

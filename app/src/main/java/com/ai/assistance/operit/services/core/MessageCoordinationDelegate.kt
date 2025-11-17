@@ -10,12 +10,14 @@ import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.ui.features.chat.viewmodel.UiStateDelegate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 /**
  * 消息协调委托类
@@ -42,6 +44,9 @@ class MessageCoordinationDelegate(
     // 总结状态
     private val _isSummarizing = MutableStateFlow(false)
     val isSummarizing: StateFlow<Boolean> = _isSummarizing.asStateFlow()
+    
+    // 保存总结任务的 Job 引用，用于取消
+    private var summaryJob: Job? = null
     
     // 保存当前的 promptFunctionType，用于自动继续时保持提示词一致性
     private var currentPromptFunctionType: PromptFunctionType = PromptFunctionType.CHAT
@@ -136,20 +141,29 @@ class MessageCoordinationDelegate(
                 messageProcessingDelegate.setActiveStreamingChatId(chatId)
                 messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Summarizing("正在压缩历史记录..."))
 
-                coroutineScope.launch {
-                    val summarySuccess = summarizeHistory(autoContinue = false, promptFunctionType = promptFunctionType)
-                    if (summarySuccess) {
-                        // 总结成功后，恢复用户输入并继续发送
+                summaryJob = coroutineScope.launch {
+                    var summarySuccess = false
+                    try {
+                        summarySuccess = summarizeHistory(autoContinue = false, promptFunctionType = promptFunctionType)
+                        if (summarySuccess) {
+                            // 总结成功后，恢复用户输入并继续发送
+                            messageProcessingDelegate.updateUserMessage(userInput)
+                            sendMessageInternal(
+                                promptFunctionType = promptFunctionType,
+                                isContinuation = false, // 仍然是用户发起
+                                skipSummaryCheck = true // 跳过再次检查
+                            )
+                        } else {
+                            // 总结失败，恢复用户输入并提示
+                            messageProcessingDelegate.updateUserMessage(userInput)
+                            uiStateDelegate.showErrorMessage("历史记录总结失败，消息未发送")
+                        }
+                    } catch (e: CancellationException) {
+                        // 总结被取消，恢复用户输入但不显示错误消息
                         messageProcessingDelegate.updateUserMessage(userInput)
-                        sendMessageInternal(
-                            promptFunctionType = promptFunctionType,
-                            isContinuation = false, // 仍然是用户发起
-                            skipSummaryCheck = true // 跳过再次检查
-                        )
-                    } else {
-                        // 总结失败，恢复用户输入并提示
-                        messageProcessingDelegate.updateUserMessage(userInput)
-                        uiStateDelegate.showErrorMessage("历史记录总结失败，消息未发送")
+                        throw e // 重新抛出，让协程正确取消
+                    } finally {
+                        summaryJob = null
                     }
                 }
                 return // 阻止当前的消息发送流程
@@ -237,8 +251,24 @@ class MessageCoordinationDelegate(
      */
     fun handleTokenLimitExceeded() {
         Log.d(TAG, "接收到Token超限信号，开始执行总结并继续...")
-        coroutineScope.launch {
+        summaryJob = coroutineScope.launch {
             summarizeHistory(autoContinue = true)
+            summaryJob = null
+        }
+    }
+
+    /**
+     * 取消正在进行的总结操作
+     */
+    fun cancelSummary() {
+        if (_isSummarizing.value) {
+            Log.d(TAG, "取消正在进行的总结操作")
+            summaryJob?.cancel()
+            summaryJob = null
+            _isSummarizing.value = false
+            // 重置状态
+            messageProcessingDelegate.resetLoadingState()
+            messageProcessingDelegate.handleInputProcessingState(InputProcessingState.Idle)
         }
     }
 
@@ -294,6 +324,10 @@ class MessageCoordinationDelegate(
             } else {
                 Log.w(TAG, "总结失败或无需总结")
             }
+        } catch (e: CancellationException) {
+            // 总结被取消，这是正常流程
+            Log.d(TAG, "总结操作被取消")
+            throw e // 重新抛出取消异常，让协程正确取消
         } catch (e: Exception) {
             Log.e(TAG, "生成总结时出错: ${e.message}", e)
             uiStateDelegate.showErrorMessage("生成聊天总结时出错: ${e.message}")

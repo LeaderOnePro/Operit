@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
+import coil.compose.LocalImageLoader
 import coil.request.CachePolicy
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.ChatStyle
@@ -113,6 +114,17 @@ object MessageImageGenerator {
                 // 创建 ComposeView，包含所有消息内容
                 val composeView = ComposeView(context).apply {
                     setContent {
+                        // 为截图渲染提供只使用软件 Bitmap 的 ImageLoader，避免
+                        // "Software rendering doesn't support hardware bitmaps" 崩溃
+                        val softwareImageLoader = ImageLoader.Builder(context)
+                            .allowHardware(false)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .build()
+
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalImageLoader provides softwareImageLoader
+                        ) {
                         MaterialTheme(colorScheme = colorScheme) {
                             // 不再使用 Capturable，直接渲染内容
                             val density = LocalDensity.current
@@ -221,6 +233,7 @@ object MessageImageGenerator {
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }

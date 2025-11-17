@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRendererState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +48,9 @@ fun AiMessageComposable(
     // 链接预览弹窗状态
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkToPreview by remember { mutableStateOf("") }
+    
+    // 创建并保存StreamMarkdownRenderer的状态，使用message.timestamp作为key确保同一条消息共享状态
+    val rendererState = remember(message.timestamp) { StreamMarkdownRendererState() }
 
     // 创建自定义XML渲染器
     val xmlRenderer = remember(showThinkingProcess, showStatusTags, enableDialogs) {
@@ -100,17 +104,20 @@ fun AiMessageComposable(
                     backgroundColor = backgroundColor,
                     onLinkClick = rememberedOnLinkClick,
                     xmlRenderer = xmlRenderer,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    state = rendererState
                 )
             } else {
                 // 对于已完成的静态消息，使用新的字符串渲染器以提高性能
+                // 共享相同的state，避免重新计算nodes等状态
                 StreamMarkdownRenderer(
                     content = message.content,
                     textColor = textColor,
                     backgroundColor = backgroundColor,
                     onLinkClick = rememberedOnLinkClick,
                     xmlRenderer = xmlRenderer,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    state = rendererState
                 )
             }
         }

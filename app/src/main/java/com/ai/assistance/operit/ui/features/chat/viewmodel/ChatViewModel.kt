@@ -815,6 +815,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     fun cancelCurrentMessage() {
+        // 先取消总结（如果正在进行）
+        if (::messageCoordinationDelegate.isInitialized) {
+            messageCoordinationDelegate.cancelSummary()
+        }
+        // 然后取消消息处理
         messageProcessingDelegate.cancelCurrentMessage()
         uiStateDelegate.showToast("已取消当前对话")
     }

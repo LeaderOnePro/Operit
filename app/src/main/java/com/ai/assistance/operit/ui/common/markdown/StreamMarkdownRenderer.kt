@@ -52,6 +52,7 @@ import com.ai.assistance.operit.util.markdown.MarkdownNode
 import com.ai.assistance.operit.util.markdown.MarkdownNodeStable
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import com.ai.assistance.operit.util.markdown.NestedMarkdownProcessor
+import com.ai.assistance.operit.util.markdown.SmartString
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.util.stream.StreamInterceptor
 import com.ai.assistance.operit.util.stream.splitBy as streamSplitBy
@@ -135,6 +136,45 @@ private fun String.trimAll(): String {
     return this.trim { it.isWhitespace() }
 }
 
+/**
+ * StreamMarkdownRenderer的状态类
+ * 用于在流式渲染和静态渲染之间共享状态，避免切换时重新计算
+ */
+@Stable
+class StreamMarkdownRendererState {
+    // 原始数据收集列表
+    val nodes = mutableStateListOf<MarkdownNode>()
+    // 用于UI渲染的列表
+    val renderNodes = mutableStateListOf<MarkdownNodeStable>()
+    // 节点动画状态映射表
+    val nodeAnimationStates = mutableStateMapOf<String, Boolean>()
+    // 缓存转换后的稳定节点，避免不必要的对象创建
+    val conversionCache = mutableStateMapOf<Int, Pair<Int, MarkdownNodeStable>>()
+    // 保存流式渲染收集的完整内容，用于切换时判断是否需要重新解析
+    val collectedContent = SmartString()
+    // 渲染器ID
+    var rendererId: String = ""
+        private set
+    
+    /**
+     * 更新渲染器ID
+     */
+    fun updateRendererId(id: String) {
+        rendererId = id
+    }
+    
+    /**
+     * 重置所有状态（用于切换内容源时）
+     */
+    fun reset() {
+        nodes.clear()
+        renderNodes.clear()
+        nodeAnimationStates.clear()
+        conversionCache.clear()
+        collectedContent.clear()
+    }
+}
+
 /** 高性能流式Markdown渲染组件 通过Jetpack Compose实现，支持流式渲染Markdown内容 使用Stream处理系统，实现高效的异步处理 */
 @Composable
 fun StreamMarkdownRenderer(
@@ -143,23 +183,29 @@ fun StreamMarkdownRenderer(
         textColor: Color = LocalContentColor.current,
         backgroundColor: Color = MaterialTheme.colorScheme.surface,
         onLinkClick: ((String) -> Unit)? = null,
-        xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() }
+        xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() },
+        state: StreamMarkdownRendererState? = null
 ) {
+    // 使用传入的state或创建新的state
+    val rendererState = state ?: remember { StreamMarkdownRendererState() }
     
     // 原始数据收集列表
-    val nodes = remember { mutableStateListOf<MarkdownNode>() }
+    val nodes = rendererState.nodes
     // 用于UI渲染的列表
-    val renderNodes = remember { mutableStateListOf<MarkdownNodeStable>() }
+    val renderNodes = rendererState.renderNodes
     // 节点动画状态映射表
-    val nodeAnimationStates = remember { mutableStateMapOf<String, Boolean>() }
+    val nodeAnimationStates = rendererState.nodeAnimationStates
     // 用于在`finally`块中启动协程
     val scope = rememberCoroutineScope()
     // 缓存转换后的稳定节点，避免不必要的对象创建
-    val conversionCache = remember { mutableStateMapOf<Int, Pair<Int, MarkdownNodeStable>>() }
+    val conversionCache = rendererState.conversionCache
 
     // 当流实例变化时，获得一个稳定的渲染器ID
-    val rendererId =
-            remember(markdownStream) { "renderer-${System.identityHashCode(markdownStream)}" }
+    val rendererId = remember(markdownStream) { 
+        val id = "renderer-${System.identityHashCode(markdownStream)}"
+        rendererState.updateRendererId(id)
+        id
+    }
 
     // 创建一个中间流，用于拦截和批处理渲染更新
     val interceptedStream =
@@ -185,9 +231,11 @@ fun StreamMarkdownRenderer(
                         )
 
                 // 最后设置拦截器的onEach函数
-                processor.setOnEach {
+                processor.setOnEach { char ->
+                    // 收集字符到 state 的 collectedContent
+                    rendererState.collectedContent + char
                     batchUpdater.startBatchUpdates()
-                    it
+                    char
                 }
 
                 processor.interceptedStream
@@ -200,6 +248,7 @@ fun StreamMarkdownRenderer(
         // 重置状态
         nodes.clear()
         renderNodes.clear()
+        rendererState.collectedContent.clear()
 
         try {
             interceptedStream.streamSplitBy(NestedMarkdownProcessor.getBlockPlugins()).collect {
@@ -370,23 +419,37 @@ fun StreamMarkdownRenderer(
         textColor: Color = LocalContentColor.current,
         backgroundColor: Color = MaterialTheme.colorScheme.surface,
         onLinkClick: ((String) -> Unit)? = null,
-        xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() }
+        xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() },
+        state: StreamMarkdownRendererState? = null
 ) {
+    // 使用传入的state或创建新的state
+    val rendererState = state ?: remember(content) { StreamMarkdownRendererState() }
     
-    // 移除渲染时间相关的变量和日志
-
     // 使用流式版本相同的渲染器ID生成逻辑
-    val rendererId = remember(content) { "static-renderer-${content.hashCode()}" }
+    val rendererId = remember(content) { 
+        val id = "static-renderer-${content.hashCode()}"
+        rendererState.updateRendererId(id)
+        id
+    }
 
     // 使用与流式版本相同的节点列表结构
-    val nodes = remember(content) { mutableStateListOf<MarkdownNode>() }
-    val renderNodes = remember(content) { mutableStateListOf<MarkdownNodeStable>() }
+    val nodes = rendererState.nodes
+    val renderNodes = rendererState.renderNodes
     // 添加节点动画状态映射表，与流式版本保持一致
-    val nodeAnimationStates = remember { mutableStateMapOf<String, Boolean>() }
+    val nodeAnimationStates = rendererState.nodeAnimationStates
     val scope = rememberCoroutineScope()
+    // 缓存转换后的稳定节点，避免不必要的对象创建
+    val conversionCache = rendererState.conversionCache
 
     // 当content字符串变化时，一次性完成解析
     LaunchedEffect(content) {
+        // 先检查内容是否与流式渲染收集的内容一致，如果一致则跳过解析
+        val collectedContentStr = rendererState.collectedContent.toString()
+        if (collectedContentStr == content && nodes.isNotEmpty()) {
+            // 内容一致且已有节点，跳过解析
+            return@LaunchedEffect
+        }
+        
         // 移除时间计算相关变量
         val cachedNodes = MarkdownNodeCache.get(content)
 
@@ -551,6 +614,8 @@ fun StreamMarkdownRenderer(
                     nodes.addAll(parsedNodes)
                     renderNodes.clear()
                     renderNodes.addAll(parsedNodes.map { it.toStableNode() })
+                    // 清理转换缓存，因为内容已完全改变
+                    conversionCache.clear()
 
                     // 更新所有节点的动画状态为可见
                     val newStates = mutableMapOf<String, Boolean>()

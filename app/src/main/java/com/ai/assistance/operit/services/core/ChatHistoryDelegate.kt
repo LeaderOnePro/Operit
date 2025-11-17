@@ -477,7 +477,19 @@ class ChatHistoryDelegate(
             val existingIndex = currentMessages.indexOfFirst { it.timestamp == message.timestamp }
 
             if (existingIndex >= 0) {
-                //只更新消息，不能重新加载聊天记录
+                //这一段只对消息结束的之后生效
+                if(message.contentStream == null) {
+                    Log.d(TAG, "更新消息到聊天 $targetChatId, stream is null, ts: ${message.timestamp}")
+                    val updatedMessages = currentMessages.mapIndexed { index, existingMessage ->
+                        if (index == existingIndex) {
+                            message // 替换为新消息对象
+                        } else {
+                            existingMessage // 保持原对象不变
+                        }
+                    }
+                    _chatHistory.value = updatedMessages
+                }
+
                 chatHistoryManager.updateMessage(targetChatId, message)
             } else {
                 Log.d(

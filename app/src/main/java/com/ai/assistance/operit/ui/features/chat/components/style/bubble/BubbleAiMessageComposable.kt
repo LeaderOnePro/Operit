@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
+import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRendererState
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
 import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
 import com.ai.assistance.operit.util.markdown.toCharStream
@@ -88,6 +89,9 @@ fun BubbleAiMessageComposable(
     // 链接预览弹窗状态
     var showLinkDialog by remember { mutableStateOf(false) }
     var linkToPreview by remember { mutableStateOf("") }
+    
+    // 创建并保存StreamMarkdownRenderer的状态，使用message.timestamp作为key确保同一条消息共享状态
+    val rendererState = remember(message.timestamp) { StreamMarkdownRendererState() }
 
     val xmlRenderer = remember(showThinkingProcess, showStatusTags) {
         CustomXmlRenderer(
@@ -185,17 +189,20 @@ fun BubbleAiMessageComposable(
                             backgroundColor = backgroundColor,
                             onLinkClick = rememberedOnLinkClick,
                             xmlRenderer = xmlRenderer,
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(12.dp),
+                            state = rendererState
                         )
                     } else {
                         // 对于已完成的静态消息，使用 content 参数的渲染器以支持Markdown
+                        // 共享相同的state，避免重新计算nodes等状态
                         StreamMarkdownRenderer(
                             content = message.content,
                             textColor = textColor,
                             backgroundColor = backgroundColor,
                             onLinkClick = rememberedOnLinkClick,
                             xmlRenderer = xmlRenderer,
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(12.dp),
+                            state = rendererState
                         )
                     }
                 }
