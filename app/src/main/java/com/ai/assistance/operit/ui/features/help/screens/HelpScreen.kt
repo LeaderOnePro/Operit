@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.ui.features.help.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -7,20 +9,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebResourceRequest
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
 import com.ai.assistance.operit.ui.features.token.webview.WebViewConfig
 
 @Composable
 fun HelpScreen(onBackPressed: () -> Unit = {}) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
+    val focusRequester = remember { FocusRequester() }
     
     // 创建WebView实例
     val webView = remember { 
@@ -50,12 +54,27 @@ fun HelpScreen(onBackPressed: () -> Unit = {}) {
     LaunchedEffect(Unit) {
         webView.loadUrl("https://aaswordman.github.io/OperitWeb/")
     }
+
+    // 确保WebView获取焦点，避免滑动时被父级拦截
+    DisposableEffect(webView) {
+        webView.post {
+            webView.requestFocus()
+            webView.requestFocusFromTouch()
+        }
+        onDispose { }
+    }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
     
     Box(modifier = Modifier.fillMaxSize()) {
         // WebView
         AndroidView(
             factory = { webView },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(focusRequester)
+                .focusable()
         )
         
         // 加载指示器

@@ -4,7 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.ApiProviderType
+import com.ai.assistance.operit.data.model.FunctionType
+import com.ai.assistance.operit.data.model.ModelConfigData
+import com.ai.assistance.operit.data.model.ModelConfigDefaults
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -25,12 +30,12 @@ class ApiConfigDelegate(
 ) {
     companion object {
         private const val TAG = "ApiConfigDelegate"
-        private const val DEFAULT_CONFIG_ID = "default" // 默认配置ID
     }
 
     // Preferences
     private val apiPreferences = ApiPreferences.getInstance(context)
     private val modelConfigManager = ModelConfigManager(context)
+    private val functionalConfigManager = FunctionalConfigManager(context)
 
     // State flows
     private val _isConfigured = MutableStateFlow(true) // 默认已配置
@@ -57,9 +62,13 @@ class ApiConfigDelegate(
             MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_AUTO_READ)
     val enableAutoRead: StateFlow<Boolean> = _enableAutoRead.asStateFlow()
 
-    private val _contextLength = MutableStateFlow(ApiPreferences.DEFAULT_CONTEXT_LENGTH)
-    private val _maxContextLength = MutableStateFlow(ApiPreferences.DEFAULT_MAX_CONTEXT_LENGTH)
-    private val _enableMaxContextMode = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_MAX_CONTEXT_MODE)
+    private val _contextLength = MutableStateFlow(ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH)
+    val baseContextLength: StateFlow<Float> = _contextLength.asStateFlow()
+    private val _maxContextLength =
+            MutableStateFlow(ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH)
+    val maxContextLengthSetting: StateFlow<Float> = _maxContextLength.asStateFlow()
+    private val _enableMaxContextMode =
+            MutableStateFlow(ModelConfigDefaults.DEFAULT_ENABLE_MAX_CONTEXT_MODE)
     val enableMaxContextMode: StateFlow<Boolean> = _enableMaxContextMode.asStateFlow()
 
     val contextLength: StateFlow<Float> = combine(
@@ -68,19 +77,25 @@ class ApiConfigDelegate(
         _maxContextLength
     ) { isMaxMode, normalLength, maxLength ->
         if (isMaxMode) maxLength else normalLength
-    }.stateIn(coroutineScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, ApiPreferences.DEFAULT_CONTEXT_LENGTH)
+    }.stateIn(
+            coroutineScope,
+            kotlinx.coroutines.flow.SharingStarted.Eagerly,
+            ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH
+    )
 
     private val _summaryTokenThreshold =
-            MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_TOKEN_THRESHOLD)
+            MutableStateFlow(ModelConfigDefaults.DEFAULT_SUMMARY_TOKEN_THRESHOLD)
     val summaryTokenThreshold: StateFlow<Float> = _summaryTokenThreshold.asStateFlow()
 
-    private val _enableSummary = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_SUMMARY)
+    private val _enableSummary = MutableStateFlow(ModelConfigDefaults.DEFAULT_ENABLE_SUMMARY)
     val enableSummary: StateFlow<Boolean> = _enableSummary.asStateFlow()
 
-    private val _enableSummaryByMessageCount = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT)
+    private val _enableSummaryByMessageCount =
+            MutableStateFlow(ModelConfigDefaults.DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT)
     val enableSummaryByMessageCount: StateFlow<Boolean> = _enableSummaryByMessageCount.asStateFlow()
 
-    private val _summaryMessageCountThreshold = MutableStateFlow(ApiPreferences.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD)
+    private val _summaryMessageCountThreshold =
+            MutableStateFlow(ModelConfigDefaults.DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD)
     val summaryMessageCountThreshold: StateFlow<Int> = _summaryMessageCountThreshold.asStateFlow()
 
     private val _enableTools = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_TOOLS)
@@ -105,24 +120,40 @@ class ApiConfigDelegate(
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
+    private val _activeConfigId =
+            MutableStateFlow(FunctionalConfigManager.DEFAULT_CONFIG_ID)
+    val activeConfigId: StateFlow<String> = _activeConfigId.asStateFlow()
+
     init {
-        // 异步初始化ModelConfigManager和加载配置
         coroutineScope.launch {
             try {
                 modelConfigManager.initializeIfNeeded()
-                
-                // 获取默认配置并设置到当前状态
-                val defaultConfig = modelConfigManager.getModelConfigFlow(ModelConfigManager.DEFAULT_CONFIG_ID).first()
-                _apiKey.value = defaultConfig.apiKey
-                _apiEndpoint.value = defaultConfig.apiEndpoint
-                _modelName.value = defaultConfig.modelName
-                _apiProviderType.value = defaultConfig.apiProviderType
-                
-                // 标记初始化完成
-                _isInitialized.value = true
+                functionalConfigManager.initializeIfNeeded()
+
+                functionalConfigManager.functionConfigMappingFlow.collect { mapping ->
+                    val chatConfigId =
+                            mapping[FunctionType.CHAT] ?: FunctionalConfigManager.DEFAULT_CONFIG_ID
+                    _activeConfigId.value = chatConfigId
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "初始化ApiConfigDelegate时出错", e)
-                // 即使出错也标记为已初始化，避免无限等待
+                Log.e(TAG, "初始化功能配置映射时出错", e)
+            }
+        }
+
+        coroutineScope.launch {
+            try {
+                modelConfigManager.initializeIfNeeded()
+
+                _activeConfigId
+                        .flatMapLatest { configId ->
+                            modelConfigManager.getModelConfigFlow(configId)
+                        }
+                        .collect { config ->
+                            updateStateFromConfig(config)
+                            _isInitialized.value = true
+                        }
+            } catch (e: Exception) {
+                Log.e(TAG, "收集模型配置时出错", e)
                 _isInitialized.value = true
             }
         }
@@ -139,6 +170,20 @@ class ApiConfigDelegate(
                 onConfigChanged(enhancedAiService)
             }
         }
+    }
+
+    private fun updateStateFromConfig(config: ModelConfigData) {
+        _apiKey.value = config.apiKey
+        _apiEndpoint.value = config.apiEndpoint
+        _modelName.value = config.modelName
+        _apiProviderType.value = config.apiProviderType
+        _contextLength.value = config.contextLength
+        _maxContextLength.value = config.maxContextLength
+        _enableMaxContextMode.value = config.enableMaxContextMode
+        _summaryTokenThreshold.value = config.summaryTokenThreshold
+        _enableSummary.value = config.enableSummary
+        _enableSummaryByMessageCount.value = config.enableSummaryByMessageCount
+        _summaryMessageCountThreshold.value = config.summaryMessageCountThreshold
     }
 
     private fun initializeSettingsCollection() {
@@ -181,53 +226,6 @@ class ApiConfigDelegate(
         coroutineScope.launch {
             apiPreferences.keepScreenOnFlow.collect { enabled ->
                 _keepScreenOn.value = enabled
-            }
-        }
-
-        // Collect context length setting
-        coroutineScope.launch {
-            apiPreferences.contextLengthFlow.collect { length ->
-                _contextLength.value = length
-            }
-        }
-
-        coroutineScope.launch {
-            apiPreferences.maxContextLengthFlow.collect { length ->
-                _maxContextLength.value = length
-            }
-        }
-
-        coroutineScope.launch {
-            apiPreferences.enableMaxContextModeFlow.collect { isEnabled ->
-                _enableMaxContextMode.value = isEnabled
-            }
-        }
-
-        // Collect summary token threshold setting
-        coroutineScope.launch {
-            apiPreferences.summaryTokenThresholdFlow.collect { threshold ->
-                _summaryTokenThreshold.value = threshold
-            }
-        }
-
-        // Collect enable summary setting
-        coroutineScope.launch {
-            apiPreferences.enableSummaryFlow.collect { enabled ->
-                _enableSummary.value = enabled
-            }
-        }
-
-        // Collect enable summary by message count setting
-        coroutineScope.launch {
-            apiPreferences.enableSummaryByMessageCountFlow.collect { enabled ->
-                _enableSummaryByMessageCount.value = enabled
-            }
-        }
-
-        // Collect summary message count threshold setting
-        coroutineScope.launch {
-            apiPreferences.summaryMessageCountThresholdFlow.collect { threshold ->
-                _summaryMessageCountThreshold.value = threshold
             }
         }
 
@@ -287,12 +285,11 @@ class ApiConfigDelegate(
     fun saveApiSettings() {
         coroutineScope.launch {
             try {
-                // 获取当前配置
-                val currentConfig = modelConfigManager.getModelConfigFlow(DEFAULT_CONFIG_ID).first()
+                val configId = _activeConfigId.value
 
                 // 更新所有API相关配置
                 modelConfigManager.updateModelConfig(
-                        DEFAULT_CONFIG_ID,
+                        configId,
                         _apiKey.value,
                         _apiEndpoint.value,
                         _modelName.value,
@@ -374,37 +371,74 @@ class ApiConfigDelegate(
     /** 更新上下文长度 */
     fun updateContextLength(length: Float) {
         coroutineScope.launch {
-            apiPreferences.saveContextLength(length)
             _contextLength.value = length
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateContextSettings(
+                    configId = configId,
+                    contextLength = length,
+                    maxContextLength = current.maxContextLength,
+                    enableMaxContextMode = current.enableMaxContextMode
+            )
         }
     }
     fun updateSummaryTokenThreshold(threshold: Float) {
         coroutineScope.launch {
-            apiPreferences.saveSummaryTokenThreshold(threshold)
             _summaryTokenThreshold.value = threshold
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateSummarySettings(
+                    configId = configId,
+                    enableSummary = current.enableSummary,
+                    summaryTokenThreshold = threshold,
+                    enableSummaryByMessageCount = current.enableSummaryByMessageCount,
+                    summaryMessageCountThreshold = current.summaryMessageCountThreshold
+            )
         }
     }
 
     fun updateMaxContextLength(length: Float) {
         coroutineScope.launch {
-            apiPreferences.saveMaxContextLength(length)
             _maxContextLength.value = length
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateContextSettings(
+                    configId = configId,
+                    contextLength = current.contextLength,
+                    maxContextLength = length,
+                    enableMaxContextMode = current.enableMaxContextMode
+            )
         }
     }
 
     fun toggleEnableMaxContextMode() {
         coroutineScope.launch {
             val newValue = !_enableMaxContextMode.value
-            apiPreferences.saveEnableMaxContextMode(newValue)
             _enableMaxContextMode.value = newValue
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateContextSettings(
+                    configId = configId,
+                    contextLength = current.contextLength,
+                    maxContextLength = current.maxContextLength,
+                    enableMaxContextMode = newValue
+            )
         }
     }
     /** 切换启用总结功能 */
     fun toggleEnableSummary() {
         coroutineScope.launch {
             val newValue = !_enableSummary.value
-            apiPreferences.saveEnableSummary(newValue)
             _enableSummary.value = newValue
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateSummarySettings(
+                    configId = configId,
+                    enableSummary = newValue,
+                    summaryTokenThreshold = current.summaryTokenThreshold,
+                    enableSummaryByMessageCount = current.enableSummaryByMessageCount,
+                    summaryMessageCountThreshold = current.summaryMessageCountThreshold
+            )
         }
     }
 
@@ -412,16 +446,32 @@ class ApiConfigDelegate(
     fun toggleEnableSummaryByMessageCount() {
         coroutineScope.launch {
             val newValue = !_enableSummaryByMessageCount.value
-            apiPreferences.saveEnableSummaryByMessageCount(newValue)
             _enableSummaryByMessageCount.value = newValue
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateSummarySettings(
+                    configId = configId,
+                    enableSummary = current.enableSummary,
+                    summaryTokenThreshold = current.summaryTokenThreshold,
+                    enableSummaryByMessageCount = newValue,
+                    summaryMessageCountThreshold = current.summaryMessageCountThreshold
+            )
         }
     }
 
     /** 更新总结消息数量阈值 */
     fun updateSummaryMessageCountThreshold(threshold: Int) {
         coroutineScope.launch {
-            apiPreferences.saveSummaryMessageCountThreshold(threshold)
             _summaryMessageCountThreshold.value = threshold
+            val configId = _activeConfigId.value
+            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
+            modelConfigManager.updateSummarySettings(
+                    configId = configId,
+                    enableSummary = current.enableSummary,
+                    summaryTokenThreshold = current.summaryTokenThreshold,
+                    enableSummaryByMessageCount = current.enableSummaryByMessageCount,
+                    summaryMessageCountThreshold = threshold
+            )
         }
     }
 

@@ -2960,6 +2960,8 @@
     <!-- 手动更新记忆 -->
     <string name="manual_memory_update">手动更新记忆</string>
     <string name="manual_memory_update_desc">当AI在任务完成后忘记总结时，手动触发记忆保存，将本次对话的有价值内容存入长期记忆库。</string>
+    <string name="manual_conversation_summary">手动总结对话</string>
+    <string name="manual_conversation_summary_desc">立即触发一次对话总结，帮助压缩上下文并保留双方重点内容，适用于长对话或发送前清理历史。</string>
 
     <!-- Context and Summary Settings Screen -->
     <string name="screen_title_context_summary_settings">上下文和总结设置</string>

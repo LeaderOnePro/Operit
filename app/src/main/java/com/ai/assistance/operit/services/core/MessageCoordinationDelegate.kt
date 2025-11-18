@@ -247,6 +247,24 @@ class MessageCoordinationDelegate(
     }
 
     /**
+     * 手动触发对话总结
+     */
+    fun manuallySummarizeConversation() {
+        if (_isSummarizing.value) {
+            uiStateDelegate.showToast("正在总结中，请稍候")
+            return
+        }
+        coroutineScope.launch {
+            val success = summarizeHistory(autoContinue = false)
+            if (success) {
+                uiStateDelegate.showToast("对话总结已生成")
+            } else {
+                uiStateDelegate.showErrorMessage("生成对话总结失败")
+            }
+        }
+    }
+
+    /**
      * 处理Token超限的情况，触发一次历史总结并继续。
      */
     fun handleTokenLimitExceeded() {

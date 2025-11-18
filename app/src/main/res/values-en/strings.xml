@@ -1252,6 +1252,8 @@
     <!-- Manual Memory Update -->
     <string name="manual_memory_update">Manual Memory Update</string>
     <string name="manual_memory_update_desc">When AI forgets to summarize after task completion, manually trigger memory saving to store valuable content from this conversation into long-term memory.</string>
+    <string name="manual_conversation_summary">Manual Conversation Summary</string>
+    <string name="manual_conversation_summary_desc">Immediately trigger a conversation summary to compress context and keep key points from both sides. Useful for long chats or before sending new messages.</string>
     
     <!-- Context and Summary Settings Screen -->
     <string name="screen_title_context_summary_settings">Context and Summary Settings</string>

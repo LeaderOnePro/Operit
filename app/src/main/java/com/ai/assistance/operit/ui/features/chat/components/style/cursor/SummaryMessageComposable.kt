@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.ui.common.displays.MarkdownTextComposable
 
 /**
  * A composable function for rendering memory summarization messages as a compact divider. This
@@ -133,11 +132,10 @@ fun SummaryMessageComposable(
                                 .heightIn(max = 400.dp)
                                 .verticalScroll(scrollState)
                     ) {
-                        MarkdownTextComposable(
+                        Text(
                             text = message.content,
-                            textColor =
-                                MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
 

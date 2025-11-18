@@ -692,6 +692,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                                 },
                                 maxWindowSizeInK =
                                         actualViewModel.maxWindowSizeInK.collectAsState().value,
+                                baseContextLengthInK =
+                                        actualViewModel.baseContextLengthInK.collectAsState().value,
+                                maxContextLengthInK =
+                                        actualViewModel.maxContextLengthInK.collectAsState().value,
                                 onContextLengthChange = {
                                     actualViewModel.updateContextLength(it)
                                 },
@@ -716,7 +720,8 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                                 onToggleTools = { actualViewModel.toggleTools() },
                                 disableStreamOutput = disableStreamOutput,
                                 onToggleDisableStreamOutput = { actualViewModel.toggleDisableStreamOutput() },
-                                onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() }
+                                onManualMemoryUpdate = { actualViewModel.manuallyUpdateMemory() },
+                                onManualSummarizeConversation = { actualViewModel.manuallySummarizeConversation() }
                         )
                     }
                 }

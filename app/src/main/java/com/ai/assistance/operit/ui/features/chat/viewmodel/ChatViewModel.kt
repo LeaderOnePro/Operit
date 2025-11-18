@@ -159,6 +159,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 上下文长度
     val maxWindowSizeInK: StateFlow<Float> by lazy { apiConfigDelegate.contextLength }
+    val baseContextLengthInK: StateFlow<Float> by lazy { apiConfigDelegate.baseContextLength }
+    val maxContextLengthInK: StateFlow<Float> by lazy { apiConfigDelegate.maxContextLengthSetting }
     val enableMaxContextMode: StateFlow<Boolean> by lazy { apiConfigDelegate.enableMaxContextMode }
 
     // 聊天历史相关
@@ -1547,6 +1549,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun manuallyUpdateMemory() {
         messageCoordinationDelegate.manuallyUpdateMemory()
+    }
+
+    fun manuallySummarizeConversation() {
+        messageCoordinationDelegate.manuallySummarizeConversation()
     }
 
 }

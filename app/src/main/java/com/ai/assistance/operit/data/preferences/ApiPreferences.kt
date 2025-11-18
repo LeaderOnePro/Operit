@@ -101,19 +101,6 @@ class ApiPreferences private constructor(private val context: Context) {
         // Key for Disable Stream Output
         val DISABLE_STREAM_OUTPUT = booleanPreferencesKey("disable_stream_output")
 
-        // Keys for Summary Settings
-        val ENABLE_SUMMARY = booleanPreferencesKey("enable_summary")
-        val ENABLE_SUMMARY_BY_MESSAGE_COUNT = booleanPreferencesKey("enable_summary_by_message_count")
-        val SUMMARY_MESSAGE_COUNT_THRESHOLD = intPreferencesKey("summary_message_count_threshold")
-
-        // Key for Context Length
-        val CONTEXT_LENGTH = floatPreferencesKey("context_length")
-        val MAX_CONTEXT_LENGTH = floatPreferencesKey("max_context_length")
-        val ENABLE_MAX_CONTEXT_MODE = booleanPreferencesKey("enable_max_context_mode")
-
-        // Key for Summary Token Threshold
-        val SUMMARY_TOKEN_THRESHOLD = floatPreferencesKey("summary_token_threshold")
-
         // Custom Prompt Settings
         val CUSTOM_INTRO_PROMPT = stringPreferencesKey("custom_intro_prompt")
         
@@ -155,19 +142,6 @@ class ApiPreferences private constructor(private val context: Context) {
 
         // Default value for Disable Stream Output (default false, meaning stream is enabled by default)
         const val DEFAULT_DISABLE_STREAM_OUTPUT = false
-
-        // Default values for Summary Settings
-        const val DEFAULT_ENABLE_SUMMARY = true
-        const val DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT = true
-        const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 16
-
-        // Default value for Context Length (in K)
-        const val DEFAULT_CONTEXT_LENGTH = 48.0f
-        const val DEFAULT_MAX_CONTEXT_LENGTH = 128.0f
-        const val DEFAULT_ENABLE_MAX_CONTEXT_MODE = false
-
-        // Default value for Summary Token Threshold
-        const val DEFAULT_SUMMARY_TOKEN_THRESHOLD = 0.70f
 
         // Default values for custom prompts
         const val DEFAULT_INTRO_PROMPT = "你是Operit，一个全能AI助手，旨在解决用户提出的任何任务。你有各种工具可以调用，以高效完成复杂的请求。"
@@ -302,43 +276,6 @@ class ApiPreferences private constructor(private val context: Context) {
         context.apiDataStore.data.map { preferences ->
             preferences[DISABLE_STREAM_OUTPUT] ?: DEFAULT_DISABLE_STREAM_OUTPUT
         }
-
-    // Flows for Summary Settings
-    val enableSummaryFlow: Flow<Boolean> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[ENABLE_SUMMARY] ?: DEFAULT_ENABLE_SUMMARY
-        }
-
-    val enableSummaryByMessageCountFlow: Flow<Boolean> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] ?: DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
-        }
-
-    val summaryMessageCountThresholdFlow: Flow<Int> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] ?: DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
-        }
-
-    // Flow for Context Length
-    val contextLengthFlow: Flow<Float> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[CONTEXT_LENGTH] ?: DEFAULT_CONTEXT_LENGTH
-        }
-// Flow for Summary Token Threshold
-val summaryTokenThresholdFlow: Flow<Float> =
-    context.apiDataStore.data.map { preferences ->
-        preferences[SUMMARY_TOKEN_THRESHOLD] ?: DEFAULT_SUMMARY_TOKEN_THRESHOLD
-    }
-
-val maxContextLengthFlow: Flow<Float> =
-    context.apiDataStore.data.map { preferences ->
-        preferences[MAX_CONTEXT_LENGTH] ?: DEFAULT_MAX_CONTEXT_LENGTH
-    }
-
-val enableMaxContextModeFlow: Flow<Boolean> =
-    context.apiDataStore.data.map { preferences ->
-        preferences[ENABLE_MAX_CONTEXT_MODE] ?: DEFAULT_ENABLE_MAX_CONTEXT_MODE
-    }
 
     // Custom Prompt Flows
     val customIntroPromptFlow: Flow<String> =
@@ -484,39 +421,6 @@ val enableMaxContextModeFlow: Flow<Boolean> =
         }
     }
 
-    // Save Summary Settings
-    suspend fun saveEnableSummary(isEnabled: Boolean) {
-        context.apiDataStore.edit { preferences ->
-            preferences[ENABLE_SUMMARY] = isEnabled
-        }
-    }
-
-    suspend fun saveEnableSummaryByMessageCount(isEnabled: Boolean) {
-        context.apiDataStore.edit { preferences ->
-            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = isEnabled
-        }
-    }
-
-    suspend fun saveSummaryMessageCountThreshold(threshold: Int) {
-        context.apiDataStore.edit { preferences ->
-            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = threshold
-        }
-    }
-
-    // Save Context Length
-    suspend fun saveContextLength(length: Float) {
-        context.apiDataStore.edit { preferences ->
-            preferences[CONTEXT_LENGTH] = length
-        }
-    }
-
-    // Save Summary Token Threshold
-    suspend fun saveSummaryTokenThreshold(threshold: Float) {
-        context.apiDataStore.edit { preferences ->
-            preferences[SUMMARY_TOKEN_THRESHOLD] = threshold
-        }
-    }
-
     // 保存显示和行为设置的方法，不会影响模型参数
     suspend fun saveDisplaySettings(
             showFpsCounter: Boolean,
@@ -525,18 +429,6 @@ val enableMaxContextModeFlow: Flow<Boolean> =
         context.apiDataStore.edit { preferences ->
             preferences[SHOW_FPS_COUNTER] = showFpsCounter
             preferences[KEEP_SCREEN_ON] = keepScreenOn
-        }
-    }
-
-    suspend fun saveMaxContextLength(length: Float) {
-        context.apiDataStore.edit { preferences ->
-            preferences[MAX_CONTEXT_LENGTH] = length
-        }
-    }
-
-    suspend fun saveEnableMaxContextMode(isEnabled: Boolean) {
-        context.apiDataStore.edit { preferences ->
-            preferences[ENABLE_MAX_CONTEXT_MODE] = isEnabled
         }
     }
 
@@ -906,21 +798,9 @@ val enableMaxContextModeFlow: Flow<Boolean> =
         return preferences[MAX_HTTP_RESPONSE_LENGTH] ?: DEFAULT_MAX_HTTP_RESPONSE_LENGTH
     }
 
-    // 重置上下文、总结和截断设置为默认值
-    suspend fun resetContextSummaryAndTruncationSettings() {
+    // 重置截断设置为默认值
+    suspend fun resetTruncationSettings() {
         context.apiDataStore.edit { preferences ->
-            // Context Settings
-            preferences[CONTEXT_LENGTH] = DEFAULT_CONTEXT_LENGTH
-            preferences[MAX_CONTEXT_LENGTH] = DEFAULT_MAX_CONTEXT_LENGTH
-            preferences[ENABLE_MAX_CONTEXT_MODE] = DEFAULT_ENABLE_MAX_CONTEXT_MODE
-
-            // Summary Settings
-            preferences[ENABLE_SUMMARY] = DEFAULT_ENABLE_SUMMARY
-            preferences[ENABLE_SUMMARY_BY_MESSAGE_COUNT] = DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT
-            preferences[SUMMARY_MESSAGE_COUNT_THRESHOLD] = DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD
-            preferences[SUMMARY_TOKEN_THRESHOLD] = DEFAULT_SUMMARY_TOKEN_THRESHOLD
-
-            // Truncation Settings
             preferences[MAX_FILE_SIZE_BYTES] = DEFAULT_MAX_FILE_SIZE_BYTES
             preferences[PART_SIZE] = DEFAULT_PART_SIZE
             preferences[MAX_TEXT_RESULT_LENGTH] = DEFAULT_MAX_TEXT_RESULT_LENGTH

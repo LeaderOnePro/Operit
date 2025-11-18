@@ -3,9 +3,7 @@ package com.ai.assistance.operit.ui.common.markdown
 import android.util.Log
 import android.webkit.WebView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -176,7 +174,6 @@ fun EnhancedCodeBlock(code: String, language: String = "", modifier: Modifier = 
                 ) {
                     Column(
                         modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
                             .padding(end = 8.dp, top = 8.dp)
                     ) {
                         // 使用key为每行建立记忆
@@ -193,10 +190,11 @@ fun EnhancedCodeBlock(code: String, language: String = "", modifier: Modifier = 
                                 
                                 // 渲染单行代码，利用行缓存机制
                                 CachedCodeLine(
-                                    line = line, 
-                                    language = language, 
+                                    line = line,
+                                    language = language,
                                     index = index,
-                                    lineCache = lineCache
+                                    lineCache = lineCache,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
@@ -503,7 +501,8 @@ private fun CachedCodeLine(
     line: String, 
     language: String, 
     index: Int,
-    lineCache: MutableMap<String, AnnotatedString>
+    lineCache: MutableMap<String, AnnotatedString>,
+    modifier: Modifier = Modifier
 ) {
     // 计算缓存key
     val cacheKey = "$language:$line"
@@ -526,9 +525,10 @@ private fun CachedCodeLine(
         fontSize = 12.sp,
         lineHeight = 16.sp,
         color = Color.White,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Visible
+        maxLines = Int.MAX_VALUE,
+        softWrap = true,
+        overflow = TextOverflow.Clip,
+        modifier = modifier
     )
 }
 

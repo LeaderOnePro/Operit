@@ -1,7 +1,13 @@
 package com.ai.assistance.operit.ui.features.settings.sections
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,12 +16,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.ModelConfigData
@@ -434,19 +444,26 @@ fun ModelParametersSection(
     }
 
     // UI部分
+    var parametersExpanded by rememberSaveable { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 4.dp),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             // 标题
             Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { parametersExpanded = !parametersExpanded }
             ) {
                 Icon(
                         imageVector = Icons.Default.Tune,
@@ -459,165 +476,182 @@ fun ModelParametersSection(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                        imageVector = if (parametersExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (parametersExpanded) "收起" else "展开",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
-            // 参数描述
-            Text(
-                text = stringResource(R.string.parameters_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // 生成参数部分
-            if (generationParams.isNotEmpty()) {
-                SectionTitle(
-                    title = stringResource(R.string.generation_parameters),
-                    icon = Icons.Default.AutoFixHigh
-                )
-                generationParams.forEach { parameter ->
-                    ParameterItem(
-                            parameter = parameter,
-                            onValueChange = { newValue ->
-                                updateParameterValue(parameter, newValue)
-                            },
-                            onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
-                            onEditClick = { /* Not needed for standard parameters */ },
-                            onDeleteClick = { },
-                            error = parameterErrors[parameter.id],
-                            onErrorChange = { error ->
-                                if (error != null) {
-                                    parameterErrors[parameter.id] = error
-                                } else {
-                                    parameterErrors.remove(parameter.id)
-                                }
-                            }
+            AnimatedVisibility(
+                    visible = parametersExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // 参数描述
+                    Text(
+                        text = stringResource(R.string.parameters_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    // 温度推荐显示
-                    if (parameter.apiName == "temperature") {
-                        TemperatureRecommendationRow()
+                    val parameterTabs = listOf(
+                            ParameterTab(
+                                    id = "generation",
+                                    title = stringResource(R.string.generation_parameters),
+                                    icon = Icons.Default.AutoFixHigh,
+                                    category = ParameterCategory.GENERATION
+                            ),
+                            ParameterTab(
+                                    id = "creativity",
+                                    title = stringResource(R.string.creativity_parameters),
+                                    icon = Icons.Default.Lightbulb,
+                                    category = ParameterCategory.CREATIVITY
+                            ),
+                            ParameterTab(
+                                    id = "repetition",
+                                    title = stringResource(R.string.repetition_parameters),
+                                    icon = Icons.Default.Repeat,
+                                    category = ParameterCategory.REPETITION
+                            ),
+                            ParameterTab(
+                                    id = "custom",
+                                    title = customParametersSectionText,
+                                    icon = Icons.Default.Settings,
+                                    category = ParameterCategory.OTHER,
+                                    isCustom = true
+                            )
+                    )
+
+                    var selectedTabIndex by remember(config.id) { mutableStateOf(0) }
+
+                    ScrollableTabRow(
+                            selectedTabIndex = selectedTabIndex,
+                            edgePadding = 0.dp,
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                            indicator = { tabPositions ->
+                                TabRowDefaults.SecondaryIndicator(
+                                        Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                        color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                    ) {
+                        parameterTabs.forEachIndexed { index, tab ->
+                            Tab(
+                                    selected = selectedTabIndex == index,
+                                    onClick = { selectedTabIndex = index },
+                                    text = {
+                                        Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                    imageVector = tab.icon,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                    text = tab.title,
+                                                    style = MaterialTheme.typography.labelLarge
+                                            )
+                                        }
+                                    }
+                            )
+                        }
+                    }
+
+                    Crossfade(targetState = parameterTabs[selectedTabIndex].id, modifier = Modifier.fillMaxWidth()) { tabId ->
+                        val currentTab = parameterTabs.first { it.id == tabId }
+                        val displayedParams =
+                                when {
+                                    currentTab.isCustom -> customParams
+                                    currentTab.category == ParameterCategory.GENERATION -> generationParams
+                                    currentTab.category == ParameterCategory.CREATIVITY -> creativityParams
+                                    currentTab.category == ParameterCategory.REPETITION -> repetitionParams
+                                    else -> emptyList()
+                                }
+
+                        if (displayedParams.isEmpty()) {
+                            ParametersEmptyState(
+                                    message =
+                                            if (currentTab.isCustom) "暂无自定义参数"
+                                            else "当前类别暂无可配置参数"
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                displayedParams.forEach { parameter ->
+                                    ParameterItem(
+                                            parameter = parameter,
+                                            onValueChange = { newValue ->
+                                                updateParameterValue(parameter, newValue)
+                                            },
+                                            onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
+                                            onEditClick = {
+                                                if (parameter.isCustom) {
+                                                    parameterToEdit =
+                                                            modelParameterToCustomParameterData(parameter)
+                                                }
+                                            },
+                                            onDeleteClick = {
+                                                if (parameter.isCustom) {
+                                                    scope.launch {
+                                                        val updatedParameters =
+                                                                parameters.filterNot { it.id == parameter.id }
+                                                        parameters = updatedParameters
+                                                        configManager.updateParameters(
+                                                                config.id,
+                                                                updatedParameters
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            error = parameterErrors[parameter.id],
+                                            onErrorChange = { error ->
+                                                if (error != null) {
+                                                    parameterErrors[parameter.id] = error
+                                                } else {
+                                                    parameterErrors.remove(parameter.id)
+                                                }
+                                            }
+                                    )
+
+                                    if (parameter.apiName == "temperature") {
+                                        TemperatureRecommendationRow()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 操作按钮
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { resetParameters() },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(resetParametersText)
+                        }
+                        
+                        Button(
+                            onClick = { showAddParameterDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(addCustomParameterText)
+                        }
                     }
                 }
-            }
-
-            // 创造性参数部分
-            if (creativityParams.isNotEmpty()) {
-                SectionTitle(
-                    title = stringResource(R.string.creativity_parameters),
-                    icon = Icons.Default.Lightbulb
-                )
-                creativityParams.forEach { parameter ->
-                    ParameterItem(
-                            parameter = parameter,
-                            onValueChange = { newValue ->
-                                updateParameterValue(parameter, newValue)
-                            },
-                            onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
-                            onEditClick = { /* Not needed for standard parameters */ },
-                            onDeleteClick = { },
-                            error = parameterErrors[parameter.id],
-                            onErrorChange = { error ->
-                                if (error != null) {
-                                    parameterErrors[parameter.id] = error
-                                } else {
-                                    parameterErrors.remove(parameter.id)
-                                }
-                            }
-                    )
-                }
-            }
-
-            // 重复控制参数部分
-            if (repetitionParams.isNotEmpty()) {
-                SectionTitle(
-                    title = stringResource(R.string.repetition_parameters),
-                    icon = Icons.Default.Repeat
-                )
-                repetitionParams.forEach { parameter ->
-                    ParameterItem(
-                            parameter = parameter,
-                            onValueChange = { newValue ->
-                                updateParameterValue(parameter, newValue)
-                            },
-                            onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
-                            onEditClick = { /* Not needed for standard parameters */ },
-                            onDeleteClick = { },
-                            error = parameterErrors[parameter.id],
-                            onErrorChange = { error ->
-                                if (error != null) {
-                                    parameterErrors[parameter.id] = error
-                                } else {
-                                    parameterErrors.remove(parameter.id)
-                                }
-                            }
-                    )
-                }
-            }
-
-            // 自定义参数部分
-            if (customParams.isNotEmpty()) {
-                SectionTitle(title = customParametersSectionText, icon = Icons.Default.Settings)
-                customParams.forEach { parameter ->
-                    ParameterItem(
-                        parameter = parameter,
-                        onValueChange = { newValue ->
-                            updateParameterValue(parameter, newValue)
-                        },
-                        onToggle = { isEnabled -> toggleParameter(parameter, isEnabled) },
-                        onEditClick = {
-                            parameterToEdit = modelParameterToCustomParameterData(parameter)
-                        },
-                        onDeleteClick = {
-                            scope.launch {
-                                val updatedParameters = parameters.filterNot { it.id == parameter.id }
-                                parameters = updatedParameters
-                                configManager.updateParameters(config.id, updatedParameters)
-                            }
-                        },
-                            error = parameterErrors[parameter.id],
-                            onErrorChange = { error ->
-                                if (error != null) {
-                                    parameterErrors[parameter.id] = error
-                                } else {
-                                    parameterErrors.remove(parameter.id)
-                                }
-                            }
-                    )
-                }
-            }
-
-            // 操作按钮
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 24.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                OutlinedButton(
-                        onClick = { resetParameters() },
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                ) {
-                    Icon(
-                            imageVector = Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.reset),
-                            modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                                            Text(resetParametersText)
-                }
-            }
-
-            // 新增自定义参数按钮
-            OutlinedButton(
-                onClick = { showAddParameterDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(addCustomParameterText)
             }
         }
     }
@@ -1099,26 +1133,42 @@ private fun ParameterCategory.toDisplayString(): String {
     }
 }
 
+private data class ParameterTab(
+        val id: String,
+        val title: String,
+        val icon: ImageVector,
+        val category: ParameterCategory?,
+        val isCustom: Boolean = false
+)
+
 @Composable
-private fun SectionTitle(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(vertical = 8.dp)
+private fun ParametersEmptyState(message: String) {
+    Surface(
+            modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
     ) {
-        Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-        )
+        Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
-    Divider(modifier = Modifier.padding(bottom = 8.dp))
 }
 
 @Composable
@@ -1140,90 +1190,96 @@ private fun ParameterItem(
     val mustBeIntegerText = stringResource(R.string.must_be_integer)
     val mustBeFloatText = stringResource(R.string.must_be_float)
 
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 4.dp)) {
-        Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                        text = parameter.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                )
-
-                if (parameter.description.isNotEmpty()) {
+    Surface(
+            modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                            text = parameter.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = parameter.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
                     )
-                }
 
-                if (parameter.isCustom) {
-                Text(
-                        text = "自定义参数",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.api_name_label, parameter.apiName),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 启用/禁用开关
-                Switch(
-                        checked = parameter.isEnabled,
-                        onCheckedChange = { onToggle(it) },
-                        colors =
-                                SwitchDefaults.colors(
-                                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                        checkedTrackColor =
-                                                MaterialTheme.colorScheme.primaryContainer
-                                )
-                )
-
-                if (parameter.isCustom) {
-                    IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(R.string.edit_custom_parameter),
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                    if (parameter.description.isNotEmpty()) {
+                        Text(
+                                text = parameter.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete_action),
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.error
+
+                    if (parameter.isCustom) {
+                        Text(
+                                text = "自定义参数",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                        )
+                    } else {
+                        Text(
+                                text = stringResource(R.string.api_name_label, parameter.apiName),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
                         )
                     }
                 }
 
-                // 展开/收起按钮
-                IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                            imageVector =
-                                    if (expanded) Icons.Default.ExpandLess
-                                    else Icons.Default.ExpandMore,
-                        contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(
-                            R.string.expand
-                        ),
-                            modifier = Modifier.size(20.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                            checked = parameter.isEnabled,
+                            onCheckedChange = { onToggle(it) },
+                            colors =
+                                    SwitchDefaults.colors(
+                                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                            checkedTrackColor =
+                                                    MaterialTheme.colorScheme.primaryContainer
+                                    )
                     )
+
+                    if (parameter.isCustom) {
+                        IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.edit_custom_parameter),
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                                onClick = { showDeleteConfirm = true },
+                                modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_action),
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                                imageVector =
+                                        if (expanded) Icons.Default.ExpandLess
+                                        else Icons.Default.ExpandMore,
+                                contentDescription =
+                                        if (expanded) stringResource(R.string.collapse)
+                                        else stringResource(R.string.expand),
+                                modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
-        }
 
         if (showDeleteConfirm) {
             AlertDialog(
@@ -1398,7 +1454,7 @@ private fun ParameterItem(
             }
         }
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+        }
     }
 }
 

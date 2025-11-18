@@ -155,6 +155,16 @@ class ModelConfigManager(private val context: Context) {
         }
     }
 
+    private suspend fun updateConfigInternal(
+            configId: String,
+            transform: (ModelConfigData) -> ModelConfigData
+    ): ModelConfigData {
+        val current = getModelConfigFlow(configId).first()
+        val updated = transform(current)
+        saveConfigToDataStore(updated)
+        return updated
+    }
+
     // 获取指定ID的配置
     fun getModelConfigFlow(configId: String): Flow<ModelConfigData> {
         return context.modelConfigDataStore.data.map { preferences ->
@@ -370,6 +380,38 @@ class ModelConfigManager(private val context: Context) {
         val updatedConfig = config.copy(enableDirectImageProcessing = enableDirectImageProcessing)
         saveConfigToDataStore(updatedConfig)
         return updatedConfig
+    }
+
+    suspend fun updateContextSettings(
+            configId: String,
+            contextLength: Float,
+            maxContextLength: Float,
+            enableMaxContextMode: Boolean
+    ): ModelConfigData {
+        return updateConfigInternal(configId) {
+            it.copy(
+                    contextLength = contextLength,
+                    maxContextLength = maxContextLength,
+                    enableMaxContextMode = enableMaxContextMode
+            )
+        }
+    }
+
+    suspend fun updateSummarySettings(
+            configId: String,
+            enableSummary: Boolean,
+            summaryTokenThreshold: Float,
+            enableSummaryByMessageCount: Boolean,
+            summaryMessageCountThreshold: Int
+    ): ModelConfigData {
+        return updateConfigInternal(configId) {
+            it.copy(
+                    enableSummary = enableSummary,
+                    summaryTokenThreshold = summaryTokenThreshold,
+                    enableSummaryByMessageCount = enableSummaryByMessageCount,
+                    summaryMessageCountThreshold = summaryMessageCountThreshold
+            )
+        }
     }
 
     /**

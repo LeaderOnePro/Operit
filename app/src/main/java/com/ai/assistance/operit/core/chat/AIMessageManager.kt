@@ -292,14 +292,29 @@ object AIMessageManager {
             return null
         }
 
+        val memoryTagRegex = Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL)
+        val conversationReviewEntries = mutableListOf<Pair<String, String>>()
+        fun String.condenseForQuote(): String {
+            val normalized = trim()
+            return if (normalized.length <= 40) {
+                normalized
+            } else {
+                "${normalized.take(20)}...${normalized.takeLast(20)}"
+            }
+        }
         val conversationToSummarize = messagesToSummarize.mapIndexed { index, message ->
             val role = if (message.sender == "user") "user" else "assistant"
-            val content = if (role == "user") {
-                message.content.replace(Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL), "").trim()
+            val cleanedContent = if (role == "user") {
+                message.content.replace(memoryTagRegex, "").trim()
             } else {
                 message.content
             }
-            Pair(role, "#${index + 1}: ${content}")
+            if (cleanedContent.isNotBlank()) {
+                val displayContent =
+                    if (role == "assistant") cleanedContent.condenseForQuote() else cleanedContent
+                conversationReviewEntries.add(role to displayContent)
+            }
+            Pair(role, "#${index + 1}: $cleanedContent")
         }
 
         return try {
@@ -312,11 +327,25 @@ object AIMessageManager {
                 null
             } else {
                 // 如果是自动续写，在总结消息尾部添加续写提示
+                val trimmedSummary = summary.trim()
+                val summaryWithQuotes = buildString {
+                    append(trimmedSummary)
+                    if (conversationReviewEntries.isNotEmpty()) {
+                        append("\n\n对话回顾：\n")
+                        conversationReviewEntries.forEach { (role, content) ->
+                            append("- ")
+                            append(if (role == "user") "用户" else "AI")
+                            append(": ")
+                            append(content)
+                            append("\n")
+                        }
+                    }
+                }.trimEnd()
+
                 val finalSummary = if (autoContinue) {
-                    val trimmedSummary = summary.trim()
-                    "$trimmedSummary\n\n请你继续，如果任务完成，输出总结"
+                    "$summaryWithQuotes\n\n请你继续，如果任务完成，输出总结"
                 } else {
-                    summary.trim()
+                    summaryWithQuotes
                 }
                 
                 ChatMessage(

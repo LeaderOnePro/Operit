@@ -61,7 +61,6 @@ import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.PromptPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
-import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
 import java.text.DecimalFormat
 import kotlinx.coroutines.flow.first
@@ -80,6 +79,8 @@ fun ChatSettingsBar(
     enableThinkingGuidance: Boolean,
     onToggleThinkingGuidance: () -> Unit,
     maxWindowSizeInK: Float,
+    baseContextLengthInK: Float,
+    maxContextLengthInK: Float,
     onContextLengthChange: (Float) -> Unit,
     enableMemoryQuery: Boolean,
     onToggleMemoryQuery: () -> Unit,
@@ -96,7 +97,8 @@ fun ChatSettingsBar(
     onToggleTools: () -> Unit,
     disableStreamOutput: Boolean,
     onToggleDisableStreamOutput: () -> Unit,
-    onManualMemoryUpdate: () -> Unit
+    onManualMemoryUpdate: () -> Unit,
+    onManualSummarizeConversation: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val iconScale by
@@ -113,7 +115,6 @@ fun ChatSettingsBar(
     val scope = rememberCoroutineScope()
     val functionalConfigManager = remember { FunctionalConfigManager(context) }
     val modelConfigManager = remember { ModelConfigManager(context) }
-    val apiPreferences = remember { ApiPreferences.getInstance(context) }
     val configMapping by
             functionalConfigManager.functionConfigMappingFlow.collectAsState(initial = emptyMap())
     var configSummaries by remember { mutableStateOf<List<ModelConfigSummary>>(emptyList()) }
@@ -122,9 +123,6 @@ fun ChatSettingsBar(
             configMapping[FunctionType.CHAT] ?: FunctionalConfigManager.DEFAULT_CONFIG_ID
     
     // 获取上下文长度设置，用于显示在 MaxMode 描述中
-    val normalContextLength by apiPreferences.contextLengthFlow.collectAsState(initial = ApiPreferences.DEFAULT_CONTEXT_LENGTH)
-    val maxContextLength by apiPreferences.maxContextLengthFlow.collectAsState(initial = ApiPreferences.DEFAULT_MAX_CONTEXT_LENGTH)
-            
     // 新增：用户偏好（记忆）选择逻辑
     val userPreferencesManager = remember { UserPreferencesManager(context) }
     val activeProfileId by
@@ -331,15 +329,15 @@ fun ChatSettingsBar(
                                 isChecked = enableMaxContextMode,
                                 onToggle = onToggleEnableMaxContextMode,
                                 onInfoClick = {
-                                    val normalLengthText = if (normalContextLength % 1f == 0f) {
-                                        normalContextLength.toInt().toString()
+                                    val normalLengthText = if (baseContextLengthInK % 1f == 0f) {
+                                        baseContextLengthInK.toInt().toString()
                                     } else {
-                                        String.format("%.1f", normalContextLength)
+                                        String.format("%.1f", baseContextLengthInK)
                                     }
-                                    val maxLengthText = if (maxContextLength % 1f == 0f) {
-                                        maxContextLength.toInt().toString()
+                                    val maxLengthText = if (maxContextLengthInK % 1f == 0f) {
+                                        maxContextLengthInK.toInt().toString()
                                     } else {
-                                        String.format("%.1f", maxContextLength)
+                                        String.format("%.1f", maxContextLengthInK)
                                     }
                                     infoPopupContent = context.getString(R.string.max_mode_title) to context.getString(
                                         R.string.max_mode_info,
@@ -394,6 +392,22 @@ fun ChatSettingsBar(
                                 onInfoClick = {
                                     infoPopupContent =
                                         context.getString(R.string.manual_memory_update) to context.getString(R.string.manual_memory_update_desc)
+                                    showMenu = false
+                                }
+                            )
+
+                            // 手动总结对话
+                            ActionSettingItem(
+                                title = stringResource(R.string.manual_conversation_summary),
+                                icon = Icons.Outlined.History,
+                                iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                onClick = {
+                                    onManualSummarizeConversation()
+                                    showMenu = false
+                                },
+                                onInfoClick = {
+                                    infoPopupContent =
+                                        context.getString(R.string.manual_conversation_summary) to context.getString(R.string.manual_conversation_summary_desc)
                                     showMenu = false
                                 }
                             )
