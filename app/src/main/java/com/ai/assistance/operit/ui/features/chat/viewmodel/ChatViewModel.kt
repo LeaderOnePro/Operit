@@ -558,6 +558,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         chatHistoryDelegate.showChatHistorySelector(show)
     }
 
+    /** 创建对话分支 */
+    fun createBranch(upToMessageTimestamp: Long? = null) {
+        chatHistoryDelegate.createBranch(upToMessageTimestamp)
+        uiStateDelegate.showToast("已创建对话分支")
+    }
+
     /** 删除单条消息 */
     fun deleteMessage(index: Int) {
         Log.d(TAG, "准备删除消息，索引: $index")
@@ -1337,6 +1343,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     /** 更新指定聊天的标题 */
     fun updateChatTitle(chatId: String, newTitle: String) {
         chatHistoryDelegate.updateChatTitle(chatId, newTitle)
+    }
+
+    /** 更新指定聊天绑定的角色卡 */
+    fun updateChatCharacterCardBinding(chatId: String, characterCardName: String?) {
+        chatHistoryDelegate.updateChatCharacterCard(chatId, characterCardName)
     }
 
     /** 更新指定聊天的标题 */

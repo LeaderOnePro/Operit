@@ -260,12 +260,17 @@ class ChatHistoryDelegate(
             // 获取当前对话ID，以便继承分组
             val currentChatId = _currentChatId.value
             
-            // 创建新对话，如果有当前对话则继承其分组
-            val newChat = chatHistoryManager.createNewChat(inheritGroupFromChatId = currentChatId)
+            // 获取当前活跃的角色卡
+            val activeCard = characterCardManager.activeCharacterCardFlow.first()
+            
+            // 创建新对话，如果有当前对话则继承其分组，并绑定当前活跃的角色卡
+            val newChat = chatHistoryManager.createNewChat(
+                inheritGroupFromChatId = currentChatId,
+                characterCardName = activeCard.name // 绑定当前活跃的角色卡名称
+            )
             _currentChatId.value = newChat.id
             
             // --- 新增：检查并添加开场白 ---
-            val activeCard = characterCardManager.activeCharacterCardFlow.first()
             if (activeCard.openingStatement.isNotBlank()) {
                 val openingMessage = ChatMessage(
                     sender = "ai",
@@ -299,6 +304,34 @@ class ChatHistoryDelegate(
 
             delay(200)
             onScrollToBottom()
+        }
+    }
+
+    /** 创建对话分支 */
+    fun createBranch(upToMessageTimestamp: Long? = null) {
+        coroutineScope.launch {
+            val (inputTokens, outputTokens, windowSize) = getChatStatistics()
+            saveCurrentChat(inputTokens, outputTokens, windowSize) // 保存当前聊天
+
+            val currentChatId = _currentChatId.value
+            if (currentChatId != null) {
+                // 创建分支
+                val branchChat = chatHistoryManager.createBranch(currentChatId, upToMessageTimestamp)
+                _currentChatId.value = branchChat.id
+                
+                // 加载分支的消息
+                _chatHistory.value = branchChat.messages
+                
+                // 加载分支的 token 统计（继承自父对话）
+                onTokenStatisticsLoaded(
+                    branchChat.inputTokens,
+                    branchChat.outputTokens,
+                    branchChat.currentWindowSize
+                )
+                
+                delay(200)
+                onScrollToBottom()
+            }
         }
     }
 
@@ -390,6 +423,22 @@ class ChatHistoryDelegate(
             val updatedHistories = _chatHistories.value.map {
                 if (it.id == chatId) {
                     it.copy(workspace = workspace, updatedAt = LocalDateTime.now())
+                } else {
+                    it
+                }
+            }
+            _chatHistories.value = updatedHistories
+        }
+    }
+
+    /** 更新聊天绑定的角色卡 */
+    fun updateChatCharacterCard(chatId: String, characterCardName: String?) {
+        coroutineScope.launch {
+            chatHistoryManager.updateChatCharacterCardName(chatId, characterCardName)
+
+            val updatedHistories = _chatHistories.value.map {
+                if (it.id == chatId) {
+                    it.copy(characterCardName = characterCardName, updatedAt = LocalDateTime.now())
                 } else {
                     it
                 }

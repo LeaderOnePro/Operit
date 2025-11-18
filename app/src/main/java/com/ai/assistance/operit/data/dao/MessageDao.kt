@@ -47,4 +47,8 @@ interface MessageDao {
     /** 查找包含特定关键词的聊天ID列表（不重复） */
     @Query("SELECT DISTINCT chatId FROM messages WHERE content LIKE '%' || :query || '%' COLLATE NOCASE")
     suspend fun searchChatIdsByContent(query: String): List<String>
+
+    /** 批量重命名消息中的角色名 */
+    @Query("UPDATE messages SET roleName = :newName WHERE roleName = :oldName")
+    suspend fun renameRoleName(oldName: String, newName: String): Int
 }

@@ -19,5 +19,7 @@ data class ChatHistory(
     val currentWindowSize: Int = 0,
     val group: String? = null,
     val displayOrder: Long = 0L,
-    val workspace: String? = null
+    val workspace: String? = null,
+    val parentChatId: String? = null,
+    val characterCardName: String? = null
 ) 

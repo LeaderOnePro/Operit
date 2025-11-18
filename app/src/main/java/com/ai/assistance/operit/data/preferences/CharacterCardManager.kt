@@ -224,6 +224,7 @@ class CharacterCardManager private constructor(private val context: Context) {
 
         // 删除角色卡对应的主题配置
         userPreferencesManager.deleteCharacterCardTheme(id)
+        
     }
     
     // 设置活跃角色卡

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.ai.assistance.operit.data.model.ChatEntity
+import com.ai.assistance.operit.data.model.CharacterCardChatStats
 import kotlinx.coroutines.flow.Flow
 
 /** 聊天DAO接口，定义对聊天表的数据访问方法 */
@@ -54,6 +55,10 @@ interface ChatDao {
     @Query("UPDATE chats SET `group` = :group, updatedAt = :timestamp WHERE id = :chatId")
     suspend fun updateChatGroup(chatId: String, group: String?, timestamp: Long = System.currentTimeMillis())
 
+    /** 更新聊天绑定的角色卡名称 */
+    @Query("UPDATE chats SET characterCardName = :characterCardName, updatedAt = :timestamp WHERE id = :chatId")
+    suspend fun updateChatCharacterCardName(chatId: String, characterCardName: String?, timestamp: Long = System.currentTimeMillis())
+
     /** 更新单个聊天的顺序和分组 */
     @Query("UPDATE chats SET displayOrder = :displayOrder, `group` = :group, updatedAt = :timestamp WHERE id = :chatId")
     suspend fun updateChatOrderAndGroup(chatId: String, displayOrder: Long, group: String?, timestamp: Long = System.currentTimeMillis())
@@ -70,7 +75,68 @@ interface ChatDao {
     @Query("DELETE FROM chats WHERE `group` = :groupName")
     suspend fun deleteChatsInGroup(groupName: String)
 
-    /** 将分组下的所有聊天移动到“未分组” */
+    /** 将分组下的所有聊天移动到"未分组" */
     @Query("UPDATE chats SET `group` = NULL, updatedAt = :timestamp WHERE `group` = :groupName")
     suspend fun removeGroupFromChats(groupName: String, timestamp: Long = System.currentTimeMillis())
+
+    /** 根据parentChatId获取所有分支对话 */
+    @Query("SELECT * FROM chats WHERE parentChatId = :parentChatId ORDER BY displayOrder ASC")
+    suspend fun getBranchesByParentId(parentChatId: String): List<ChatEntity>
+
+    /** 根据parentChatId获取所有分支对话（Flow版本） */
+    @Query("SELECT * FROM chats WHERE parentChatId = :parentChatId ORDER BY displayOrder ASC")
+    fun getBranchesByParentIdFlow(parentChatId: String): Flow<List<ChatEntity>>
+
+    /** 获取所有没有父对话的对话（即主对话） */
+    @Query("SELECT * FROM chats WHERE parentChatId IS NULL ORDER BY displayOrder ASC")
+    suspend fun getMainChats(): List<ChatEntity>
+
+    /** 获取所有没有父对话的对话（Flow版本） */
+    @Query("SELECT * FROM chats WHERE parentChatId IS NULL ORDER BY displayOrder ASC")
+    fun getMainChatsFlow(): Flow<List<ChatEntity>>
+
+    /** 根据角色卡名称过滤聊天（非默认角色卡：只显示该角色卡名称的对话） */
+    @Query("SELECT * FROM chats WHERE characterCardName = :characterCardName ORDER BY displayOrder ASC")
+    fun getChatsByCharacterCard(characterCardName: String): Flow<List<ChatEntity>>
+
+    /** 根据角色卡名称过滤聊天（默认角色卡：显示该角色卡名称的对话 + 所有characterCardName为null的对话） */
+    @Query("SELECT * FROM chats WHERE characterCardName = :characterCardName OR characterCardName IS NULL ORDER BY displayOrder ASC")
+    fun getChatsByCharacterCardOrNull(characterCardName: String): Flow<List<ChatEntity>>
+
+    /** 批量清理绑定特定角色卡名称的对话（将characterCardName设为null） */
+    @Query("UPDATE chats SET characterCardName = NULL, updatedAt = :timestamp WHERE characterCardName = :characterCardName")
+    suspend fun clearCharacterCardBinding(characterCardName: String, timestamp: Long = System.currentTimeMillis())
+
+    /** 批量重命名角色卡绑定 */
+    @Query("UPDATE chats SET characterCardName = :newName, updatedAt = :timestamp WHERE characterCardName = :oldName")
+    suspend fun renameCharacterCardBinding(
+            oldName: String,
+            newName: String,
+            timestamp: Long = System.currentTimeMillis()
+    ): Int
+
+    /** 将所有未绑定角色卡的聊天归类到指定角色卡 */
+    @Query("UPDATE chats SET characterCardName = :newName, updatedAt = :timestamp WHERE characterCardName IS NULL")
+    suspend fun assignCharacterCardToUnbound(
+            newName: String,
+            timestamp: Long = System.currentTimeMillis()
+    ): Int
+
+    /** 获取按角色卡分组的聊天与消息统计 */
+    @Query(
+        """
+        SELECT 
+            c.characterCardName AS characterCardName,
+            COUNT(c.id) AS chatCount,
+            IFNULL(SUM(mc.messageCount), 0) AS messageCount
+        FROM chats c
+        LEFT JOIN (
+            SELECT chatId, COUNT(*) AS messageCount
+            FROM messages
+            GROUP BY chatId
+        ) mc ON c.id = mc.chatId
+        GROUP BY c.characterCardName
+        """
+    )
+    fun getCharacterCardChatStats(): Flow<List<CharacterCardChatStats>>
 }

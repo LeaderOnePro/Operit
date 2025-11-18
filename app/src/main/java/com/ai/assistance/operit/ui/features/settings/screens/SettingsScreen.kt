@@ -51,6 +51,7 @@ fun SettingsScreen(
         navigateToModelPrompts: () -> Unit,
         navigateToFunctionalConfig: () -> Unit,
         navigateToChatHistorySettings: () -> Unit,
+        navigateToChatBackupSettings: () -> Unit,
         navigateToLanguageSettings: () -> Unit,
         navigateToSpeechServicesSettings: () -> Unit,
         navigateToCustomHeadersSettings: () -> Unit,
@@ -298,11 +299,18 @@ fun SettingsScreen(
                         
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_data_backup),
-                                subtitle = stringResource(id = R.string.settings_data_backup_subtitle),
-                                icon = Icons.Default.History,
-                                onClick = navigateToChatHistorySettings
+                                subtitle = stringResource(id = R.string.settings_data_backup_desc),
+                                icon = Icons.Default.CloudUpload,
+                                onClick = navigateToChatBackupSettings
                         )
                         
+                        CompactSettingsItem(
+                                title = stringResource(id = R.string.settings_chat_history_management),
+                                subtitle = stringResource(id = R.string.settings_chat_history_management_subtitle),
+                                icon = Icons.Default.ManageHistory,
+                                onClick = navigateToChatHistorySettings
+                        )
+
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_token_usage_stats),
                                 subtitle = stringResource(id = R.string.settings_token_usage_subtitle),

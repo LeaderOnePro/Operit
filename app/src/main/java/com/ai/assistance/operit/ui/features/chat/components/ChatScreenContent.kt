@@ -34,8 +34,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
+import com.ai.assistance.operit.data.model.CharacterCard
 
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -156,6 +158,30 @@ fun ChatScreenContent(
     // 监听朗读状态
     val isPlaying by actualViewModel.isPlaying.collectAsState()
     val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
+    val characterCardManager = remember { CharacterCardManager.getInstance(context) }
+    val activeCharacterCard by characterCardManager.activeCharacterCardFlow.collectAsState(initial = null)
+    val displayedChatHistories = remember(chatHistories, activeCharacterCard) {
+        val activeCard = activeCharacterCard ?: return@remember emptyList()
+        chatHistories.filter { history ->
+            val historyCard = history.characterCardName
+            if (activeCard.isDefault) {
+                historyCard == null || historyCard == activeCard.name
+            } else {
+                historyCard == activeCard.name
+            }
+        }
+    }
+
+    LaunchedEffect(activeCharacterCard, displayedChatHistories, currentChatId) {
+        val activeCard = activeCharacterCard ?: return@LaunchedEffect
+        if (displayedChatHistories.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val hasCurrentChatInFilter = displayedChatHistories.any { it.id == currentChatId }
+        if (currentChatId.isBlank() || !hasCurrentChatInFilter) {
+            actualViewModel.switchChat(displayedChatHistories.first().id)
+        }
+    }
 
     val onSelectMessageToEditCallback = remember(editingMessageIndex, editingMessageContent, editingMessageType) {
         { index: Int, message: ChatMessage, senderType: String ->
@@ -189,6 +215,7 @@ fun ChatScreenContent(
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
+                        onCreateBranch = { timestamp -> actualViewModel.createBranch(timestamp) }, // 添加创建分支回调
                         topPadding = headerHeight,
                         chatStyle = chatStyle, // Pass chat style
                         isMultiSelectMode = isMultiSelectMode,
@@ -258,6 +285,7 @@ fun ChatScreenContent(
                         onDeleteMessagesFrom = { index -> actualViewModel.deleteMessagesFrom(index) },
                         onSpeakMessage = { content -> actualViewModel.speakMessage(content) }, // 添加朗读回调
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) }, // 添加回复回调
+                        onCreateBranch = { timestamp -> actualViewModel.createBranch(timestamp) }, // 添加创建分支回调
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) }, // 添加自动朗读回调
                         chatStyle = chatStyle, // Pass chat style
                         isMultiSelectMode = isMultiSelectMode,
@@ -534,12 +562,13 @@ fun ChatScreenContent(
             val chatHistorySearchQuery by actualViewModel.chatHistorySearchQuery.collectAsState()
             ChatHistorySelectorPanel(
                     actualViewModel = actualViewModel,
-                    chatHistories = chatHistories,
+                    chatHistories = displayedChatHistories,
                     currentChatId = currentChatId,
                     showChatHistorySelector = showChatHistorySelector,
                     historyListState = historyListState,
                     searchQuery = chatHistorySearchQuery,
-                    onSearchQueryChange = actualViewModel::onChatHistorySearchQueryChange
+                    onSearchQueryChange = actualViewModel::onChatHistorySearchQueryChange,
+                    activeCharacterCard = activeCharacterCard
             )
         }
 
@@ -741,7 +770,8 @@ fun ChatHistorySelectorPanel(
         showChatHistorySelector: Boolean,
         historyListState: LazyListState,
         searchQuery: String,
-        onSearchQueryChange: (String) -> Unit
+        onSearchQueryChange: (String) -> Unit,
+        activeCharacterCard: CharacterCard?
 ) {
     // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
     Box(
@@ -756,43 +786,55 @@ fun ChatHistorySelectorPanel(
                                     shape = RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
                             )
     ) {
-        // 直接使用ChatHistorySelector
-        ChatHistorySelector(
-                modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-                onNewChat = {
-                    actualViewModel.createNewChat()
-                    // 创建新对话后自动收起侧边框
-                    actualViewModel.showChatHistorySelector(false)
-                },
-                onSelectChat = { chatId ->
-                    actualViewModel.switchChat(chatId)
-                    // 切换聊天后也自动收起侧边框
-                    actualViewModel.showChatHistorySelector(false)
-                },
-                onDeleteChat = { chatId -> actualViewModel.deleteChatHistory(chatId) },
-                onUpdateChatTitle = { chatId, newTitle ->
-                    actualViewModel.updateChatTitle(chatId, newTitle)
-                },
-                onCreateGroup = { groupName -> actualViewModel.createGroup(groupName) },
-                onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
-                    actualViewModel.updateChatOrderAndGroup(
-                            reorderedHistories,
-                            movedItem,
-                            targetGroup
-                    )
-                },
-                onUpdateGroupName = { oldName, newName ->
-                    actualViewModel.updateGroupName(oldName, newName)
-                },
-                onDeleteGroup = { groupName, deleteChats ->
-                    actualViewModel.deleteGroup(groupName, deleteChats)
-                },
-                chatHistories = chatHistories,
-                currentId = currentChatId,
-                lazyListState = historyListState,
-                onBack = { actualViewModel.toggleChatHistorySelector() },
-                searchQuery = searchQuery,
-                onSearchQueryChange = onSearchQueryChange
-        )
+        if (activeCharacterCard == null) {
+            Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            // 直接使用ChatHistorySelector
+            ChatHistorySelector(
+                    modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+                    onNewChat = {
+                        actualViewModel.createNewChat()
+                        // 创建新对话后自动收起侧边框
+                        actualViewModel.showChatHistorySelector(false)
+                    },
+                    onSelectChat = { chatId ->
+                        actualViewModel.switchChat(chatId)
+                        // 切换聊天后也自动收起侧边框
+                        actualViewModel.showChatHistorySelector(false)
+                    },
+                    onDeleteChat = { chatId -> actualViewModel.deleteChatHistory(chatId) },
+                    onUpdateChatTitle = { chatId, newTitle ->
+                        actualViewModel.updateChatTitle(chatId, newTitle)
+                    },
+                    onUpdateChatBinding = { chatId, characterCardName ->
+                        actualViewModel.updateChatCharacterCardBinding(chatId, characterCardName)
+                    },
+                    onCreateGroup = { groupName -> actualViewModel.createGroup(groupName) },
+                    onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
+                        actualViewModel.updateChatOrderAndGroup(
+                                reorderedHistories,
+                                movedItem,
+                                targetGroup
+                        )
+                    },
+                    onUpdateGroupName = { oldName, newName ->
+                        actualViewModel.updateGroupName(oldName, newName)
+                    },
+                    onDeleteGroup = { groupName, deleteChats ->
+                        actualViewModel.deleteGroup(groupName, deleteChats)
+                    },
+                    chatHistories = chatHistories,
+                    currentId = currentChatId,
+                    lazyListState = historyListState,
+                    onBack = { actualViewModel.toggleChatHistorySelector() },
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = onSearchQueryChange
+            )
+        }
     }
 }

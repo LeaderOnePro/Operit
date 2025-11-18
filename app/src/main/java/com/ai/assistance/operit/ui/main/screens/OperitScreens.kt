@@ -25,6 +25,7 @@ import com.ai.assistance.operit.ui.features.packages.screens.MCPMarketScreen
 import com.ai.assistance.operit.ui.features.packages.screens.MCPManageScreen
 import com.ai.assistance.operit.ui.features.packages.screens.MCPPublishScreen
 import com.ai.assistance.operit.ui.features.packages.screens.MCPPluginDetailScreen
+import com.ai.assistance.operit.ui.features.settings.screens.ChatBackupSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ChatHistorySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ContextSummarySettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.FunctionalConfigScreen
@@ -305,6 +306,7 @@ sealed class Screen(
                     navigateToModelPrompts = { navigateTo(ModelPromptsSettings) },
                     navigateToFunctionalConfig = { navigateTo(FunctionalConfig) },
                     navigateToChatHistorySettings = { navigateTo(ChatHistorySettings) },
+                    navigateToChatBackupSettings = { navigateTo(ChatBackupSettings) },
                     navigateToLanguageSettings = { navigateTo(LanguageSettings) },
                     navigateToSpeechServicesSettings = { navigateTo(SpeechServicesSettings) },
                     navigateToCustomHeadersSettings = { navigateTo(CustomHeadersSettings) },
@@ -695,9 +697,10 @@ sealed class Screen(
                     ) {
                         ModelPromptsSettingsScreen(
                             onBackPressed = onGoBack,
-                                            onNavigateToMarket = { navigateTo(TagMarket) },
-                    onNavigateToPersonaGeneration = { navigateTo(PersonaCardGeneration) }
-                            )
+                            onNavigateToMarket = { navigateTo(TagMarket) },
+                            onNavigateToPersonaGeneration = { navigateTo(PersonaCardGeneration) },
+                            onNavigateToChatManagement = { navigateTo(ChatHistorySettings) }
+                        )
                         }
                     }
                     
@@ -769,6 +772,23 @@ sealed class Screen(
                 onGestureConsumed: (Boolean) -> Unit
         ) {
             ChatHistorySettingsScreen()
+        }
+    }
+
+    data object ChatBackupSettings :
+            Screen(parentScreen = Settings, navItem = NavItem.Settings, titleRes = R.string.screen_title_chat_backup_settings) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            ChatBackupSettingsScreen()
         }
     }
 

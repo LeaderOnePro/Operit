@@ -17,7 +17,9 @@ data class ChatEntity(
         val currentWindowSize: Int = 0,
         val group: String? = null,
         val displayOrder: Long = -createdAt,
-        val workspace: String? = null
+        val workspace: String? = null,
+        val parentChatId: String? = null,
+        val characterCardName: String? = null
 ) {
     /** 转换为ChatHistory对象（供UI层使用） */
     fun toChatHistory(messages: List<ChatMessage>): ChatHistory {
@@ -32,7 +34,9 @@ data class ChatEntity(
                 currentWindowSize = currentWindowSize,
                 group = group,
                 displayOrder = displayOrder,
-                workspace = workspace
+                workspace = workspace,
+                parentChatId = parentChatId,
+                characterCardName = characterCardName
         )
     }
 
@@ -60,7 +64,9 @@ data class ChatEntity(
                     currentWindowSize = chatHistory.currentWindowSize,
                     group = chatHistory.group,
                     displayOrder = if (chatHistory.displayOrder != 0L) chatHistory.displayOrder else -now,
-                    workspace = chatHistory.workspace
+                    workspace = chatHistory.workspace,
+                    parentChatId = chatHistory.parentChatId,
+                    characterCardName = chatHistory.characterCardName
             )
         }
     }

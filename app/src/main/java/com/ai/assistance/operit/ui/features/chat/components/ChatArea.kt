@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.draw.alpha
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
@@ -109,6 +110,7 @@ fun ChatArea(
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调参数
     onAutoReadMessage: ((String) -> Unit)? = null, // 添加自动朗读回调参数
     onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调参数
+    onCreateBranch: ((Long) -> Unit)? = null, // 添加创建分支回调参数
     messagesPerPage: Int = 10, // 每页显示的消息数量
     topPadding: Dp = 0.dp,
     chatStyle: ChatStyle = ChatStyle.CURSOR, // 新增参数，默认为CURSOR风格
@@ -191,6 +193,7 @@ fun ChatArea(
                         onDeleteMessagesFrom = onDeleteMessagesFrom,
                         onSpeakMessage = onSpeakMessage, // 传递朗读回调
                         onReplyToMessage = onReplyToMessage, // 传递回复回调
+                        onCreateBranch = onCreateBranch, // 传递创建分支回调
                         chatStyle = chatStyle, // 传递风格
                         isHidden = shouldHide, // 新增参数控制隐藏
                         isMultiSelectMode = isMultiSelectMode, // 传递多选模式状态
@@ -258,6 +261,7 @@ private fun MessageItem(
     onDeleteMessagesFrom: ((Int) -> Unit)?,
     onSpeakMessage: ((String) -> Unit)? = null, // 添加朗读回调
     onReplyToMessage: ((ChatMessage) -> Unit)? = null, // 添加回复回调
+    onCreateBranch: ((Long) -> Unit)? = null, // 添加创建分支回调
     chatStyle: ChatStyle, // 新增参数
     isHidden: Boolean = false, // 新增参数控制隐藏
     isMultiSelectMode: Boolean = false, // 是否处于多选模式
@@ -499,6 +503,30 @@ private fun MessageItem(
                     modifier = Modifier.height(36.dp)
                 )
             }
+
+            // 创建分支
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(id = R.string.create_branch),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.sp
+                    )
+                },
+                onClick = {
+                    onCreateBranch?.invoke(message.timestamp)
+                    showContextMenu = false
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.AccountTree,
+                        contentDescription = stringResource(id = R.string.create_branch),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                modifier = Modifier.height(36.dp)
+            )
 
             // 多选
             DropdownMenuItem(

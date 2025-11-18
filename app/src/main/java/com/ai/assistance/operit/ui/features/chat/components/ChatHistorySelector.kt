@@ -2,6 +2,7 @@ package com.ai.assistance.operit.ui.features.chat.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.ArrowBack
@@ -41,6 +43,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +52,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,10 +61,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,15 +74,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatHistory
+import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.ui.common.rememberLocal
 import me.saket.swipe.SwipeAction
 import me.saket.swipe.SwipeableActionsBox
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.material3.CircularProgressIndicator
 
 private sealed interface HistoryListItem {
@@ -83,7 +94,7 @@ private sealed interface HistoryListItem {
     data class Item(val history: ChatHistory) : HistoryListItem
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHistorySelector(
         modifier: Modifier = Modifier,
@@ -91,6 +102,7 @@ fun ChatHistorySelector(
         onSelectChat: (String) -> Unit,
         onDeleteChat: (String) -> Unit,
         onUpdateChatTitle: (chatId: String, newTitle: String) -> Unit,
+        onUpdateChatBinding: (chatId: String, characterCardName: String?) -> Unit,
         onCreateGroup: (groupName: String) -> Unit,
     onUpdateChatOrderAndGroup: (reorderedHistories: List<ChatHistory>, movedItem: ChatHistory, targetGroup: String?) -> Unit,
     onUpdateGroupName: (oldName: String, newName: String) -> Unit,
@@ -119,6 +131,16 @@ fun ChatHistorySelector(
 
     val context = LocalContext.current
     val chatHistoryManager = remember { ChatHistoryManager.getInstance(context) }
+    val characterCardManager = remember { CharacterCardManager.getInstance(context) }
+    var availableCharacterCards by remember { mutableStateOf<List<CharacterCard>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        characterCardManager.characterCardListFlow.collectLatest { ids ->
+            val cards = ids.mapNotNull { id ->
+                runCatching { characterCardManager.getCharacterCard(id) }.getOrNull()
+            }
+            availableCharacterCards = cards
+        }
+    }
     val actualLazyListState = lazyListState ?: rememberLazyListState()
     val ungroupedText = stringResource(R.string.ungrouped)
 
@@ -144,22 +166,20 @@ fun ChatHistorySelector(
         }
     }
 
-    val flatItems = remember(chatHistories, collapsedGroups, ungroupedText, searchQuery, matchedChatIdsByContent) {
-        // 根据搜索关键词过滤聊天历史
-        val filteredHistories = if (searchQuery.isNotBlank()) {
+    val filteredHistories = remember(chatHistories, searchQuery, matchedChatIdsByContent) {
+        if (searchQuery.isNotBlank()) {
             chatHistories.filter { history ->
-                // 搜索标题或分组
                 val matchesTitleOrGroup = history.title.contains(searchQuery, ignoreCase = true) ||
                         (history.group?.contains(searchQuery, ignoreCase = true) == true)
-                // 搜索聊天内容
                 val matchesContent = matchedChatIdsByContent.contains(history.id)
-                // 如果匹配标题、分组或内容中的任意一项，就包含在结果中
                 matchesTitleOrGroup || matchesContent
             }
         } else {
             chatHistories
         }
-        
+    }
+
+    val flatItems = remember(filteredHistories, collapsedGroups, ungroupedText) {
         filteredHistories
             .groupBy { it.group ?: ungroupedText }
             .flatMap { (group, histories) ->
@@ -474,22 +494,89 @@ fun ChatHistorySelector(
     }
 
     if (chatToEdit != null) {
-        var newTitle by remember { mutableStateOf(chatToEdit!!.title) }
+        val editingChat = chatToEdit!!
+        var newTitle by remember(editingChat) { mutableStateOf(editingChat.title) }
+        var selectedCharacterCardName by remember(editingChat) { mutableStateOf(editingChat.characterCardName) }
+        var bindingMenuExpanded by remember { mutableStateOf(false) }
+        val bindingOptions = remember(availableCharacterCards) {
+            listOf<String?>(null) + availableCharacterCards.map { it.name }
+        }
+        val unboundLabel = stringResource(R.string.unbound_character_card)
+        val bindingLabel = stringResource(R.string.bind_character_card)
+        val bindingHint = stringResource(R.string.chat_binding_scope_hint)
+        val density = LocalDensity.current
+        var bindingMenuWidth by remember { mutableStateOf(0.dp) }
+        val dropdownClickSource = remember { MutableInteractionSource() }
+
         AlertDialog(
                 onDismissRequest = { chatToEdit = null },
                 title = { Text(stringResource(R.string.edit_title)) },
                 text = {
-                    OutlinedTextField(
-                            value = newTitle,
-                            onValueChange = { newTitle = it },
-                            label = { Text(stringResource(R.string.new_title)) },
-                            modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                                value = newTitle,
+                                onValueChange = { newTitle = it },
+                                label = { Text(stringResource(R.string.new_title)) },
+                                modifier = Modifier.fillMaxWidth()
+                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                    value = selectedCharacterCardName ?: unboundLabel,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text(bindingLabel) },
+                                    trailingIcon = {
+                                        Icon(
+                                                imageVector = if (bindingMenuExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier
+                                            .fillMaxWidth()
+                                            .onGloballyPositioned { coordinates ->
+                                                bindingMenuWidth = with(density) { coordinates.size.width.toDp() }
+                                            }
+                            )
+                            Box(
+                                    modifier = Modifier
+                                            .matchParentSize()
+                                            .clickable(
+                                                    interactionSource = dropdownClickSource,
+                                                    indication = null
+                                            ) { bindingMenuExpanded = !bindingMenuExpanded }
+                            )
+                            DropdownMenu(
+                                    expanded = bindingMenuExpanded,
+                                    onDismissRequest = { bindingMenuExpanded = false },
+                                    modifier = if (bindingMenuWidth > 0.dp) Modifier.width(bindingMenuWidth) else Modifier
+                            ) {
+                                bindingOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                            text = { Text(option ?: unboundLabel) },
+                                            onClick = {
+                                                selectedCharacterCardName = option
+                                                bindingMenuExpanded = false
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                                text = bindingHint,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
                 confirmButton = {
                     Button(
                             onClick = {
-                                onUpdateChatTitle(chatToEdit!!.id, newTitle)
+                                if (newTitle != editingChat.title) {
+                                    onUpdateChatTitle(editingChat.id, newTitle)
+                                }
+                                if (selectedCharacterCardName != editingChat.characterCardName) {
+                                    onUpdateChatBinding(editingChat.id, selectedCharacterCardName)
+                                }
                                 chatToEdit = null
                             }
                     ) {
@@ -844,6 +931,28 @@ fun ChatHistorySelector(
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.weight(1f)
                                             )
+                                            // 如果是分支，在右侧显示分支图标和父对话标题
+                                            if (item.history.parentChatId != null) {
+                                                val parentChat = chatHistories.find { it.id == item.history.parentChatId }
+                                                if (parentChat != null) {
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Default.AccountTree,
+                                                        contentDescription = stringResource(id = R.string.branch),
+                                                        tint = contentColor.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = parentChat.title,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = contentColor.copy(alpha = 0.6f),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.widthIn(max = 120.dp) // 限制最大宽度以便省略
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -855,3 +964,4 @@ fun ChatHistorySelector(
         }
     }
 }
+

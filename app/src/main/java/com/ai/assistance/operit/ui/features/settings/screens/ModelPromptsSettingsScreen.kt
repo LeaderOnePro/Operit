@@ -54,7 +54,8 @@ import com.ai.assistance.operit.ui.features.settings.components.CharacterCardDia
 fun ModelPromptsSettingsScreen(
         onBackPressed: () -> Unit = {},
         onNavigateToMarket: () -> Unit = {},
-        onNavigateToPersonaGeneration: () -> Unit = {}
+    onNavigateToPersonaGeneration: () -> Unit = {},
+    onNavigateToChatManagement: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -65,14 +66,13 @@ fun ModelPromptsSettingsScreen(
     // 管理器
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val promptTagManager = remember { PromptTagManager.getInstance(context) }
-    val oldPromptPreferencesManager = remember { PromptPreferencesManager(context) }
     val userPreferencesManager = remember { UserPreferencesManager(context) }
 
     // 获取当前活跃角色卡ID
     val activeCharacterCardId by characterCardManager.activeCharacterCardIdFlow.collectAsState(initial = "")
 
     // 状态
-    var currentTab by remember { mutableStateOf(0) } // 0: 角色卡, 1: 标签, 2: 旧配置
+    var currentTab by remember { mutableStateOf(0) } // 0: 角色卡, 1: 标签
     var refreshTrigger by remember { mutableStateOf(0) }
 
     // 角色卡相关状态
@@ -80,6 +80,7 @@ fun ModelPromptsSettingsScreen(
     var showAddCharacterCardDialog by remember { mutableStateOf(false) }
     var showEditCharacterCardDialog by remember { mutableStateOf(false) }
     var editingCharacterCard by remember { mutableStateOf<CharacterCard?>(null) }
+    var editingOriginalName by remember { mutableStateOf<String?>(null) }
 
     // 删除确认对话框状态
     var showDeleteCharacterCardConfirm by remember { mutableStateOf(false) }
@@ -90,6 +91,7 @@ fun ModelPromptsSettingsScreen(
     var showImportSuccessMessage by remember { mutableStateOf(false) }
     var showImportErrorMessage by remember { mutableStateOf(false) }
     var importErrorMessage by remember { mutableStateOf("") }
+    var showChatManagementPrompt by remember { mutableStateOf(false) }
 
     // Avatar picker and cropper launcher
     val cropAvatarLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
@@ -210,11 +212,6 @@ fun ModelPromptsSettingsScreen(
     var deletingTagId by remember { mutableStateOf("") }
     var deletingTagName by remember { mutableStateOf("") }
 
-    // 旧配置相关状态
-    val oldProfileList by oldPromptPreferencesManager.profileListFlow.collectAsState(initial = emptyList())
-    var showOldConfigDialog by remember { mutableStateOf(false) }
-    var selectedOldProfileId by remember { mutableStateOf("") }
-
     // 初始化
     LaunchedEffect(Unit) {
         characterCardManager.initializeIfNeeded()
@@ -232,21 +229,29 @@ fun ModelPromptsSettingsScreen(
     // 保存角色卡
     fun saveCharacterCard() {
         editingCharacterCard?.let { card ->
+            val originalNameSnapshot = editingOriginalName
+            val isExistingCard = card.id.isNotEmpty()
+            val nameChanged = isExistingCard &&
+                    !originalNameSnapshot.isNullOrEmpty() &&
+                    originalNameSnapshot != card.name
+
             scope.launch {
-                if (card.id.isEmpty()) {
-                    // 新建
+                if (!isExistingCard) {
                     val newCardId = characterCardManager.createCharacterCard(card)
                     userPreferencesManager.saveCustomChatTitleForCharacterCard(newCardId, card.name.ifEmpty { null })
                 } else {
-                    // 更新
                     characterCardManager.updateCharacterCard(card)
                     userPreferencesManager.saveCustomChatTitleForCharacterCard(card.id, card.name.ifEmpty { null })
                 }
                 showAddCharacterCardDialog = false
                 showEditCharacterCardDialog = false
                 editingCharacterCard = null
+                editingOriginalName = null
                 showSaveSuccessMessage = true
                 refreshTrigger++
+                if (nameChanged) {
+                    showChatManagementPrompt = true
+                }
             }
         }
     }
@@ -305,6 +310,7 @@ fun ModelPromptsSettingsScreen(
             deletingCharacterCardId = ""
             deletingCharacterCardName = ""
             refreshTrigger++
+            showChatManagementPrompt = true
         }
     }
 
@@ -356,7 +362,7 @@ fun ModelPromptsSettingsScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // 标签栏
+                // 标签栏（移除旧配置选项）
                 TabRow(selectedTabIndex = currentTab) {
                     Tab(
                         selected = currentTab == 0,
@@ -392,32 +398,17 @@ fun ModelPromptsSettingsScreen(
                             Text(stringResource(R.string.tags), fontSize = 12.sp)
                         }
                     }
-                    Tab(
-                        selected = currentTab == 2,
-                        onClick = { currentTab = 2 }
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(stringResource(R.string.old_config), fontSize = 12.sp)
-                        }
-                    }
+                    // 旧配置选项已废弃，删除对应标签
                 }
 
-                // 内容区域
+                // 内容区域（仅保留角色卡和标签两页）
                 when (currentTab) {
                     0 -> CharacterCardTab(
                         characterCards = allCharacterCards,
                         activeCharacterCardId = activeCharacterCardId,
                         allTags = allTags,
                         onAddCharacterCard = {
+                            editingOriginalName = null
                             editingCharacterCard = CharacterCard(
                                 id = "",
                                 name = "",
@@ -431,6 +422,7 @@ fun ModelPromptsSettingsScreen(
                             showAddCharacterCardDialog = true
                         },
                         onEditCharacterCard = { card ->
+                            editingOriginalName = card.name
                             editingCharacterCard = card.copy()
                             showEditCharacterCardDialog = true
                         },
@@ -464,14 +456,6 @@ fun ModelPromptsSettingsScreen(
                         },
                         onDeleteTag = { tag -> showDeleteTagConfirm(tag.id, tag.name) },
                         onNavigateToMarket = onNavigateToMarket
-                    )
-                    2 -> OldConfigTab(
-                        profileList = oldProfileList,
-                        promptPreferencesManager = oldPromptPreferencesManager,
-                        onShowOldConfig = { profileId ->
-                            selectedOldProfileId = profileId
-                            showOldConfigDialog = true
-                        }
                     )
                 }
             }
@@ -692,6 +676,7 @@ fun ModelPromptsSettingsScreen(
             onDismiss = {
                 showEditCharacterCardDialog = false
                 editingCharacterCard = null
+                editingOriginalName = null
             },
             onSave = { card ->
                 editingCharacterCard = card
@@ -749,18 +734,6 @@ fun ModelPromptsSettingsScreen(
             onSave = {
                 editingTag = it
                 saveTag()
-            }
-        )
-    }
-
-    // 旧配置查看对话框
-    if (showOldConfigDialog) {
-        OldConfigDialog(
-            profileId = selectedOldProfileId,
-            promptPreferencesManager = oldPromptPreferencesManager,
-            onDismiss = {
-                showOldConfigDialog = false
-                selectedOldProfileId = ""
                                         }
         )
     }
@@ -791,6 +764,30 @@ fun ModelPromptsSettingsScreen(
                     }
                 ) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    // 角色卡变更提示
+    if (showChatManagementPrompt) {
+        AlertDialog(
+            onDismissRequest = { showChatManagementPrompt = false },
+            title = { Text(stringResource(R.string.character_card_change_title)) },
+            text = { Text(stringResource(R.string.character_card_change_prompt)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showChatManagementPrompt = false
+                        onNavigateToChatManagement()
+                    }
+                ) {
+                    Text(stringResource(R.string.go_to_chat_management))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showChatManagementPrompt = false }) {
+                    Text(stringResource(R.string.maybe_later))
                 }
             }
         )
@@ -1327,94 +1324,6 @@ fun TagItem(
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(16.dp))
                                                             }
                                     }
-                                }
-                            }
-                        }
-                    }
-
-// 旧配置标签页
-@Composable
-fun OldConfigTab(
-    profileList: List<String>,
-    promptPreferencesManager: PromptPreferencesManager,
-    onShowOldConfig: (String) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item {
-                                                    Text(
-                text = stringResource(R.string.old_prompt_config),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-                                                        Text(
-                text = stringResource(R.string.old_prompt_config_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-                fontSize = 13.sp
-            )
-        }
-
-        items(profileList) { profileId ->
-            OldConfigItem(
-                profileId = profileId,
-                promptPreferencesManager = promptPreferencesManager,
-                onShowConfig = { onShowOldConfig(profileId) }
-            )
-        }
-    }
-}
-
-// 旧配置项目
-@Composable
-fun OldConfigItem(
-    profileId: String,
-    promptPreferencesManager: PromptPreferencesManager,
-    onShowConfig: () -> Unit
-) {
-    val profile by promptPreferencesManager.getPromptProfileFlow(profileId).collectAsState(
-        initial = null
-    )
-
-    profile?.let { promptProfile ->
-        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(6.dp)
-        ) {
-                        Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onShowConfig)
-                    .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = promptProfile.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                    if (promptProfile.introPrompt.isNotBlank()) {
-                        Text(
-                            text = stringResource(R.string.intro_prompt_preview, promptProfile.introPrompt.take(50)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-
-                            Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = stringResource(R.string.view_details),
-                                tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                            )
             }
         }
     }
@@ -1494,162 +1403,4 @@ fun TagDialog(
     )
 }
 
-// 旧配置查看对话框
-@Composable
-fun OldConfigDialog(
-    profileId: String,
-    promptPreferencesManager: PromptPreferencesManager,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    val profile by promptPreferencesManager.getPromptProfileFlow(profileId).collectAsState(
-        initial = null
-    )
-
-    // 复制到剪贴板的函数
-    fun copyToClipboard(text: String, label: String) {
-        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText(label, text)
-        clipboard.setPrimaryClip(clip)
-        // 这里可以添加一个 Toast 提示，但为了简洁我们先不添加
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(R.string.old_config_details),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            profile?.let { promptProfile ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.config_name_format, promptProfile.name),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    if (promptProfile.introPrompt.isNotBlank()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.intro_prompt_label),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            IconButton(
-                                onClick = { copyToClipboard(promptProfile.introPrompt, context.getString(R.string.intro_prompt_label)) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.copy_intro_prompt),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                        SelectionContainer {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Text(
-                                    text = promptProfile.introPrompt,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (promptProfile.tonePrompt.isNotBlank()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-        Text(
-                                text = stringResource(R.string.tone_prompt_label),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            IconButton(
-                                onClick = { copyToClipboard(promptProfile.tonePrompt, context.getString(R.string.tone_prompt_label)) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = stringResource(R.string.copy_tone_prompt),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                        SelectionContainer {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Text(
-                                    text = promptProfile.tonePrompt,
-            style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // 复制全部内容按钮
-                    val allContent = buildString {
-                        append(stringResource(R.string.config_name_format, promptProfile.name) + "\n\n")
-                        if (promptProfile.introPrompt.isNotBlank()) {
-                            append(stringResource(R.string.intro_prompt_label) + "\n${promptProfile.introPrompt}\n\n")
-                        }
-                        if (promptProfile.tonePrompt.isNotBlank()) {
-                            append(stringResource(R.string.tone_prompt_label) + "\n${promptProfile.tonePrompt}")
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = { copyToClipboard(allContent, context.getString(R.string.old_config_details)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.copy_all_content), fontSize = 14.sp)
-                    }
-
-        Text(
-                        text = stringResource(R.string.old_config_usage_tip),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
-    }
-        }
-    )
-}
+// 旧配置查看对话框已废弃

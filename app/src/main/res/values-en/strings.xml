@@ -122,6 +122,10 @@
     <string name="mcp">MCP</string>
     <string name="token_config_title">DeepSeek Token Configuration</string>
     <string name="chat_history_settings">Chat History Management</string>
+    <string name="character_card_change_title">Character Card Updated</string>
+    <string name="character_card_change_prompt">The character card has changed. Do you want to go to Chat Management to handle chats bound to it?</string>
+    <string name="go_to_chat_management">Go to Chat Management</string>
+    <string name="maybe_later">Maybe Later</string>
     
     <!-- Chat History Management Screen -->
     <string name="chat_history_manager">Chat History Manager</string>
@@ -286,6 +290,9 @@
     <string name="edit_and_resend">Edit &amp; Resend</string>
     <string name="reply_message">Reply</string>
     <string name="select_copy">Select &amp; Copy</string>
+    <string name="create_branch">Create Branch</string>
+    <string name="branch">Branch</string>
+    <string name="parent_chat">Parent: %1$s</string>
 
     <string name="modify_memory">Modify Memory</string>
     <string name="delete_from_here">Delete From Here</string>
@@ -409,6 +416,8 @@
     <string name="settings_customize_theme">Customize Theme</string>
     <string name="settings_data_backup">Data Backup and Recovery</string>
     <string name="settings_data_backup_desc">Import, export, or delete chat history and problem library data for easy backup and recovery of important information</string>
+    <string name="settings_chat_history_management">Chat History Management</string>
+    <string name="settings_chat_history_management_subtitle">View stats and batch organize your conversations</string>
     <string name="settings_manage_backup">Manage Backup</string>
     
     <string name="settings_section_ai_model">AI Model Configuration</string>
@@ -2640,6 +2649,7 @@
     <string name="screen_title_theme_settings">Theme Settings</string>
     <string name="screen_title_layout_adjustment">Layout Adjustment</string>
     <string name="screen_title_chat_history_settings">Chat History Management</string>
+    <string name="screen_title_chat_backup_settings">Data Backup &amp; Restore</string>
     <string name="screen_title_language_settings">Language Settings</string>
     <string name="screen_title_file_manager">File Manager</string>
     <string name="screen_title_terminal">Command Terminal</string>
