@@ -122,6 +122,22 @@ interface ChatDao {
             timestamp: Long = System.currentTimeMillis()
     ): Int
 
+    /** 批量为指定聊天更新角色卡绑定 */
+    @Query("UPDATE chats SET characterCardName = :newName, updatedAt = :timestamp WHERE id IN (:chatIds)")
+    suspend fun updateCharacterCardForChats(
+        chatIds: List<String>,
+        newName: String?,
+        timestamp: Long = System.currentTimeMillis()
+    ): Int
+
+    /** 批量为指定聊天更新分组 */
+    @Query("UPDATE chats SET `group` = :groupName, updatedAt = :timestamp WHERE id IN (:chatIds)")
+    suspend fun updateGroupForChats(
+        chatIds: List<String>,
+        groupName: String?,
+        timestamp: Long = System.currentTimeMillis()
+    ): Int
+
     /** 获取按角色卡分组的聊天与消息统计 */
     @Query(
         """

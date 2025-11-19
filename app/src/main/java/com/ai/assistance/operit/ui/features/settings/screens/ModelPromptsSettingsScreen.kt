@@ -1374,9 +1374,12 @@ fun TagDialog(
                     value = promptContent,
                     onValueChange = { promptContent = it },
                     label = { Text(stringResource(R.string.prompt_content)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    minLines = 4
-                    )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 280.dp),
+                    minLines = 4,
+                    maxLines = 12
+                )
                 }
             },
             confirmButton = {

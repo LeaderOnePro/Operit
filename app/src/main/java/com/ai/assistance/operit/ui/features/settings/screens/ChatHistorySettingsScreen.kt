@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,8 +34,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import coil.compose.rememberAsyncImagePainter
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.model.CharacterCardChatStats
@@ -81,10 +85,12 @@ fun ChatHistorySettingsScreen() {
         }
     }
 
+    var chatHistories by remember { mutableStateOf<List<ChatHistory>>(emptyList()) }
     var totalChatCount by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
-        chatHistoryManager.chatHistoriesFlow.collect { chatHistories ->
-            totalChatCount = chatHistories.size
+        chatHistoryManager.chatHistoriesFlow.collect { histories ->
+            chatHistories = histories
+            totalChatCount = histories.size
         }
     }
 
@@ -137,6 +143,61 @@ fun ChatHistorySettingsScreen() {
                         pendingAssignStat = stat
                         selectedCharacterCardId = availableCharacterCards.firstOrNull()?.id
                         showAssignCharacterDialog = true
+                    }
+                )
+            }
+            item {
+                ChatHistoryBatchSelectorCard(
+                    chatHistories = chatHistories,
+                    characterCards = availableCharacterCards,
+                    onApply = { selectedIds, targetCharacterName, targetGroupName, shouldUnbindCharacterCard ->
+                        if (selectedIds.isEmpty()) {
+                            Toast.makeText(context, "请先选择聊天记录", Toast.LENGTH_SHORT).show()
+                            return@ChatHistoryBatchSelectorCard false
+                        }
+                        try {
+                            var messageParts = mutableListOf<String>()
+                            
+                            // 更新角色卡绑定（仅在明确指定时更新）
+                            // shouldUnbindCharacterCard 为 true 表示移除绑定
+                            // targetCharacterName 不为 null 表示设置新的角色卡
+                            // 如果两者都为 false/null，且提供了分组，则只更新分组，不更新角色卡
+                            val shouldUpdateCharacterCard = shouldUnbindCharacterCard || targetCharacterName != null
+                            
+                            if (shouldUpdateCharacterCard) {
+                                chatHistoryManager.assignCharacterCardToChats(
+                                    chatIds = selectedIds,
+                                    targetCharacterCardName = targetCharacterName
+                                )
+                                messageParts.add(
+                                    if (targetCharacterName.isNullOrBlank()) {
+                                        "已移除 ${selectedIds.size} 条对话的角色卡绑定"
+                                    } else {
+                                        "已将 ${selectedIds.size} 条对话归类到「$targetCharacterName」"
+                                    }
+                                )
+                            }
+                            
+                            // 更新分组
+                            if (targetGroupName != null) {
+                                chatHistoryManager.assignGroupToChats(
+                                    chatIds = selectedIds,
+                                    groupName = targetGroupName
+                                )
+                                messageParts.add("已将 ${selectedIds.size} 条对话分组到「$targetGroupName」")
+                            }
+                            
+                            val message = messageParts.joinToString("；")
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            true
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                context,
+                                "批量更新失败：${e.localizedMessage ?: e}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            false
+                        }
                     }
                 )
             }
@@ -475,6 +536,336 @@ private fun CharacterCardStatRow(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatHistoryBatchSelectorCard(
+    chatHistories: List<ChatHistory>,
+    characterCards: List<CharacterCard>,
+    onApply: suspend (selectedChatIds: List<String>, targetCharacterCardName: String?, targetGroupName: String?, shouldUnbindCharacterCard: Boolean) -> Boolean
+) {
+    val scope = rememberCoroutineScope()
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedChatIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var selectedTargetName by remember { mutableStateOf<String?>(null) }
+    var targetIsUnbind by remember { mutableStateOf(false) }
+    var targetGroupName by remember { mutableStateOf("") }
+    var submitting by remember { mutableStateOf(false) }
+
+    val normalizedQuery = searchQuery.trim()
+    val filteredHistories = remember(chatHistories, normalizedQuery) {
+        val base = if (normalizedQuery.isBlank()) {
+            chatHistories
+        } else {
+            chatHistories.filter { history ->
+                history.title.contains(normalizedQuery, ignoreCase = true) ||
+                        (history.group?.contains(normalizedQuery, ignoreCase = true) == true) ||
+                        (history.characterCardName?.contains(normalizedQuery, ignoreCase = true) == true)
+            }
+        }
+        // 先按是否有角色卡、分组分区，再按角色卡名称和分组名称排序，方便成批管理
+        base.sortedWith(
+            compareBy<ChatHistory> {
+                // 无角色卡的排在后面
+                it.characterCardName.isNullOrBlank()
+            }.thenBy {
+                // 再按角色卡名称排序
+                it.characterCardName ?: ""
+            }.thenBy {
+                // 然后按分组名称排序（空分组排在后面）
+                it.group.isNullOrBlank()
+            }.thenBy {
+                it.group ?: ""
+            }.thenByDescending {
+                // 同一角色卡+分组内按最近更新时间倒序
+                it.updatedAt
+            }
+        )
+    }
+
+    LaunchedEffect(chatHistories) {
+        val availableIds = chatHistories.map { it.id }.toSet()
+        selectedChatIds = selectedChatIds.filter { it in availableIds }.toSet()
+    }
+
+    LaunchedEffect(characterCards) {
+        if (selectedTargetName != null && characterCards.none { it.name == selectedTargetName }) {
+            selectedTargetName = null
+        }
+    }
+
+    val hasSelection = selectedChatIds.isNotEmpty()
+    val hasTargetSelection = targetIsUnbind || !selectedTargetName.isNullOrBlank()
+    val hasTargetGroup = targetGroupName.isNotBlank()
+    val canSubmit = hasSelection && (hasTargetSelection || hasTargetGroup) && !submitting
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            SectionHeader(
+                title = stringResource(R.string.batch_assign_title),
+                subtitle = stringResource(R.string.batch_assign_subtitle),
+                icon = Icons.Default.PlaylistAddCheck
+            )
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text("按标题、分组或角色卡搜索") },
+                label = { Text("筛选聊天记录") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (chatHistories.isEmpty()) {
+                Text(
+                    text = "暂无聊天记录，无法进行批量操作。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@ElevatedCard
+            }
+
+            if (filteredHistories.isEmpty()) {
+                Text(
+                    text = "没有匹配的聊天记录，请调整筛选条件。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "已选择 ${selectedChatIds.size} / ${filteredHistories.size} 条",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = {
+                                val ids = filteredHistories.map { it.id }
+                                selectedChatIds = selectedChatIds.toMutableSet().apply { addAll(ids) }
+                            },
+                            enabled = filteredHistories.isNotEmpty()
+                        ) {
+                            Text("全选当前列表")
+                        }
+                        TextButton(
+                            onClick = { selectedChatIds = emptySet() },
+                            enabled = selectedChatIds.isNotEmpty()
+                        ) {
+                            Text("清空选择")
+                        }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    itemsIndexed(filteredHistories, key = { _, history -> history.id }) { index, history ->
+                        ChatHistorySelectableRow(
+                            history = history,
+                            selected = selectedChatIds.contains(history.id),
+                            onSelectionChange = { selected ->
+                                selectedChatIds = if (selected) {
+                                    selectedChatIds + history.id
+                                } else {
+                                    selectedChatIds - history.id
+                                }
+                            }
+                        )
+                        if (index < filteredHistories.lastIndex) {
+                            Divider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)
+                        }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded,
+                    onExpandedChange = { dropdownExpanded = it }
+                ) {
+                    val targetLabel = when {
+                        targetIsUnbind -> "移除角色卡绑定"
+                        !selectedTargetName.isNullOrBlank() -> selectedTargetName!!
+                        else -> ""
+                    }
+                    OutlinedTextField(
+                        value = targetLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("目标角色卡（可选）") },
+                        placeholder = { Text("请选择一个角色卡或取消绑定") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        colors = ExposedDropdownMenuDefaults.textFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("移除角色卡绑定") },
+                            onClick = {
+                                targetIsUnbind = true
+                                selectedTargetName = null
+                                dropdownExpanded = false
+                            }
+                        )
+                        if (characterCards.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("暂无可用角色卡", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                enabled = false,
+                                onClick = {}
+                            )
+                        } else {
+                            characterCards.forEach { card ->
+                                DropdownMenuItem(
+                                    text = { Text(card.name) },
+                                    onClick = {
+                                        selectedTargetName = card.name
+                                        targetIsUnbind = false
+                                        dropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = targetGroupName,
+                    onValueChange = { targetGroupName = it },
+                    singleLine = true,
+                    maxLines = 1,
+                    label = { Text(stringResource(R.string.target_group_optional)) },
+                    placeholder = { Text(stringResource(R.string.enter_group_name_hint)) },
+                    leadingIcon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = stringResource(R.string.batch_assign_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (!canSubmit) return@Button
+                            scope.launch {
+                                submitting = true
+                                val groupName = targetGroupName.takeIf { it.isNotBlank() }
+                                val success = onApply(
+                                    selectedChatIds.toList(),
+                                    if (targetIsUnbind) null else selectedTargetName,
+                                    groupName,
+                                    targetIsUnbind
+                                )
+                                if (success) {
+                                    selectedChatIds = emptySet()
+                                    targetGroupName = ""
+                                }
+                                submitting = false
+                            }
+                        },
+                        enabled = canSubmit,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (submitting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        val buttonText = when {
+                            targetIsUnbind && targetGroupName.isNotBlank() -> "应用更改"
+                            targetIsUnbind -> "移除绑定"
+                            targetGroupName.isNotBlank() && selectedTargetName.isNullOrBlank() -> "应用分组"
+                            else -> "应用角色卡"
+                        }
+                        Text(buttonText)
+                    }
+                    TextButton(
+                        onClick = {
+                            selectedChatIds = emptySet()
+                        },
+                        enabled = selectedChatIds.isNotEmpty(),
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    ) {
+                        Text("取消选择")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatHistorySelectableRow(
+    history: ChatHistory,
+    selected: Boolean,
+    onSelectionChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelectionChange(!selected) }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = selected,
+            onCheckedChange = { onSelectionChange(it) }
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = history.title.ifBlank { "未命名对话" },
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            val subtitle = buildString {
+                history.group?.let {
+                    append("分组：$it")
+                    append(" · ")
+                }
+                append(
+                    if (history.characterCardName.isNullOrBlank()) {
+                        "未绑定角色卡"
+                    } else {
+                        "角色卡：${history.characterCardName}"
+                    }
+                )
+            }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

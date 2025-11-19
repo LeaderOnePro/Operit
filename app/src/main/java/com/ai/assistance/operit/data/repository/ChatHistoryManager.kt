@@ -925,6 +925,48 @@ class ChatHistoryManager private constructor(private val context: Context) {
     }
 
     /**
+     * 批量为特定聊天更新角色卡绑定
+     * @return 受影响的对话数量
+     */
+    suspend fun assignCharacterCardToChats(
+        chatIds: List<String>,
+        targetCharacterCardName: String?
+    ): Int {
+        if (chatIds.isEmpty()) {
+            return 0
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                chatDao.updateCharacterCardForChats(chatIds, targetCharacterCardName)
+            } catch (e: Exception) {
+                Log.e(TAG, "批量更新聊天角色卡失败: $targetCharacterCardName, chatIds=$chatIds", e)
+                throw e
+            }
+        }
+    }
+
+    /**
+     * 批量为特定聊天更新分组
+     * @return 受影响的对话数量
+     */
+    suspend fun assignGroupToChats(
+        chatIds: List<String>,
+        groupName: String?
+    ): Int {
+        if (chatIds.isEmpty()) {
+            return 0
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                chatDao.updateGroupForChats(chatIds, groupName)
+            } catch (e: Exception) {
+                Log.e(TAG, "批量更新聊天分组失败: $groupName, chatIds=$chatIds", e)
+                throw e
+            }
+        }
+    }
+
+    /**
      * 批量重命名对话中绑定的角色卡名称
      * @return 受影响的对话数量
      */

@@ -2180,6 +2180,11 @@
     <string name="new_group">新建分组</string>
     <string name="group_name">分组名称</string>
     <string name="create_new_group">新建分组</string>
+    <string name="target_group_optional">目标分组（可选）</string>
+    <string name="enter_group_name_hint">分组名称（留空不修改）</string>
+    <string name="batch_assign_description">批量将所选对话绑定到指定角色卡或分组。可以仅修改分组而不切换角色卡，也可以同时修改两者。</string>
+    <string name="batch_assign_title">历史记录批量归类</string>
+    <string name="batch_assign_subtitle">选择多个聊天记录并批量调整角色卡绑定或分组</string>
     <string name="long_press_to_manage">长按管理</string>
     <string name="edit_title_desc">编辑标题</string>
     <string name="reorder">Reorder</string>
@@ -2563,8 +2568,8 @@
     <string name="creativity_parameters">创造性参数</string>
     <string name="repetition_control_parameters">重复控制参数</string>
     <string name="reset">重置</string>
-    <string name="reset_parameters">重置参数</string>
-    <string name="save_parameters">保存参数</string>
+    <string name="reset_parameters">重置</string>
+    <string name="save_parameters">保存</string>
     <string name="api_name_format">API名称: %s</string>
     <string name="collapse">收起</string>
     <string name="expand">展开</string>
@@ -2597,7 +2602,7 @@
     <string name="must_be_boolean">必须为\'true\'或\'false\'</string>
     
     <string name="add_custom_parameter_failed">添加自定义参数失败: %s</string>
-    <string name="add_custom_parameter">添加自定义参数</string>
+    <string name="add_custom_parameter">添加</string>
     <string name="custom_parameters_section">自定义参数</string>
     <string name="edit_custom_parameter">编辑自定义参数</string>
     <string name="custom_parameter_updated">自定义参数已更新</string>
@@ -3151,6 +3156,14 @@
     <string name="dialog_message_orientation_change">检测到屏幕方向发生变化，是否重新加载页面？</string>
     <string name="dialog_button_confirm">重新加载</string>
     <string name="dialog_button_dismiss">取消</string>
+    
+    <!-- Chat binding announcement -->
+    <string name="chat_binding_announcement_title">对话已绑定角色卡</string>
+    <string name="chat_binding_announcement_body">本次更新后，所有对话都会绑定一个角色卡。\n\n此前的聊天记录已自动归类到「默认角色卡」，你可以前往「设置 &gt; 聊天管理」批量调整、重命名或重新分组。</string>
+    <string name="chat_binding_announcement_primary_button">前往</string>
+    <string name="chat_binding_announcement_acknowledge">我知道了</string>
+    <string name="chat_binding_announcement_acknowledge_countdown">我知道了（%1$ds后可点击）</string>
+
     <string name="settings_context_card_title">设置说明:</string>
     <string name="settings_context_card_content">· 上下文长度: 建议设为您日常使用的最大值。\n· 最大上下文长度: 建议设为模型API支持的最大值。\n软件会在上下文达到阈值时自动压缩，以防超限。请注意，上下文并非越大越好，需用户与软件协同配合。</string>
 </resources>

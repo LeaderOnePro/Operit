@@ -2189,6 +2189,11 @@
     <string name="new_group">New Group</string>
     <string name="group_name">Group name</string>
     <string name="create_new_group">Create new group</string>
+    <string name="target_group_optional">Target Group (Optional)</string>
+    <string name="enter_group_name_hint">Group name (leave empty to keep)</string>
+    <string name="batch_assign_description">Batch assign selected chats to a character card or group. You can modify the group without changing the character card, or modify both.</string>
+    <string name="batch_assign_title">Batch Assign Chat History</string>
+    <string name="batch_assign_subtitle">Select multiple chat records and batch adjust character card binding or grouping</string>
     <string name="long_press_to_manage">Long press to manage</string>
     <string name="edit_title_desc">Edit title</string>
     <string name="reorder">Reorder</string>
@@ -2565,8 +2570,8 @@
     <string name="generation_parameters">Generation Parameters</string>
     <string name="creativity_parameters">Creativity Parameters</string>
     <string name="repetition_control_parameters">Repetition Control Parameters</string>
-    <string name="reset_parameters">Reset Parameters</string>
-    <string name="save_parameters">Save Parameters</string>
+    <string name="reset_parameters">Reset</string>
+    <string name="save_parameters">Save</string>
     <string name="api_name_format">API name: %s</string>
     <string name="must_be_integer">Must be an integer</string>
     <string name="value">Value</string>
@@ -2579,7 +2584,7 @@
     <string name="parameter_range_format">Range: %1$s - %2$s</string>
   
     <!-- Custom Parameters Dialog -->
-    <string name="add_custom_parameter">Add Custom Parameter</string>
+    <string name="add_custom_parameter">Add</string>
     <string name="custom_parameter_added">Custom parameter added</string>
     <string name="add_custom_parameter_failed">Failed to add custom parameter: %s</string>
     <string name="parameter_name">Parameter Name</string>
@@ -3151,6 +3156,14 @@
     <string name="dialog_message_orientation_change">Screen orientation has changed. Reload the page?</string>
     <string name="dialog_button_confirm">Reload</string>
     <string name="dialog_button_dismiss">Cancel</string>
+    
+    <!-- Chat binding announcement -->
+    <string name="chat_binding_announcement_title">Chats Are Now Linked to Character Cards</string>
+    <string name="chat_binding_announcement_body">Starting with this update, every conversation is linked to a character card.\n\nAll of your previous chats have been mapped to the &quot;Default character card&quot; automatically. Head to Settings &gt; Chat Management if you need to edit, regroup, or rename them.</string>
+    <string name="chat_binding_announcement_primary_button">Review</string>
+    <string name="chat_binding_announcement_acknowledge">Got it</string>
+    <string name="chat_binding_announcement_acknowledge_countdown">Got it (%1$ds left)</string>
+
     <string name="settings_context_card_title">Setup Instructions:</string>
     <string name="settings_context_card_content">· Context Length: Recommended to set to your daily maximum usage value.\n· Max Context Length: Recommended to set to the maximum value supported by the model API.\nThe software will automatically compress the context when the threshold is reached to prevent exceeding the limit. Note that a larger context is not always better; user cooperation with the software is required.</string>
 </resources>

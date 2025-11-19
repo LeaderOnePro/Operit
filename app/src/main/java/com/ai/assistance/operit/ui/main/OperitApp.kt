@@ -24,8 +24,10 @@ import androidx.navigation.compose.rememberNavController
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.preferences.ChatAnnouncementPreferences
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.ui.common.NavItem
+import com.ai.assistance.operit.ui.features.announcement.ChatBindingAnnouncementDialog
 import com.ai.assistance.operit.ui.main.layout.PhoneLayout
 import com.ai.assistance.operit.ui.main.layout.TabletLayout
 import com.ai.assistance.operit.ui.main.screens.OperitRouter
@@ -51,6 +53,7 @@ fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandl
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val announcementPreferences = remember { ChatAnnouncementPreferences(context) }
 
 
     // Navigation state - using a custom back stack
@@ -150,6 +153,15 @@ fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandl
     // - Less than 600dp: phone
     // - 600dp and above: tablet
     val useTabletLayout = screenWidthDp >= 600
+
+    var showChatBindingAnnouncement by remember {
+        mutableStateOf(announcementPreferences.shouldShowChatBindingAnnouncement())
+    }
+
+    fun dismissChatBindingAnnouncement() {
+        announcementPreferences.setChatBindingAnnouncementAcknowledged()
+        showChatBindingAnnouncement = false
+    }
 
     // Navigation items grouped by category
     val navGroups =
@@ -275,6 +287,16 @@ fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandl
                         topBarActions = { topBarActions() }
                 )
             }
+        }
+
+        if (showChatBindingAnnouncement) {
+            ChatBindingAnnouncementDialog(
+                onNavigateToChatManagement = {
+                    dismissChatBindingAnnouncement()
+                    navigateTo(Screen.ChatHistorySettings)
+                },
+                onDismiss = { dismissChatBindingAnnouncement() }
+            )
         }
     }
 }
