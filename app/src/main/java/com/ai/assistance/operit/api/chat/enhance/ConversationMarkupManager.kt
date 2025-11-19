@@ -94,6 +94,27 @@ class ConversationMarkupManager {
         }
 
         /**
+         * Creates a warning when tools and task completion are reported together.
+         *
+         * @param toolNames The names of the tools involved
+         * @return The formatted warning message
+         */
+        fun createToolsSkippedByCompletionWarning(toolNames: List<String>): String {
+            val uniqueNames =
+                    toolNames.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val toolDescription =
+                    if (uniqueNames.isEmpty()) {
+                        "工具调用"
+                    } else {
+                        "工具 `${uniqueNames.joinToString("`, `")}` 调用"
+                    }
+            val message =
+                    "警告：检测到任务完成标记的同时存在$toolDescription，系统仍会执行这些工具，但这是高风险组合。" +
+                            "请勿在发送任务完成状态的同时调用工具，以避免重复或矛盾的响应。"
+            return createWarningStatus(message)
+        }
+
+        /**
          * Cleans task completion content by removing the completion marker and adding a completion
          * status.
          *

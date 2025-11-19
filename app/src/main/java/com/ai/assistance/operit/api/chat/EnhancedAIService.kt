@@ -670,8 +670,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                 context.roundManager.updateContent(enhancedContent)
             }
 
-            // Handle task completion marker
-            if (ConversationMarkupManager.containsTaskCompletion(enhancedContent)) {
+            // 预先提取工具调用信息和完成标记，避免重复解析
+            val extractedToolInvocations = ToolExecutionManager.extractToolInvocations(enhancedContent)
+            val hasTaskCompletion = ConversationMarkupManager.containsTaskCompletion(enhancedContent)
+
+            // 如果只有任务完成标记且没有工具调用，立即处理完成逻辑
+            if (hasTaskCompletion && extractedToolInvocations.isEmpty()) {
                 handleTaskCompletion(context, enhancedContent, enableMemoryQuery, isSubTask, characterName, avatarUri)
                 return
             }
@@ -695,10 +699,21 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
 
             // Main flow: Detect and process tool invocations
-            // Try to detect tool invocations
-            val toolInvocations = ToolExecutionManager.extractToolInvocations(enhancedContent)
+            if (extractedToolInvocations.isNotEmpty()) {
+                if (hasTaskCompletion) {
+                    val warning =
+                            ConversationMarkupManager.createToolsSkippedByCompletionWarning(
+                                    extractedToolInvocations.map { it.tool.name }
+                            )
+                    context.roundManager.appendContent(warning)
+                    collector.emit(warning)
+                    try {
+                        context.conversationHistory.add(Pair("tool", warning))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "添加任务完成跳过工具警告到历史记录失败", e)
+                    }
+                }
 
-            if (toolInvocations.isNotEmpty()) {
                 // Handle wait for user need marker
                 if (ConversationMarkupManager.containsWaitForUserNeed(enhancedContent)) {
                     val userNeedContent =
@@ -718,10 +733,10 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                 Log.d(
                         TAG,
-                        "检测到 ${toolInvocations.size} 个工具调用，处理时间: ${System.currentTimeMillis() - startTime}ms"
+                        "检测到 ${extractedToolInvocations.size} 个工具调用，处理时间: ${System.currentTimeMillis() - startTime}ms"
                 )
                 handleToolInvocation(
-                        toolInvocations,
+                        extractedToolInvocations,
                         context,
                         functionType,
                         collector,

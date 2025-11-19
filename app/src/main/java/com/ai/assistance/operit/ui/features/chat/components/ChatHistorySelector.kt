@@ -32,9 +32,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material3.AlertDialog
@@ -52,9 +55,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatHistoryDisplayMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +73,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,18 +90,30 @@ import me.saket.swipe.SwipeableActionsBox
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.material3.CircularProgressIndicator
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
 private sealed interface HistoryListItem {
-    data class Header(val name: String) : HistoryListItem
+    data class CharacterHeader(val key: String, val name: String) : HistoryListItem
+    data class Header(val key: String, val name: String, val groupValue: String?) : HistoryListItem
     data class Item(val history: ChatHistory) : HistoryListItem
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class
+)
 @Composable
 fun ChatHistorySelector(
         modifier: Modifier = Modifier,
@@ -112,12 +131,17 @@ fun ChatHistorySelector(
         lazyListState: LazyListState? = null,
         onBack: (() -> Unit)? = null,
         searchQuery: String,
-        onSearchQueryChange: (String) -> Unit
+        onSearchQueryChange: (String) -> Unit,
+        historyDisplayMode: ChatHistoryDisplayMode,
+        onDisplayModeChange: (ChatHistoryDisplayMode) -> Unit,
+        autoSwitchCharacterCard: Boolean,
+        onAutoSwitchCharacterCardChange: (Boolean) -> Unit
 ) {
     var chatToEdit by remember { mutableStateOf<ChatHistory?>(null) }
     var showNewGroupDialog by remember { mutableStateOf(false) }
     var newGroupName by remember { mutableStateOf("") }
     var collapsedGroups by rememberLocal("chat_history_collapsed_groups", emptySet<String>())
+    var collapsedCharacters by rememberLocal("chat_history_collapsed_characters", emptySet<String>())
 
     var groupActionTarget by remember { mutableStateOf<String?>(null) }
     var groupToRename by remember { mutableStateOf<String?>(null) }
@@ -128,6 +152,7 @@ fun ChatHistorySelector(
     var showSearchBox by remember { mutableStateOf(false) }
     var matchedChatIdsByContent by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isSearching by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val chatHistoryManager = remember { ChatHistoryManager.getInstance(context) }
@@ -179,42 +204,131 @@ fun ChatHistorySelector(
         }
     }
 
-    val flatItems = remember(filteredHistories, collapsedGroups, ungroupedText) {
-        filteredHistories
-            .groupBy { it.group ?: ungroupedText }
-            .flatMap { (group, histories) ->
-                val header = HistoryListItem.Header(group)
-                val items =
-                    if (collapsedGroups.contains(group)) {
-                        emptyList()
-                    } else {
-                        histories.map { HistoryListItem.Item(it) }
+    val unboundCharacterText = stringResource(R.string.unbound_character_card)
+    val flatItems =
+            remember(
+                    filteredHistories,
+                    collapsedGroups,
+                    collapsedCharacters,
+                    ungroupedText,
+                    unboundCharacterText,
+                    historyDisplayMode
+            ) {
+                fun characterKey(name: String) = "character::$name"
+                fun groupKey(characterName: String?, groupValue: String?): String {
+                    val characterPart = characterName ?: "all"
+                    val groupPart = groupValue ?: "ungrouped"
+                    return "group::$characterPart::$groupPart"
+                }
+
+                when (historyDisplayMode) {
+                    ChatHistoryDisplayMode.BY_CHARACTER_CARD -> {
+                        filteredHistories
+                            .groupBy { it.characterCardName ?: unboundCharacterText }
+                            .flatMap { (characterName, histories) ->
+                                val cKey = characterKey(characterName)
+                                val children =
+                                        if (collapsedCharacters.contains(cKey)) {
+                                            emptyList()
+                                        } else {
+                                            histories
+                                                .groupBy { it.group }
+                                                .flatMap { (groupValue, groupedHistories) ->
+                                                    val displayName = groupValue ?: ungroupedText
+                                                    val gKey = groupKey(characterName, groupValue)
+                                                    val header =
+                                                            HistoryListItem.Header(
+                                                                    key = gKey,
+                                                                    name = displayName,
+                                                                    groupValue = groupValue
+                                                            )
+                                                    val items =
+                                                            if (collapsedGroups.contains(gKey)) {
+                                                                emptyList()
+                                                            } else {
+                                                                groupedHistories.map {
+                                                                    HistoryListItem.Item(it)
+                                                                }
+                                                            }
+                                                    listOf(header) + items
+                                                }
+                                        }
+                                listOf(HistoryListItem.CharacterHeader(cKey, characterName)) + children
+                            }
                     }
-                listOf(header) + items
+                    else -> {
+                        filteredHistories
+                            .groupBy { it.group }
+                            .flatMap { (groupValue, histories) ->
+                                val displayName = groupValue ?: ungroupedText
+                                val gKey = groupKey(null, groupValue)
+                                val header =
+                                        HistoryListItem.Header(
+                                                key = gKey,
+                                                name = displayName,
+                                                groupValue = groupValue
+                                        )
+                                val items =
+                                        if (collapsedGroups.contains(gKey)) {
+                                            emptyList()
+                                        } else {
+                                            histories.map { HistoryListItem.Item(it) }
+                                        }
+                                listOf(header) + items
+                            }
+                    }
+                }
             }
-    }
 
     val reorderableState = rememberReorderableLazyListState(actualLazyListState) { from, to ->
-        val movedItem = flatItems.getOrNull(from.index) as? HistoryListItem.Item ?: return@rememberReorderableLazyListState
+        val movedItem = flatItems.getOrNull(from.index) as? HistoryListItem.Item
+                ?: return@rememberReorderableLazyListState
 
         val reorderedFlatList = flatItems.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
 
         var newGroup: String? = null
-        val newOrderedHistories = reorderedFlatList
-            .mapNotNull {
-                when (it) {
-                    is HistoryListItem.Header -> {
-                        newGroup = it.name.takeIf { name -> name != ungroupedText }
-                        null
+        var newCharacterCardName: String? = null
+        val newOrderedHistories =
+                reorderedFlatList
+                    .mapNotNull {
+                        when (it) {
+                            is HistoryListItem.CharacterHeader -> {
+                                // 在角色卡分类模式下，更新当前的角色卡名称
+                                newCharacterCardName = if (it.name == unboundCharacterText) null else it.name
+                                newGroup = null
+                                null
+                            }
+                            is HistoryListItem.Header -> {
+                                newGroup = it.groupValue
+                                null
+                            }
+                            is HistoryListItem.Item -> {
+                                // 根据当前显示模式决定是否更新 characterCardName
+                                val updatedHistory = if (historyDisplayMode == ChatHistoryDisplayMode.BY_CHARACTER_CARD) {
+                                    it.history.copy(
+                                        group = newGroup,
+                                        characterCardName = newCharacterCardName
+                                    )
+                                } else {
+                                    it.history.copy(group = newGroup)
+                                }
+                                updatedHistory
+                            }
+                        }
                     }
-                    is HistoryListItem.Item -> it.history.copy(group = newGroup)
-                }
-            }
-            .mapIndexed { index, history -> history.copy(displayOrder = index.toLong()) }
+                    .mapIndexed { index, history -> history.copy(displayOrder = index.toLong()) }
 
-        val finalMovedItem = newOrderedHistories.find { it.id == movedItem.history.id } ?: return@rememberReorderableLazyListState
+        val finalMovedItem =
+                newOrderedHistories.find { it.id == movedItem.history.id }
+                        ?: return@rememberReorderableLazyListState
+
+        // 如果角色卡绑定发生了变化，需要额外通知
+        if (historyDisplayMode == ChatHistoryDisplayMode.BY_CHARACTER_CARD &&
+            finalMovedItem.characterCardName != movedItem.history.characterCardName) {
+            onUpdateChatBinding(finalMovedItem.id, finalMovedItem.characterCardName)
+        }
 
         onUpdateChatOrderAndGroup(newOrderedHistories, finalMovedItem, finalMovedItem.group)
     }
@@ -591,6 +705,159 @@ fun ChatHistorySelector(
         )
     }
 
+    if (showSettingsDialog) {
+        Dialog(onDismissRequest = { showSettingsDialog = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 6.dp
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "聊天记录设置",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    Text(
+                        text = "显示模式",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    listOf(
+                        Triple(
+                            ChatHistoryDisplayMode.BY_CHARACTER_CARD,
+                            stringResource(R.string.history_filter_role_card),
+                            stringResource(R.string.history_filter_role_card_desc)
+                        ),
+                        Triple(
+                            ChatHistoryDisplayMode.BY_FOLDER,
+                            stringResource(R.string.history_filter_folder),
+                            stringResource(R.string.history_filter_folder_desc)
+                        ),
+                        Triple(
+                            ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY,
+                            stringResource(R.string.history_filter_current_card),
+                            stringResource(R.string.history_filter_current_card_desc)
+                        )
+                    ).forEach { (mode, title, description) ->
+                        val selected = historyDisplayMode == mode
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    onDisplayModeChange(mode)
+                                },
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            },
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (selected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable {
+                                onAutoSwitchCharacterCardChange(!autoSwitchCharacterCard)
+                            },
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.history_auto_switch_character),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = stringResource(R.string.history_auto_switch_character_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = autoSwitchCharacterCard,
+                                onCheckedChange = onAutoSwitchCharacterCardChange,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    TextButton(
+                        onClick = { showSettingsDialog = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        }
+    }
+
     if (showNewGroupDialog) {
         AlertDialog(
                 onDismissRequest = { showNewGroupDialog = false },
@@ -625,80 +892,90 @@ fun ChatHistorySelector(
     }
 
     Column(modifier = modifier) {
-        // 标题行，左侧返回按钮和标题，右侧放置搜索和分组按钮
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
-            // 左侧：标题
-            Text(
-                text = stringResource(R.string.chat_history),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            // 右侧：分组创建、搜索和返回按钮
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { showNewGroupDialog = true },
-                    modifier = Modifier.size(32.dp)
+                Text(
+                    text = stringResource(R.string.chat_history),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.AddCircleOutline,
-                        contentDescription = stringResource(R.string.new_group),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        showSearchBox = !showSearchBox
-                        // 不再重置搜索查询
-                    },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        if (showSearchBox) Icons.Default.SearchOff else Icons.Default.Search,
-                        contentDescription = stringResource(R.string.search),
-                        tint = if (showSearchBox) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                if (onBack != null) {
                     IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(32.dp)
+                        onClick = { showSearchBox = !showSearchBox },
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "返回",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                            if (showSearchBox) Icons.Default.SearchOff else Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search),
+                            tint = if (showSearchBox) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
                         )
+                    }
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "设置",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "返回",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 新建对话按钮独占一行
+        // 新建对话按钮
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
                 onClick = { onNewChat() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.new_chat))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.new_chat))
+            }
+            IconButton(
+                onClick = { showNewGroupDialog = true },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Default.AddCircleOutline,
+                    contentDescription = stringResource(R.string.new_group),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
@@ -772,77 +1049,197 @@ fun ChatHistorySelector(
                 items = flatItems,
                 key = {
                     when (it) {
-                        is HistoryListItem.Header -> it.name
+                        is HistoryListItem.CharacterHeader -> it.key
+                        is HistoryListItem.Header -> it.key
                         is HistoryListItem.Item -> it.history.id
                     }
                 }
             ) { item ->
                 when (item) {
-                    is HistoryListItem.Header -> {
-                    Surface(
+                    is HistoryListItem.CharacterHeader -> {
+                        val userPreferencesManager = remember { UserPreferencesManager(context) }
+                        val characterCard = availableCharacterCards.find { it.name == item.name }
+                        val avatarUri by userPreferencesManager.getAiAvatarForCharacterCardFlow(
+                            characterCard?.id ?: ""
+                        ).collectAsState(initial = null)
+                        
+                        Row(
                             modifier = Modifier
-                                    .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(MaterialTheme.shapes.medium)
+                                .fillMaxWidth()
+                                .padding(top = 16.dp, bottom = 8.dp)
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onTap = {
-                                            collapsedGroups = if (collapsedGroups.contains(item.name)) {
-                                                collapsedGroups - item.name
-                                        } else {
-                                                collapsedGroups + item.name
-                                            }
-                                        },
-                                        onLongPress = {
-                                            if (item.name != ungroupedText) {
-                                                groupActionTarget = item.name
-                                                hasLongPressedGroup = true
-                                            }
+                                            collapsedCharacters =
+                                                if (collapsedCharacters.contains(item.key)) {
+                                                    collapsedCharacters - item.key
+                                                } else {
+                                                    collapsedCharacters + item.key
+                                                }
                                         }
                                     )
-                                    },
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            shadowElevation = 2.dp,
-                            shape = MaterialTheme.shapes.medium
-                    ) {
-                        Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp, topStart = 4.dp, bottomStart = 4.dp)
+                                    )
+                                    .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                                Icon(
-                                    imageVector = Icons.Default.Folder,
-                                    contentDescription = "Group",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            Column(
-                                modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (avatarUri != null) Color.Transparent 
+                                            else MaterialTheme.colorScheme.primaryContainer
+                                        ),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (item.name != ungroupedText && !hasLongPressedGroup) {
-                                        Text(
-                                            text = " (" + stringResource(R.string.long_press_manage) + ")",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    if (avatarUri != null) {
+                                        Image(
+                                            painter = rememberAsyncImagePainter(model = Uri.parse(avatarUri)),
+                                            contentDescription = "Avatar",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
+                                Text(
+                                    text = item.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(2.dp)
+                                    .padding(horizontal = 8.dp)
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+
                             Icon(
-                                    imageVector = if (collapsedGroups.contains(item.name)) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = if (collapsedGroups.contains(item.name)) stringResource(R.string.expand) else stringResource(R.string.collapse)
+                                imageVector = if (collapsedCharacters.contains(item.key)) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(end = 16.dp)
+                                    .size(24.dp)
                             )
                         }
                     }
-                }
+                    is HistoryListItem.Header -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (historyDisplayMode == ChatHistoryDisplayMode.BY_CHARACTER_CARD) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(32.dp)
+                                        .padding(start = 16.dp, end = 8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp)
+                                            .height(40.dp)
+                                            .align(Alignment.Center)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                                shape = RoundedCornerShape(1.dp)
+                                            )
+                                    )
+                                }
+                            }
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                collapsedGroups = if (collapsedGroups.contains(item.key)) {
+                                                    collapsedGroups - item.key
+                                                } else {
+                                                    collapsedGroups + item.key
+                                                }
+                                            },
+                                            onLongPress = {
+                                                if (item.name != ungroupedText) {
+                                                    groupActionTarget = item.name
+                                                    hasLongPressedGroup = true
+                                                }
+                                            }
+                                        )
+                                    },
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                shadowElevation = 2.dp,
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Folder,
+                                        contentDescription = "Group",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = item.name,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (item.name != ungroupedText && !hasLongPressedGroup) {
+                                                Text(
+                                                    text = " (" + stringResource(R.string.long_press_manage) + ")",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = if (collapsedGroups.contains(item.key)) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                        contentDescription = if (collapsedGroups.contains(item.key)) stringResource(R.string.expand) else stringResource(R.string.collapse)
+                                    )
+                                }
+                            }
+                        }
+                    }
                     is HistoryListItem.Item -> {
                         val deleteAction = SwipeAction(
                             onSwipe = { onDeleteChat(item.history.id) },
@@ -883,74 +1280,100 @@ fun ChatHistorySelector(
                                 MaterialTheme.colorScheme.onSurface
                             }
 
-                            SwipeableActionsBox(
-                                startActions = listOf(editAction),
-                                endActions = listOf(deleteAction),
-                                swipeThreshold = 100.dp,
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 2.dp)
-                                    .clip(MaterialTheme.shapes.medium)
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    color = containerColor,
-                                    shape = MaterialTheme.shapes.medium,
-                                    shadowElevation = if (isDragging) 8.dp else 0.dp
-                                ) {
+                                if (historyDisplayMode == ChatHistoryDisplayMode.BY_CHARACTER_CARD) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
+                                            .width(32.dp)
+                                            .padding(start = 16.dp, end = 8.dp)
                                     ) {
-                                        Row(
+                                        Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 10.dp)
-                                                .pointerInput(Unit) {
-                                                    detectTapGestures(onTap = { onSelectChat(item.history.id) })
-                                                },
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            IconButton(
-                                                modifier = Modifier.draggableHandle(),
-                                                onClick = {}
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DragHandle,
-                                                    contentDescription = "Reorder",
-                                                    tint = contentColor
+                                                .width(2.dp)
+                                                .height(50.dp)
+                                                .align(Alignment.Center)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                                    shape = RoundedCornerShape(1.dp)
                                                 )
-                                            }
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = item.history.title,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = contentColor,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            // 如果是分支，在右侧显示分支图标和父对话标题
-                                            if (item.history.parentChatId != null) {
-                                                val parentChat = chatHistories.find { it.id == item.history.parentChatId }
-                                                if (parentChat != null) {
+                                        )
+                                    }
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SwipeableActionsBox(
+                                        startActions = listOf(editAction),
+                                        endActions = listOf(deleteAction),
+                                        swipeThreshold = 100.dp,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(MaterialTheme.shapes.medium)
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                            color = containerColor,
+                                            shape = MaterialTheme.shapes.medium,
+                                            shadowElevation = if (isDragging) 8.dp else 0.dp
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 10.dp)
+                                                        .pointerInput(Unit) {
+                                                            detectTapGestures(onTap = { onSelectChat(item.history.id) })
+                                                        },
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    IconButton(
+                                                        modifier = Modifier.draggableHandle(),
+                                                        onClick = {}
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.DragHandle,
+                                                            contentDescription = "Reorder",
+                                                            tint = contentColor
+                                                        )
+                                                    }
                                                     Spacer(modifier = Modifier.width(8.dp))
-                                                    Icon(
-                                                        imageVector = Icons.Default.AccountTree,
-                                                        contentDescription = stringResource(id = R.string.branch),
-                                                        tint = contentColor.copy(alpha = 0.6f),
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
-                                                        text = parentChat.title,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = contentColor.copy(alpha = 0.6f),
+                                                        text = item.history.title,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = contentColor,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.widthIn(max = 120.dp) // 限制最大宽度以便省略
+                                                        modifier = Modifier.weight(1f)
                                                     )
+                                                    // 如果是分支，在右侧显示分支图标和父对话标题
+                                                    if (item.history.parentChatId != null) {
+                                                        val parentChat = chatHistories.find { it.id == item.history.parentChatId }
+                                                        if (parentChat != null) {
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Icon(
+                                                                imageVector = Icons.Default.AccountTree,
+                                                                contentDescription = stringResource(id = R.string.branch),
+                                                                tint = contentColor.copy(alpha = 0.6f),
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text(
+                                                                text = parentChat.title,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = contentColor.copy(alpha = 0.6f),
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                modifier = Modifier.widthIn(max = 120.dp) // 限制最大宽度以便省略
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }

@@ -39,6 +39,8 @@ import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
+import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatHistoryDisplayMode
+import com.ai.assistance.operit.ui.common.rememberLocal
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -138,6 +140,17 @@ fun ChatScreenContent(
 
     // 获取WebView状态
     val showWebView = actualViewModel.showWebView.collectAsState().value
+    
+    // 使用 rememberLocal 持久化历史记录显示设置
+    var historyDisplayMode by rememberLocal(
+        "chat_history_display_mode", 
+        ChatHistoryDisplayMode.BY_FOLDER
+    )
+    var autoSwitchCharacterCard by rememberLocal(
+        "chat_history_auto_switch_character_card", 
+        false
+    )
+    
     val currentChat = chatHistories.find { it.id == currentChatId }
 
     // 导出相关状态
@@ -160,17 +173,26 @@ fun ChatScreenContent(
     val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val activeCharacterCard by characterCardManager.activeCharacterCardFlow.collectAsState(initial = null)
-    val displayedChatHistories = remember(chatHistories, activeCharacterCard) {
-        val activeCard = activeCharacterCard ?: return@remember emptyList()
-        chatHistories.filter { history ->
-            val historyCard = history.characterCardName
-            if (activeCard.isDefault) {
-                historyCard == null || historyCard == activeCard.name
-            } else {
-                historyCard == activeCard.name
+    val displayedChatHistories =
+            remember(chatHistories, activeCharacterCard, historyDisplayMode) {
+                when (historyDisplayMode) {
+                    ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY -> {
+                        val activeCard = activeCharacterCard ?: return@remember emptyList()
+                        chatHistories.filter { history ->
+                            val historyCard = history.characterCardName
+                            if (activeCard.isDefault) {
+                                historyCard == null || historyCard == activeCard.name
+                            } else {
+                                historyCard == activeCard.name
+                            }
+                        }
+                    }
+
+                    else -> {
+                        chatHistories
+                    }
+                }
             }
-        }
-    }
 
     LaunchedEffect(activeCharacterCard, displayedChatHistories, currentChatId) {
         val activeCard = activeCharacterCard ?: return@LaunchedEffect
@@ -568,7 +590,11 @@ fun ChatScreenContent(
                     historyListState = historyListState,
                     searchQuery = chatHistorySearchQuery,
                     onSearchQueryChange = actualViewModel::onChatHistorySearchQueryChange,
-                    activeCharacterCard = activeCharacterCard
+                    activeCharacterCard = activeCharacterCard,
+                    historyDisplayMode = historyDisplayMode,
+                    onDisplayModeChange = { historyDisplayMode = it },
+                    autoSwitchCharacterCard = autoSwitchCharacterCard,
+                    onAutoSwitchCharacterCardChange = { autoSwitchCharacterCard = it }
             )
         }
 
@@ -771,7 +797,11 @@ fun ChatHistorySelectorPanel(
         historyListState: LazyListState,
         searchQuery: String,
         onSearchQueryChange: (String) -> Unit,
-        activeCharacterCard: CharacterCard?
+        activeCharacterCard: CharacterCard?,
+        historyDisplayMode: ChatHistoryDisplayMode,
+        onDisplayModeChange: (ChatHistoryDisplayMode) -> Unit,
+        autoSwitchCharacterCard: Boolean,
+        onAutoSwitchCharacterCardChange: (Boolean) -> Unit
 ) {
     // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
     Box(
@@ -833,7 +863,11 @@ fun ChatHistorySelectorPanel(
                     lazyListState = historyListState,
                     onBack = { actualViewModel.toggleChatHistorySelector() },
                     searchQuery = searchQuery,
-                    onSearchQueryChange = onSearchQueryChange
+                    onSearchQueryChange = onSearchQueryChange,
+                    historyDisplayMode = historyDisplayMode,
+                    onDisplayModeChange = onDisplayModeChange,
+                    autoSwitchCharacterCard = autoSwitchCharacterCard,
+                    onAutoSwitchCharacterCardChange = onAutoSwitchCharacterCardChange
             )
         }
     }

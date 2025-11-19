@@ -45,6 +45,7 @@ import kotlinx.coroutines.withContext
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
 import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import com.ai.assistance.operit.util.TtsCleaner
@@ -59,6 +60,12 @@ import com.ai.assistance.operit.services.core.MessageCoordinationDelegate
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
 
+enum class ChatHistoryDisplayMode {
+    BY_CHARACTER_CARD,
+    BY_FOLDER,
+    CURRENT_CHARACTER_ONLY
+}
+
 class ChatViewModel(private val context: Context) : ViewModel() {
 
     companion object {
@@ -68,6 +75,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // 添加语音服务
     private var voiceService: VoiceService? = null
     private val speechServicesPreferences = SpeechServicesPreferences(context)
+    private val characterCardManager = CharacterCardManager.getInstance(context)
 
     // 添加语音播放状态
     private val _isPlaying = MutableStateFlow(false)
@@ -241,6 +249,25 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun onChatHistorySearchQueryChange(query: String) {
         _chatHistorySearchQuery.value = query
     }
+
+    fun setHistoryDisplayMode(mode: ChatHistoryDisplayMode) {
+        _historyDisplayMode.value = mode
+    }
+
+    fun setAutoSwitchCharacterCard(enabled: Boolean) {
+        _autoSwitchCharacterCard.value = enabled
+    }
+
+    fun toggleAutoSwitchCharacterCard() {
+        setAutoSwitchCharacterCard(!_autoSwitchCharacterCard.value)
+    }
+
+    private val _historyDisplayMode =
+            MutableStateFlow(ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY)
+    val historyDisplayMode: StateFlow<ChatHistoryDisplayMode> = _historyDisplayMode.asStateFlow()
+
+    private val _autoSwitchCharacterCard = MutableStateFlow(false)
+    val autoSwitchCharacterCard: StateFlow<Boolean> = _autoSwitchCharacterCard.asStateFlow()
     
     // 总结状态
     val isSummarizing: StateFlow<Boolean> by lazy {
@@ -546,6 +573,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 refreshWebView()
             }
         }
+
+        if (_autoSwitchCharacterCard.value) {
+            viewModelScope.launch {
+                autoSwitchCharacterCardForChat(chatId)
+            }
+        }
     }
 
     fun deleteChatHistory(chatId: String) = chatHistoryDelegate.deleteChatHistory(chatId)
@@ -556,6 +589,21 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun toggleChatHistorySelector() = chatHistoryDelegate.toggleChatHistorySelector()
     fun showChatHistorySelector(show: Boolean) {
         chatHistoryDelegate.showChatHistorySelector(show)
+    }
+
+    private suspend fun autoSwitchCharacterCardForChat(chatId: String) {
+        val targetHistory = chatHistories.value.firstOrNull { it.id == chatId } ?: return
+        val targetCardName = targetHistory.characterCardName ?: return
+
+        runCatching {
+            val targetCard = characterCardManager.findCharacterCardByName(targetCardName) ?: return
+            val activeId = characterCardManager.activeCharacterCardIdFlow.first()
+            if (activeId != targetCard.id) {
+                characterCardManager.setActiveCharacterCard(targetCard.id)
+            }
+        }.onFailure { throwable ->
+            Log.w(TAG, "Auto switch character card failed: ${throwable.message}")
+        }
     }
 
     /** 创建对话分支 */

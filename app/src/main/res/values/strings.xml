@@ -138,6 +138,14 @@
     <string name="current_chats">当前共有 %1$d 条聊天记录</string>
     <string name="backup_location">备份文件保存在「下载/Operit」文件夹中</string>
     <string name="faq_backup">常见问题</string>
+    <string name="history_filter_role_card">按角色卡分类</string>
+    <string name="history_filter_role_card_desc">角色卡-文件夹-对话三级分类</string>
+    <string name="history_filter_folder">按文件夹分类</string>
+    <string name="history_filter_folder_desc">显示为文件夹+对话（全部角色卡）</string>
+    <string name="history_filter_current_card">仅显示当前角色卡</string>
+    <string name="history_filter_current_card_desc">仅显示当前角色卡下的文件夹和对话</string>
+    <string name="history_auto_switch_character">自动切换角色卡</string>
+    <string name="history_auto_switch_character_desc">切换对话时自动匹配绑定的角色卡</string>
     
     <!-- Terminal Screen -->
     <string name="termux_not_installed">Termux 未安装</string>
