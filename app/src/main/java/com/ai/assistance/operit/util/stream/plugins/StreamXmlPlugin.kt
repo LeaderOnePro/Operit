@@ -23,6 +23,10 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
     private var endTagMatcher: StreamKmpGraph? = null
     // Allow matching a new start tag immediately after we just closed an end tag, even if not at start of line
     private var allowStartAfterEndTag: Boolean = false
+    private var allowStartAfterPunctuation: Boolean = false
+
+    private val punctuationTriggers =
+            setOf('，', '。', '？', '！', ',', '.', '?', '!')
 
     init {
         startTagMatcher =
@@ -62,6 +66,7 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                     StreamLogger.i("StreamXmlPlugin", "Found end tag. Switching to IDLE.")
                     // Enable one-time allowance for starting a new tag right after this end tag
                     allowStartAfterEndTag = true
+                    allowStartAfterPunctuation = false
                     reset()
                     includeTagsInOutput
                 }
@@ -78,12 +83,13 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
             }
         } else {
             if (state == PluginState.IDLE && !atStartOfLine) {
-                if (!allowStartAfterEndTag) {
-                    return true
+                val allowStart = allowStartAfterEndTag || allowStartAfterPunctuation
+                if (!allowStart) {
+                    return handleDefaultCharacter(c)
                 }
-                // Allow adjacent XML after an end tag even if separated by spaces/tabs
+                // Allow adjacent XML after an end tag/punctuation even if separated by spaces/tabs
                 if (c == ' ' || c == '\t') {
-                    return true
+                    return handleDefaultCharacter(c)
                 }
             }
             // We are in IDLE or TRYING state, looking for a start tag.
@@ -99,6 +105,7 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                         state = PluginState.PROCESSING
                         // Consuming this as a new start clears the post-end allowance
                         allowStartAfterEndTag = false
+                        allowStartAfterPunctuation = false
                         // We have a full start tag. Configure the end tag matcher.
                         endTagMatcher =
                                 StreamKmpGraphBuilder()
@@ -122,6 +129,7 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                     // so only this potential sequence benefits from it
                     // (if it fails below, we will clear it)
                     // Keep it true while in-progress so subsequent chars can proceed
+                    allowStartAfterPunctuation = false
                     return includeTagsInOutput
                 }
                 is StreamKmpMatchResult.NoMatch -> {
@@ -131,8 +139,9 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
                     }
                     // Clear the allowance if we failed to start a new tag
                     allowStartAfterEndTag = false
+                    allowStartAfterPunctuation = false
                     // This is a default character, not part of a tag managed by this plugin.
-                    return true
+                    return handleDefaultCharacter(c)
                 }
             }
         }
@@ -152,5 +161,24 @@ class StreamXmlPlugin(private val includeTagsInOutput: Boolean = true) : StreamP
         endTagMatcher = null
         startTagMatcher.reset()
         state = PluginState.IDLE
+    }
+
+    private fun handleDefaultCharacter(c: Char): Boolean {
+        updatePunctuationAllowance(c)
+        return true
+    }
+
+    private fun updatePunctuationAllowance(c: Char) {
+        when {
+            punctuationTriggers.contains(c) -> {
+                allowStartAfterPunctuation = true
+            }
+            c == ' ' || c == '\t' -> {
+                // keep current state so `<` after spaces still benefits
+            }
+            else -> {
+                allowStartAfterPunctuation = false
+            }
+        }
     }
 }
