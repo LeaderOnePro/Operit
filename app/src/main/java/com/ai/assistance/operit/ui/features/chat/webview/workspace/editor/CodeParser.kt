@@ -191,35 +191,88 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
                 continue
             }
             
-            // 处理数字
-            if (Character.isDigit(text[i])) {
-                val start = i
-                while (i < text.length && (Character.isDigit(text[i]) || text[i] == '.')) {
-                    if (i < codeColors.size) codeColors[i] = NUMBER_COLOR
+            // 处理数字（包括十六进制、二进制、科学计数法）
+            if (Character.isDigit(text[i]) || (text[i] == '0' && i + 1 < text.length && (text[i + 1] == 'x' || text[i + 1] == 'X' || text[i + 1] == 'b' || text[i + 1] == 'B'))) {
+                val startPos = i
+                
+                // 十六进制 0x... 或二进制 0b...
+                if (text[i] == '0' && i + 1 < text.length) {
+                    when (text[i + 1]) {
+                        'x', 'X' -> {
+                            i += 2
+                            while (i < text.length && (Character.isDigit(text[i]) || text[i] in 'a'..'f' || text[i] in 'A'..'F')) {
+                                i++
+                            }
+                        }
+                        'b', 'B' -> {
+                            i += 2
+                            while (i < text.length && (text[i] == '0' || text[i] == '1')) {
+                                i++
+                            }
+                        }
+                        else -> {
+                            while (i < text.length && (Character.isDigit(text[i]) || text[i] == '.' || text[i] == 'e' || text[i] == 'E' || text[i] == '-' || text[i] == '+')) {
+                                i++
+                            }
+                        }
+                    }
+                } else {
+                    // 普通数字或科学计数法
+                    while (i < text.length && (Character.isDigit(text[i]) || text[i] == '.' || text[i] == 'e' || text[i] == 'E' || text[i] == '-' || text[i] == '+')) {
+                        i++
+                    }
+                }
+                
+                // 处理数字后缀（如 123L, 3.14f）
+                if (i < text.length && (text[i] == 'L' || text[i] == 'l' || text[i] == 'F' || text[i] == 'f' || text[i] == 'D' || text[i] == 'd')) {
                     i++
+                }
+                
+                for (j in startPos until i) {
+                    if (j < codeColors.size) codeColors[j] = NUMBER_COLOR
                 }
                 continue
             }
             
             // 处理标识符（关键字、类型、函数等）
             if (Character.isJavaIdentifierStart(text[i])) {
-                val start = i
+                val startPos = i
                 while (i < text.length && Character.isJavaIdentifierPart(text[i])) {
                     i++
                 }
                 
                 if (i <= text.length) {
-                    val word = text.substring(start, i)
-                    val color = when {
-                        languageSupport?.getKeywords()?.contains(word) == true -> KEYWORD_COLOR
-                        languageSupport?.getBuiltInTypes()?.contains(word) == true -> TYPE_COLOR
-                        languageSupport?.getBuiltInVariables()?.contains(word) == true -> VARIABLE_COLOR
-                        languageSupport?.getBuiltInFunctions()?.contains(word) == true -> FUNCTION_COLOR
-                        i < text.length && text[i] == '(' -> FUNCTION_COLOR
-                        else -> DEFAULT_COLOR
+                    val word = text.substring(startPos, i)
+                    
+                    // 跳过空白字符
+                    var nextCharIdx = i
+                    while (nextCharIdx < text.length && (text[nextCharIdx] == ' ' || text[nextCharIdx] == '\t')) {
+                        nextCharIdx++
                     }
                     
-                    for (j in start until i) {
+                    val nextChar = if (nextCharIdx < text.length) text[nextCharIdx] else ' '
+                    
+                    // 检查是否是类型名（首字母大写的标识符，通常是类名）
+                    val isCapitalized = word.isNotEmpty() && word[0].isUpperCase()
+                    
+                    val color = when {
+                        // 关键字优先级最高
+                        languageSupport?.getKeywords()?.contains(word) == true -> KEYWORD_COLOR
+                        // 内置类型
+                        languageSupport?.getBuiltInTypes()?.contains(word) == true -> TYPE_COLOR
+                        // 内置变量
+                        languageSupport?.getBuiltInVariables()?.contains(word) == true -> VARIABLE_COLOR
+                        // 内置函数
+                        languageSupport?.getBuiltInFunctions()?.contains(word) == true -> FUNCTION_COLOR
+                        // 函数调用（后面跟括号）
+                        nextChar == '(' -> FUNCTION_COLOR
+                        // 类名（首字母大写的标识符）
+                        isCapitalized -> TYPE_COLOR
+                        // 其他标识符使用变量颜色
+                        else -> VARIABLE_COLOR
+                    }
+                    
+                    for (j in startPos until i) {
                         if (j < codeColors.size) codeColors[j] = color
                     }
                 }
@@ -227,8 +280,18 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
                 continue
             }
             
-            // 处理操作符
-            if ("+-*/%=&|<>!~^?:;,(){}[]".contains(text[i])) {
+            // 处理操作符（增强识别）
+            if ("+-*/%=&|<>!~^?:;,(){}[].".contains(text[i])) {
+                // 检查是否是多字符操作符
+                if (i + 1 < text.length) {
+                    val twoChar = text.substring(i, i + 2)
+                    if (twoChar in listOf("==", "!=", "<=", ">=", "&&", "||", "++", "--", "+=", "-=", "*=", "/=", "=>", "->", "::")) {
+                        if (i < codeColors.size) codeColors[i] = OPERATOR_COLOR
+                        if (i + 1 < codeColors.size) codeColors[i + 1] = OPERATOR_COLOR
+                        i += 2
+                        continue
+                    }
+                }
                 if (i < codeColors.size) codeColors[i] = OPERATOR_COLOR
             } else {
                 if (i < codeColors.size) codeColors[i] = DEFAULT_COLOR

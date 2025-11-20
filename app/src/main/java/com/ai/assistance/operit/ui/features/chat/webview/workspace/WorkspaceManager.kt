@@ -99,6 +99,9 @@ fun WorkspaceManager(
     // 解绑确认对话框状态
     var showUnbindConfirmDialog by remember { mutableStateOf(false) }
     
+    // 关闭文件确认对话框状态
+    var fileToCloseIndex by remember { mutableStateOf(-1) }
+    
     // 当前活动的编辑器引用
     var activeEditor by remember { mutableStateOf<com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.NativeCodeEditor?>(null) }
 
@@ -163,8 +166,8 @@ fun WorkspaceManager(
         }
     }
 
-    // 关闭文件标签
-    fun closeFile(index: Int) {
+    // 实际执行关闭文件操作
+    fun confirmCloseFile(index: Int) {
         if (index >= 0 && index < openFiles.size) {
             val fileToClose = openFiles[index]
             val updatedFiles = openFiles.toMutableList()
@@ -179,6 +182,21 @@ fun WorkspaceManager(
                 updatedFiles.isEmpty() -> -1
                 index >= updatedFiles.size -> updatedFiles.size - 1
                 else -> index
+            }
+        }
+        fileToCloseIndex = -1 // 重置待关闭文件索引
+    }
+
+    // 关闭文件标签
+    fun closeFile(index: Int) {
+        if (index >= 0 && index < openFiles.size) {
+            val fileToClose = openFiles[index]
+            // 如果文件有未保存的更改，显示确认对话框
+            if (unsavedFiles.contains(fileToClose.path)) {
+                fileToCloseIndex = index
+            } else {
+                // 否则直接关闭
+                confirmCloseFile(index)
             }
         }
     }
@@ -440,6 +458,43 @@ fun WorkspaceManager(
                     }
                 }
             )
+        }
+        
+        // 关闭文件确认对话框
+        if (fileToCloseIndex != -1) {
+            val file = openFiles.getOrNull(fileToCloseIndex)
+            if (file != null) {
+                AlertDialog(
+                    onDismissRequest = { fileToCloseIndex = -1 },
+                    title = { Text("保存更改？") },
+                    text = { Text("文件 '${file.name}' 已修改，是否保存更改？") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                saveFile(file)
+                                unsavedFiles = unsavedFiles - file.path
+                                confirmCloseFile(fileToCloseIndex)
+                            }
+                        ) {
+                            Text("保存")
+                        }
+                    },
+                    dismissButton = {
+                        Row {
+                            TextButton(onClick = { fileToCloseIndex = -1 }) {
+                                Text("取消")
+                            }
+                            TextButton(
+                                onClick = {
+                                    confirmCloseFile(fileToCloseIndex)
+                                }
+                            ) {
+                                Text("不保存")
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 }

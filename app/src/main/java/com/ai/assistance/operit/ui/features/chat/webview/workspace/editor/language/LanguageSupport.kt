@@ -76,18 +76,18 @@ interface LanguageSupport {
     )
     
     /**
-     * 语法高亮颜色
+     * 语法高亮颜色 - VSCode Dark+ Theme
      */
     companion object {
-        // Monokai Pro Theme Colors - A vibrant and high-contrast theme
-        val KEYWORD_COLOR = Color.parseColor("#FF6188")      // Pink for keywords and operators
-        val FUNCTION_COLOR = Color.parseColor("#A9DC76")     // Green for functions
-        val STRING_COLOR = Color.parseColor("#FFD866")       // Yellow for strings
-        val NUMBER_COLOR = Color.parseColor("#AB9DF2")       // Purple for numbers
-        val COMMENT_COLOR = Color.parseColor("#75715E")      // Grey for comments
-        val TYPE_COLOR = Color.parseColor("#78DCE8")         // Cyan for types/classes
-        val VARIABLE_COLOR = Color.parseColor("#9CDCFE")     // Light blue for variables
-        val OPERATOR_COLOR = Color.parseColor("#FF6188")     // Pink, same as keywords
-        val DEFAULT_COLOR = Color.parseColor("#F8F8F2")      // Off-white for default text
+        // VSCode Dark+ Theme Colors - Professional and comfortable for long-term use
+        val KEYWORD_COLOR = Color.parseColor("#569CD6")      // Blue for keywords (if, else, return, etc.)
+        val FUNCTION_COLOR = Color.parseColor("#DCDCAA")     // Yellow for functions and methods
+        val STRING_COLOR = Color.parseColor("#CE9178")       // Orange-brown for strings
+        val NUMBER_COLOR = Color.parseColor("#B5CEA8")       // Light green for numbers
+        val COMMENT_COLOR = Color.parseColor("#6A9955")      // Green for comments
+        val TYPE_COLOR = Color.parseColor("#4EC9B0")         // Cyan for types, classes, interfaces
+        val VARIABLE_COLOR = Color.parseColor("#9CDCFE")     // Light blue for variables and parameters
+        val OPERATOR_COLOR = Color.parseColor("#D4D4D4")     // Light grey for operators
+        val DEFAULT_COLOR = Color.parseColor("#D4D4D4")      // Light grey for default text
     }
 } 

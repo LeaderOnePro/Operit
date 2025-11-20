@@ -196,6 +196,9 @@ open class ColorsText : AppCompatEditText {
             DpiUtils.dip2px(context, 8f),
             DpiUtils.dip2px(context, 48f)
         )
+        
+        // 禁用水平滚动，启用自动换行
+        setHorizontallyScrolling(false)
     }
     
     /**
@@ -658,19 +661,6 @@ open class ColorsText : AppCompatEditText {
         }
     
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action and MotionEvent.ACTION_MASK) {
-            MotionEvent.ACTION_UP -> {
-                if (event.y > height - paddingBottom) {
-                    val len = length()
-                    val currentText = text
-                    // More efficient
-                    if (len > 0 && currentText != null && currentText[len - 1] != '\n') {
-                        // 可以在这里添加额外的处理
-                    }
-                    append("\n")
-                }
-            }
-        }
         val result = super.onTouchEvent(event)
         return result
     }
@@ -685,23 +675,28 @@ open class ColorsText : AppCompatEditText {
     
     // 原EditText不合理的onMeasure在这里重新写
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        if (fixedWidth <= 0 && fixedHeight <= 0) {
+        val specSizeW = getParentWidth()  // 父容器宽度（屏幕宽度）
+        val specSizeH = getParentHeight() // 父容器高度（屏幕高度）
+        
+        // 如果父容器尺寸还未初始化，使用默认测量
+        if (specSizeW <= 0 || specSizeH <= 0) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            fixedWidth = measuredWidth
-            fixedHeight = measuredHeight
-            
+            return
+        }
+        
+        // 计算内容高度（行数 * 行高）+ padding，确保可以滚动到底部
+        fixedHeight = (lineCount + 1) * lineHeight + paddingTop + paddingBottom
+        // 固定宽度为父容器宽度，禁用横向滚动
+        fixedWidth = specSizeW
+        fixedHeight = fixedHeight.coerceAtLeast(specSizeH)
+        
+        // 初始化可视行范围
+        if (visualFirstLine == 0 && visualLastLine == 0) {
             visualFirstLine = 0
             visualLastLine = lineCount
-        } else {
-            val specSizeH = getParentWidth()
-            val specSizeW = getParentHeight()
-            
-            fixedHeight = (lineCount + 1) * lineHeight + minHeight
-            fixedWidth = compoundPaddingLeft + compoundPaddingRight + getLineMaxWidth(layout, visualFirstLine, visualLastLine)
-            fixedWidth = fixedWidth.coerceAtLeast(specSizeW)
-            fixedHeight = fixedHeight.coerceAtLeast(specSizeH)
-            setMeasuredDimension(fixedWidth, fixedHeight)
         }
+        
+        setMeasuredDimension(fixedWidth, fixedHeight)
     }
     
     /**

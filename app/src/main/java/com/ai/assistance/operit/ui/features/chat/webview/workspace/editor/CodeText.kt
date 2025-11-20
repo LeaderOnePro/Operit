@@ -317,6 +317,16 @@ class CodeText : ColorsText {
     }
 
     /**
+     * 手动触发完整代码解析（用于文件加载后初始化高亮）
+     */
+    fun triggerParse() {
+        val textLength = text?.length ?: 0
+        if (textLength > 0) {
+            codeParser.parse(0, 0, textLength)
+        }
+    }
+
+    /**
      * 设置语法检查
      */
     fun setCheckGrammar(c: GrammarCheck.Check) {
