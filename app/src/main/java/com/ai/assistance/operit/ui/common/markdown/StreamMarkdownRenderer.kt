@@ -281,6 +281,9 @@ fun StreamMarkdownRenderer(
                 val nodeIndex = nodes.lastIndex
                 if (isInlineContainer) {
                     // Stream-parse the block stream for inline elements
+                    // 将 lastCharWasNewline 提升到这个作用域，以便跨 inlineGroup 保持换行符状态
+                    var lastCharWasNewline = false
+                    
                     blockGroup.stream.streamSplitBy(NestedMarkdownProcessor.getInlinePlugins())
                             .collect { inlineGroup ->
                                 val originalInlineType =
@@ -292,7 +295,6 @@ fun StreamMarkdownRenderer(
                                         else originalInlineType
 
                                 var childNode: MarkdownNode? = null
-                                var lastCharWasNewline = false // 跟踪上一个字符是否为换行符
 
                                 inlineGroup.stream.collect { str ->
                                     // 检查是否为空白内容
@@ -507,6 +509,9 @@ fun StreamMarkdownRenderer(
 
                     if (isInlineContainer) {
                         // Stream-parse the block stream for inline elements
+                        // 将 lastCharWasNewline 提升到这个作用域，以便跨 inlineGroup 保持换行符状态
+                        var lastCharWasNewline = false
+                        
                         blockGroup.stream.streamSplitBy(NestedMarkdownProcessor.getInlinePlugins())
                                 .collect { inlineGroup ->
                                     val originalInlineType =
@@ -521,7 +526,6 @@ fun StreamMarkdownRenderer(
                                             else originalInlineType
 
                                     var childNode: MarkdownNode? = null
-                                    var lastCharWasNewline = false // 跟踪上一个字符是否为换行符
 
                                     inlineGroup.stream.collect { str ->
                                         // 检查是否为空白内容
