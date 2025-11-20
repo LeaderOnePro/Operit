@@ -145,6 +145,9 @@ object WaifuMessageProcessor {
             // 移除思考标签（包括 <think> 和 <thinking>）
             .replace(Regex("<think(?:ing)?[^>]*>.*?</think(?:ing)?>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<think(?:ing)?[^>]*/>"), "")
+            // 移除搜索来源标签
+            .replace(Regex("<search[^>]*>.*?</search>", RegexOption.DOT_MATCHES_ALL), "")
+            .replace(Regex("<search[^>]*/>"), "")
             // 移除工具标签
             .replace(Regex("<tool[^>]*>.*?</tool>", RegexOption.DOT_MATCHES_ALL), "")
             .replace(Regex("<tool[^>]*/>"), "")

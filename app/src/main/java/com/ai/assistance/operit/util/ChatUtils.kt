@@ -2,17 +2,20 @@ package com.ai.assistance.operit.util
 
 /** Utility functions for chat message handling */
 object ChatUtils {
-    /** 过滤掉内容中的思考部分 移除<think></think>和<thinking></thinking>标签及其中的内容，并处理未闭合的情况 */
+    /** 过滤掉内容中的思考部分和搜索来源 移除<think></think>、<thinking></thinking>和<search></search>标签及其中的内容，并处理未闭合的情况 */
     fun removeThinkingContent(content: String): String {
-        // 使用正则表达式匹配<think>和<thinking>标签及其内容
-        // 这个正则表达式会匹配四种情况：
+        // 使用正则表达式匹配<think>、<thinking>和<search>标签及其内容
+        // 这个正则表达式会匹配以下情况：
         // 1. <think>...</think> (正常闭合的标签)
         // 2. <think>... (未闭合，直到字符串末尾)
         // 3. <thinking>...</thinking> (正常闭合的标签)
         // 4. <thinking>... (未闭合，直到字符串末尾)
+        // 5. <search>...</search> (正常闭合的标签)
+        // 6. <search>... (未闭合，直到字符串末尾)
         // \\z 匹配字符串的绝对末尾
         val thinkPattern = "<think(?:ing)?>.*?(</think(?:ing)?>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
-        return content.replace(thinkPattern, "").trim()
+        val searchPattern = "<search>.*?(</search>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
+        return content.replace(thinkPattern, "").replace(searchPattern, "").trim()
     }
 
     /**

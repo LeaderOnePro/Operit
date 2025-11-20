@@ -37,7 +37,7 @@ class CustomXmlRenderer(
 ) : XmlContentRenderer {
     // 定义渲染器能够处理的内置标签集合
     private val builtInTags =
-            setOf("think", "thinking", "tool", "status", "tool_result", "html", "mood")
+            setOf("think", "thinking", "search", "tool", "status", "tool_result", "html", "mood")
 
     @Composable
     override fun RenderXmlContent(xmlContent: String, modifier: Modifier, textColor: Color) {
@@ -68,7 +68,7 @@ class CustomXmlRenderer(
 
         // 根据新规则处理未闭合的标签
         if (!isXmlFullyClosed(trimmedContent)) {
-            if (tagName in builtInTags && tagName != "tool" && tagName != "think" && tagName != "thinking") {
+            if (tagName in builtInTags && tagName != "tool" && tagName != "think" && tagName != "thinking" && tagName != "search") {
                 // 是内置标签但未闭合，则不显示任何内容，等待其闭合
                 return
             } else if (!(tagName in builtInTags)) {
@@ -82,6 +82,7 @@ class CustomXmlRenderer(
         when (tagName) {
             "think" -> renderThinkContent(trimmedContent, modifier, textColor)
             "thinking" -> renderThinkContent(trimmedContent, modifier, textColor)
+            "search" -> renderSearchContent(trimmedContent, modifier, textColor)
             "tool" -> renderToolRequest(trimmedContent, modifier, textColor)
             "tool_result" -> renderToolResult(trimmedContent, modifier, textColor)
             "status" -> renderStatus(trimmedContent, modifier, textColor)
@@ -144,6 +145,79 @@ class CustomXmlRenderer(
         }
 
         return params
+    }
+
+    /** 渲染 <search> 标签内容 (Google Search Grounding 来源) */
+    @Composable
+    private fun renderSearchContent(content: String, modifier: Modifier, textColor: Color) {
+        val startTag = "<search>"
+        val endTag = "</search>"
+        val startIndex = content.indexOf(startTag) + startTag.length
+
+        // 提取搜索来源内容
+        val searchText =
+                if (content.contains(endTag)) {
+                    val endIndex = content.lastIndexOf(endTag)
+                    content.substring(startIndex, endIndex).trim()
+                } else {
+                    // 没有结束标签，直接使用startIndex后的所有内容
+                    content.substring(startIndex).trim()
+                }
+
+        var expanded by remember { mutableStateOf(false) }  // 默认收起
+
+        Column(modifier = modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp)) {
+            Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        expanded = !expanded
+                    },
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+            ) {
+                val rotation by
+                        animateFloatAsState(
+                                targetValue = if (expanded) 90f else 0f,
+                                animationSpec = tween(durationMillis = 300),
+                                label = "arrowRotation"
+                        )
+
+                Icon(
+                        imageVector = Icons.Default.KeyboardArrowRight,
+                        contentDescription = if (expanded) "收起" else "展开",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rotation }
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                        text = stringResource(id = R.string.search_sources),  // 需要添加字符串资源
+                        style = MaterialTheme.typography.labelMedium,
+                        color = textColor.copy(alpha = 0.7f)
+                )
+            }
+
+            AnimatedVisibility(
+                    visible = expanded,
+                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)),
+                    exit = androidx.compose.animation.fadeOut(animationSpec = tween(200))
+            ) {
+                if (searchText.isNotBlank()) {
+                    Box(
+                            modifier =
+                                    Modifier.fillMaxWidth()
+                                            .padding(top = 4.dp, bottom = 8.dp, start = 24.dp)
+                    ) {
+                        // 使用 Markdown 渲染器来渲染搜索来源（支持链接等格式）
+                        com.ai.assistance.operit.ui.common.displays.MarkdownTextComposable(
+                                text = searchText,
+                                textColor = textColor.copy(alpha = 0.8f),
+                                modifier = Modifier
+                        )
+                    }
+                }
+            }
+        }
     }
 
     /** 渲染 <think> 和 <thinking> 标签内容 */

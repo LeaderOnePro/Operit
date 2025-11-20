@@ -863,6 +863,7 @@ class GeminiProvider(
         onTokensUpdated: suspend (input: Int, cachedInput: Int, output: Int) -> Unit
     ): String {
         val contentBuilder = StringBuilder()
+        val searchSourcesBuilder = StringBuilder()
 
         try {
             // 检查是否有错误信息
@@ -882,6 +883,74 @@ class GeminiProvider(
 
             // 处理第一个candidate
             val candidate = candidates.getJSONObject(0)
+            
+            // 提取 Google Search grounding metadata（搜索来源信息）
+            if (enableGoogleSearch) {
+                val groundingMetadata = candidate.optJSONObject("groundingMetadata")
+                if (groundingMetadata != null) {
+                    // 提取搜索查询
+                    val webSearchQueries = groundingMetadata.optJSONArray("webSearchQueries")
+                    if (webSearchQueries != null && webSearchQueries.length() > 0) {
+                        searchSourcesBuilder.append("<search>\n\n")
+                        searchSourcesBuilder.append("**🔍 Google 搜索来源：**\n\n")
+                        
+                        for (i in 0 until webSearchQueries.length()) {
+                            val query = webSearchQueries.optString(i)
+                            searchSourcesBuilder.append("- 查询：`${query}`\n")
+                            logDebug("搜索查询 [$i]: $query")
+                        }
+                        
+                        // 提取搜索结果的URL来源
+                        val groundingSupports = groundingMetadata.optJSONArray("groundingSupports")
+                        if (groundingSupports != null && groundingSupports.length() > 0) {
+                            searchSourcesBuilder.append("\n**📄 参考来源：**\n\n")
+                            
+                            for (i in 0 until groundingSupports.length()) {
+                                val support = groundingSupports.getJSONObject(i)
+                                val segment = support.optJSONObject("segment")
+                                val groundingChunkIndices = support.optJSONArray("groundingChunkIndices")
+                                
+                                // 如果有chunk indices，提取对应的URL
+                                if (groundingChunkIndices != null) {
+                                    for (j in 0 until groundingChunkIndices.length()) {
+                                        val chunkIndex = groundingChunkIndices.getInt(j)
+                                        val retrievalMetadata = groundingMetadata.optJSONObject("retrievalMetadata")
+                                        if (retrievalMetadata != null) {
+                                            val webDynamicRetrievalScore = retrievalMetadata.optDouble("webDynamicRetrievalScore", -1.0)
+                                            if (webDynamicRetrievalScore > 0) {
+                                                logDebug("搜索动态检索分数: $webDynamicRetrievalScore")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 提取 grounding chunks（包含URL）
+                            val groundingChunks = groundingMetadata.optJSONArray("groundingChunks")
+                            if (groundingChunks != null && groundingChunks.length() > 0) {
+                                for (i in 0 until groundingChunks.length()) {
+                                    val chunk = groundingChunks.getJSONObject(i)
+                                    val web = chunk.optJSONObject("web")
+                                    if (web != null) {
+                                        val uri = web.optString("uri", "")
+                                        val title = web.optString("title", "")
+                                        if (uri.isNotEmpty()) {
+                                            if (title.isNotEmpty()) {
+                                                searchSourcesBuilder.append("${i + 1}. [${title}](${uri})\n")
+                                            } else {
+                                                searchSourcesBuilder.append("${i + 1}. <${uri}>\n")
+                                            }
+                                            logDebug("搜索来源 [$i]: $title - $uri")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        searchSourcesBuilder.append("\n</search>\n\n")
+                    }
+                }
+            }
 
             // 检查finish_reason
             val finishReason = candidate.optString("finishReason", "")
@@ -966,7 +1035,14 @@ class GeminiProvider(
                 }
             }
 
-            return contentBuilder.toString()
+            // 将搜索来源拼接到内容最前面
+            val finalContent = if (searchSourcesBuilder.isNotEmpty()) {
+                searchSourcesBuilder.toString() + contentBuilder.toString()
+            } else {
+                contentBuilder.toString()
+            }
+            
+            return finalContent
         } catch (e: Exception) {
             logError("提取内容时发生错误: ${e.message}", e)
             return ""
