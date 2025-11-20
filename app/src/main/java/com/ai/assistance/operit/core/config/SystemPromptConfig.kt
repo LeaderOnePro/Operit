@@ -96,11 +96,14 @@ File System Tools:
 - list_files: List files in a directory. Parameters: path (e.g. "/sdcard/Download")
 $readFileDescription
 - read_file_part: Read the content of a file by parts (200 lines per part). Parameters: path (file path), partIndex (part number, starts from 0)
-- apply_file: Applies edits to a file by finding and replacing content blocks.
-  - **How it works**: This tool locates code based on the content inside the `[OLD]` block, not by line numbers. It then replaces this content with the content from the `[NEW]` block.
+- apply_file: Applies edits to a file by finding and replacing content blocks, or directly overwrites the entire file.
+  - **How it works**: This tool has two modes:
+    1. **Edit Mode**: Locates code based on the content inside the `[OLD]` block (not by line numbers) and replaces it with the content from the `[NEW]` block.
+    2. **Overwrite Mode**: If no edit blocks (REPLACE/DELETE) are present, the entire content parameter will overwrite the file. This is useful for creating new files or completely rewriting existing ones.
   - **CRITICAL RULES**:
     1.  **Use Semantic Blocks**: `REPLACE` requires both `[OLD]` and `[NEW]` blocks. `DELETE` only requires an `[OLD]` block.
     2.  **Correct Syntax**: All tags (e.g., `[START-REPLACE]`, `[OLD]`) must be on their own lines.
+    3.  **Overwrite**: To overwrite a file, simply provide the content without any edit blocks.
 
   - **Operations & Examples**:
     - **Replace**: `[START-REPLACE]`
@@ -116,8 +119,9 @@ $readFileDescription
       ...content to be deleted...
       [/OLD]
       [END-DELETE]
+    - **Overwrite**: Simply provide the full file content without any blocks (will replace entire file)
 
-  - **Parameters**: path (file path), content (the string containing all your edit blocks)
+  - **Parameters**: path (file path), content (the string containing all your edit blocks, or the full file content for overwrite mode)
 - delete_file: Delete a file or directory. Parameters: path (target path), recursive (boolean, default false)
 - file_exists: Check if a file or directory exists. Parameters: path (target path)
 - move_file: Move or rename a file or directory. Parameters: source (source path), destination (destination path)
@@ -173,11 +177,14 @@ Note: The memory library and user personality profile are automatically updated 
 - list_files: 列出目录中的文件。参数：path（例如"/sdcard/Download"）
 $readFileDescription
 - read_file_part: 分部分读取文件内容（每部分200行）。参数：path（文件路径），partIndex（部分编号，从0开始）
-- apply_file: 通过查找并替换内容块来编辑文件。
-  - **工作原理**: 此工具根据 `[OLD]` 块中的内容（而不是行号）来定位代码，然后用 `[NEW]` 块中的内容替换它。
+- apply_file: 通过查找并替换内容块来编辑文件，或直接覆盖整个文件。
+  - **工作原理**: 此工具有两种模式：
+    1. **编辑模式**: 根据 `[OLD]` 块中的内容（而不是行号）来定位代码，然后用 `[NEW]` 块中的内容替换它。
+    2. **覆盖模式**: 如果没有编辑块（REPLACE/DELETE），整个 content 参数的内容将覆盖文件。这对于创建新文件或完全重写现有文件很有用。
   - **关键规则**:
     1.  **使用语义块**: `REPLACE` 操作需要同时包含 `[OLD]` 和 `[NEW]` 块。`DELETE` 操作只需要 `[OLD]` 块。
     2.  **正确的语法**: 所有标签（例如 `[START-REPLACE]`, `[OLD]`）都必须独占一行。
+    3.  **覆盖**: 要覆盖文件，只需提供内容而不使用任何编辑块。
 
   - **操作示例**:
     - **替换**: `[START-REPLACE]`
@@ -193,8 +200,9 @@ $readFileDescription
       ...要被删除的内容...
       [/OLD]
       [END-DELETE]
+    - **覆盖**: 直接提供完整的文件内容而不使用任何块（将替换整个文件）
 
-  - **参数**: path (文件路径), content (包含所有编辑块的字符串)
+  - **参数**: path (文件路径), content (包含所有编辑块的字符串，或用于覆盖模式的完整文件内容)
 - delete_file: 删除文件或目录。参数：path（目标路径），recursive（布尔值，默认false）
 - file_exists: 检查文件或目录是否存在。参数：path（目标路径）
 - move_file: 移动或重命名文件或目录。参数：source（源路径），destination（目标路径）

@@ -235,6 +235,15 @@ private sealed class DrawInstruction {
 }
 
 /**
+ * 布局计算结果 - 包含高度、实际使用的宽度和绘制指令
+ */
+private data class LayoutResult(
+    val height: Float,
+    val actualWidth: Float,  // 实际使用的最大宽度
+    val instructions: List<DrawInstruction>
+)
+
+/**
  * Canvas 版本的 Markdown 节点渲染器
  * 
  * 优化策略：
@@ -253,7 +262,9 @@ fun CanvasMarkdownNodeRenderer(
     modifier: Modifier = Modifier,
     onLinkClick: ((String) -> Unit)? = null,
     index: Int,
-    xmlRenderer: XmlContentRenderer
+    xmlRenderer: XmlContentRenderer,
+    fillMaxWidth: Boolean = true,
+    isLastNode: Boolean = false
 ) {
     
     val density = LocalDensity.current
@@ -296,7 +307,9 @@ fun CanvasMarkdownNodeRenderer(
         modifier = modifier,
         onLinkClick = currentOnLinkClick.value,
         xmlRenderer = currentXmlRenderer.value,
-        index = index
+        index = index,
+        fillMaxWidth = fillMaxWidth,
+        isLastNode = isLastNode
     )
 }
 
@@ -321,7 +334,9 @@ private fun renderNodeContent(
     modifier: Modifier,
     onLinkClick: ((String) -> Unit)?,
     xmlRenderer: XmlContentRenderer,
-    index: Int
+    index: Int,
+    fillMaxWidth: Boolean,
+    isLastNode: Boolean = false
 ) {
     // 【关键优化】只要节点内容不变，就记住原始节点实例，防止不必要的重组
     val stableNode = remember(content) { node }
@@ -344,7 +359,9 @@ private fun renderNodeContent(
                 titleSmallSize = fontSizes.titleSmall,
                 density = density,
                 modifier = modifier,
-                onLinkClick = onLinkClick
+                onLinkClick = onLinkClick,
+                fillMaxWidth = fillMaxWidth,
+                isLastNode = isLastNode
             )
         }
         
@@ -554,7 +571,9 @@ private fun UnifiedCanvasRenderer(
     titleSmallSize: TextUnit,
     density: Density,
     modifier: Modifier = Modifier,
-    onLinkClick: ((String) -> Unit)?
+    onLinkClick: ((String) -> Unit)?,
+    fillMaxWidth: Boolean = true,
+    isLastNode: Boolean = false
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
@@ -578,7 +597,7 @@ private fun UnifiedCanvasRenderer(
         val contentLength = node.content.length
         
         // 计算布局和绘制指令
-        val (totalHeight, drawInstructions) = remember(contentLength, textColor, availableWidthPx, node.type, normalTypeface, boldTypeface) {
+        val layoutResult = remember(contentLength, textColor, availableWidthPx, node.type, normalTypeface, boldTypeface, isLastNode) {
             calculateLayout(
                 node = node,
                 textColor = textColor,
@@ -593,16 +612,25 @@ private fun UnifiedCanvasRenderer(
                 normalTypeface = normalTypeface,
                 boldTypeface = boldTypeface,
                 density = density,
-                availableWidthPx = availableWidthPx
+                availableWidthPx = availableWidthPx,
+                isLastNode = isLastNode
             )
         }
         
         // 使用单个 Canvas 绘制所有内容
         Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(with(density) { totalHeight.toDp() })
-                .pointerInput(drawInstructions, onLinkClick) {
+            modifier = (if (fillMaxWidth) {
+                Modifier.fillMaxWidth()
+            } else {
+                // bubble模式：使用实际宽度，如果宽度为0则wrapContent
+                if (layoutResult.actualWidth > 0f) {
+                    Modifier.width(with(density) { layoutResult.actualWidth.toDp() })
+                } else {
+                    Modifier
+                }
+            })
+                .height(with(density) { layoutResult.height.toDp() })
+                .pointerInput(layoutResult.instructions, onLinkClick) {
                     // 使用 awaitEachGesture 来精确控制事件消费
                     awaitEachGesture {
                         val down = awaitPointerEvent(PointerEventPass.Initial).changes.first()
@@ -621,7 +649,7 @@ private fun UnifiedCanvasRenderer(
                         if (isTap) {
                             // 检查是否点击到了链接
                             var clickedLink = false
-                            drawInstructions.forEach { instruction ->
+                            layoutResult.instructions.forEach { instruction ->
                                 if (instruction is DrawInstruction.TextLayout) {
                                     val layout = instruction.layout
                                     val text = instruction.text
@@ -663,7 +691,7 @@ private fun UnifiedCanvasRenderer(
                 canvas.nativeCanvas.getClipBounds(clipBounds)
                 
                 // 只绘制在可见区域内的指令
-                drawInstructions.forEach { instruction ->
+                layoutResult.instructions.forEach { instruction ->
                     when (instruction) {
                         is DrawInstruction.Text -> {
                             // 判断文本是否在可见区域内
@@ -714,6 +742,28 @@ private fun UnifiedCanvasRenderer(
 }
 
 /**
+ * 计算 StaticLayout 的实际使用宽度（取所有行的最大宽度）
+ * @param layout 要计算的 StaticLayout
+ * @param offsetX 水平偏移量（用于列表项等有缩进的情况）
+ * @param availableWidthPx 最大可用宽度，用于提前终止遍历
+ * @return 实际使用的最大宽度
+ */
+private inline fun calculateActualWidth(
+    layout: StaticLayout,
+    offsetX: Float = 0f,
+    availableWidthPx: Int
+): Float {
+    var maxWidth = 0f
+    for (line in 0 until layout.lineCount) {
+        val lineWidth = offsetX + layout.getLineWidth(line)
+        maxWidth = maxOf(maxWidth, lineWidth)
+        // 如果某行已达到最大可用宽度，无需继续遍历
+        if (lineWidth >= availableWidthPx) break
+    }
+    return maxWidth
+}
+
+/**
  * 计算布局和生成绘制指令
  */
 private fun calculateLayout(
@@ -730,11 +780,13 @@ private fun calculateLayout(
     normalTypeface: Typeface,
     boldTypeface: Typeface,
     density: Density,
-    availableWidthPx: Int
-): Pair<Float, List<DrawInstruction>> {
+    availableWidthPx: Int,
+    isLastNode: Boolean = false
+): LayoutResult {
     val content = node.content
     val instructions = mutableListOf<DrawInstruction>()
     var currentY = 0f
+    var maxWidth = 0f  // 追踪实际使用的最大宽度
     
     when (node.type) {
         MarkdownProcessorType.HEADER -> {
@@ -792,8 +844,12 @@ private fun calculateLayout(
             
             instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY, layout.text))
             currentY += layout.height
+            maxWidth = maxOf(maxWidth, calculateActualWidth(layout, 0f, availableWidthPx))
             
-            currentY += bottomPaddingPx
+            // 最后一个节点不添加底部间距
+            if (!isLastNode) {
+                currentY += bottomPaddingPx
+            }
         }
         
         MarkdownProcessorType.ORDERED_LIST -> {
@@ -844,9 +900,12 @@ private fun calculateLayout(
 
             instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY, layout.text))
             currentY += layout.height
+            maxWidth = maxOf(maxWidth, calculateActualWidth(layout, contentX, availableWidthPx))
             
-            // 列表项底部间距
-            currentY += 2f * density.density
+            // 最后一个节点不添加底部间距
+            if (!isLastNode) {
+                currentY += 2f * density.density
+            }
         }
         
         MarkdownProcessorType.UNORDERED_LIST -> {
@@ -895,13 +954,16 @@ private fun calculateLayout(
             }
             instructions.add(DrawInstruction.TextLayout(layout, contentX, currentY, layout.text))
             currentY += layout.height
+            maxWidth = maxOf(maxWidth, calculateActualWidth(layout, contentX, availableWidthPx))
             
-            // 列表项底部间距
-            currentY += 2f * density.density
+            // 最后一个节点不添加底部间距
+            if (!isLastNode) {
+                currentY += 2f * density.density
+            }
         }
         
         MarkdownProcessorType.PLAIN_TEXT -> {
-            if (content.trimAll().isEmpty()) return Pair(0f, emptyList())
+            if (content.trimAll().isEmpty()) return LayoutResult(0f, 0f, emptyList())
             
             val textSizePx = with(density) { bodyMediumSize.toPx() }
             val textPaint = PaintCache.getTextPaint(textColor, textSizePx, normalTypeface)
@@ -921,9 +983,12 @@ private fun calculateLayout(
 
             instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY, layout.text))
             currentY += layout.height
+            maxWidth = maxOf(maxWidth, calculateActualWidth(layout, 0f, availableWidthPx))
             
-            // 段落底部间距
-            currentY += 6f * density.density
+            // 最后一个节点不添加底部间距
+            if (!isLastNode) {
+                currentY += 6f * density.density
+            }
         }
         
         else -> {
@@ -931,7 +996,7 @@ private fun calculateLayout(
         }
     }
     
-    return Pair(currentY, instructions)
+    return LayoutResult(currentY, maxWidth, instructions)
 }
 
 

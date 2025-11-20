@@ -565,10 +565,9 @@ class ChatHistoryManager private constructor(private val context: Context) {
             // 如果要继承分组，尝试从指定的对话获取分组
             inheritGroupFromChatId != null -> {
                 chatDao.getChatById(inheritGroupFromChatId)?.group
-                    ?: localizedContext.getString(R.string.ungrouped)
             }
-            // 默认使用未分组
-            else -> localizedContext.getString(R.string.ungrouped)
+            // 默认为空分组（不分组）
+            else -> null
         }
         
         val newHistory =

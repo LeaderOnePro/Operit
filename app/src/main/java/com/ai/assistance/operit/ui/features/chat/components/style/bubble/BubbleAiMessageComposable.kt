@@ -190,7 +190,8 @@ fun BubbleAiMessageComposable(
                             onLinkClick = rememberedOnLinkClick,
                             xmlRenderer = xmlRenderer,
                             modifier = Modifier.padding(12.dp),
-                            state = rendererState
+                            state = rendererState,
+                            fillMaxWidth = false  // bubble模式：横向缩紧
                         )
                     } else {
                         // 对于已完成的静态消息，使用 content 参数的渲染器以支持Markdown
@@ -202,7 +203,8 @@ fun BubbleAiMessageComposable(
                             onLinkClick = rememberedOnLinkClick,
                             xmlRenderer = xmlRenderer,
                             modifier = Modifier.padding(12.dp),
-                            state = rendererState
+                            state = rendererState,
+                            fillMaxWidth = false  // bubble模式：横向缩紧
                         )
                     }
                 }

@@ -184,7 +184,8 @@ fun StreamMarkdownRenderer(
         backgroundColor: Color = MaterialTheme.colorScheme.surface,
         onLinkClick: ((String) -> Unit)? = null,
         xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() },
-        state: StreamMarkdownRendererState? = null
+        state: StreamMarkdownRendererState? = null,
+        fillMaxWidth: Boolean = true
 ) {
     // 使用传入的state或创建新的state
     val rendererState = state ?: remember { StreamMarkdownRendererState() }
@@ -391,7 +392,8 @@ fun StreamMarkdownRenderer(
                 textColor = textColor,
                 onLinkClick = onLinkClick,
                 xmlRenderer = xmlRenderer,
-                modifier = Modifier.fillMaxWidth()
+                modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
+                fillMaxWidth = fillMaxWidth
             )
         }
     }
@@ -420,7 +422,8 @@ fun StreamMarkdownRenderer(
         backgroundColor: Color = MaterialTheme.colorScheme.surface,
         onLinkClick: ((String) -> Unit)? = null,
         xmlRenderer: XmlContentRenderer = remember { DefaultXmlRenderer() },
-        state: StreamMarkdownRendererState? = null
+        state: StreamMarkdownRendererState? = null,
+        fillMaxWidth: Boolean = true
 ) {
     // 使用传入的state或创建新的state
     val rendererState = state ?: remember(content) { StreamMarkdownRendererState() }
@@ -643,7 +646,8 @@ fun StreamMarkdownRenderer(
                 textColor = textColor,
                 onLinkClick = onLinkClick,
                 xmlRenderer = xmlRenderer,
-                modifier = Modifier.fillMaxWidth()
+                modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
+                fillMaxWidth = fillMaxWidth
             )
         }
     }
@@ -675,7 +679,9 @@ private fun AnimatedNode(
     isVisible: Boolean,
     textColor: Color,
     onLinkClick: ((String) -> Unit)?,
-    xmlRenderer: XmlContentRenderer
+    xmlRenderer: XmlContentRenderer,
+    fillMaxWidth: Boolean,
+    isLastNode: Boolean = false
 ) {
     // alpha 动画状态在这里，变化只影响这个 Composable 的作用域
     val alpha by animateFloatAsState(
@@ -696,7 +702,9 @@ private fun AnimatedNode(
             modifier = Modifier,
             onLinkClick = onLinkClick,
             index = index,
-            xmlRenderer = xmlRenderer
+            xmlRenderer = xmlRenderer,
+            fillMaxWidth = fillMaxWidth,
+            isLastNode = isLastNode
         )
     }
 }
@@ -709,7 +717,8 @@ private fun UnifiedMarkdownCanvas(
     textColor: Color,
     onLinkClick: ((String) -> Unit)?,
     xmlRenderer: XmlContentRenderer,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fillMaxWidth: Boolean = true
 ) {
     
     val density = LocalDensity.current
@@ -746,7 +755,9 @@ private fun UnifiedMarkdownCanvas(
                     isVisible = nodeAnimationStates[nodeKey] ?: true,
                     textColor = textColor,
                     onLinkClick = onLinkClick,
-                    xmlRenderer = xmlRenderer
+                    xmlRenderer = xmlRenderer,
+                    fillMaxWidth = fillMaxWidth,
+                    isLastNode = index == nodes.lastIndex  // 判断是否是最后一个节点
                 )
             }
         }
