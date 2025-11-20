@@ -2521,6 +2521,8 @@
     <string name="default_config_model_restriction">使用默认配置时，只能使用deepseek-chat模型</string>
     <string name="enable_direct_image_processing">启用直接图片处理</string>
     <string name="enable_direct_image_processing_desc">启用后，图片将直接发送给AI处理，而不是让AI通过OCR工具读取</string>
+    <string name="enable_google_search">启用 Google Search</string>
+    <string name="enable_google_search_desc">启用后，Gemini 将使用 Google 搜索来增强回答（可能产生额外费用）</string>
     <string name="api_settings_saved">API设置已保存</string>
     <string name="save_api_settings">保存API设置</string>
     <string name="available_models_list">可用模型列表</string>

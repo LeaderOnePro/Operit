@@ -108,6 +108,9 @@ fun ModelApiSettingsSection(
     
     // 图片处理配置状态
     var enableDirectImageProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectImageProcessing) }
+    
+    // Google Search Grounding 配置状态 (仅Gemini)
+    var enableGoogleSearchInput by remember(config.id) { mutableStateOf(config.enableGoogleSearch) }
 
     // 保存设置的通用函数
     val saveSettings = {
@@ -135,6 +138,12 @@ fun ModelApiSettingsSection(
             configManager.updateDirectImageProcessing(
                     configId = config.id,
                     enableDirectImageProcessing = enableDirectImageProcessingInput
+            )
+            
+            // 更新 Google Search Grounding 配置 (仅Gemini)
+            configManager.updateGoogleSearch(
+                    configId = config.id,
+                    enableGoogleSearch = enableGoogleSearchInput
             )
 
             // 刷新所有AI服务实例，确保使用最新配置
@@ -474,6 +483,16 @@ fun ModelApiSettingsSection(
                         subtitle = stringResource(R.string.enable_direct_image_processing_desc),
                             checked = enableDirectImageProcessingInput,
                             onCheckedChange = { enableDirectImageProcessingInput = it }
+                    )
+            }
+            
+            // Google Search Grounding 开关 (仅Gemini支持)
+            if (selectedApiProvider == ApiProviderType.GOOGLE) {
+                SettingsSwitchRow(
+                        title = stringResource(R.string.enable_google_search),
+                        subtitle = stringResource(R.string.enable_google_search_desc),
+                            checked = enableGoogleSearchInput,
+                            onCheckedChange = { enableGoogleSearchInput = it }
                     )
             }
 

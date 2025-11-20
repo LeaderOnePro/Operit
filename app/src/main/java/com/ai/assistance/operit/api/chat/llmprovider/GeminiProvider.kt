@@ -30,7 +30,8 @@ class GeminiProvider(
     private val modelName: String,
     private val client: OkHttpClient,
     private val customHeaders: Map<String, String> = emptyMap(),
-    private val providerType: ApiProviderType = ApiProviderType.GOOGLE
+    private val providerType: ApiProviderType = ApiProviderType.GOOGLE,
+    private val enableGoogleSearch: Boolean = false
 ) : AIService {
     companion object {
         private const val TAG = "GeminiProvider"
@@ -445,6 +446,17 @@ class GeminiProvider(
             json.put("systemInstruction", systemInstruction)
         }
         json.put("contents", contentsArray)
+
+        // 添加 Google Search grounding 工具（如果启用）
+        if (enableGoogleSearch) {
+            val tools = JSONArray()
+            val googleSearchTool = JSONObject().apply {
+                put("googleSearch", JSONObject())
+            }
+            tools.put(googleSearchTool)
+            json.put("tools", tools)
+            logDebug("已启用 Google Search Grounding")
+        }
 
         // 添加生成配置
         val generationConfig = JSONObject()

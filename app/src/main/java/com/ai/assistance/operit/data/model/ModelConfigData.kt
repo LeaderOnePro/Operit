@@ -94,7 +94,10 @@ data class ModelConfigData(
         val mnnThreadCount: Int = 4, // 推理线程数
 
         // 图片处理配置
-        val enableDirectImageProcessing: Boolean = false // 是否启用直接图片处理
+        val enableDirectImageProcessing: Boolean = false, // 是否启用直接图片处理
+
+        // Gemini特定配置
+        val enableGoogleSearch: Boolean = false // 是否启用Google Search Grounding (仅Gemini支持)
 )
 
 /** 简化版的模型配置数据，用于列表显示 */
