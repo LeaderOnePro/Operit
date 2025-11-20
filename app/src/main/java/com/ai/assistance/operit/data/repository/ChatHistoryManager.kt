@@ -296,13 +296,20 @@ class ChatHistoryManager private constructor(private val context: Context) {
      * 重命名分组
      * @param oldName 旧的分组名称
      * @param newName 新的分组名称
+     * @param characterCardName 角色卡名称，如果为null则更新所有同名分组
      */
-    suspend fun updateGroupName(oldName: String, newName: String) {
+    suspend fun updateGroupName(oldName: String, newName: String, characterCardName: String?) {
         mutex.withLock {
             try {
-                chatDao.updateGroupName(oldName, newName)
+                if (characterCardName != null) {
+                    // 只更新指定角色卡下的分组（使用 SQL 批量操作）
+                    chatDao.updateGroupNameForCharacter(oldName, newName, characterCardName)
+                } else {
+                    // 更新所有同名分组
+                    chatDao.updateGroupName(oldName, newName)
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to rename group from $oldName to $newName", e)
+                Log.e(TAG, "Failed to rename group from $oldName to $newName (character: $characterCardName)", e)
                 throw e
             }
         }
@@ -312,17 +319,28 @@ class ChatHistoryManager private constructor(private val context: Context) {
      * 删除分组
      * @param groupName 要删除的分组名称
      * @param deleteChats 是否同时删除分组下的聊天记录
+     * @param characterCardName 角色卡名称，如果为null则删除所有同名分组
      */
-    suspend fun deleteGroup(groupName: String, deleteChats: Boolean) {
+    suspend fun deleteGroup(groupName: String, deleteChats: Boolean, characterCardName: String?) {
         mutex.withLock {
             try {
-                if (deleteChats) {
-                    chatDao.deleteChatsInGroup(groupName)
+                if (characterCardName != null) {
+                    // 只删除指定角色卡下的分组（使用 SQL 批量操作）
+                    if (deleteChats) {
+                        chatDao.deleteChatsInGroupForCharacter(groupName, characterCardName)
+                    } else {
+                        chatDao.removeGroupFromChatsForCharacter(groupName, characterCardName)
+                    }
                 } else {
-                    chatDao.removeGroupFromChats(groupName)
+                    // 删除所有同名分组
+                    if (deleteChats) {
+                        chatDao.deleteChatsInGroup(groupName)
+                    } else {
+                        chatDao.removeGroupFromChats(groupName)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete group $groupName (deleteChats: $deleteChats)", e)
+                Log.e(TAG, "Failed to delete group $groupName (deleteChats: $deleteChats, character: $characterCardName)", e)
                 throw e
             }
         }

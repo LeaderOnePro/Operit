@@ -252,7 +252,7 @@ class ChatHistoryDelegate(
     }
 
     /** 创建新的聊天 */
-    fun createNewChat() {
+    fun createNewChat(characterCardName: String? = null) {
         coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize) // 使用获取到的完整统计数据
@@ -263,15 +263,18 @@ class ChatHistoryDelegate(
             // 获取当前活跃的角色卡
             val activeCard = characterCardManager.activeCharacterCardFlow.first()
             
-            // 创建新对话，如果有当前对话则继承其分组，并绑定当前活跃的角色卡
+            // 确定角色卡名称：如果参数指定了则使用参数，否则使用当前活跃的角色卡
+            val effectiveCharacterCardName = characterCardName ?: activeCard.name
+            
+            // 创建新对话，如果有当前对话则继承其分组，并绑定角色卡
             val newChat = chatHistoryManager.createNewChat(
                 inheritGroupFromChatId = currentChatId,
-                characterCardName = activeCard.name // 绑定当前活跃的角色卡名称
+                characterCardName = effectiveCharacterCardName
             )
             _currentChatId.value = newChat.id
             
-            // --- 新增：检查并添加开场白 ---
-            if (activeCard.openingStatement.isNotBlank()) {
+            // --- 新增：检查并添加开场白（只在使用活跃角色卡时添加） ---
+            if (characterCardName == null && activeCard.openingStatement.isNotBlank()) {
                 val openingMessage = ChatMessage(
                     sender = "ai",
                     content = activeCard.openingStatement,
@@ -628,26 +631,29 @@ class ChatHistoryDelegate(
     }
 
     /** 重命名分组 */
-    fun updateGroupName(oldName: String, newName: String) {
+    fun updateGroupName(oldName: String, newName: String, characterCardName: String?) {
         coroutineScope.launch {
-            chatHistoryManager.updateGroupName(oldName, newName)
+            chatHistoryManager.updateGroupName(oldName, newName, characterCardName)
         }
     }
 
     /** 删除分组 */
-    fun deleteGroup(groupName: String, deleteChats: Boolean) {
+    fun deleteGroup(groupName: String, deleteChats: Boolean, characterCardName: String?) {
         coroutineScope.launch {
-            chatHistoryManager.deleteGroup(groupName, deleteChats)
+            chatHistoryManager.deleteGroup(groupName, deleteChats, characterCardName)
         }
     }
 
     /** 创建新分组（通过创建新聊天实现） */
-    fun createGroup(groupName: String) {
+    fun createGroup(groupName: String, characterCardName: String?) {
         coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
             saveCurrentChat(inputTokens, outputTokens, windowSize)
 
-            val newChat = chatHistoryManager.createNewChat(group = groupName)
+            val newChat = chatHistoryManager.createNewChat(
+                group = groupName,
+                characterCardName = characterCardName
+            )
             _currentChatId.value = newChat.id
             _chatHistory.value = newChat.messages
 

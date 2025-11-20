@@ -558,8 +558,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     // 聊天历史相关方法
-    fun createNewChat() {
-        chatHistoryDelegate.createNewChat()
+    fun createNewChat(characterCardName: String? = null) {
+        chatHistoryDelegate.createNewChat(characterCardName)
     }
 
     fun switchChat(chatId: String) {
@@ -1455,18 +1455,18 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     /** 创建新分组（通过创建新聊天实现） */
-    fun createGroup(groupName: String) {
-        chatHistoryDelegate.createGroup(groupName)
+    fun createGroup(groupName: String, characterCardName: String?) {
+        chatHistoryDelegate.createGroup(groupName, characterCardName)
     }
 
     /** 重命名分组 */
-    fun updateGroupName(oldName: String, newName: String) {
-        chatHistoryDelegate.updateGroupName(oldName, newName)
+    fun updateGroupName(oldName: String, newName: String, characterCardName: String?) {
+        chatHistoryDelegate.updateGroupName(oldName, newName, characterCardName)
     }
 
     /** 删除分组 */
-    fun deleteGroup(groupName: String, deleteChats: Boolean) {
-        chatHistoryDelegate.deleteGroup(groupName, deleteChats)
+    fun deleteGroup(groupName: String, deleteChats: Boolean, characterCardName: String?) {
+        chatHistoryDelegate.deleteGroup(groupName, deleteChats, characterCardName)
     }
 
     fun onWorkspaceButtonClick() {

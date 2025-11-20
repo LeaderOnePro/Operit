@@ -104,9 +104,19 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
+private data class GroupTarget(
+    val groupName: String,
+    val characterCardName: String?
+)
+
 private sealed interface HistoryListItem {
     data class CharacterHeader(val key: String, val name: String) : HistoryListItem
-    data class Header(val key: String, val name: String, val groupValue: String?) : HistoryListItem
+    data class Header(
+        val key: String, 
+        val name: String, 
+        val groupValue: String?,
+        val characterCardName: String? = null
+    ) : HistoryListItem
     data class Item(val history: ChatHistory) : HistoryListItem
 }
 
@@ -117,15 +127,15 @@ private sealed interface HistoryListItem {
 @Composable
 fun ChatHistorySelector(
         modifier: Modifier = Modifier,
-        onNewChat: () -> Unit,
+        onNewChat: (characterCardName: String?) -> Unit,
         onSelectChat: (String) -> Unit,
         onDeleteChat: (String) -> Unit,
         onUpdateChatTitle: (chatId: String, newTitle: String) -> Unit,
         onUpdateChatBinding: (chatId: String, characterCardName: String?) -> Unit,
-        onCreateGroup: (groupName: String) -> Unit,
+        onCreateGroup: (groupName: String, characterCardName: String?) -> Unit,
     onUpdateChatOrderAndGroup: (reorderedHistories: List<ChatHistory>, movedItem: ChatHistory, targetGroup: String?) -> Unit,
-    onUpdateGroupName: (oldName: String, newName: String) -> Unit,
-    onDeleteGroup: (groupName: String, deleteChats: Boolean) -> Unit,
+    onUpdateGroupName: (oldName: String, newName: String, characterCardName: String?) -> Unit,
+    onDeleteGroup: (groupName: String, deleteChats: Boolean, characterCardName: String?) -> Unit,
         chatHistories: List<ChatHistory>,
         currentId: String?,
         lazyListState: LazyListState? = null,
@@ -135,7 +145,8 @@ fun ChatHistorySelector(
         historyDisplayMode: ChatHistoryDisplayMode,
         onDisplayModeChange: (ChatHistoryDisplayMode) -> Unit,
         autoSwitchCharacterCard: Boolean,
-        onAutoSwitchCharacterCardChange: (Boolean) -> Unit
+        onAutoSwitchCharacterCardChange: (Boolean) -> Unit,
+        activeCharacterCard: CharacterCard? = null
 ) {
     var chatToEdit by remember { mutableStateOf<ChatHistory?>(null) }
     var showNewGroupDialog by remember { mutableStateOf(false) }
@@ -143,9 +154,9 @@ fun ChatHistorySelector(
     var collapsedGroups by rememberLocal("chat_history_collapsed_groups", emptySet<String>())
     var collapsedCharacters by rememberLocal("chat_history_collapsed_characters", emptySet<String>())
 
-    var groupActionTarget by remember { mutableStateOf<String?>(null) }
-    var groupToRename by remember { mutableStateOf<String?>(null) }
-    var groupToDelete by remember { mutableStateOf<String?>(null) }
+    var groupActionTarget by remember { mutableStateOf<GroupTarget?>(null) }
+    var groupToRename by remember { mutableStateOf<GroupTarget?>(null) }
+    var groupToDelete by remember { mutableStateOf<GroupTarget?>(null) }
     var hasLongPressedGroup by rememberLocal("has_long_pressed_group", defaultValue = false)
     
     // 搜索相关状态
@@ -212,7 +223,8 @@ fun ChatHistorySelector(
                     collapsedCharacters,
                     ungroupedText,
                     unboundCharacterText,
-                    historyDisplayMode
+                    historyDisplayMode,
+                    activeCharacterCard
             ) {
                 fun characterKey(name: String) = "character::$name"
                 fun groupKey(characterName: String?, groupValue: String?): String {
@@ -240,7 +252,9 @@ fun ChatHistorySelector(
                                                             HistoryListItem.Header(
                                                                     key = gKey,
                                                                     name = displayName,
-                                                                    groupValue = groupValue
+                                                                    groupValue = groupValue,
+                                                                    // 未绑定角色卡使用 null 而不是字符串
+                                                                    characterCardName = if (characterName == unboundCharacterText) null else characterName
                                                             )
                                                     val items =
                                                             if (collapsedGroups.contains(gKey)) {
@@ -262,11 +276,18 @@ fun ChatHistorySelector(
                             .flatMap { (groupValue, histories) ->
                                 val displayName = groupValue ?: ungroupedText
                                 val gKey = groupKey(null, groupValue)
+                                // 在仅显示当前角色卡模式下，使用当前角色卡名称
+                                val effectiveCharacterCardName = if (historyDisplayMode == ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY) {
+                                    activeCharacterCard?.name
+                                } else {
+                                    null
+                                }
                                 val header =
                                         HistoryListItem.Header(
                                                 key = gKey,
                                                 name = displayName,
-                                                groupValue = groupValue
+                                                groupValue = groupValue,
+                                                characterCardName = effectiveCharacterCardName
                                         )
                                 val items =
                                         if (collapsedGroups.contains(gKey)) {
@@ -359,7 +380,7 @@ fun ChatHistorySelector(
                     )
 
                     Text(
-                        text = groupActionTarget!!,
+                        text = groupActionTarget!!.groupName,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
@@ -447,7 +468,7 @@ fun ChatHistorySelector(
     }
 
     if (groupToRename != null) {
-        var newGroupNameText by remember(groupToRename) { mutableStateOf(groupToRename!!) }
+        var newGroupNameText by remember(groupToRename) { mutableStateOf(groupToRename!!.groupName) }
         AlertDialog(
             onDismissRequest = { groupToRename = null },
             title = { Text(stringResource(R.string.rename_group)) },
@@ -462,8 +483,12 @@ fun ChatHistorySelector(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (newGroupNameText.isNotBlank() && newGroupNameText != groupToRename) {
-                            onUpdateGroupName(groupToRename!!, newGroupNameText)
+                        if (newGroupNameText.isNotBlank() && newGroupNameText != groupToRename!!.groupName) {
+                            onUpdateGroupName(
+                                groupToRename!!.groupName, 
+                                newGroupNameText,
+                                groupToRename!!.characterCardName
+                            )
                         }
                         groupToRename = null
                     }
@@ -509,7 +534,7 @@ fun ChatHistorySelector(
                     )
 
                     Text(
-                        text = groupToDelete!!,
+                        text = groupToDelete!!.groupName,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -528,7 +553,11 @@ fun ChatHistorySelector(
 
                     TextButton(
                         onClick = {
-                            onDeleteGroup(groupToDelete!!, true)
+                            onDeleteGroup(
+                                groupToDelete!!.groupName, 
+                                true,
+                                groupToDelete!!.characterCardName
+                            )
                             groupToDelete = null
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -564,7 +593,11 @@ fun ChatHistorySelector(
 
                     TextButton(
                         onClick = {
-                            onDeleteGroup(groupToDelete!!, false)
+                            onDeleteGroup(
+                                groupToDelete!!.groupName, 
+                                false,
+                                groupToDelete!!.characterCardName
+                            )
                             groupToDelete = null
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -874,7 +907,13 @@ fun ChatHistorySelector(
                     Button(
                             onClick = {
                                 if (newGroupName.isNotBlank()) {
-                                    onCreateGroup(newGroupName)
+                                    // 根据当前显示模式确定新分组的角色卡归属
+                                    val characterCardName = when (historyDisplayMode) {
+                                        ChatHistoryDisplayMode.BY_CHARACTER_CARD -> activeCharacterCard?.name // 按角色卡分类时绑定到当前角色卡
+                                        ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY -> activeCharacterCard?.name
+                                        else -> null // 按文件夹分类时不绑定
+                                    }
+                                    onCreateGroup(newGroupName, characterCardName)
                                     newGroupName = ""
                                     showNewGroupDialog = false
                                 }
@@ -959,7 +998,15 @@ fun ChatHistorySelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
-                onClick = { onNewChat() },
+                onClick = { 
+                    // 根据当前显示模式确定新对话的角色卡归属
+                    val characterCardName = when (historyDisplayMode) {
+                        ChatHistoryDisplayMode.BY_CHARACTER_CARD -> activeCharacterCard?.name
+                        ChatHistoryDisplayMode.CURRENT_CHARACTER_ONLY -> activeCharacterCard?.name
+                        else -> null
+                    }
+                    onNewChat(characterCardName)
+                },
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.new_chat))
@@ -1191,7 +1238,10 @@ fun ChatHistorySelector(
                                             },
                                             onLongPress = {
                                                 if (item.name != ungroupedText) {
-                                                    groupActionTarget = item.name
+                                                    groupActionTarget = GroupTarget(
+                                                        groupName = item.name,
+                                                        characterCardName = item.characterCardName
+                                                    )
                                                     hasLongPressedGroup = true
                                                 }
                                             }

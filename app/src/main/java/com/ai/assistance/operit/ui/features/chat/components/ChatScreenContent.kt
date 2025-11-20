@@ -151,6 +151,11 @@ fun ChatScreenContent(
         false
     )
     
+    // 同步 autoSwitchCharacterCard 到 ViewModel（ViewModel 内部逻辑需要这个值）
+    LaunchedEffect(autoSwitchCharacterCard) {
+        actualViewModel.setAutoSwitchCharacterCard(autoSwitchCharacterCard)
+    }
+    
     val currentChat = chatHistories.find { it.id == currentChatId }
 
     // 导出相关状态
@@ -827,8 +832,8 @@ fun ChatHistorySelectorPanel(
             // 直接使用ChatHistorySelector
             ChatHistorySelector(
                     modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-                    onNewChat = {
-                        actualViewModel.createNewChat()
+                    onNewChat = { characterCardName ->
+                        actualViewModel.createNewChat(characterCardName)
                         // 创建新对话后自动收起侧边框
                         actualViewModel.showChatHistorySelector(false)
                     },
@@ -844,7 +849,9 @@ fun ChatHistorySelectorPanel(
                     onUpdateChatBinding = { chatId, characterCardName ->
                         actualViewModel.updateChatCharacterCardBinding(chatId, characterCardName)
                     },
-                    onCreateGroup = { groupName -> actualViewModel.createGroup(groupName) },
+                    onCreateGroup = { groupName, characterCardName -> 
+                        actualViewModel.createGroup(groupName, characterCardName)
+                    },
                     onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
                         actualViewModel.updateChatOrderAndGroup(
                                 reorderedHistories,
@@ -852,11 +859,11 @@ fun ChatHistorySelectorPanel(
                                 targetGroup
                         )
                     },
-                    onUpdateGroupName = { oldName, newName ->
-                        actualViewModel.updateGroupName(oldName, newName)
+                    onUpdateGroupName = { oldName, newName, characterCardName ->
+                        actualViewModel.updateGroupName(oldName, newName, characterCardName)
                     },
-                    onDeleteGroup = { groupName, deleteChats ->
-                        actualViewModel.deleteGroup(groupName, deleteChats)
+                    onDeleteGroup = { groupName, deleteChats, characterCardName ->
+                        actualViewModel.deleteGroup(groupName, deleteChats, characterCardName)
                     },
                     chatHistories = chatHistories,
                     currentId = currentChatId,
@@ -867,7 +874,8 @@ fun ChatHistorySelectorPanel(
                     historyDisplayMode = historyDisplayMode,
                     onDisplayModeChange = onDisplayModeChange,
                     autoSwitchCharacterCard = autoSwitchCharacterCard,
-                    onAutoSwitchCharacterCardChange = onAutoSwitchCharacterCardChange
+                    onAutoSwitchCharacterCardChange = onAutoSwitchCharacterCardChange,
+                    activeCharacterCard = activeCharacterCard
             )
         }
     }

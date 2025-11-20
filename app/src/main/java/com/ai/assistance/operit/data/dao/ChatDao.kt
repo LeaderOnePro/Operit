@@ -70,14 +70,26 @@ interface ChatDao {
     /** 重命名分组 */
     @Query("UPDATE chats SET `group` = :newName WHERE `group` = :oldName")
     suspend fun updateGroupName(oldName: String, newName: String)
+    
+    /** 重命名指定角色卡下的分组 */
+    @Query("UPDATE chats SET `group` = :newName WHERE `group` = :oldName AND characterCardName = :characterCardName")
+    suspend fun updateGroupNameForCharacter(oldName: String, newName: String, characterCardName: String)
 
     /** 删除分组下的所有聊天 */
     @Query("DELETE FROM chats WHERE `group` = :groupName")
     suspend fun deleteChatsInGroup(groupName: String)
+    
+    /** 删除指定角色卡下分组的所有聊天 */
+    @Query("DELETE FROM chats WHERE `group` = :groupName AND characterCardName = :characterCardName")
+    suspend fun deleteChatsInGroupForCharacter(groupName: String, characterCardName: String)
 
     /** 将分组下的所有聊天移动到"未分组" */
     @Query("UPDATE chats SET `group` = NULL, updatedAt = :timestamp WHERE `group` = :groupName")
     suspend fun removeGroupFromChats(groupName: String, timestamp: Long = System.currentTimeMillis())
+    
+    /** 将指定角色卡下分组的所有聊天移动到"未分组" */
+    @Query("UPDATE chats SET `group` = NULL, updatedAt = :timestamp WHERE `group` = :groupName AND characterCardName = :characterCardName")
+    suspend fun removeGroupFromChatsForCharacter(groupName: String, characterCardName: String, timestamp: Long = System.currentTimeMillis())
 
     /** 根据parentChatId获取所有分支对话 */
     @Query("SELECT * FROM chats WHERE parentChatId = :parentChatId ORDER BY displayOrder ASC")
