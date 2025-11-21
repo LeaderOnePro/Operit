@@ -137,7 +137,7 @@ fun ChatHistorySettingsScreen() {
                     isLoading = isCharacterCardStatsLoading || characterCardsLoading,
                     onAssignMissing = { stat ->
                         if (availableCharacterCards.isEmpty()) {
-                            Toast.makeText(context, "暂无可用角色卡，请先创建一个角色卡", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.no_available_character_cards_toast), Toast.LENGTH_SHORT).show()
                             return@CharacterCardStatsCard
                         }
                         pendingAssignStat = stat
@@ -152,7 +152,7 @@ fun ChatHistorySettingsScreen() {
                     characterCards = availableCharacterCards,
                     onApply = { selectedIds, targetCharacterName, targetGroupName, shouldUnbindCharacterCard ->
                         if (selectedIds.isEmpty()) {
-                            Toast.makeText(context, "请先选择聊天记录", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.please_select_chats_first), Toast.LENGTH_SHORT).show()
                             return@ChatHistoryBatchSelectorCard false
                         }
                         try {
@@ -193,7 +193,7 @@ fun ChatHistorySettingsScreen() {
                         } catch (e: Exception) {
                             Toast.makeText(
                                 context,
-                                "批量更新失败：${e.localizedMessage ?: e}",
+                                context.getString(R.string.batch_update_failed, e.localizedMessage ?: e.toString()),
                                 Toast.LENGTH_LONG
                             ).show()
                             false
@@ -219,7 +219,7 @@ fun ChatHistorySettingsScreen() {
                 ) {
                     CircularProgressIndicator()
                     Text(
-                        text = "正在加载数据，请稍候…",
+                        text = context.getString(R.string.loading_data_please_wait),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -250,13 +250,13 @@ fun ChatHistorySettingsScreen() {
                 }
 
                 if (stat == null) {
-                    Toast.makeText(context, "未找到需要归类的聊天统计", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.no_chat_stats_to_assign), Toast.LENGTH_SHORT).show()
                     showAssignCharacterDialog = false
                     return@CharacterCardAssignDialog
                 }
 
                 if (targetCard == null) {
-                    Toast.makeText(context, "请选择一个角色卡", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.please_select_a_character_card), Toast.LENGTH_SHORT).show()
                     return@CharacterCardAssignDialog
                 }
 
@@ -269,7 +269,7 @@ fun ChatHistorySettingsScreen() {
                         )
                         Toast.makeText(
                             context,
-                            "已归类到角色卡「${targetCard.name}」",
+                            context.getString(R.string.assigned_to_character_card, targetCard.name),
                             Toast.LENGTH_SHORT
                         ).show()
                         showAssignCharacterDialog = false
@@ -278,7 +278,7 @@ fun ChatHistorySettingsScreen() {
                     } catch (e: Exception) {
                         Toast.makeText(
                             context,
-                            "归类失败：${e.localizedMessage ?: e}",
+                            context.getString(R.string.assign_failed_error, e.localizedMessage ?: e.toString()),
                             Toast.LENGTH_LONG
                         ).show()
                     } finally {
@@ -297,6 +297,7 @@ private fun ChatManagementOverviewCard(
     totalChatCount: Int,
     activeProfileName: String
 ) {
+    val context = LocalContext.current
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -304,11 +305,11 @@ private fun ChatManagementOverviewCard(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                    text = "聊天记录概览",
+                    text = context.getString(R.string.chat_history_overview),
                     style = MaterialTheme.typography.titleLarge
                 )
                 Text(
-                    text = "当前配置：$activeProfileName",
+                    text = context.getString(R.string.current_config_label, activeProfileName),
                 style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -316,7 +317,7 @@ private fun ChatManagementOverviewCard(
             StatChip(
                 icon = Icons.Default.History,
                 title = "$totalChatCount",
-                subtitle = "聊天记录"
+                subtitle = context.getString(R.string.chat_records_label)
             )
         }
     }
@@ -390,14 +391,14 @@ private fun CharacterCardStatsCard(
                 ) {
                     CircularProgressIndicator()
                     Text(
-                        text = "正在统计聊天数据…",
+                        text = context.getString(R.string.counting_chat_data),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else if (stats.isEmpty()) {
             Text(
-                    text = "暂无聊天数据可供统计。",
+                    text = context.getString(R.string.no_chat_data_available),
                 style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -439,6 +440,7 @@ private fun CharacterCardStatRow(
     userPreferencesManager: UserPreferencesManager,
     onAssignMissing: (() -> Unit)?
 ) {
+    val context = LocalContext.current
     val isMissing = stat.characterCardName.isNullOrBlank()
     val needsAttention = characterCard == null
     val iconBackground = if (needsAttention) {
@@ -514,18 +516,18 @@ private fun CharacterCardStatRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
                     Text(
-                text = stat.characterCardName ?: "未绑定角色卡",
+                text = stat.characterCardName ?: context.getString(R.string.unbound_character_card),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                text = "${stat.chatCount} 个对话 · ${stat.messageCount} 条消息",
+                text = context.getString(R.string.chats_and_messages_count, stat.chatCount, stat.messageCount),
                 style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (needsAttention && onAssignMissing != null) {
                 Text(
-                    text = "点击归类到现有角色卡",
+                    text = context.getString(R.string.click_to_assign_to_card),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -548,6 +550,7 @@ private fun ChatHistoryBatchSelectorCard(
     characterCards: List<CharacterCard>,
     onApply: suspend (selectedChatIds: List<String>, targetCharacterCardName: String?, targetGroupName: String?, shouldUnbindCharacterCard: Boolean) -> Boolean
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var selectedChatIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -620,14 +623,14 @@ private fun ChatHistoryBatchSelectorCard(
                 onValueChange = { searchQuery = it },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                placeholder = { Text("按标题、分组或角色卡搜索") },
-                label = { Text("筛选聊天记录") },
+                placeholder = { Text(context.getString(R.string.search_by_title_group_card)) },
+                label = { Text(context.getString(R.string.filter_chat_history)) },
                 modifier = Modifier.fillMaxWidth()
             )
 
             if (chatHistories.isEmpty()) {
                 Text(
-                    text = "暂无聊天记录，无法进行批量操作。",
+                    text = context.getString(R.string.no_chat_records_for_batch),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -636,7 +639,7 @@ private fun ChatHistoryBatchSelectorCard(
 
             if (filteredHistories.isEmpty()) {
                 Text(
-                    text = "没有匹配的聊天记录，请调整筛选条件。",
+                    text = context.getString(R.string.no_matching_chats_adjust_filter),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -659,13 +662,13 @@ private fun ChatHistoryBatchSelectorCard(
                             },
                             enabled = filteredHistories.isNotEmpty()
                         ) {
-                            Text("全选当前列表")
+                            Text(context.getString(R.string.select_all_current_list))
                         }
                         TextButton(
                             onClick = { selectedChatIds = emptySet() },
                             enabled = selectedChatIds.isNotEmpty()
                         ) {
-                            Text("清空选择")
+                            Text(context.getString(R.string.clear_selection))
                         }
                     }
                 }
@@ -702,7 +705,7 @@ private fun ChatHistoryBatchSelectorCard(
                     onExpandedChange = { dropdownExpanded = it }
                 ) {
                     val targetLabel = when {
-                        targetIsUnbind -> "移除角色卡绑定"
+                        targetIsUnbind -> context.getString(R.string.remove_character_card_binding)
                         !selectedTargetName.isNullOrBlank() -> selectedTargetName!!
                         else -> ""
                     }
@@ -710,8 +713,8 @@ private fun ChatHistoryBatchSelectorCard(
                         value = targetLabel,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("目标角色卡（可选）") },
-                        placeholder = { Text("请选择一个角色卡或取消绑定") },
+                        label = { Text(context.getString(R.string.target_character_card_optional)) },
+                        placeholder = { Text(context.getString(R.string.select_card_or_unbind)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
                         modifier = Modifier
                             .menuAnchor()
@@ -723,7 +726,7 @@ private fun ChatHistoryBatchSelectorCard(
                         onDismissRequest = { dropdownExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("移除角色卡绑定") },
+                            text = { Text(context.getString(R.string.remove_character_card_binding)) },
                             onClick = {
                                 targetIsUnbind = true
                                 selectedTargetName = null
@@ -732,7 +735,7 @@ private fun ChatHistoryBatchSelectorCard(
                         )
                         if (characterCards.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text("暂无可用角色卡", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                text = { Text(context.getString(R.string.no_available_character_cards_dropdown), color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 enabled = false,
                                 onClick = {}
                             )
@@ -814,7 +817,7 @@ private fun ChatHistoryBatchSelectorCard(
                         enabled = selectedChatIds.isNotEmpty(),
                         modifier = Modifier.align(Alignment.CenterVertically)
                     ) {
-                        Text("取消选择")
+                        Text(context.getString(R.string.cancel_selection))
                     }
                 }
             }
@@ -828,6 +831,7 @@ private fun ChatHistorySelectableRow(
     selected: Boolean,
     onSelectionChange: (Boolean) -> Unit
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -842,23 +846,22 @@ private fun ChatHistorySelectableRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = history.title.ifBlank { "未命名对话" },
+                text = history.title.ifBlank { context.getString(R.string.unnamed_conversation) },
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             val subtitle = buildString {
-                history.group?.let {
-                    append("分组：$it")
+                history.group?.let { group ->
+                    append(context.getString(R.string.group_label, group))
                     append(" · ")
                 }
-                append(
-                    if (history.characterCardName.isNullOrBlank()) {
-                        "未绑定角色卡"
-                    } else {
-                        "角色卡：${history.characterCardName}"
-                    }
-                )
+                val cardInfo = if (history.characterCardName.isNullOrBlank()) {
+                    context.getString(R.string.unbound_character_card)
+                } else {
+                    context.getString(R.string.character_card_label, history.characterCardName)
+                }
+                append(cardInfo)
             }
             Text(
                 text = subtitle,

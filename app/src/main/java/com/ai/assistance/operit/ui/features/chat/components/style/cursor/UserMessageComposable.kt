@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -75,6 +76,7 @@ import androidx.compose.ui.res.stringResource
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColor: Color) {
+    val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -113,7 +115,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
                 ) {
                     Icon(
                         imageVector = Icons.Default.Reply,
-                        contentDescription = "回复",
+                        contentDescription = context.getString(R.string.reply),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(12.dp)
                     )
@@ -144,7 +146,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
             ) {
                 // Display image links as tags
                 imageLinks.forEach { imageLink ->
-                    val displayText = if (imageLink.bitmap != null) "图片" else "图片 (已过期)"
+                    val displayText = if (imageLink.bitmap != null) context.getString(R.string.image) else context.getString(R.string.image_expired)
                     AttachmentTag(
                         attachment = AttachmentData(
                             id = imageLink.id,
@@ -289,7 +291,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "关闭",
+                                contentDescription = context.getString(R.string.close),
                                 tint =
                                 MaterialTheme.colorScheme
                                     .onSurface
@@ -345,7 +347,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
                             showContentPreview.value = false
                         },
                         modifier = Modifier.align(Alignment.End)
-                    ) { Text("复制内容") }
+                    ) { Text(context.getString(R.string.copy_content)) }
                 }
             }
         }
@@ -461,7 +463,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
                     val bytes = Base64.decode(imageData.base64, Base64.DEFAULT)
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 } catch (e: Exception) {
-                    android.util.Log.e("UserMessageComposable", "解码图片失败: $id", e)
+                    android.util.Log.e("UserMessageComposable", "Failed to decode image: $id", e)
                     null
                 }
                 imageLinks.add(ImageLinkData(id, bitmap))
@@ -646,7 +648,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
         )
     } catch (e: Exception) {
         // 如果解析失败，返回原始内容
-        android.util.Log.e("UserMessageComposable", "解析消息内容失败", e)
+        android.util.Log.e("UserMessageComposable", "Failed to parse message content", e)
         return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo, imageLinks)
     }
 }
@@ -668,6 +670,7 @@ private fun AttachmentTag(
     backgroundColor: Color,
     onClick: (AttachmentData) -> Unit = {}
 ) {
+    val context = LocalContext.current
     // 根据附件类型选择图标
     val icon: ImageVector =
         when {
@@ -682,8 +685,8 @@ private fun AttachmentTag(
     // 根据附件类型调整显示标签
     val displayLabel =
         when {
-            attachment.type == "text/json" && attachment.filename == "screen_content.json" -> "屏幕内容"
-            attachment.type == "application/vnd.workspace-context+xml" -> "工作区"
+            attachment.type == "text/json" && attachment.filename == "screen_content.json" -> context.getString(R.string.screen_content)
+            attachment.type == "application/vnd.workspace-context+xml" -> context.getString(R.string.workspace)
             else -> attachment.filename
         }
 

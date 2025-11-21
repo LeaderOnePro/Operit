@@ -739,15 +739,15 @@ fun ThemeSettingsScreen() {
                                     fontType = UserPreferencesManager.FONT_TYPE_FILE
                                 )
                             }
-                            Toast.makeText(context, "字体文件已保存 (.$extension)", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.font_file_saved, extension), Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "字体文件保存失败", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.font_file_save_failed), Toast.LENGTH_LONG).show()
                         }
                     } else {
                         // 不是支持的字体格式
                         Toast.makeText(
                             context, 
-                            "不支持的文件格式，请选择 .ttf, .otf 或 .ttc 字体文件",
+                            context.getString(R.string.unsupported_font_format),
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -887,13 +887,13 @@ fun ThemeSettingsScreen() {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "当前角色: ${activeCharacterCard.name}",
+                        text = context.getString(R.string.current_character, activeCharacterCard.name),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "主题设置将自动绑定到此角色卡",
+                        text = context.getString(R.string.theme_auto_bind_character_card),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1762,11 +1762,11 @@ fun ThemeSettingsScreen() {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "启用自定义字体",
+                            text = context.getString(R.string.enable_custom_font),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "使用系统字体或自定义字体文件",
+                            text = context.getString(R.string.use_system_or_custom_font),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1788,7 +1788,7 @@ fun ThemeSettingsScreen() {
 
                     // 字体类型选择
                     Text(
-                        text = "字体类型",
+                        text = context.getString(R.string.font_type_label),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -1808,7 +1808,7 @@ fun ThemeSettingsScreen() {
                                     )
                                 }
                             },
-                            label = { Text("系统字体") }
+                            label = { Text(context.getString(R.string.system_font)) }
                         )
 
                         // 自定义文件按钮
@@ -1822,7 +1822,7 @@ fun ThemeSettingsScreen() {
                                     )
                                 }
                             },
-                            label = { Text("自定义文件") }
+                            label = { Text(context.getString(R.string.custom_font_file)) }
                         )
                     }
 
@@ -1833,7 +1833,7 @@ fun ThemeSettingsScreen() {
                         UserPreferencesManager.FONT_TYPE_SYSTEM -> {
                             // 系统字体选择
                             Text(
-                                text = "选择系统字体",
+                                text = context.getString(R.string.select_system_font),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
@@ -1879,13 +1879,13 @@ fun ThemeSettingsScreen() {
                         UserPreferencesManager.FONT_TYPE_FILE -> {
                             // 自定义字体文件
                             Text(
-                                text = "自定义字体文件",
+                                text = context.getString(R.string.custom_font_file_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
 
                             Text(
-                                text = "支持 .ttf、.otf 和 .ttc 字体文件",
+                                text = context.getString(R.string.font_file_support_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1908,7 +1908,7 @@ fun ThemeSettingsScreen() {
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("选择字体文件")
+                                    Text(context.getString(R.string.select_font_file))
                                 }
 
                                 if (!customFontPathInput.isNullOrEmpty()) {
@@ -1929,7 +1929,7 @@ fun ThemeSettingsScreen() {
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("清除字体")
+                                        Text(context.getString(R.string.clear_font))
                                     }
                                 }
                             }
@@ -1937,7 +1937,7 @@ fun ThemeSettingsScreen() {
                             if (!customFontPathInput.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "当前字体文件:\n${customFontPathInput?.substringAfterLast("/") ?: ""}",
+                                    text = context.getString(R.string.current_font_file_path, customFontPathInput?.substringAfterLast("/") ?: ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(top = 4.dp)
@@ -1949,7 +1949,7 @@ fun ThemeSettingsScreen() {
                     // 添加字体大小调整滑块
                     Divider(modifier = Modifier.padding(vertical = 16.dp))
                     Text(
-                        text = "字体大小缩放 (${String.format("%.1f", fontScaleInput)}x)",
+                        text = context.getString(R.string.font_size_scale_label, String.format("%.1f", fontScaleInput)),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )

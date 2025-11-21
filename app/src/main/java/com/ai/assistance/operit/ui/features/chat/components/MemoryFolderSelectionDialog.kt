@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryRepository
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.common.rememberLocal
 import com.ai.assistance.operit.ui.features.memory.screens.FolderExpandedState
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +89,7 @@ fun MemoryFolderSelectionDialog(
                 isLoading = false
             } catch (e: Exception) {
                 Log.e("MemoryFolderDialog", "Failed to load folders", e)
-                errorMessage = "加载文件夹失败: ${e.message}"
+                errorMessage = context.getString(R.string.load_folder_failed, e.message)
                 isLoading = false
             }
         }
@@ -97,7 +98,7 @@ fun MemoryFolderSelectionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("选择记忆文件夹")
+            Text(context.getString(R.string.select_memory_folder))
         },
         text = {
             Column(
@@ -106,7 +107,7 @@ fun MemoryFolderSelectionDialog(
                     .height(400.dp)
             ) {
                 Text(
-                    text = "选择一个或多个文件夹，AI将能够在其中检索相关记忆",
+                    text = context.getString(R.string.select_memory_folder_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -127,7 +128,7 @@ fun MemoryFolderSelectionDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = errorMessage ?: "未知错误",
+                                text = errorMessage ?: context.getString(R.string.unknown_error),
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
@@ -138,7 +139,7 @@ fun MemoryFolderSelectionDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "暂无记忆文件夹\n请先在记忆管理中创建文件夹",
+                                text = context.getString(R.string.no_memory_folder),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -189,12 +190,12 @@ fun MemoryFolderSelectionDialog(
                 },
                 enabled = selectedFolders.isNotEmpty()
             ) {
-                Text("确定 (${selectedFolders.size})")
+                Text(context.getString(R.string.confirm_with_count, selectedFolders.size))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(context.getString(R.string.cancel))
             }
         }
     )
@@ -250,6 +251,7 @@ private fun FolderTreeItem(
     onToggleSelection: () -> Unit,
     onToggleExpanded: () -> Unit
 ) {
+    val context = LocalContext.current
     val indent = (node.level * 20).dp
     
     Row(
@@ -271,7 +273,7 @@ private fun FolderTreeItem(
                     } else {
                         Icons.Default.KeyboardArrowRight
                     },
-                    contentDescription = if (isExpanded) "折叠" else "展开",
+                    contentDescription = if (isExpanded) context.getString(R.string.collapse) else context.getString(R.string.expand),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
@@ -335,8 +337,8 @@ private fun buildFolderTree(folderPaths: List<String>): List<FolderNode> {
     val rootNodes = mutableListOf<FolderNode>()
     val nodeMap = mutableMapOf<String, FolderNode>()
     
-    // 过滤掉"未分类"
-    val validPaths = folderPaths.filter { it != "未分类" && it.isNotBlank() }
+    // 过滤掉空路径和"未分类"
+    val validPaths = folderPaths.filter { it.isNotBlank() && it != "未分类" }
     
     // 遍历每个路径，自动创建所有中间节点
     validPaths.forEach { path ->

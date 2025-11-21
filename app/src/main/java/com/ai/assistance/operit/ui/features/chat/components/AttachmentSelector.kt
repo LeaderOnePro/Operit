@@ -50,7 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.services.core.AttachmentDelegate
 import kotlinx.coroutines.Dispatchers
@@ -173,14 +175,14 @@ fun AttachmentSelectorPanel(
                     // 照片选项
                     AttachmentOption(
                             icon = Icons.Default.Image,
-                            label = "照片",
+                            label = context.getString(R.string.attachment_photo),
                             onClick = { imagePickerLauncher.launch("image/*") }
                     )
 
                     // 拍照选项
                     AttachmentOption(
                             icon = Icons.Default.PhotoCamera,
-                            label = "拍照",
+                            label = context.getString(R.string.attachment_camera),
                             onClick = {
                                 val uri = getTmpFileUri(context)
                                 tempCameraUri = uri
@@ -191,7 +193,7 @@ fun AttachmentSelectorPanel(
                     // 记忆选项
                     AttachmentOption(
                             icon = Icons.Default.Memory,
-                            label = "记忆",
+                            label = context.getString(R.string.attachment_memory),
                             onClick = { 
                                 onAttachMemory()
                                 onDismiss()
@@ -201,7 +203,7 @@ fun AttachmentSelectorPanel(
                     // 音频选项
                     AttachmentOption(
                             icon = Icons.Default.AudioFile,
-                            label = "音频",
+                            label = context.getString(R.string.attachment_audio),
                             onClick = { imagePickerLauncher.launch("audio/*") }
                     )
                 }
@@ -217,14 +219,14 @@ fun AttachmentSelectorPanel(
                     // 文件选项
                     AttachmentOption(
                         icon = Icons.Default.Description,
-                        label = "文件",
+                        label = context.getString(R.string.attachment_file),
                         onClick = { filePickerLauncher.launch("*/*") }
                     )
 
                     // 屏幕内容选项
                     AttachmentOption(
                             icon = Icons.Default.ScreenshotMonitor,
-                            label = "屏幕内容",
+                            label = context.getString(R.string.attachment_screen_content),
                             onClick = {
                                 onAttachScreenContent()
                                 onDismiss()
@@ -234,7 +236,7 @@ fun AttachmentSelectorPanel(
                     // 当前通知选项
                     AttachmentOption(
                             icon = Icons.Default.Notifications,
-                            label = "当前通知",
+                            label = context.getString(R.string.attachment_notifications),
                             onClick = {
                                 onAttachNotifications()
                                 onDismiss()
@@ -244,7 +246,7 @@ fun AttachmentSelectorPanel(
                     // 当前位置选项
                     AttachmentOption(
                             icon = Icons.Default.LocationOn,
-                            label = "当前位置",
+                            label = context.getString(R.string.attachment_location),
                             onClick = {
                                 onAttachLocation()
                                 onDismiss()
@@ -300,6 +302,7 @@ private fun AttachmentOption(icon: ImageVector, label: String, onClick: () -> Un
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier =
                     Modifier.clickable(onClick = onClick)
+                            .width(70.dp)
                             .padding(horizontal = 8.dp, vertical = 8.dp)
     ) {
         // 图标区域 - 改为圆角方形
@@ -328,7 +331,9 @@ private fun AttachmentOption(icon: ImageVector, label: String, onClick: () -> Un
         Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
         )
     }
 }

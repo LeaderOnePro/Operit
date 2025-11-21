@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
@@ -50,18 +51,19 @@ fun CharacterCardAssignDialog(
     onConfirm: () -> Unit,
     inProgress: Boolean
 ) {
+    val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("归类到角色卡") },
+        title = { Text(context.getString(R.string.assign_to_character_card_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "共有 $missingChatCount 条聊天记录未绑定角色卡。请选择要归类到的目标角色卡：",
+                    text = context.getString(R.string.unbound_chats_select_card, missingChatCount),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (characterCards.isEmpty()) {
                     Text(
-                        text = "暂无可用角色卡，请先创建一个角色卡。",
+                        text = context.getString(R.string.no_cards_create_first),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -90,12 +92,12 @@ fun CharacterCardAssignDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("归类")
+                Text(context.getString(R.string.assign_action))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !inProgress) {
-                Text("取消")
+                Text(context.getString(R.string.cancel))
             }
         }
     )

@@ -32,10 +32,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ai.assistance.operit.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -48,6 +50,7 @@ fun CompactToolDisplay(
         modifier: Modifier = Modifier,
         enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
+    val context = LocalContext.current
     // 弹窗状态
     var showDetailDialog by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
@@ -56,7 +59,7 @@ fun CompactToolDisplay(
     // 显示详细内容的弹窗 - 仅在启用弹窗时显示
     if (showDetailDialog && hasParams && enableDialog) {
         ContentDetailDialog(
-            title = "$toolName 调用参数",
+            title = "$toolName ${context.getString(R.string.tool_call_parameters)}",
             content = params,
             icon = getToolIcon(toolName),
             onDismiss = { showDetailDialog = false }
@@ -77,7 +80,7 @@ fun CompactToolDisplay(
         // 工具图标
         Icon(
                 imageVector = getToolIcon(toolName),
-                contentDescription = "工具调用",
+                contentDescription = context.getString(R.string.tool_call),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp)
         )
@@ -125,6 +128,7 @@ fun DetailedToolDisplay(
         modifier: Modifier = Modifier,
         enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
+    val context = LocalContext.current
     // 弹窗状态
     var showDetailDialog by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
@@ -133,7 +137,7 @@ fun DetailedToolDisplay(
     // 显示详细内容的弹窗 - 仅在启用弹窗时显示
     if (showDetailDialog && hasParams && enableDialog) {
         ContentDetailDialog(
-            title = "$toolName 调用参数",
+            title = "$toolName ${context.getString(R.string.tool_call_parameters)}",
             content = params,
             icon = getToolIcon(toolName),
             onDismiss = { showDetailDialog = false }
@@ -167,7 +171,7 @@ fun DetailedToolDisplay(
                 // 工具图标 - 与CompactToolDisplay保持一致的大小和位置
                 Icon(
                         imageVector = getToolIcon(toolName),
-                        contentDescription = "工具调用",
+                        contentDescription = context.getString(R.string.tool_call),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                         modifier = Modifier.size(16.dp)
                 )
@@ -188,7 +192,7 @@ fun DetailedToolDisplay(
                 if (hasParams) {
                     val lineCount = remember(params) { params.lines().size }
                     Text(
-                            text = "$lineCount 行",
+                            text = "$lineCount ${context.getString(R.string.lines_count)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )

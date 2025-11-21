@@ -2246,7 +2246,7 @@
     <string name="current_value">Current Value</string>
     <string name="closer_to_edge">Closer to Edge</string>
     <string name="farther_from_edge">Farther from Edge</string>
-    <string name="invalid_value_range">Invalid value. Please enter a number between %.1f and %.1f</string>
+    <string name="invalid_value_range" formatted="false">Invalid value. Please enter a number between %.1f and %.1f</string>
     <string name="reset_to_default">Reset to Default</string>
     <string name="layout_reset_settings">Reset Layout Settings</string>
     <string name="layout_reset_settings_desc">Reset all layout adjustment settings to default values</string>
@@ -2545,6 +2545,7 @@
     <string name="provider_baichuan">Baichuan Models</string>
     <string name="provider_moonshot">Moonshot AI</string>
     <string name="provider_deepseek">Deepseek Models</string>
+    <string name="provider_mistral">Mistral AI (Codestral)</string>
     <string name="provider_siliconflow">SiliconFlow</string>
     <string name="provider_openrouter">OpenRouter (Multi-model Hub)</string>
     <string name="provider_infiniai">InfiniAI</string>
@@ -3172,4 +3173,190 @@
 
     <string name="settings_context_card_title">Setup Instructions:</string>
     <string name="settings_context_card_content">· Context Length: Recommended to set to your daily maximum usage value.\n· Max Context Length: Recommended to set to the maximum value supported by the model API.\nThe software will automatically compress the context when the threshold is reached to prevent exceeding the limit. Note that a larger context is not always better; user cooperation with the software is required.</string>
+
+    <!-- Chat component hardcoded strings -->
+    <string name="reply">Reply</string>
+    <string name="image">Image</string>
+    <string name="image_expired">Image (Expired)</string>
+    <string name="copy_content">Copy Content</string>
+    <string name="user_reply_instruction">User is replying to your previous message:</string>
+    <string name="workspace_status">Workspace Status</string>
+    <string name="workspace">Workspace</string>
+    <string name="history_dialog_summary">History Dialog Summary</string>
+    <string name="confirm_delete_summary">Confirm Delete Summary</string>
+    <string name="confirm_delete_summary_message">Are you sure you want to delete this summary? This action cannot be undone.</string>
+    <string name="tool_execution_result">Tool Execution Result</string>
+    <string name="success">Success</string>
+    <string name="failed">Failed</string>
+    <string name="execution_success">Execution Successful</string>
+    <string name="execution_failed">Execution Failed</string>
+    <string name="copy_result">Copy Result</string>
+    <string name="tool_call_parameters">Call Parameters</string>
+    <string name="tool_call">Tool Call</string>
+    <string name="lines_count">%d lines</string>
+    <string name="edit_message">Edit Message</string>
+    <string name="visual">Visual</string>
+    <string name="plain_text">Plain Text</string>
+    <string name="plain_text_content">Plain Text Content</string>
+    <string name="input_text_content">Enter text content...</string>
+    <string name="text_label">Text</string>
+    <string name="attributes_optional">Attributes (Optional)</string>
+    <string name="content_label">Content</string>
+    <string name="tag_example">e.g: code, image, bold</string>
+    <string name="attributes_example">e.g: id="example" class="test"</string>
+    <string name="new_tag">New Tag</string>
+    <string name="create_new_xml_tag">Create a new XML tag</string>
+    <string name="modify_xml_tag_content">Modify XML tag content</string>
+    <string name="select_memory_folder">Select Memory Folder</string>
+    <string name="select_memory_folder_description">Select one or more folders, AI will be able to retrieve relevant memories from them</string>
+    <string name="load_folder_failed">Failed to load folder: %1$s</string>
+    <string name="no_memory_folder">No memory folders available\nPlease create folders in memory management first</string>
+    <string name="confirm_with_count">Confirm (%1$d)</string>
+    <string name="uncategorized">Uncategorized</string>
+    <string name="link_preview">Link Preview</string>
+    <string name="link_address">Link Address:</string>
+    <string name="no_app_found">No app found to open this link</string>
+    <string name="open_link_failed">Failed to open link: %1$s</string>
+    <string name="visit">Visit</string>
+    <string name="confirm_link_safety">Please confirm the link is safe before visiting</string>
+    <string name="select_export_platform">Select Export Platform</string>
+    <string name="configure_android_app">Configure Android App</string>
+    <string name="configure_windows_app">Configure Windows App</string>
+    <string name="package_name_label">Package Name</string>
+    <string name="app_name_label">App Name</string>
+    <string name="app_icon">App Icon:</string>
+    <string name="click_select_icon">Click to select icon</string>
+    <string name="exporting">Exporting</string>
+    <string name="export_failed">Export Failed</string>
+    <string name="file_saved_to">File saved to:</string>
+    <string name="token_limit_warning">Token Limit Warning</string>
+    <string name="token_limit_warning_message">The message has exceeded the token limit. Continuing to send may result in context loss or AI being unable to understand. Continue?</string>
+    <string name="continue_send">Continue Send</string>
+    <string name="microphone_permission_denied_toast">Microphone permission denied</string>
+    <string name="executing_tool">Executing tool: %1$s</string>
+    <string name="processing_tool_result">Processing tool result: %1$s</string>
+    <string name="input_question_hint">Enter your question...</string>
+    <string name="input_question_with_workspace">Enter question, use @ to reference files</string>
+    <string name="add_attachment">Add Attachment</string>
+    <string name="user_uploaded_image">User uploaded image</string>
+    <string name="decode_image_failed">Failed to decode image: %1$s</string>
+    <string name="parse_message_failed">Failed to parse message content</string>
+    <string name="unknown_tool">Unknown Tool</string>
+    <string name="cancel_reply">Cancel Reply</string>
+    <string name="content_fragment">Content Fragment</string>
+    <string name="add_text">Add Text</string>
+    <string name="add_tag">Add Tag</string>
+    <string name="save_and_resend">Save and Resend</string>
+    <string name="update_memory">Update Memory</string>
+    <string name="chat_message">Chat Message</string>
+    <string name="share_failed_log">Share Failed</string>
+    <string name="generate_image_failed">Failed to generate image: %1$s</string>
+    <string name="start_export">Starting export...</string>
+    <string name="file_operation_error">File operation error: %1$s</string>
+    
+    <!-- Missing translations added -->
+    <string name="bind_character_card">Bind Character Card</string>
+    <string name="unbound_character_card">Unbound</string>
+    <string name="chat_binding_scope_hint">Only affects binding for this conversation, will not modify existing messages</string>
+    <string name="history_filter_role_card">Categorize by Character Card</string>
+    <string name="history_filter_role_card_desc">Character Card - Folder - Conversation three-level classification</string>
+    <string name="history_filter_folder">Categorize by Folder</string>
+    <string name="history_filter_folder_desc">Display as Folder + Conversation (all character cards)</string>
+    <string name="history_filter_current_card">Show Current Character Card Only</string>
+    <string name="history_filter_current_card_desc">Only show folders and conversations under the current character card</string>
+    <string name="history_auto_switch_character">Auto Switch Character Card</string>
+    <string name="history_auto_switch_character_desc">Automatically match bound character card when switching conversations</string>
+    <string name="voice_input">Voice Input</string>
+    <string name="insert_attachment">Insert Attachment</string>
+    <string name="remove_attachment">Remove Attachment</string>
+    <string name="token_limit_exceeded_message">Maximum token limit exceeded (%1$d / %2$d)</string>
+    
+    <!-- Font Settings -->
+    <string name="font_file_saved">Font file saved (.%1$s)</string>
+    <string name="font_file_save_failed">Failed to save font file</string>
+    <string name="unsupported_font_format">Unsupported file format, please select .ttf, .otf or .ttc font file</string>
+    <string name="current_character">Current Character: %1$s</string>
+    <string name="theme_auto_bind_character_card">Theme settings will be automatically bound to this character card</string>
+    <string name="enable_custom_font">Enable Custom Font</string>
+    <string name="use_system_or_custom_font">Use system font or custom font file</string>
+    <string name="font_type_label">Font Type</string>
+    <string name="system_font">System Font</string>
+    <string name="custom_font_file">Custom File</string>
+    <string name="select_system_font">Select System Font</string>
+    <string name="custom_font_file_title">Custom Font File</string>
+    <string name="font_file_support_desc">Supports .ttf, .otf and .ttc font files</string>
+    <string name="select_font_file">Select Font File</string>
+    <string name="clear_font">Clear Font</string>
+    <string name="current_font_file_path">Current font file:\n%1$s</string>
+    <string name="font_size_scale_label">Font Size Scale (%1$s)</string>
+    
+    <!-- Chat History Batch -->
+    <string name="no_available_character_cards_toast">No available character cards, please create one first</string>
+    <string name="please_select_chats_first">Please select chat records first</string>
+    <string name="chats_unbound_from_card">Removed character card binding from %1$d conversations</string>
+    <string name="chats_assigned_to_character">Assigned %1$d conversations to \'%2$s\'</string>
+    <string name="chats_group_updated">Set group to \'%2$s\' for %1$d conversations</string>
+    <string name="batch_update_failed">Batch update failed: %1$s</string>
+    <string name="loading_data_please_wait">Loading data, please wait…</string>
+    <string name="no_chat_stats_to_assign">No chat statistics found to assign</string>
+    <string name="please_select_a_character_card">Please select a character card</string>
+    <string name="assigned_to_character_card">Assigned to character card \'%1$s\'</string>
+    <string name="assign_failed_error">Assignment failed: %1$s</string>
+    <string name="chat_history_overview">Chat History Overview</string>
+    <string name="counting_chat_data">Counting chat data…</string>
+    <string name="no_chat_data_available">No chat data available.</string>
+    <string name="chats_and_messages_count">%1$d conversations · %2$d messages</string>
+    <string name="click_to_assign_to_card">Click to assign to existing character card</string>
+    <string name="search_by_title_group_card">Search by title, group or character card</string>
+    <string name="filter_chat_history">Filter Chat History</string>
+    <string name="no_chat_records_for_batch">No chat records available for batch operations.</string>
+    <string name="no_matching_chats_adjust_filter">No matching chat records, please adjust filter conditions.</string>
+    
+    <!-- Assign Dialog -->
+    <string name="assign_to_character_card_title">Assign to Character Card</string>
+    <string name="unbound_chats_select_card">There are %1$d chat records not bound to a character card. Please select the target character card:</string>
+    <string name="no_cards_create_first">No available character cards, please create one first.</string>
+    <string name="assign_action">Assign</string>
+    <string name="select_all_current_list">Select All in List</string>
+    <string name="target_character_card_optional">Target Character Card (Optional)</string>
+    <string name="select_card_or_unbind">Select a character card or cancel binding</string>
+    <string name="remove_character_card_binding">Remove Character Card Binding</string>
+    <string name="no_available_character_cards_dropdown">No Available Character Cards</string>
+    <string name="cancel_selection">Cancel Selection</string>
+    <string name="character_card_label">Character Card: %1$s</string>
+    <string name="chat_records_label">Chat Records</string>
+    <string name="group_label">Group: %1$s</string>
+    <string name="unnamed_conversation">Unnamed Conversation</string>
+    
+    <!-- Character Selector -->
+    <string name="select_character">Select Character</string>
+    <string name="character_count">%1$d characters</string>
+    
+    <!-- Attachment Selector -->
+    <string name="attachment_photo">Photo</string>
+    <string name="attachment_camera">Camera</string>
+    <string name="attachment_memory">Memory</string>
+    <string name="attachment_audio">Audio</string>
+    <string name="attachment_file">File</string>
+    <string name="attachment_screen_content">Screen Content</string>
+    <string name="attachment_notifications">Notifications</string>
+    <string name="attachment_location">Location</string>
+    <string name="attachments_count">Attachments (%1$d)</string>
+    
+    <!-- Workspace -->
+    <string name="select_file_to_reference">Select file to reference</string>
+    <string name="workspace_directory_invalid">Workspace directory does not exist or is invalid</string>
+    <string name="chat_not_bound_to_workspace">Current chat not bound to workspace</string>
+    <string name="file_browser">File Browser</string>
+    <string name="unbind_workspace_title">Unbind Workspace</string>
+    <string name="unbind">Unbind</string>
+    <string name="unbind_workspace_confirm">Are you sure you want to unbind the workspace for this chat? You will no longer be able to access workspace files and context information.</string>
+    <string name="save_changes_question">Save changes?</string>
+    <string name="file_modified_save_prompt">File \'%1$s\' has been modified, save changes?</string>
+    <string name="dont_save">Don\'t Save</string>
+    <string name="format_code">Format Code</string>
+    <string name="create_default_workspace">Create Default</string>
+    <string name="create_new_workspace_in_app">Create new workspace in app</string>
+    <string name="select_existing_workspace">Select Existing</string>
+    <string name="select_folder_from_device">Select a folder from device</string>
 </resources>

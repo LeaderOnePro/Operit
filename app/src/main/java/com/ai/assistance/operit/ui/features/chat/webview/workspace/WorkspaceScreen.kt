@@ -8,8 +8,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import java.io.File
@@ -41,6 +43,7 @@ fun WorkspaceScreen(
             }
         )
     } else {
+        val context = LocalContext.current
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -49,7 +52,7 @@ fun WorkspaceScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "请先选择或创建一个对话", style = MaterialTheme.typography.headlineMedium)
+            Text(text = context.getString(R.string.please_select_or_create_conversation), style = MaterialTheme.typography.headlineMedium)
         }
     }
 }

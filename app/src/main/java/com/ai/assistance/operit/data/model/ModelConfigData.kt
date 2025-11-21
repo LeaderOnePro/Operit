@@ -15,6 +15,7 @@ enum class ApiProviderType {
         BAICHUAN, // 百川大模型
         MOONSHOT, // 月之暗面大模型
         DEEPSEEK, // Deepseek大模型
+        MISTRAL, // Mistral AI (Codestral等)
         SILICONFLOW, // 硅基流动
         OPENROUTER, // OpenRouter (多模型聚合)
         INFINIAI, // 无问芯穹

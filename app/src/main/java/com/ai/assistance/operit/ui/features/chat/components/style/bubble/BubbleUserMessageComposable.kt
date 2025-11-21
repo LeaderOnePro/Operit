@@ -123,7 +123,7 @@ fun BubbleUserMessageComposable(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Reply,
-                            contentDescription = "回复",
+                            contentDescription = context.getString(R.string.reply),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(12.dp)
                         )
@@ -167,7 +167,7 @@ fun BubbleUserMessageComposable(
                         ) {
                             Image(
                                 bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "用户上传的图片",
+                                contentDescription = context.getString(R.string.user_uploaded_image),
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -177,7 +177,7 @@ fun BubbleUserMessageComposable(
                         AttachmentTag(
                             attachment = AttachmentData(
                                 id = imageLink.id,
-                                filename = "图片 (已过期)",
+                                filename = context.getString(R.string.image_expired),
                                 type = "image/*",
                                 size = 0L,
                                 content = ""
@@ -322,7 +322,7 @@ fun BubbleUserMessageComposable(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "关闭",
+                                contentDescription = context.getString(R.string.close),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -363,7 +363,7 @@ fun BubbleUserMessageComposable(
                         },
                         modifier = Modifier.align(Alignment.End)
                     ) { 
-                        Text("复制内容") 
+                        Text(context.getString(R.string.copy_content)) 
                     }
                 }
             }
@@ -479,7 +479,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
                     val bytes = Base64.decode(imageData.base64, Base64.DEFAULT)
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 } catch (e: Exception) {
-                    Log.e("BubbleUserMessage", "解码图片失败: $id", e)
+                    Log.e("BubbleUserMessage", "Failed to decode image: $id", e)
                     null
                 }
                 imageLinks.add(ImageLinkData(id, bitmap))
@@ -655,7 +655,7 @@ private fun parseMessageContent(content: String): MessageParseResult {
         return MessageParseResult(messageText.toString(), trailingAttachments, replyInfo, imageLinks)
     } catch (e: Exception) {
         // 如果解析失败，返回原始内容
-        android.util.Log.e("BubbleUserMessageComposable", "解析消息内容失败", e)
+        android.util.Log.e("BubbleUserMessageComposable", "Failed to parse message content", e)
         return MessageParseResult(cleanedContent, workspaceAttachments, replyInfo, imageLinks)
     }
 }
@@ -677,6 +677,7 @@ private fun AttachmentTag(
     backgroundColor: Color,
     onClick: (AttachmentData) -> Unit = {}
 ) {
+    val context = LocalContext.current
     // 根据附件类型选择图标
     val icon: ImageVector =
         when {
@@ -690,8 +691,8 @@ private fun AttachmentTag(
     // 根据附件类型调整显示标签
     val displayLabel =
         when {
-            attachment.type == "text/json" && attachment.filename == "screen_content.json" -> "屏幕内容"
-            attachment.type == "application/vnd.workspace-context+xml" -> "工作区"
+            attachment.type == "text/json" && attachment.filename == "screen_content.json" -> context.getString(R.string.screen_content)
+            attachment.type == "application/vnd.workspace-context+xml" -> context.getString(R.string.workspace)
             else -> attachment.filename
         }
 

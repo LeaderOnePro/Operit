@@ -39,12 +39,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ai.assistance.operit.R
 
 /**
  * 消息编辑器组件，用于编辑包含XML标签的消息
@@ -101,6 +103,7 @@ fun MessageEditor(
     onResend: () -> Unit,
     showResendButton: Boolean
 ) {
+    val context = LocalContext.current
     val initialParts = remember(editingMessageContent.value) {
         parseMessageContentForEditor(editingMessageContent.value)
     }
@@ -146,7 +149,7 @@ fun MessageEditor(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        if (showResendButton) "编辑消息" else "修改记忆",
+                        if (showResendButton) context.getString(R.string.edit_message) else context.getString(R.string.modify_memory),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -154,7 +157,7 @@ fun MessageEditor(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { isRawEditMode = !isRawEditMode }) {
-                            Text(if (isRawEditMode) "可视化" else "纯文本")
+                            Text(if (isRawEditMode) context.getString(R.string.visual) else context.getString(R.string.plain_text))
                         }
 
                         IconButton(
@@ -165,7 +168,7 @@ fun MessageEditor(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "取消",
+                                contentDescription = context.getString(R.string.cancel),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -186,7 +189,7 @@ fun MessageEditor(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                            label = { Text("纯文本内容") },
+                            label = { Text(context.getString(R.string.plain_text_content)) },
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = FontFamily.Monospace
                             ),
@@ -210,7 +213,7 @@ fun MessageEditor(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "内容片段",
+                                    context.getString(R.string.content_fragment),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -230,8 +233,8 @@ fun MessageEditor(
                                                 },
                                                 modifier = Modifier
                                                     .fillMaxWidth(),
-                                                label = { Text("文本", style = MaterialTheme.typography.bodySmall) },
-                                                placeholder = { Text("输入文本内容...") },
+                                                label = { Text(context.getString(R.string.text_label), style = MaterialTheme.typography.bodySmall) },
+                                                placeholder = { Text(context.getString(R.string.input_text_content)) },
                                                 shape = RoundedCornerShape(12.dp),
                                                 colors = TextFieldDefaults.outlinedTextFieldColors(
                                                     focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -242,7 +245,7 @@ fun MessageEditor(
                                             )
                                             ActionIconButton(
                                                 icon = Icons.Default.Delete,
-                                                contentDescription = "删除",
+                                                contentDescription = context.getString(R.string.delete),
                                                 onClick = {
                                                     val updatedParts = partsState.toMutableList()
                                                     updatedParts.removeAt(index)
@@ -288,12 +291,12 @@ fun MessageEditor(
                                 ) {
                                     Icon(
                                         Icons.Default.Add,
-                                        contentDescription = "添加文本",
+                                        contentDescription = context.getString(R.string.add_text),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "添加文本",
+                                        context.getString(R.string.add_text),
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
@@ -310,12 +313,12 @@ fun MessageEditor(
                                 ) {
                                     Icon(
                                         Icons.Outlined.Tag,
-                                        contentDescription = "添加标签",
+                                        contentDescription = context.getString(R.string.add_tag),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        "添加标签",
+                                        context.getString(R.string.add_tag),
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
@@ -338,7 +341,7 @@ fun MessageEditor(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
-                            "取消",
+                            context.getString(R.string.cancel),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -355,7 +358,7 @@ fun MessageEditor(
                             )
                         ) {
                             Text(
-                                "保存",
+                                context.getString(R.string.save),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium
                             )
@@ -372,7 +375,7 @@ fun MessageEditor(
                             )
                         ) {
                             Text(
-                                "保存并重发",
+                                context.getString(R.string.save_and_resend),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium
                             )
@@ -389,7 +392,7 @@ fun MessageEditor(
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Text(
-                                "更新记忆",
+                                context.getString(R.string.update_memory),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium
                             )
@@ -427,6 +430,7 @@ private fun XmlTagItem(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val rotationState by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -489,19 +493,19 @@ private fun XmlTagItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ActionIconButton(
                         icon = Icons.Default.Edit,
-                        contentDescription = "编辑",
+                        contentDescription = context.getString(R.string.edit),
                         onClick = onClick
                     )
 
                     ActionIconButton(
                         icon = Icons.Default.Delete,
-                        contentDescription = "删除",
+                        contentDescription = context.getString(R.string.delete),
                         onClick = onDelete
                     )
 
                     Icon(
                         Icons.Default.KeyboardArrowDown,
-                        contentDescription = "展开",
+                        contentDescription = context.getString(R.string.expand),
                         modifier = Modifier
                             .rotate(rotationState)
                             .size(22.dp),
@@ -564,6 +568,7 @@ private fun TagEditorDialog(
     onDismiss: () -> Unit,
     onSave: (ParsedMessagePart) -> Unit
 ) {
+    val context = LocalContext.current
     var tagName by remember { mutableStateOf(part?.tag ?: "") }
     var attributes by remember { mutableStateOf(part?.attributes ?: "") }
     var content by remember { mutableStateOf(part?.content ?: "") }
@@ -587,13 +592,13 @@ private fun TagEditorDialog(
                 ) {
                     Column {
                         Text(
-                            text = if (isNewTag) "新建标签" else "编辑标签",
+                            text = if (isNewTag) context.getString(R.string.new_tag) else context.getString(R.string.edit_tag),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
-                            text = if (isNewTag) "创建一个新的XML标签" else "修改XML标签内容",
+                            text = if (isNewTag) context.getString(R.string.create_new_xml_tag) else context.getString(R.string.modify_xml_tag_content),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp)
@@ -622,8 +627,8 @@ private fun TagEditorDialog(
                 OutlinedTextField(
                     value = tagName,
                     onValueChange = { tagName = it },
-                    label = { Text("标签名", style=MaterialTheme.typography.bodySmall) },
-                    placeholder = { Text("例如: code, image, bold") },
+                    label = { Text(context.getString(R.string.tag_name), style=MaterialTheme.typography.bodySmall) },
+                    placeholder = { Text(context.getString(R.string.tag_example)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     textStyle = MaterialTheme.typography.bodyMedium,
@@ -639,8 +644,8 @@ private fun TagEditorDialog(
                 OutlinedTextField(
                     value = attributes,
                     onValueChange = { attributes = it },
-                    label = { Text("属性 (可选)", style=MaterialTheme.typography.bodySmall) },
-                    placeholder = { Text("例如: id=\"example\" class=\"test\"") },
+                    label = { Text(context.getString(R.string.attributes_optional), style=MaterialTheme.typography.bodySmall) },
+                    placeholder = { Text(context.getString(R.string.attributes_example)) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     textStyle = MaterialTheme.typography.bodyMedium,
@@ -656,7 +661,7 @@ private fun TagEditorDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("内容", style=MaterialTheme.typography.bodySmall) },
+                    label = { Text(context.getString(R.string.content_label), style=MaterialTheme.typography.bodySmall) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp),
@@ -686,7 +691,7 @@ private fun TagEditorDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            "取消",
+                            context.getString(R.string.cancel),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
                         )
@@ -701,7 +706,7 @@ private fun TagEditorDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            "保存",
+                            context.getString(R.string.save),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
                         )

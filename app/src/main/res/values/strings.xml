@@ -2550,6 +2550,7 @@
     <string name="provider_baichuan">百川大模型</string>
     <string name="provider_moonshot">月之暗面大模型</string>
     <string name="provider_deepseek">Deepseek大模型</string>
+    <string name="provider_mistral">Mistral AI (Codestral)</string>
     <string name="provider_siliconflow">硅基流动</string>
     <string name="provider_openrouter">OpenRouter (多模型聚合)</string>
     <string name="provider_infiniai">无问芯穹</string>
@@ -3180,4 +3181,177 @@
 
     <string name="settings_context_card_title">设置说明:</string>
     <string name="settings_context_card_content">· 上下文长度: 建议设为您日常使用的最大值。\n· 最大上下文长度: 建议设为模型API支持的最大值。\n软件会在上下文达到阈值时自动压缩，以防超限。请注意，上下文并非越大越好，需用户与软件协同配合。</string>
+
+    <!-- 聊天组件硬编码字符串 -->
+    <string name="reply">回复</string>
+    <string name="image">图片</string>
+    <string name="image_expired">图片 (已过期)</string>
+    <string name="copy_content">复制内容</string>
+    <string name="user_reply_instruction">用户正在回复你之前的这条消息：</string>
+    <string name="workspace_status">工作区状态</string>
+    <string name="workspace">工作区</string>
+    <string name="history_dialog_summary">历史对话摘要</string>
+    <string name="confirm_delete_summary">确认删除摘要</string>
+    <string name="confirm_delete_summary_message">你确定要删除这条摘要吗？此操作无法撤销。</string>
+    <string name="tool_execution_result">工具执行结果</string>
+    <string name="success">成功</string>
+    <string name="failed">失败</string>
+    <string name="execution_success">执行成功</string>
+    <string name="execution_failed">执行失败</string>
+    <string name="copy_result">复制结果</string>
+    <string name="tool_call_parameters">调用参数</string>
+    <string name="tool_call">工具调用</string>
+    <string name="lines_count">%d 行</string>
+    <string name="edit_message">编辑消息</string>
+    <string name="visual">可视化</string>
+    <string name="plain_text">纯文本</string>
+    <string name="plain_text_content">纯文本内容</string>
+    <string name="input_text_content">输入文本内容...</string>
+    <string name="text_label">文本</string>
+    <string name="attributes_optional">属性 (可选)</string>
+    <string name="content_label">内容</string>
+    <string name="tag_example">例如: code, image, bold</string>
+    <string name="attributes_example">例如: id="example" class="test"</string>
+    <string name="new_tag">新建标签</string>
+    <string name="create_new_xml_tag">创建一个新的XML标签</string>
+    <string name="modify_xml_tag_content">修改XML标签内容</string>
+    <string name="select_memory_folder">选择记忆文件夹</string>
+    <string name="select_memory_folder_description">选择一个或多个文件夹，AI将能够在其中检索相关记忆</string>
+    <string name="load_folder_failed">加载文件夹失败: %1$s</string>
+    <string name="no_memory_folder">暂无记忆文件夹\n请先在记忆管理中创建文件夹</string>
+    <string name="confirm_with_count">确定 (%1$d)</string>
+    <string name="uncategorized">未分类</string>
+    <string name="link_preview">链接预览</string>
+    <string name="link_address">链接地址:</string>
+    <string name="no_app_found">没有找到可以打开此链接的应用</string>
+    <string name="open_link_failed">打开链接失败: %1$s</string>
+    <string name="visit">访问</string>
+    <string name="confirm_link_safety">请确认链接安全后再访问</string>
+    <string name="select_export_platform">选择导出平台</string>
+    <string name="configure_android_app">配置Android应用</string>
+    <string name="configure_windows_app">配置Windows应用</string>
+    <string name="package_name_label">包名</string>
+    <string name="app_name_label">应用名称</string>
+    <string name="app_icon">应用图标:</string>
+    <string name="click_select_icon">点击选择图标</string>
+    <string name="exporting">导出中</string>
+    <string name="export_failed">导出失败</string>
+    <string name="file_saved_to">文件已保存到:</string>
+    <string name="token_limit_warning">Token 超限警告</string>
+    <string name="token_limit_warning_message">消息已超出Token上限，继续发送可能会导致上下文丢失或AI无法理解。是否继续？</string>
+    <string name="continue_send">继续发送</string>
+    <string name="microphone_permission_denied_toast">麦克风权限被拒绝</string>
+    <string name="executing_tool">正在执行工具: %1$s</string>
+    <string name="processing_tool_result">正在处理工具结果: %1$s</string>
+    <string name="input_question_hint">请输入您的问题...</string>
+    <string name="input_question_with_workspace">输入问题，使用@来引用文件</string>
+    <string name="add_attachment">添加附件</string>
+    <string name="user_uploaded_image">用户上传的图片</string>
+    <string name="decode_image_failed">解码图片失败: %1$s</string>
+    <string name="parse_message_failed">解析消息内容失败</string>
+    <string name="unknown_tool">未知工具</string>
+    <string name="cancel_reply">取消回复</string>
+    <string name="content_fragment">内容片段</string>
+    <string name="add_text">添加文本</string>
+    <string name="add_tag">添加标签</string>
+    <string name="save_and_resend">保存并重发</string>
+    <string name="update_memory">更新记忆</string>
+    <string name="chat_message">聊天消息</string>
+    <string name="share_failed_log">分享失败</string>
+    <string name="generate_image_failed">生成图片失败: %1$s</string>
+    <string name="start_export">开始导出...</string>
+    <string name="file_operation_error">文件操作错误: %1$s</string>
+    <string name="voice_input">语音输入</string>
+    <string name="insert_attachment">插入附件</string>
+    <string name="remove_attachment">删除附件</string>
+    <string name="token_limit_exceeded_message">已超出最大Token限制 (%1$d / %2$d)</string>
+    
+    <!-- Font Settings -->
+    <string name="font_file_saved">字体文件已保存 (.%1$s)</string>
+    <string name="font_file_save_failed">字体文件保存失败</string>
+    <string name="unsupported_font_format">不支持的文件格式，请选择 .ttf, .otf 或 .ttc 字体文件</string>
+    <string name="current_character">当前角色: %1$s</string>
+    <string name="theme_auto_bind_character_card">主题设置将自动绑定到此角色卡</string>
+    <string name="enable_custom_font">启用自定义字体</string>
+    <string name="use_system_or_custom_font">使用系统字体或自定义字体文件</string>
+    <string name="font_type_label">字体类型</string>
+    <string name="system_font">系统字体</string>
+    <string name="custom_font_file">自定义文件</string>
+    <string name="select_system_font">选择系统字体</string>
+    <string name="custom_font_file_title">自定义字体文件</string>
+    <string name="font_file_support_desc">支持 .ttf、.otf 和 .ttc 字体文件</string>
+    <string name="select_font_file">选择字体文件</string>
+    <string name="clear_font">清除字体</string>
+    <string name="current_font_file_path">当前字体文件:\n%1$s</string>
+    <string name="font_size_scale_label">字体大小缩放 (%1$s)</string>
+    
+    <!-- Chat History Batch -->
+    <string name="no_available_character_cards_toast">暂无可用角色卡，请先创建一个角色卡</string>
+    <string name="please_select_chats_first">请先选择聊天记录</string>
+    <string name="chats_unbound_from_card">已移除 %1$d 条对话的角色卡绑定</string>
+    <string name="chats_assigned_to_character">已将 %1$d 条对话归类到「%2$s」</string>
+    <string name="chats_group_updated">已将 %1$d 条对话的分组设置为「%2$s」</string>
+    <string name="batch_update_failed">批量更新失败：%1$s</string>
+    <string name="loading_data_please_wait">正在加载数据，请稍候…</string>
+    <string name="no_chat_stats_to_assign">未找到需要归类的聊天统计</string>
+    <string name="please_select_a_character_card">请选择一个角色卡</string>
+    <string name="assigned_to_character_card">已归类到角色卡「%1$s」</string>
+    <string name="assign_failed_error">归类失败：%1$s</string>
+    <string name="chat_history_overview">聊天记录概览</string>
+    <string name="counting_chat_data">正在统计聊天数据…</string>
+    <string name="no_chat_data_available">暂无聊天数据可供统计。</string>
+    <string name="chats_and_messages_count">%1$d 个对话 · %2$d 条消息</string>
+    <string name="click_to_assign_to_card">点击归类到现有角色卡</string>
+    <string name="search_by_title_group_card">按标题、分组或角色卡搜索</string>
+    <string name="filter_chat_history">筛选聊天记录</string>
+    <string name="no_chat_records_for_batch">暂无聊天记录，无法进行批量操作。</string>
+    <string name="no_matching_chats_adjust_filter">没有匹配的聊天记录，请调整筛选条件。</string>
+    
+    <!-- Assign Dialog -->
+    <string name="assign_to_character_card_title">归类到角色卡</string>
+    <string name="unbound_chats_select_card">共有 %1$d 条聊天记录未绑定角色卡。请选择要归类到的目标角色卡：</string>
+    <string name="no_cards_create_first">暂无可用角色卡，请先创建一个角色卡。</string>
+    <string name="assign_action">归类</string>
+    <string name="select_all_current_list">全选当前列表</string>
+    <string name="target_character_card_optional">目标角色卡（可选）</string>
+    <string name="select_card_or_unbind">请选择一个角色卡或取消绑定</string>
+    <string name="remove_character_card_binding">移除角色卡绑定</string>
+    <string name="no_available_character_cards_dropdown">暂无可用角色卡</string>
+    <string name="cancel_selection">取消选择</string>
+    <string name="character_card_label">角色卡：%1$s</string>
+    <string name="chat_records_label">聊天记录</string>
+    <string name="group_label">分组：%1$s</string>
+    <string name="unnamed_conversation">未命名对话</string>
+    
+    <!-- Character Selector -->
+    <string name="select_character">选择角色</string>
+    <string name="character_count">%1$d 个角色</string>
+    
+    <!-- Attachment Selector -->
+    <string name="attachment_photo">照片</string>
+    <string name="attachment_camera">拍照</string>
+    <string name="attachment_memory">记忆</string>
+    <string name="attachment_audio">音频</string>
+    <string name="attachment_file">文件</string>
+    <string name="attachment_screen_content">屏幕内容</string>
+    <string name="attachment_notifications">当前通知</string>
+    <string name="attachment_location">当前位置</string>
+    <string name="attachments_count">附件 (%1$d)</string>
+    
+    <!-- Workspace -->
+    <string name="select_file_to_reference">选择要引用的文件</string>
+    <string name="workspace_directory_invalid">工作区目录不存在或无效</string>
+    <string name="chat_not_bound_to_workspace">当前对话未绑定工作区</string>
+    <string name="file_browser">文件浏览器</string>
+    <string name="unbind_workspace_title">解绑工作区</string>
+    <string name="unbind">解绑</string>
+    <string name="unbind_workspace_confirm">确定要解绑当前聊天的工作区吗？解绑后将无法访问工作区文件和上下文信息。</string>
+    <string name="save_changes_question">保存更改？</string>
+    <string name="file_modified_save_prompt">文件 \'%1$s\' 已修改，是否保存更改？</string>
+    <string name="dont_save">不保存</string>
+    <string name="format_code">格式化代码</string>
+    <string name="create_default_workspace">创建默认</string>
+    <string name="create_new_workspace_in_app">在应用内创建新工作区</string>
+    <string name="select_existing_workspace">选择现有</string>
+    <string name="select_folder_from_device">从设备中选择一个文件夹</string>
 </resources>

@@ -19,8 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
+import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.process.GitIgnoreFilter
 import com.ai.assistance.operit.util.FileUtils
@@ -75,7 +78,8 @@ fun WorkspaceFileSelector(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("选择要引用的文件", style = MaterialTheme.typography.titleMedium)
+                        val context = LocalContext.current
+                        Text(context.getString(R.string.select_file_to_reference), style = MaterialTheme.typography.titleMedium)
                     }
                     // File List
                     LazyColumn(
@@ -111,12 +115,14 @@ fun WorkspaceFileSelector(
                 }
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("工作区目录不存在或无效")
+                    val context = LocalContext.current
+                    Text(context.getString(R.string.workspace_directory_invalid))
                 }
             }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("当前对话未绑定工作区")
+                val context = LocalContext.current
+                Text(context.getString(R.string.chat_not_bound_to_workspace))
             }
         }
     }

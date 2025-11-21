@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ChatHistory
@@ -401,9 +402,9 @@ fun WorkspaceManager(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("文件浏览器", style = MaterialTheme.typography.titleMedium)
+                        Text(context.getString(R.string.file_browser), style = MaterialTheme.typography.titleMedium)
                         IconButton(onClick = { showFileManager = false }) {
-                            Icon(Icons.Default.Close, contentDescription = "关闭")
+                            Icon(Icons.Default.Close, contentDescription = context.getString(R.string.close))
                         }
                     }
 
@@ -465,8 +466,8 @@ fun WorkspaceManager(
         if (showUnbindConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { showUnbindConfirmDialog = false },
-                title = { Text("解绑工作区") },
-                text = { Text("确定要解绑当前聊天的工作区吗？解绑后将无法访问工作区文件和上下文信息。") },
+                title = { Text(context.getString(R.string.unbind_workspace_title)) },
+                text = { Text(context.getString(R.string.unbind_workspace_confirm)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -474,12 +475,12 @@ fun WorkspaceManager(
                             showUnbindConfirmDialog = false
                         }
                     ) {
-                        Text("确定")
+                        Text(context.getString(R.string.confirm_action))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showUnbindConfirmDialog = false }) {
-                        Text("取消")
+                        Text(context.getString(R.string.cancel))
                     }
                 }
             )
@@ -491,8 +492,8 @@ fun WorkspaceManager(
             if (file != null) {
                 AlertDialog(
                     onDismissRequest = { fileToCloseIndex = -1 },
-                    title = { Text("保存更改？") },
-                    text = { Text("文件 '${file.name}' 已修改，是否保存更改？") },
+                    title = { Text(context.getString(R.string.save_changes_question)) },
+                    text = { Text(context.getString(R.string.file_modified_save_prompt, file.name)) },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -501,20 +502,20 @@ fun WorkspaceManager(
                                 confirmCloseFile(fileToCloseIndex)
                             }
                         ) {
-                            Text("保存")
+                            Text(context.getString(R.string.save))
                         }
                     },
                     dismissButton = {
                         Row {
                             TextButton(onClick = { fileToCloseIndex = -1 }) {
-                                Text("取消")
+                                Text(context.getString(R.string.cancel))
                             }
                             TextButton(
                                 onClick = {
                                     confirmCloseFile(fileToCloseIndex)
                                 }
                             ) {
-                                Text("不保存")
+                                Text(context.getString(R.string.dont_save))
                             }
                         }
                     }
@@ -536,6 +537,7 @@ fun ExpandableFabMenu(
     onUnbindClick: () -> Unit,
     canFormat: Boolean = false
 ) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -545,19 +547,19 @@ fun ExpandableFabMenu(
     ) {
         // 展开的菜单项
         if (isExpanded) {
-            FabMenuItem(icon = Icons.Default.Undo, text = "撤销", onClick = onUndoClick)
+            FabMenuItem(icon = Icons.Default.Undo, text = context.getString(R.string.undo), onClick = onUndoClick)
             Spacer(modifier = Modifier.height(12.dp))
-            FabMenuItem(icon = Icons.Default.Redo, text = "重做", onClick = onRedoClick)
+            FabMenuItem(icon = Icons.Default.Redo, text = context.getString(R.string.redo), onClick = onRedoClick)
             Spacer(modifier = Modifier.height(12.dp))
             if (canFormat) {
-                FabMenuItem(icon = Icons.Default.AutoFixHigh, text = "格式化", onClick = onFormatClick)
+                FabMenuItem(icon = Icons.Default.AutoFixHigh, text = context.getString(R.string.format_code), onClick = onFormatClick)
                 Spacer(modifier = Modifier.height(12.dp))
             }
-            FabMenuItem(icon = Icons.Default.Folder, text = "文件", onClick = onFileManagerClick)
+            FabMenuItem(icon = Icons.Default.Folder, text = context.getString(R.string.files), onClick = onFileManagerClick)
             Spacer(modifier = Modifier.height(12.dp))
-            FabMenuItem(icon = Icons.Default.Upload, text = "导出", onClick = onExportClick)
+            FabMenuItem(icon = Icons.Default.Upload, text = context.getString(R.string.export), onClick = onExportClick)
             Spacer(modifier = Modifier.height(12.dp))
-            FabMenuItem(icon = Icons.Default.LinkOff, text = "解绑", onClick = onUnbindClick)
+            FabMenuItem(icon = Icons.Default.LinkOff, text = context.getString(R.string.unbind), onClick = onUnbindClick)
             Spacer(modifier = Modifier.height(16.dp))
         }
 

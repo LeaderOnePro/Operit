@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentUtils
 
@@ -43,9 +45,10 @@ fun AttachmentPreview(
 ) {
     if (attachments.isEmpty()) return
 
+    val context = LocalContext.current
     Column(modifier = modifier) {
         Text(
-                text = "附件 (${attachments.size})",
+                text = context.getString(R.string.attachments_count, attachments.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)

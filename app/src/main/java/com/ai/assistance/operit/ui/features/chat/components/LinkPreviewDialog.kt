@@ -54,7 +54,7 @@ fun LinkPreviewDialog(
             ) {
                 // 标题
                 Text(
-                    text = "链接预览",
+                    text = context.getString(R.string.link_preview),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
@@ -72,7 +72,7 @@ fun LinkPreviewDialog(
                         modifier = Modifier.padding(12.dp)
                     ) {
                         Text(
-                            text = "链接地址:",
+                            text = context.getString(R.string.link_address),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -105,7 +105,7 @@ fun LinkPreviewDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("取消")
+                        Text(context.getString(R.string.cancel))
                     }
                     
                     // 访问按钮
@@ -125,14 +125,14 @@ fun LinkPreviewDialog(
                                 } else {
                                     Toast.makeText(
                                         context,
-                                        "没有找到可以打开此链接的应用",
+                                        context.getString(R.string.no_app_found),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
                             } catch (e: Exception) {
                                 Toast.makeText(
                                     context,
-                                    "打开链接失败: ${e.message ?: "未知错误"}",
+                                    context.getString(R.string.open_link_failed, e.message ?: context.getString(R.string.unknown_error)),
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -145,7 +145,7 @@ fun LinkPreviewDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("访问")
+                        Text(context.getString(R.string.visit))
                     }
                 }
                 
@@ -153,7 +153,7 @@ fun LinkPreviewDialog(
                 
                 // 提示文字
                 Text(
-                    text = "请确认链接安全后再访问",
+                    text = context.getString(R.string.confirm_link_safety),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center

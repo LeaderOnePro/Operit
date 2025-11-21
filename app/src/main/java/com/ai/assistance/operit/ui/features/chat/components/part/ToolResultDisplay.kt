@@ -17,12 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ai.assistance.operit.R
 
 /** 工具执行结果显示组件 简洁风格，显示工具执行结果，无边框，与CompactToolDisplay风格一致 通过缩进和特殊图标区分工具调用和执行结果 支持点击查看详细内容 */
 @Composable
@@ -33,6 +35,7 @@ fun ToolResultDisplay(
         onCopyResult: () -> Unit = {},
         enableDialog: Boolean = true  // 新增参数：是否启用弹窗功能，默认启用
 ) {
+    val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val hasContent = result.isNotBlank()
 
@@ -68,7 +71,7 @@ fun ToolResultDisplay(
         // 子目录箭头图标，表示这是上个工具的执行结果
         Icon(
                 imageVector = Icons.Default.SubdirectoryArrowRight,
-                contentDescription = "工具执行结果",
+                contentDescription = context.getString(R.string.tool_execution_result),
                 tint =
                         if (isSuccess) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                         else MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
@@ -80,7 +83,7 @@ fun ToolResultDisplay(
         // 状态图标
         Icon(
                 imageVector = if (isSuccess) Icons.Default.Check else Icons.Default.Close,
-                contentDescription = if (isSuccess) "成功" else "失败",
+                contentDescription = if (isSuccess) context.getString(R.string.success) else context.getString(R.string.failed),
                 tint =
                         if (isSuccess) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.error,
@@ -91,7 +94,7 @@ fun ToolResultDisplay(
 
         // 结果内容（确保在一行显示）
         Text(
-                text = if (hasContent) result.take(200) else if (isSuccess) "执行成功" else "执行失败",
+                text = if (hasContent) result.take(200) else if (isSuccess) context.getString(R.string.execution_success) else context.getString(R.string.execution_failed),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (!hasContent) FontWeight.Medium else FontWeight.Normal,
                 color =
@@ -113,7 +116,7 @@ fun ToolResultDisplay(
             ) {
                 Icon(
                         imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "复制结果",
+                        contentDescription = context.getString(R.string.copy_result),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                         modifier = Modifier.size(14.dp)
                 )
@@ -131,6 +134,7 @@ private fun ToolResultDetailDialog(
         onDismiss: () -> Unit,
         onCopy: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
@@ -151,7 +155,7 @@ private fun ToolResultDetailDialog(
                     Icon(
                             imageVector =
                                     if (isSuccess) Icons.Default.Check else Icons.Default.Close,
-                            contentDescription = if (isSuccess) "成功" else "失败",
+                            contentDescription = if (isSuccess) context.getString(R.string.success) else context.getString(R.string.failed),
                             tint =
                                     if (isSuccess) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.error,
@@ -162,7 +166,7 @@ private fun ToolResultDetailDialog(
 
                     // 工具名称
                     Text(
-                            text = "$toolName ${if (isSuccess) "执行成功" else "执行失败"}",
+                            text = "$toolName ${if (isSuccess) context.getString(R.string.execution_success) else context.getString(R.string.execution_failed)}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -174,7 +178,7 @@ private fun ToolResultDetailDialog(
                     IconButton(onClick = onCopy) {
                         Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "复制结果",
+                                contentDescription = context.getString(R.string.copy_result),
                                 tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -226,7 +230,7 @@ private fun ToolResultDetailDialog(
                                 ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary
                                 )
-                ) { Text("关闭") }
+                ) { Text(context.getString(R.string.close)) }
             }
         }
     }

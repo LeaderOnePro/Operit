@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.webview.createAndGetDefaultWorkspace
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -62,7 +64,7 @@ fun WorkspaceSetup(chatId: String, onBindWorkspace: (String) -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "设置工作区", // 更改标题
+                text = context.getString(R.string.setup_workspace),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -70,7 +72,7 @@ fun WorkspaceSetup(chatId: String, onBindWorkspace: (String) -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
             
             Text(
-                text = "为您的AI项目提供一个专属的文件环境",
+                text = context.getString(R.string.workspace_description),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -87,8 +89,8 @@ fun WorkspaceSetup(chatId: String, onBindWorkspace: (String) -> Unit) {
             ) {
                 WorkspaceOption(
                     icon = Icons.Default.CreateNewFolder,
-                    title = "创建默认",
-                    description = "在应用内创建新工作区",
+                    title = context.getString(R.string.create_default_workspace),
+                    description = context.getString(R.string.create_new_workspace_in_app),
                     onClick = {
                         val workspaceDir = createAndGetDefaultWorkspace(context, chatId)
                         onBindWorkspace(workspaceDir.absolutePath)
@@ -97,8 +99,8 @@ fun WorkspaceSetup(chatId: String, onBindWorkspace: (String) -> Unit) {
                 
                 WorkspaceOption(
                     icon = Icons.Default.FolderOpen,
-                    title = "选择现有",
-                    description = "从设备中选择一个文件夹",
+                    title = context.getString(R.string.select_existing_workspace),
+                    description = context.getString(R.string.select_folder_from_device),
                     onClick = { showFileBrowser = true }
                 )
             }

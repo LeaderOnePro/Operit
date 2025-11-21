@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,6 +81,7 @@ fun ModelApiSettingsSection(
             ApiProviderType.ZHIPU -> "glm-4.5"
             ApiProviderType.BAICHUAN -> "baichuan4"
             ApiProviderType.MOONSHOT -> "moonshot-v1-128k"
+            ApiProviderType.MISTRAL -> "codestral-latest"
             ApiProviderType.SILICONFLOW -> "yi-1.5-34b"
             ApiProviderType.OPENROUTER -> "google/gemini-pro"
             ApiProviderType.INFINIAI -> "infini-mini"
@@ -177,6 +179,7 @@ fun ModelApiSettingsSection(
                     "https://open.bigmodel.cn/api/paas/v4/chat/completions"
             ApiProviderType.BAICHUAN -> "https://api.baichuan-ai.com/v1/chat/completions"
             ApiProviderType.MOONSHOT -> "https://api.moonshot.cn/v1/chat/completions"
+            ApiProviderType.MISTRAL -> "https://codestral.mistral.ai/v1/chat/completions"
             ApiProviderType.SILICONFLOW -> "https://api.siliconflow.cn/v1/chat/completions"
             ApiProviderType.OPENROUTER -> "https://openrouter.ai/api/v1/chat/completions"
             ApiProviderType.INFINIAI -> "https://cloud.infini-ai.com/maas/v1/chat/completions"
@@ -197,7 +200,7 @@ fun ModelApiSettingsSection(
     LaunchedEffect(selectedApiProvider) {
         Log.d("ModelApiSettingsSection", "API提供商改变")
         if (selectedApiProvider == ApiProviderType.OPENAI || selectedApiProvider == ApiProviderType.GOOGLE
-            || selectedApiProvider == ApiProviderType.ANTHROPIC) {
+            || selectedApiProvider == ApiProviderType.ANTHROPIC || selectedApiProvider == ApiProviderType.MISTRAL) {
             val inChina = LocationUtils.isDeviceInMainlandChina(context)
             showRegionWarning = inChina
             if (inChina) {
@@ -748,6 +751,7 @@ private fun getProviderDisplayName(provider: ApiProviderType, context: android.c
         ApiProviderType.BAICHUAN -> context.getString(R.string.provider_baichuan)
         ApiProviderType.MOONSHOT -> context.getString(R.string.provider_moonshot)
         ApiProviderType.DEEPSEEK -> context.getString(R.string.provider_deepseek)
+        ApiProviderType.MISTRAL -> context.getString(R.string.provider_mistral)
         ApiProviderType.SILICONFLOW -> context.getString(R.string.provider_siliconflow)
         ApiProviderType.OPENROUTER -> context.getString(R.string.provider_openrouter)
         ApiProviderType.INFINIAI -> context.getString(R.string.provider_infiniai)
@@ -962,7 +966,11 @@ private fun SettingsSelectorRow(
                     text = value,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(end = 8.dp)
+                    modifier = Modifier
+                            .padding(end = 8.dp)
+                            .weight(0.5f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
             )
             Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
@@ -1266,6 +1274,7 @@ private fun getProviderColor(provider: ApiProviderType): androidx.compose.ui.gra
         ApiProviderType.BAICHUAN -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f)
         ApiProviderType.MOONSHOT -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
         ApiProviderType.DEEPSEEK -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        ApiProviderType.MISTRAL -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f)
         ApiProviderType.SILICONFLOW -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
         ApiProviderType.OPENROUTER -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
         ApiProviderType.INFINIAI -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
