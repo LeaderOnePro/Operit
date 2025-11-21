@@ -2497,6 +2497,9 @@
     <string name="model_config_name_placeholder">例如: GPT-4配置、Claude配置...</string>
     <string name="create_action">创建</string>
     <string name="new_config_created">新配置已创建</string>
+    <string name="rename_model_config">重命名模型配置</string>
+    <string name="rename_model_config_desc">修改模型配置的名称</string>
+    <string name="config_renamed">配置已重命名</string>
     
     <!-- ModelApiSettingsSection strings -->
     <string name="api_settings">API设置</string>

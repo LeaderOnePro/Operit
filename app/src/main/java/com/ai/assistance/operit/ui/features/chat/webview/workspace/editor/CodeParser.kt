@@ -28,8 +28,12 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
     }
 
     private var language = "javascript"
+    @Volatile
     private var running = false
+    @Volatile
     private var reparse = false
+    @Volatile
+    private var forceFullParse = false
     
     // 当前使用的语言支持
     private var languageSupport = LanguageFactory.getLanguageSupport(language)
@@ -48,6 +52,7 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
     fun parse(start: Int, before: Int, count: Int) {
         if (running) {
             reparse = true
+            forceFullParse = true
             return
         }
         running = true
@@ -72,6 +77,7 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
         }
         
         // 重新解析以应用新的高亮规则
+        forceFullParse = true
         parse(0, 0, codeText.length())
     }
 
@@ -85,10 +91,11 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
             val currentLength = text.length
             val colorArrayLength = codeColors.size
             
-            // 如果文本长度发生了较大变化，或者是首次解析，则完全重新解析
-            if (Math.abs(lastCodeLength - currentLength) > 100 || lastCodeLength == 0) {
+            // 如果文本长度发生了较大变化，或者是首次解析，或者被强制，则完全重新解析
+            if (forceFullParse || Math.abs(lastCodeLength - currentLength) > 100 || lastCodeLength == 0) {
                 // 完全重新解析
                 parseFullText(text, codeColors)
+                forceFullParse = false
             } else {
                 // 增量解析
                 handleIncrementalParse(text, codeColors)
@@ -104,12 +111,12 @@ class CodeParser(private val codeText: ColorsText) : Runnable {
             Log.e(TAG, "解析代码时出错", e)
         }
         
+        running = false
+        
         if (reparse) {
             reparse = false
             parse(start, before, count)
         }
-        
-        running = false
     }
     
     /**

@@ -5,6 +5,7 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ModelConfigScreen(
     onBackPressed: () -> Unit = {},
@@ -67,9 +68,11 @@ fun ModelConfigScreen(
 
     // UI状态
     var showAddConfigDialog by remember { mutableStateOf(false) }
+    var showRenameConfigDialog by remember { mutableStateOf(false) }
     var showSaveSuccessMessage by remember { mutableStateOf(false) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
     var newConfigName by remember { mutableStateOf("") }
+    var renameConfigName by remember { mutableStateOf("") }
     var confirmMessage by remember { mutableStateOf("") }
 
     // 连接测试状态
@@ -216,12 +219,29 @@ fun ModelConfigScreen(
                             }
                         }
 
-                        Row(
+                        FlowRow(
                                 modifier = Modifier.padding(top = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (selectedConfigId != "default") {
+                                TextButton(
+                                        onClick = {
+                                            renameConfigName = selectedConfig.value?.name ?: ""
+                                            showRenameConfigDialog = true
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 12.dp),
+                                        modifier = Modifier.height(36.dp)
+                                ) {
+                                    Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(stringResource(R.string.rename_action), fontSize = 14.sp)
+                                }
+                                
                                 TextButton(
                                         onClick = {
                                             scope.launch {
@@ -535,6 +555,66 @@ fun ModelConfigScreen(
                                 onClick = {
                                     showAddConfigDialog = false
                                     newConfigName = ""
+                                }
+                        ) { Text(stringResource(R.string.cancel_action), fontSize = 13.sp) }
+                    },
+                    shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        // 重命名配置对话框
+        if (showRenameConfigDialog) {
+            AlertDialog(
+                    onDismissRequest = {
+                        showRenameConfigDialog = false
+                        renameConfigName = ""
+                    },
+                    title = {
+                        Text(
+                                stringResource(R.string.rename_model_config),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                    stringResource(R.string.rename_model_config_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                    value = renameConfigName,
+                                    onValueChange = { renameConfigName = it },
+                                    label = { Text(stringResource(R.string.model_config_name), fontSize = 12.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    singleLine = true
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                                onClick = {
+                                    if (renameConfigName.isNotBlank()) {
+                                        scope.launch {
+                                            configManager.updateConfigBase(selectedConfigId, renameConfigName)
+                                            configNameMap[selectedConfigId] = renameConfigName
+                                            showRenameConfigDialog = false
+                                            renameConfigName = ""
+                                            showNotification(context.getString(R.string.config_renamed))
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                        ) { Text(stringResource(R.string.confirm_rename), fontSize = 13.sp) }
+                    },
+                    dismissButton = {
+                        TextButton(
+                                onClick = {
+                                    showRenameConfigDialog = false
+                                    renameConfigName = ""
                                 }
                         ) { Text(stringResource(R.string.cancel_action), fontSize = 13.sp) }
                     },

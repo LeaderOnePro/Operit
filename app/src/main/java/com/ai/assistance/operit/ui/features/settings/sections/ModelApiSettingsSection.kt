@@ -299,7 +299,7 @@ fun ModelApiSettingsSection(
                         apiKeyInput = filteredInput
                         },
                         keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
+                                keyboardType = KeyboardType.Text,
                                 imeAction = ImeAction.Next
                         )
                 )

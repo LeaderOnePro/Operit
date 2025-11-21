@@ -458,7 +458,7 @@ class CodeText : ColorsText {
             val start = selectionStart
             val end = selectionEnd
             if (start == end) {
-                text?.insert(start, "  ")
+                text?.insert(start, "    ")
             }
             return true
         }
@@ -488,7 +488,7 @@ class CodeText : ColorsText {
                     val c = text?.get(start - 1)
                     if (c == '{' || c == '[' || c == '(') {
                         val newStart = selectionStart
-                        text?.insert(newStart, "  ")
+                        text?.insert(newStart, "    ")
                         val afterIndentStart = selectionStart
                         text?.insert(afterIndentStart, "\n$space")
                         setSelection(afterIndentStart)
@@ -499,4 +499,4 @@ class CodeText : ColorsText {
         }
         return super.onKeyDown(keyCode, event)
     }
-} 
+}

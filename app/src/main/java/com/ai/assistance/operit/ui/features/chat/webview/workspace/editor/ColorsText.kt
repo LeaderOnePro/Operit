@@ -508,6 +508,49 @@ open class ColorsText : AppCompatEditText {
             
             val textLength = currentText.length
             
+            // 绘制缩进指引线
+            if (start < textLength) {
+                var indentCount = 0
+                var charPos = start
+                // 计算该行的缩进级别（每4个空格为一个级别）
+                while (charPos < end && charPos < textLength) {
+                    val char = currentText[charPos]
+                    if (char == ' ') {
+                        indentCount++
+                        charPos++
+                    } else {
+                        break
+                    }
+                }
+                
+                // 为每个缩进级别绘制一条虚线
+                val indentLevels = indentCount / 4
+                if (indentLevels > 0) {
+                    val spaceWidth = paint.measureText(" ")
+                    paint.color = 0x80FFFFFF.toInt() // 增强透明度，使虚线更明显
+                    paint.strokeWidth = 2f // 增加线宽
+                    paint.style = Paint.Style.STROKE
+                    
+                    // 使用 PathEffect 创建虚线效果
+                    val dashPath = Path()
+                    for (level in 1..indentLevels) {
+                        val x = left + (level * 4 * spaceWidth)
+                        
+                        // 绘制虚线：更长的线段，更短的间隔
+                        var y = ltop.toFloat()
+                        val dashLength = 8f // 增加虚线段长度
+                        val gapLength = 3f // 减少间隔
+                        
+                        while (y < lbottom) {
+                            canvas.drawLine(x, y, x, (y + dashLength).coerceAtMost(lbottom.toFloat()), paint)
+                            y += dashLength + gapLength
+                        }
+                    }
+                    
+                    paint.style = Paint.Style.FILL
+                }
+            }
+            
             // 绘制文字
             if (start < textLength) {
                 // 计算需要绘制的文字位置

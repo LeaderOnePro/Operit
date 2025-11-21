@@ -1151,6 +1151,9 @@
     <string name="model_config_name_placeholder">ej.: Configuración GPT-4, Configuración Claude...</string>
     <string name="create_action">Crear</string>
     <string name="new_config_created">Nueva Configuración Creada</string>
+    <string name="rename_model_config">Renombrar Configuración de Modelo</string>
+    <string name="rename_model_config_desc">Modificar el nombre de la configuración de modelo</string>
+    <string name="config_renamed">Configuración Renombrada</string>
     
     <!-- ModelApiSettingsSection strings -->
     <string name="api_endpoint_placeholder">ej.: https://api.openai.com/v1/chat/completions</string>

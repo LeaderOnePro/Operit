@@ -33,6 +33,7 @@ import com.ai.assistance.operit.ui.common.rememberLocal
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.features.chat.webview.WebViewHandler
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.CodeEditor
+import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.CodeFormatter
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.LanguageDetector
 import kotlinx.coroutines.launch
 import java.io.File
@@ -430,10 +431,34 @@ fun WorkspaceManager(
             onFileManagerClick = { showFileManager = true },
             onUndoClick = { activeEditor?.undo() },
             onRedoClick = { activeEditor?.redo() },
+            onFormatClick = {
+                // 格式化当前文件
+                val currentFile = openFiles.getOrNull(currentFileIndex)
+                if (currentFile != null) {
+                    val language = LanguageDetector.detectLanguage(currentFile.name)
+                    val formattedCode = CodeFormatter.format(currentFile.content, language)
+                    
+                    // 更新文件内容
+                    val updatedFiles = openFiles.toMutableList()
+                    updatedFiles[currentFileIndex] = currentFile.copy(content = formattedCode)
+                    openFiles = updatedFiles
+                    
+                    // 更新编辑器显示
+                    activeEditor?.replaceAllText(formattedCode)
+                    
+                    // 标记为未保存
+                    unsavedFiles = unsavedFiles + currentFile.path
+                }
+                isFabMenuExpanded = false
+            },
             onUnbindClick = { 
                 showUnbindConfirmDialog = true
                 isFabMenuExpanded = false
-            }
+            },
+            canFormat = openFiles.getOrNull(currentFileIndex)?.let { file ->
+                val language = LanguageDetector.detectLanguage(file.name).lowercase()
+                language in listOf("javascript", "js", "css", "html", "htm")
+            } ?: false
         )
         
         // 解绑确认对话框
@@ -507,7 +532,9 @@ fun ExpandableFabMenu(
     onFileManagerClick: () -> Unit,
     onUndoClick: () -> Unit,
     onRedoClick: () -> Unit,
-    onUnbindClick: () -> Unit
+    onFormatClick: () -> Unit,
+    onUnbindClick: () -> Unit,
+    canFormat: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -522,6 +549,10 @@ fun ExpandableFabMenu(
             Spacer(modifier = Modifier.height(12.dp))
             FabMenuItem(icon = Icons.Default.Redo, text = "重做", onClick = onRedoClick)
             Spacer(modifier = Modifier.height(12.dp))
+            if (canFormat) {
+                FabMenuItem(icon = Icons.Default.AutoFixHigh, text = "格式化", onClick = onFormatClick)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             FabMenuItem(icon = Icons.Default.Folder, text = "文件", onClick = onFileManagerClick)
             Spacer(modifier = Modifier.height(12.dp))
             FabMenuItem(icon = Icons.Default.Upload, text = "导出", onClick = onExportClick)
