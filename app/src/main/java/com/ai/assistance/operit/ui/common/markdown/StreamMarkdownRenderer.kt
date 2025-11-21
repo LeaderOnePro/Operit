@@ -298,7 +298,7 @@ fun StreamMarkdownRenderer(
 
                                 inlineGroup.stream.collect { str ->
                                     // 检查是否为空白内容
-                                    val isCurrentCharNewline = str == "\n" || str == "\r\n"
+                                    val isCurrentCharNewline = str == "\n" || str == "\r\n" || str == "\r"
 
                                     // 处理连续换行符逻辑
                                     if (isCurrentCharNewline) {
@@ -313,8 +313,13 @@ fun StreamMarkdownRenderer(
 
                                     if (lastCharWasNewline) {
                                         // 更新父节点和子节点内容
-                                        newNode.content + ("\n" + str)
-                                        childNode!!.content + ("\n" + str)
+                                        if (newNode.content.isNotEmpty()) {
+                                            newNode.content + ("\n" + str)
+                                            childNode!!.content + ("\n" + str)
+                                        } else {
+                                            newNode.content + str
+                                            childNode!!.content + str
+                                        }
                                         lastCharWasNewline = false
                                     } else {
                                         newNode.content + str
@@ -529,7 +534,7 @@ fun StreamMarkdownRenderer(
 
                                     inlineGroup.stream.collect { str ->
                                         // 检查是否为空白内容
-                                        val isCurrentCharNewline = str == "\n" || str == "\r\n"
+                                        val isCurrentCharNewline = str == "\n" || str == "\r\n" || str == "\r"
 
                                         // 处理连续换行符逻辑
                                         if (isCurrentCharNewline) {
@@ -544,8 +549,13 @@ fun StreamMarkdownRenderer(
 
                                         if (lastCharWasNewline) {
                                             // 更新父节点和子节点内容
-                                            newNode.content + ("\n" + str)
-                                            childNode!!.content + ("\n" + str)
+                                            if (newNode.content.isNotEmpty()) {
+                                                newNode.content + ("\n" + str)
+                                                childNode!!.content + ("\n" + str)
+                                            } else {
+                                                newNode.content + str
+                                                childNode!!.content + str
+                                            }
                                             lastCharWasNewline = false
                                         } else {
                                             newNode.content + str
