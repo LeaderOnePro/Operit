@@ -22,16 +22,6 @@ class LinuxFileSystemTools(context: Context) : StandardFileSystemTools(context) 
         private const val TAG = "LinuxFileSystemTools"
     }
 
-    /** Adds line numbers to a string of content, starting from a specific line number. */
-    private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
-        val lines = content.lines()
-        if (lines.isEmpty()) return ""
-        val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
-        return lines.mapIndexed { index, line ->
-            "${(startLine + index + 1).toString().padStart(maxDigits, ' ')}| $line"
-        }.joinToString("\n")
-    }
-
     /** 列出Linux目录中的文件 */
     override suspend fun listFiles(tool: AITool): ToolResult {
         val path = tool.parameters.find { it.name == "path" }?.value ?: ""

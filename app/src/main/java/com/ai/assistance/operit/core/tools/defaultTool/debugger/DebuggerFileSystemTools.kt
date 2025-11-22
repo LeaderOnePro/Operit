@@ -41,29 +41,6 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
 
     companion object {
         private const val TAG = "DebuggerFileSystemTools"
-        
-        // 使用父类 StandardFileSystemTools 中定义的文件大小限制常量
-        // MAX_FILE_SIZE_BYTES 和 PART_SIZE 可直接通过 StandardFileSystemTools.MAX_FILE_SIZE_BYTES 访问
-    }
-
-    /** Adds line numbers to a string of content. */
-    private fun addLineNumbers(content: String): String {
-        val lines = content.lines()
-        if (lines.isEmpty()) return ""
-        val maxDigits = lines.size.toString().length
-        return lines.mapIndexed { index, line ->
-            "${(index + 1).toString().padStart(maxDigits, ' ')}| $line"
-        }.joinToString("\n")
-    }
-
-    /** Adds line numbers to a string of content, starting from a specific line number. */
-    private fun addLineNumbers(content: String, startLine: Int, totalLines: Int): String {
-        val lines = content.lines()
-        if (lines.isEmpty()) return ""
-        val maxDigits = if (totalLines > 0) totalLines.toString().length else lines.size.toString().length
-        return lines.mapIndexed { index, line ->
-            "${(startLine + index).toString().padStart(maxDigits, ' ')}| $line"
-        }.joinToString("\n")
     }
 
     /** List files in a directory */
@@ -502,7 +479,7 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
             val fileExt = path.substringAfterLast('.', "").lowercase()
 
             // For special types, full read then truncate text is the only way.
-            if (fileExt in listOf("doc", "docx", "pdf", "jpg", "jpeg", "png", "gif", "bmp")) {
+            if (isSpecialFileType(fileExt)) {
                 val fullResult = readFileFull(tool)
                 if (!fullResult.success) return fullResult
 
@@ -607,6 +584,14 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
         }
 
         return try {
+            // 0. 特殊文件类型检查
+            // 如果是Word/PDF/图片等特殊文件，使用父类（StandardFileSystemTools）的逻辑处理
+            // 因为Shell命令(cat/sed)无法正确解析这些二进制格式
+            val fileExt = path.substringAfterLast('.', "").lowercase()
+            if (isSpecialFileType(fileExt)) {
+                 return super.readFilePart(tool)
+            }
+
             // 1. Check if file exists
             val existsResult =
                     AndroidShellExecutor.executeShellCommand(
@@ -698,6 +683,75 @@ open class DebuggerFileSystemTools(context: Context) : AccessibilityFileSystemTo
                     result = StringResultData(""),
                     error = "Error reading file part: ${e.message}"
             )
+        }
+    }
+
+    /**
+     * 重写特殊文件读取逻辑
+     * 对于受保护的路径（如 /Android/data），先通过Shell命令复制到缓存目录，
+     * 再调用父类的解析逻辑。
+     */
+    override suspend fun handleSpecialFileRead(
+        tool: AITool,
+        path: String,
+        fileExt: String
+    ): ToolResult? {
+        val file = File(path)
+        
+        // 如果文件可读，直接使用父类逻辑（更高效）
+        if (file.exists() && file.canRead()) {
+            return super.handleSpecialFileRead(tool, path, fileExt)
+        }
+
+        Log.d(TAG, "File not directly readable (permission restricted), trying Shell copy for: $path")
+        
+        // 创建临时文件用于中转
+        val tempFile = File(context.cacheDir, "shell_copy_${System.currentTimeMillis()}.$fileExt")
+        
+        return try {
+            // 使用cat命令复制文件内容
+            // 注意：使用cat而不是cp，因为cp可能保留权限属性导致仍然无法读取
+            val copyResult = AndroidShellExecutor.executeShellCommand("cat '$path' > '${tempFile.absolutePath}'")
+            
+            if (!copyResult.success) {
+                Log.w(TAG, "Shell copy failed: ${copyResult.stderr}")
+                // 复制失败，回退到父类逻辑（虽然很可能也失败，但能返回一致的错误信息）
+                return super.handleSpecialFileRead(tool, path, fileExt)
+            }
+            
+            // 检查临时文件是否有效
+            if (!tempFile.exists() || tempFile.length() == 0L) {
+                Log.w(TAG, "Temp file is empty or does not exist after copy")
+                return super.handleSpecialFileRead(tool, path, fileExt)
+            }
+
+            // 使用临时文件路径调用父类处理逻辑
+            val tempToolResult = super.handleSpecialFileRead(tool, tempFile.absolutePath, fileExt)
+            
+            // 如果处理成功，修正返回结果中的 path 为原始路径
+            if (tempToolResult != null && tempToolResult.success) {
+                val resultData = tempToolResult.result
+                if (resultData is FileContentData) {
+                    return tempToolResult.copy(
+                        result = resultData.copy(path = path)
+                    )
+                }
+            }
+            
+            tempToolResult
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in shell copy strategy", e)
+            super.handleSpecialFileRead(tool, path, fileExt)
+        } finally {
+            // 清理临时文件
+            try {
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clean up temp file", e)
+            }
         }
     }
 

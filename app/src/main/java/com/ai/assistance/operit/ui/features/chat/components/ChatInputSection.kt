@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
@@ -86,6 +87,7 @@ fun ChatInputSection(
     isWorkspaceOpen: Boolean = false
 ) {
     val showTokenLimitDialog = remember { mutableStateOf(false) }
+    val showFullscreenInput = remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     if (showTokenLimitDialog.value) {
@@ -347,6 +349,17 @@ fun ChatInputSection(
                         MaterialTheme.colorScheme.outline
                     ),
                     shape = RoundedCornerShape(16.dp),
+                    trailingIcon = {
+                        if (userMessage.text.contains("\n")) {
+                            IconButton(onClick = { showFullscreenInput.value = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Fullscreen,
+                                    contentDescription = "Fullscreen input",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
                     enabled = !isProcessing || allowTextInputWhileProcessing
                 )
 
@@ -517,6 +530,15 @@ fun ChatInputSection(
                 userQuery = userMessage.text,
                 onDismiss = { setShowAttachmentPanel(false) }
             )
+
+            if (showFullscreenInput.value) {
+                FullscreenInputDialog(
+                    value = userMessage,
+                    onValueChange = onUserMessageChange,
+                    onDismiss = { showFullscreenInput.value = false },
+                    onConfirm = { showFullscreenInput.value = false }
+                )
+            }
 
         }
     }
